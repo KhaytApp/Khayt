@@ -470,6 +470,10 @@ struct JobDetail: View {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(link, forType: .string)
                             shop.quoteLinkNote = shop.words.callIt("mac.quote_link_copied")
+                            // The customer's own link, copied to be sent: the
+                            // quote has gone out, and a later change of its
+                            // parts asks before moving the price they saw.
+                            await shop.noteQuoteShared(job.id)
                         } else {
                             shop.quoteLinkNote = shop.words.callIt("mac.quote_link_no_server")
                         }

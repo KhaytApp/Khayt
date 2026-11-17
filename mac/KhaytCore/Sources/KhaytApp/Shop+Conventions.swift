@@ -67,7 +67,11 @@ extension Shop {
                 moveProblem = why
             case .paper(let doc, let number):
                 let paper = InvoicePaper(document: doc)
-                await paper.printWithPanel(title: number ?? id, over: window)
+                // A printed quotation is handed to the customer: the quote
+                // has gone out (a no-op for an invoice, or a cancelled panel).
+                if await paper.printWithPanel(title: number ?? id, over: window) {
+                    await noteQuoteShared(id)
+                }
             }
         case .pnl:
             guard permitted("analytics", "view") else { return }

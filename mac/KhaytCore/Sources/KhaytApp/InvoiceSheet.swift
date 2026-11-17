@@ -144,6 +144,9 @@ struct InvoiceSheet: View {
                 try await paper.pdf().write(to: url, options: .atomic)
                 Telemetry.feature(.invoiceExported, in: shop)
                 saved = shop.words.callIt("mac.saved_to") + " " + url.lastPathComponent
+                // A quotation saved as a PDF is a document about to be sent
+                // (a no-op for anything that is not an unsent quote).
+                await shop.noteQuoteShared(subject.id)
             } catch {
                 saved = error.localizedDescription
             }

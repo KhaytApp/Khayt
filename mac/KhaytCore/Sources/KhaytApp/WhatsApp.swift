@@ -119,6 +119,11 @@ extension Shop {
             milestone: milestone, lang: lang) {
             await addCommunication(CommEntry(raw: raw), to: record.client.id, gate: ("orders", "edit"))
         }
+        // A message about a quote, opened in WhatsApp with its text: the
+        // quote has gone out. Here, the one place every such message passes
+        // (the message sheet, a follow-up, the automatic follow-ups), so a
+        // new caller cannot forget it. A no-op for a job that is not a quote.
+        await noteQuoteShared(job.id)
         return nil
     }
 
