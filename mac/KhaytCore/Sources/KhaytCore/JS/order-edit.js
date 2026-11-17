@@ -661,7 +661,7 @@
    * A part already handed to the customer (`delivered`) is fixed whatever the
    * job's state — `applyParts` refuses a change to one or its removal.
    */
-  function partsLock(order) {
+  function partsLock(order, ctx) {
     const none = (code) => ({ code, edit: false, addRemove: false, nameOnly: false, askPrice: false });
     if (!isObj(order)) return none('missing');
     if (present(order.zatcaUuid) || isObj(order.zatcaSubmission)) return none('zatca');
@@ -675,7 +675,7 @@
     if (FROZEN_STATUSES.indexOf(order.status) !== -1 || order.materialDeducted === true) {
       return { code: 'deducted', edit: true, addRemove: false, nameOnly: true, askPrice: false };
     }
-    const draftQuote = order.status === 'quote' && quoteIsDraft(order);
+    const draftQuote = order.status === 'quote' && quoteIsDraft(order, ctx);
     return { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: !draftQuote };
   }
 
@@ -691,12 +691,26 @@
    * stamps quoteSharedAt when it is sent" — and no sign of having been sent:
    * `quoteSharedAt`, `quoteAcceptedAt`, a revision (`quoteRevisions`,
    * `quoteVersion` past 1). Anything else asks.
+   *
+   * A follow-up is a send too (it carries the quote's total, lib/quote-
+   * followup.js markFollowUpPatch), and so is any message to the customer
+   * logged against this job: an entry in its customer's `commLog` with this
+   * job's `orderId` (lib/whatsapp-message.js commEntry). That one needs the
+   * customer, so `ctx` may carry `client` or `clients` (iPhone lane and
+   * Dev Hub, Nov 17). Shared vectors: test/fixtures/quote-draft-vectors.json.
    */
-  function quoteIsDraft(order) {
+  function quoteIsDraft(order, ctx) {
     if (!order || order.quoteShareStamped !== true) return false;
     if (present(order.quoteSharedAt) || present(order.quoteAcceptedAt)) return false;
     if (Array.isArray(order.quoteRevisions) && order.quoteRevisions.length) return false;
     if (+order.quoteVersion > 1) return false;
+    if (present(order.followUpSentAt) || +order.followUpCount > 0) return false;
+    const c = ctxOf(ctx);
+    const client = c.client && typeof c.client === 'object' ? c.client
+      : (Array.isArray(c.clients) && order.clientId != null
+        ? c.clients.find((x) => x && String(x.id) === String(order.clientId)) : null);
+    const log = client && Array.isArray(client.commLog) ? client.commLog : [];
+    if (log.some((e) => e && e.orderId != null && String(e.orderId) === String(order.id))) return false;
     return true;
   }
 
@@ -797,7 +811,7 @@
     const wanted = +m.toFixed(2);
     const was = marginOf(order);
     if (was !== null && Math.abs(was - wanted) < 0.005) return { ok: true, reason: null, changes: {} };
-    const lock = partsLock(order);
+    const lock = partsLock(order, c);
     if (!lock.edit || lock.nameOnly) return { ok: false, reason: lock.code || 'locked', changes: {} };
     const from = pricedFrom(order);
     if (from.typed || !(from.costed > 0)) return { ok: false, reason: 'price_fixed', changes: {} };
@@ -894,7 +908,7 @@
   function applyParts(order, parts, ctx) {
     const c = ctxOf(ctx);
     const refuse = (reason) => ({ ok: false, reason, changes: {}, order });
-    const lock = partsLock(order);
+    const lock = partsLock(order, c);
     if (!lock.edit) return refuse(lock.code);
     const before = partsOf(order);
     const incoming = (Array.isArray(parts) ? parts : []).filter(isObj);
