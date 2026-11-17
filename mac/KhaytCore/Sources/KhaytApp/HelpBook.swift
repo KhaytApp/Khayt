@@ -56,6 +56,7 @@ enum HelpBook {
         "catalogue",
         "inventory",
         "machines",
+        "connected-apps",
         "money",
         "reports",
         "cloud",
@@ -65,6 +66,13 @@ enum HelpBook {
         "when-something-is-wrong",
     ]
 
+    /// Articles about a feature that is switched off are not in the book: a
+    /// page explaining Pair a slicer while it is hidden sends the shop looking
+    /// for a button that is not there. On with the flag (`LanConnectorPairing`).
+    static func shown(_ id: String) -> Bool {
+        id != "connected-apps" || LanConnectorPairing.enabled
+    }
+
     /// Every article, in reading order, for a language.
     ///
     /// Falls back to English per ARTICLE rather than per book: a shop reading
@@ -72,7 +80,7 @@ enum HelpBook {
     /// translated yet, and should not be shown an English book because of it
     /// either.
     static func articles(language: String, bundle: Bundle) -> [Article] {
-        order.compactMap { id in
+        order.filter(shown).compactMap { id in
             load(id, language: language, bundle: bundle)
                 ?? (language == "en" ? nil : load(id, language: "en", bundle: bundle))
         }

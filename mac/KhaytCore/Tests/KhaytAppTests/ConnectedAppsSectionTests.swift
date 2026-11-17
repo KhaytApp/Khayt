@@ -30,6 +30,18 @@ struct ConnectedAppsSectionTests {
         #expect(!shop.canSearch, "nothing to search on this screen")
     }
 
+    @Test("the Help article on connected apps is in the book only while Pair a slicer is on")
+    func helpFollowsTheFlag() {
+        LanConnectorPairing.enabledForTests = false
+        defer { LanConnectorPairing.enabledForTests = false }
+        guard !UserDefaults.standard.bool(forKey: "connectorPairing") else { return }
+        #expect(HelpBook.order.contains("connected-apps"))
+        #expect(!HelpBook.shown("connected-apps"))
+        #expect(HelpBook.shown("machines"), "every other article is always there")
+        LanConnectorPairing.enabledForTests = true
+        #expect(HelpBook.shown("connected-apps"))
+    }
+
     @Test("Remove keeps the slicer's waiting files and says how many")
     func removeKeepsFiles() async throws {
         let shop = Shop()
