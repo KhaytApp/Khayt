@@ -44,6 +44,7 @@ extension Shop {
             slicerUploads.insert(item, at: 0)
         } catch is SlicerInbox.Duplicate {
             refreshSlicerInbox()
+            slicerDuplicate = name
         }
     }
 
@@ -54,10 +55,15 @@ extension Shop {
     /// server to answer.
     func receiveConnectorUpload(_ file: URL, name: String, origin: SlicerOrigin) async throws -> SlicerUpload {
         guard let root = slicerInboxRoot else { throw CocoaError(.fileWriteNoPermission) }
-        let item = try await Self.fileSlicerUpload(file, name: name, root: root, engine: engine, origin: origin)
-        slicerUploads.removeAll { $0.id == item.id }
-        slicerUploads.insert(item, at: 0)
-        return item
+        do {
+            let item = try await Self.fileSlicerUpload(file, name: name, root: root, engine: engine, origin: origin)
+            slicerUploads.removeAll { $0.id == item.id }
+            slicerUploads.insert(item, at: 0)
+            return item
+        } catch let same as SlicerInbox.Duplicate {
+            slicerDuplicate = name
+            throw same
+        }
     }
 
     /// Throw one away — the file and its folder, nothing else.

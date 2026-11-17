@@ -142,7 +142,7 @@ struct MarkTests {
     func coversTheShelves() {
         let shelves: [Mark] = [.dashboard, .jobs, .board, .machines, .filament, .library,
                                .catalogue, .calculator, .colour, .giftCards, .portfolio,
-                               .expenses, .waste, .reports, .clients]
+                               .expenses, .waste, .reports, .clients, .connectedApps]
         for shelf in shelves {
             #expect(Mark.allCases.contains(shelf), "\(shelf.rawValue) is missing")
         }

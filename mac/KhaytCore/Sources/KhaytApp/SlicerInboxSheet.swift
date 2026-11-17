@@ -8,7 +8,6 @@ import KhaytCore
 struct SlicerInboxSheet: View {
     @Bindable var shop: Shop
     @Environment(\.dismiss) private var dismiss
-    @State private var busy: String?
 
     var body: some View {
         SheetFrame(width: 520) {
@@ -28,10 +27,7 @@ struct SlicerInboxSheet: View {
             if shop.slicerUploads.isEmpty {
                 Text(shop.words.callIt("mac.su_none")).font(.callout).foregroundStyle(.secondary)
             } else {
-                ForEach(shop.slicerUploads) { item in
-                    row(item)
-                    if item.id != shop.slicerUploads.last?.id { Divider() }
-                }
+                SlicerInboxRows(shop: shop)
             }
         } footer: {
             HStack {
@@ -47,6 +43,31 @@ struct SlicerInboxSheet: View {
         }
     }
 
+    /// "146 g · 4h 32m · PLA · OrcaSlicer", or why there is nothing to say.
+    @MainActor static func figures(_ item: SlicerUpload, words: Words) -> String {
+        var bits: [String] = []
+        if let g = item.grams { bits.append(PrintFigures.weight(g, words)) }
+        if let m = item.minutes { bits.append(PrintFigures.duration(minutes: m, words)) }
+        guard !bits.isEmpty else { return words.callIt("mac.su_no_figures") }
+        if let material = item.material { bits.append(material) }
+        if let slicer = item.slicer { bits.append(slicer) }
+        return bits.joined(separator: " \u{00B7} ")
+    }
+}
+
+/// The inbox's files and their four actions: the sheet and the Connected apps
+/// section show the same rows (one list, one set of rules).
+struct SlicerInboxRows: View {
+    @Bindable var shop: Shop
+    @State private var busy: String?
+
+    var body: some View {
+        ForEach(shop.slicerUploads) { item in
+            row(item)
+            if item.id != shop.slicerUploads.last?.id { Divider() }
+        }
+    }
+
     private func row(_ item: SlicerUpload) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
@@ -58,7 +79,16 @@ struct SlicerInboxSheet: View {
                     shop.words.say(item.arrived, Date.FormatStyle(date: .abbreviated, time: .shortened)))]))
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Text(Self.figures(item, words: shop.words))
+            // Where it came from, and what a plugin ASKED for (never acted on).
+            HStack(spacing: 6) {
+                Text(Self.source(item, words: shop.words)).font(.caption).foregroundStyle(.secondary)
+                if let asked = Self.asked(item, words: shop.words) {
+                    Text(asked).font(.caption.weight(.medium))
+                        .padding(.horizontal, 6).padding(.vertical, 1)
+                        .background(Capsule().fill(Khayt.brand.opacity(0.12)))
+                }
+            }
+            Text(SlicerInboxSheet.figures(item, words: shop.words))
                 .font(.callout).foregroundStyle(item.grams == nil && item.minutes == nil ? .secondary : .primary)
                 .monospacedDigit()
             HStack(spacing: 8) {
@@ -87,15 +117,25 @@ struct SlicerInboxSheet: View {
         }
     }
 
-    /// "146 g · 4h 32m · PLA · OrcaSlicer", or why there is nothing to say.
-    @MainActor static func figures(_ item: SlicerUpload, words: Words) -> String {
-        var bits: [String] = []
-        if let g = item.grams { bits.append(PrintFigures.weight(g, words)) }
-        if let m = item.minutes { bits.append(PrintFigures.duration(minutes: m, words)) }
-        guard !bits.isEmpty else { return words.callIt("mac.su_no_figures") }
-        if let material = item.material { bits.append(material) }
-        if let slicer = item.slicer { bits.append(slicer) }
-        return bits.joined(separator: " \u{00B7} ")
+    /// "From OrcaSlicer on Studio PC", or the OctoPrint path.
+    @MainActor static func source(_ item: SlicerUpload, words: Words) -> String {
+        guard item.source == "connector" else { return words.callIt("mac.su_from_octo") }
+        let name = ConnectedApps.name(item.connectorName ?? "", words)
+        return words.callIt("mac.su_from_app", ["name": .string(name)])
+    }
+
+    /// What a paired plugin asked for: shown, never done (inbox-first).
+    @MainActor static func asked(_ item: SlicerUpload, words: Words) -> String? {
+        guard case .object(let s)? = item.suggested, case .string(let intent)? = s["intent"] else { return nil }
+        switch intent {
+        case "quote": return words.callIt("mac.su_asked_quote")
+        case "job": return words.callIt("mac.su_asked_job")
+        case "print": return words.callIt("mac.su_asked_print")
+        case "attach":
+            guard case .string(let job)? = s["jobId"] else { return nil }
+            return words.callIt("mac.su_asked_attach", ["job": .string(job)])
+        default: return nil
+        }
     }
 }
 

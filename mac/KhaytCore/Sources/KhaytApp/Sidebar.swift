@@ -132,6 +132,14 @@ struct Sidebar: View {
                         count: shop.expenses.count, selected: shop.shelf == .expenses)
                         .tag(Shop.Shelf.expenses)
                 }
+                // The slicers paired with this Mac and what they sent. The
+                // count is files WAITING (news), nothing when there are none.
+                if shop.canShow(.connectedApps) {
+                    Row(title: shop.words.callIt("mac.apps_title"), mark: .connectedApps,
+                        count: shop.slicerUploads.isEmpty ? nil : shop.slicerUploads.count,
+                        selected: shop.shelf == .connectedApps)
+                        .tag(Shop.Shelf.connectedApps)
+                }
             } header: { eyebrow("mac.group_floor") }
             // ── MONEY: what it is worth ───────────────────────────────
             Section {

@@ -218,6 +218,9 @@ final class LanServer {
         /// (`LanServer+Connector`): beside the inbox, never in the book. Nil
         /// keeps them in memory only.
         var sliceFolder: URL? = nil
+        /// A slicer plugin announced a file whose bytes are already waiting in
+        /// the inbox (`LanServer+Connector`): the shop is told, nothing is added.
+        var slicerDuplicateSeen: @MainActor (_ name: String) -> Void = { _ in }
         /// What is waiting in the inbox now — for a plugin's dedupe and the
         /// inbox's state, never its contents.
         var slicerInbox: @MainActor () -> [SlicerUpload] = { [] }
@@ -3221,6 +3224,7 @@ extension Shop {
             return try await self.receiveConnectorUpload(file, name: name, origin: origin)
         }
         host.slicerInbox = { [weak self] in self?.slicerUploads ?? [] }
+        host.slicerDuplicateSeen = { [weak self] name in self?.slicerDuplicate = name }
         if let root = slicerInboxRoot {
             host.sliceFolder = SlicerInbox.sliceRecords(root: root)
             host.slicerScratch = SlicerInbox.incoming(root: root)

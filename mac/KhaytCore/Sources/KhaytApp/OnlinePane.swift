@@ -382,7 +382,9 @@ struct OnlinePane: View {
                     // it reveals (`LanConnectorPairing.enabled`).
                     if LanConnectorPairing.enabled {
                         Divider()
-                        ConnectedApps(shop: shop)
+                        // Only a pointer now: slicers have a section of their
+                        // own (Floor ▸ Connected apps, `ConnectedAppsScreen`).
+                        ConnectedAppsPointer(shop: shop)
                     }
 
                     // ── WHAT THE STOREFRONT WAS LAST TOLD ─────────────────
