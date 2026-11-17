@@ -5,7 +5,7 @@
     ],
     "swapCount": 0,
     "slotsKnown": true,
-    "reader": 3,
+    "reader": 4,
     "paintSlots": [
       4
     ]
@@ -18,7 +18,7 @@
     ],
     "swapCount": 0,
     "slotsKnown": true,
-    "reader": 3,
+    "reader": 4,
     "paintSlots": [
       1,
       2,
@@ -32,7 +32,7 @@
     ],
     "swapCount": 1,
     "slotsKnown": true,
-    "reader": 3,
+    "reader": 4,
     "paintSlots": [
       1
     ]
@@ -45,11 +45,27 @@
     ],
     "swapCount": 0,
     "slotsKnown": true,
-    "reader": 3,
+    "reader": 4,
     "paintSlots": [
       1,
       2,
       5
+    ]
+  },
+  "painted-two-members.3mf": {
+    "hexes": [
+      "#222222",
+      "#333333",
+      "#666666",
+      "#777777"
+    ],
+    "swapCount": 0,
+    "slotsKnown": true,
+    "reader": 4,
+    "paintSlots": [
+      2,
+      3,
+      7
     ]
   }
 }

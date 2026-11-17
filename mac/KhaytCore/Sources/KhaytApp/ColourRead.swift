@@ -23,7 +23,8 @@ import KhaytCore
 ///
 /// Most models are not painted. The `.model` members are streamed and
 /// searched for a paint attribute first; only a painted model has its mesh
-/// read, bounded by the converter's paint budget (`Converter.paintInlineLimit`).
+/// read, one member at a time (`slotsByMember`), each bounded by the
+/// converter's paint budget (`Converter.paintInlineLimit`).
 /// A painted model past it, or one that will not read, is `{unread:true}`, and
 /// the rule then names no colours rather than the loaded list.
 enum ColourRead {
@@ -88,10 +89,64 @@ enum ColourRead {
         guard isPainted else { return .object(["slots": .array([])]) }
         // On the studio's engine, not the shop's: seconds of decoding must not
         // hold the actor every screen's rules wait on.
-        guard let studio = await Studio.engine(),
-              let read = try? await Converter.describeOffMain(url, bindMeshes: true),
-              let slots = try? await studio.paintSlots(read.described, meshes: read.meshes) else { return unread }
+        guard let studio = await Studio.engine() else { return unread }
+        let slots: [Int]?
+        if entries.contains(where: { $0.name.lowercased().hasSuffix("slic3r_pe_model.config") }) {
+            // A PrusaSlicer multi-volume project: its paint is worked out
+            // across members, so it is read whole or not at all.
+            guard let read = try? await Converter.describeOffMain(url, bindMeshes: true) else { return unread }
+            slots = try? await studio.paintSlots(read.described, meshes: read.meshes)
+        } else {
+            slots = await slotsByMember(url, entries: entries, studio: studio)
+        }
+        guard let slots else { return unread }
         return .object(["slots": .array(slots.map { .number(Double($0)) })])
+    }
+
+    /// The painted slots, read one `.model` member at a time.
+    ///
+    /// ── WHY NOT THE WHOLE FILE ───────────────────────────────────────────────
+    ///
+    /// Read whole, every member's XML is in memory together, and the budget
+    /// (`Converter.paintInlineLimit`, about 900 MB on a 32 GB Mac) is on their
+    /// SUM. A painted project of nineteen parts held 1.3 GB and was refused:
+    /// 7 of one shop's 662 local 3MFs kept the wrong dots after beta.39. Which
+    /// slots a print uses needs a few numbers per object, not the geometry, so
+    /// each member is read, digested (`StudioEngine.paintDigest`) and let go,
+    /// and the budget is now on the LARGEST member. The digests are resolved
+    /// by one rule (`lib/mf-mesh.js slotsUsedFromDigests`), proven to name the
+    /// slots the whole-file read names.
+    ///
+    /// Nil when a member is past the budget, will not come out as text, or
+    /// the rule cannot tell (past the triangle cap).
+    ///
+    /// `memberLimit` and `totalLimit` are parameters so a test can prove the
+    /// refusals without writing gigabytes or touching the shared budgets.
+    /// The total is what `Converter.describe` allows a whole file
+    /// (`rebuildLimit`): a zip can point many entries at the same bytes, so a
+    /// cap per member alone would bound the memory and not the work.
+    static func slotsByMember(_ url: URL, entries: [Zip.Entry], studio: StudioEngine,
+                              memberLimit: Int = Converter.paintInlineLimit,
+                              totalLimit: Int = Converter.rebuildLimit) async -> [Int]? {
+        var digests: [JSONValue] = []
+        var total = 0
+        for entry in entries where entry.name.lowercased().hasSuffix(".model") {
+            guard entry.size <= memberLimit else { return nil }
+            total = total > Int.max - entry.size ? Int.max : total + entry.size
+            guard total <= totalLimit else { return nil }
+            let text: String? = await PinWork.run {
+                guard let data = try? Zip.data(of: entry, in: url, limit: .max) else { return nil }
+                return String(data: data, encoding: .utf8)
+            }
+            guard let text, let digest = try? await studio.paintDigest(name: entry.name, mesh: text) else { return nil }
+            digests.append(digest)
+        }
+        let settings: String = await PinWork.run {
+            guard let e = entries.first(where: { ($0.name.lowercased().split(separator: "/").last ?? "") == "model_settings.config" }),
+                  let d = try? Zip.data(of: e, in: url) else { return "" }
+            return String(decoding: d, as: UTF8.self)
+        }
+        return (try? await studio.paintSlots(digests: digests, modelSettings: settings)) ?? nil
     }
 
     /// The config texts a colour read and the print facts both take.

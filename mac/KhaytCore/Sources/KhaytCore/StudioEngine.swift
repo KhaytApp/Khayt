@@ -739,6 +739,32 @@ public actor StudioEngine {
     }
 
 
+    /// What ONE `.model` member says about the slots a print uses
+    /// (`lib/mf-mesh.js digestModelMember`): per mesh object its triangle
+    /// count, the paint states on it and whether any face keeps its part's
+    /// own filament; per assembly its components; and the build items. A few
+    /// hundred bytes whatever the member's size, so a project is read one
+    /// member at a time and only the largest is ever in memory
+    /// (`paintSlots(digests:modelSettings:)` resolves them).
+    ///
+    /// The XML is BOUND, not passed, for the reason `paintSlots` binds it.
+    public func paintDigest(name: String, mesh: String) throws -> JSONValue {
+        try runtime.withBoundStrings(["__khaytMeshDigest": mesh]) {
+            try runtime.call2("KhaytMfMesh.digestModelMember(ARG0, globalThis.__khaytMeshDigest)",
+                              [.string(name)], as: JSONValue.self)
+        }
+    }
+
+    /// The slots the print uses, from every member's digest in the zip's
+    /// order and the text of `model_settings.config`
+    /// (`lib/mf-mesh.js slotsUsedFromDigests`). The same answer as
+    /// `paintSlots(_:meshes:)` for every file (test/mf-mesh-digests.test.js);
+    /// nil where that one is nil.
+    public func paintSlots(digests: [JSONValue], modelSettings: String) throws -> [Int]? {
+        try runtime.call2("KhaytMfMesh.slotsUsedFromDigests(ARG0, ARG1)",
+                          [.array(digests), .string(modelSettings)], as: [Int]?.self)
+    }
+
     /// The slots a 3MF's paint uses, from its `.model` members (laid out as
     /// `Converter.describe` lays them, the XML bound by name in `meshes`):
     /// `lib/mf-mesh.js` `slotsUsed`, the same codec the desktop reads paint
