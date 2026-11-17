@@ -91,6 +91,8 @@ struct JobSheet: View {
     private var partsChanged: Bool { parts != openedParts }
     private var partsLocked: Bool { lock?.edit == false }
     private var nameOnly: Bool { lock?.nameOnly == true }
+    /// Sent to ZATCA, voided, credited or cancelled: the price stays.
+    private var priceLocked: Bool { Shop.priceShut(lock) }
     private var changed: Bool { form != opened || partsChanged }
 
     var body: some View {
@@ -311,6 +313,7 @@ struct JobSheet: View {
                 HStack(spacing: 4) {
                     TextField("0", text: $form.discount)
                         .textFieldStyle(.roundedBorder).frame(width: 64).monospacedDigit()
+                        .disabled(priceLocked)
                     Text(verbatim: "%").foregroundStyle(.secondary)
                 }
             }
@@ -318,6 +321,7 @@ struct JobSheet: View {
                 label("pe.price_override")
                 TextField(shop.words.callIt("pe.price_override_ph"), text: $form.price)
                     .textFieldStyle(.roundedBorder).frame(width: 110).monospacedDigit()
+                    .disabled(priceLocked)
             }
             GridRow {
                 Color.clear.frame(width: 1, height: 1)
