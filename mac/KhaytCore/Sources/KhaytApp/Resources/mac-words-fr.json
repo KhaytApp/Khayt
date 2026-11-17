@@ -2833,6 +2833,7 @@
  "mac.su_settings_title": "Khayt comme imprimante dans votre trancheur",
  "mac.su_title": "Depuis votre trancheur",
  "mac.su_waiting": "{n} fichiers de votre trancheur",
+ "mac.su_duplicate": "{name} a été renvoyé. Le même fichier est déjà dans la boîte « Du trancheur », il n'a donc pas été ajouté deux fois.",
  "mac.su_waiting_one": "{n} fichier de votre trancheur",
  "mac.sup_vat": "Numéro de TVA",
  "mac.sup_vat_invalid": "Un numéro de TVA saoudien compte 15 chiffres, commençant et finissant par 3.",

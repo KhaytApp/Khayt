@@ -2833,6 +2833,7 @@
  "mac.su_settings_title": "Khayt als Drucker in Ihrem Slicer",
  "mac.su_title": "Von Ihrem Slicer",
  "mac.su_waiting": "{n} Dateien von Ihrem Slicer",
+ "mac.su_duplicate": "{name} wurde erneut gesendet. Dieselbe Datei liegt schon im Eingang „Vom Slicer“, sie wurde daher nicht doppelt hinzugefügt.",
  "mac.su_waiting_one": "{n} Datei von Ihrem Slicer",
  "mac.sup_vat": "Umsatzsteuernummer",
  "mac.sup_vat_invalid": "Eine saudische Umsatzsteuernummer hat 15 Ziffern, beginnend und endend mit 3.",

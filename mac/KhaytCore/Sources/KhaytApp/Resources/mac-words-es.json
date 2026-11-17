@@ -2833,6 +2833,7 @@
  "mac.su_settings_title": "Khayt como impresora en tu laminador",
  "mac.su_title": "Desde tu laminador",
  "mac.su_waiting": "{n} archivos de tu laminador",
+ "mac.su_duplicate": "{name} se envió de nuevo. El mismo archivo ya está en la bandeja «Del laminador», así que no se añadió dos veces.",
  "mac.su_waiting_one": "{n} archivo de tu laminador",
  "mac.sup_vat": "Número de VAT",
  "mac.sup_vat_invalid": "Un número de VAT saudí tiene 15 dígitos, que empiezan y terminan en 3.",

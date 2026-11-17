@@ -2833,6 +2833,7 @@
  "mac.su_settings_title": "スライサー上のプリンターとしてのKhayt",
  "mac.su_title": "スライサーから",
  "mac.su_waiting": "スライサーからのファイル {n} 件",
+ "mac.su_duplicate": "{name} が再送信されました。同じファイルがすでに「スライサーから」受信箱にあるため、二重には追加していません。",
  "mac.su_waiting_one": "スライサーからのファイル {n} 件",
  "mac.sup_vat": "VAT番号",
  "mac.sup_vat_invalid": "サウジのVAT番号は15桁で、最初と最後が3です。",

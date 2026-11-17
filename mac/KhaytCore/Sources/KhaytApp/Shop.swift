@@ -2380,6 +2380,10 @@ final class Shop {
     @ObservationIgnored var quoteFormsInFlight: Set<String> = []
     var showingSlicerInbox = false
     var slicerInboxSaid: String?
+    /// The name of a file a slicer sent again while the same bytes were
+    /// already waiting in the inbox: it is not added twice (one SHA-256 rule
+    /// for every way in), and the window says so until dismissed.
+    var slicerDuplicate: String?
     var slicerInboxProblem: String?
     /// The job or quote to open once the inbox sheet has gone — two sheets
     /// cannot be up at once.

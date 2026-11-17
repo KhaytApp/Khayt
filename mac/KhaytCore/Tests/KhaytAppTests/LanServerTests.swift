@@ -42,6 +42,9 @@ struct LanServerTests {
         let photoCalls = PrinterCalls()
         /// What reached the expense hook: the body's size, once per call.
         let expenseCalls = PrinterCalls()
+        /// Files a slicer plugin announced again while the same bytes waited
+        /// in the inbox: what the shop is told (`slicerDuplicateSeen`).
+        let slicerDuplicates = PrinterCalls()
         var tokens = 0
         /// The phones enrolled here, and the "Pair a phone" window, on the bench clock.
         let devices = LanDevices.inMemory()
@@ -204,6 +207,8 @@ struct LanServerTests {
                     try await Shop.fileSlicerUpload(file, name: name, root: slicerRoot, engine: engine, origin: origin)
                 }
                 host.slicerInbox = { SlicerInbox.list(root: slicerRoot) }
+                let duplicates = self.slicerDuplicates
+                host.slicerDuplicateSeen = { name in duplicates.calls.append(name) }
                 host.sliceFolder = SlicerInbox.sliceRecords(root: slicerRoot)
             }
             let server = LanServer(host: host)

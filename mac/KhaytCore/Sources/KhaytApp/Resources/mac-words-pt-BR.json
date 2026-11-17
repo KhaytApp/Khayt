@@ -2833,6 +2833,7 @@
  "mac.su_settings_title": "O Khayt como impressora no seu fatiador",
  "mac.su_title": "Do seu fatiador",
  "mac.su_waiting": "{n} arquivos do seu fatiador",
+ "mac.su_duplicate": "{name} foi enviado de novo. O mesmo arquivo já está na caixa “Do fatiador”, então não foi adicionado duas vezes.",
  "mac.su_waiting_one": "{n} arquivo do seu fatiador",
  "mac.sup_vat": "Número de IVA",
  "mac.sup_vat_invalid": "Um número de IVA saudita tem 15 dígitos, começando e terminando com 3.",

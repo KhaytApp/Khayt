@@ -2833,6 +2833,7 @@
  "mac.su_settings_title": "让 Khayt 成为你切片软件中的打印机",
  "mac.su_title": "来自你的切片软件",
  "mac.su_waiting": "来自你切片软件的 {n} 个文件",
+ "mac.su_duplicate": "{name} 被再次发送。相同的文件已在“来自切片软件”收件箱中，因此没有重复添加。",
  "mac.su_waiting_one": "来自你切片软件的 {n} 个文件",
  "mac.sup_vat": "增值税号",
  "mac.sup_vat_invalid": "沙特增值税号为 15 位数字，以 3 开头并以 3 结尾。",

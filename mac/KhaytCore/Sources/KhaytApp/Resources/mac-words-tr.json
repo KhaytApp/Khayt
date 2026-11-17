@@ -2833,6 +2833,7 @@
  "mac.su_settings_title": "Dilimleyicinizde Yazıcı Olarak Khayt",
  "mac.su_title": "Dilimleyicinizden",
  "mac.su_waiting": "Dilimleyicinizden {n} dosya",
+ "mac.su_duplicate": "{name} yeniden gönderildi. Aynı dosya zaten “Dilimleyiciden” kutusunda, bu yüzden iki kez eklenmedi.",
  "mac.su_waiting_one": "Dilimleyicinizden {n} dosya",
  "mac.sup_vat": "KDV numarası",
  "mac.sup_vat_invalid": "Suudi KDV numarası 3 ile başlayıp biten 15 hanedir.",
