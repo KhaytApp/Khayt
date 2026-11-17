@@ -1,0 +1,493 @@
+{
+  "about": "lib/order-edit.js applyJobEdit with a parts change: what the job's price becomes. Every app runs these through its own engine, with no markup passed (ctx.marginPct absent), as the Edit Job sheets call it. `want.price` always; `want.priceSource` and `want.computedPrice` where given ('none' = the field is absent or not 'override').",
+  "ctx": {
+    "now": 1800000000000,
+    "id": "e1",
+    "priceId": "e2",
+    "ids": [
+      "P-new"
+    ],
+    "settings": {
+      "currency": "SAR"
+    },
+    "clients": []
+  },
+  "cases": [
+    {
+      "why": "agreed only: the quantity goes 1 to 3, the bill follows",
+      "order": {
+        "id": "J-A1",
+        "status": "pending",
+        "price": 100,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "qty": 1,
+            "agreedPrice": 100
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "qty": 3,
+          "agreedPrice": 100
+        }
+      ],
+      "want": {
+        "price": 300,
+        "priceSource": "none"
+      }
+    },
+    {
+      "why": "agreed only: the agreed price changes",
+      "order": {
+        "id": "J-A2",
+        "status": "pending",
+        "price": 100,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "qty": 1,
+            "agreedPrice": 100
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "qty": 1,
+          "agreedPrice": 150
+        }
+      ],
+      "want": {
+        "price": 150,
+        "priceSource": "none"
+      }
+    },
+    {
+      "why": "agreed only: a second agreed part is added",
+      "order": {
+        "id": "J-A3",
+        "status": "pending",
+        "price": 100,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "qty": 1,
+            "agreedPrice": 100
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "qty": 1,
+          "agreedPrice": 100
+        },
+        {
+          "name": "b",
+          "qty": 1,
+          "agreedPrice": 40
+        }
+      ],
+      "want": {
+        "price": 140,
+        "priceSource": "none"
+      }
+    },
+    {
+      "why": "agreed only: a costed part is added (no markup given: at cost, as before #2523)",
+      "order": {
+        "id": "J-A4",
+        "status": "pending",
+        "price": 100,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "qty": 1,
+            "agreedPrice": 100
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "qty": 1,
+          "agreedPrice": 100
+        },
+        {
+          "name": "b",
+          "qty": 1,
+          "baseCost": 50,
+          "unitCost": 50
+        }
+      ],
+      "want": {
+        "price": 150,
+        "priceSource": "none"
+      }
+    },
+    {
+      "why": "agreed only, a draft quote: the same",
+      "order": {
+        "id": "J-A5",
+        "status": "quote",
+        "quoteShareStamped": true,
+        "price": 100,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "qty": 1,
+            "agreedPrice": 100
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "qty": 3,
+          "agreedPrice": 100
+        }
+      ],
+      "want": {
+        "price": 300,
+        "priceSource": "none"
+      }
+    },
+    {
+      "why": "mixed: agreed 100 and a part costing 80 at 50%; the agreed quantity doubles",
+      "order": {
+        "id": "J-M1",
+        "status": "pending",
+        "price": 220,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "qty": 1,
+            "agreedPrice": 100
+          },
+          {
+            "id": "P2",
+            "name": "c",
+            "qty": 1,
+            "baseCost": 80,
+            "unitCost": 80
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "qty": 2,
+          "agreedPrice": 100
+        },
+        {
+          "id": "P2",
+          "name": "c",
+          "qty": 1,
+          "baseCost": 80,
+          "unitCost": 80
+        }
+      ],
+      "want": {
+        "price": 320,
+        "priceSource": "none"
+      }
+    },
+    {
+      "why": "#2523: a price not built from its parts (none costed, none agreed) stays when a costed part is added, as a typed one",
+      "order": {
+        "id": "J-L1",
+        "status": "pending",
+        "price": 200,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "printWeight": 10,
+            "qty": 1
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "printWeight": 10,
+          "qty": 1
+        },
+        {
+          "name": "b",
+          "qty": 1,
+          "baseCost": 50,
+          "unitCost": 50
+        }
+      ],
+      "want": {
+        "price": 200,
+        "priceSource": "override",
+        "computedPrice": 50
+      }
+    },
+    {
+      "why": "#2523: such a job given an AGREED part keeps the 200 nothing explained and adds what was agreed",
+      "order": {
+        "id": "J-L2",
+        "status": "pending",
+        "price": 200,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "printWeight": 10,
+            "qty": 1
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "printWeight": 10,
+          "qty": 1
+        },
+        {
+          "name": "b",
+          "qty": 1,
+          "agreedPrice": 40
+        }
+      ],
+      "want": {
+        "price": 240,
+        "priceSource": "override",
+        "computedPrice": 40
+      }
+    },
+    {
+      "why": "no price and nothing costed: the new part's cost, as always",
+      "order": {
+        "id": "J-Z1",
+        "status": "pending",
+        "price": 0,
+        "paidAmount": 0,
+        "parts": []
+      },
+      "parts": [
+        {
+          "name": "b",
+          "qty": 1,
+          "baseCost": 50,
+          "unitCost": 50
+        }
+      ],
+      "want": {
+        "price": 50,
+        "priceSource": "none"
+      }
+    },
+    {
+      "why": "cost-plus only: two parts at 50%, a third is added",
+      "order": {
+        "id": "J-C1",
+        "status": "pending",
+        "price": 180,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "A",
+            "name": "A",
+            "qty": 1,
+            "baseCost": 80,
+            "unitCost": 80
+          },
+          {
+            "id": "B",
+            "name": "B",
+            "qty": 1,
+            "baseCost": 40,
+            "unitCost": 40
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "A",
+          "name": "A",
+          "qty": 1,
+          "baseCost": 80,
+          "unitCost": 80
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "qty": 1,
+          "baseCost": 40,
+          "unitCost": 40
+        },
+        {
+          "name": "C",
+          "qty": 1,
+          "baseCost": 20,
+          "unitCost": 20
+        }
+      ],
+      "want": {
+        "price": 210,
+        "priceSource": "none"
+      }
+    },
+    {
+      "why": "agreed 100 and an uncosted part, 300: a costed part is added, the price stays (a typed one now)",
+      "order": {
+        "id": "J-X1",
+        "status": "pending",
+        "price": 300,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "qty": 1,
+            "agreedPrice": 100
+          },
+          {
+            "id": "P0",
+            "name": "u",
+            "printWeight": 10,
+            "qty": 1
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "qty": 1,
+          "agreedPrice": 100
+        },
+        {
+          "id": "P0",
+          "name": "u",
+          "printWeight": 10,
+          "qty": 1
+        },
+        {
+          "name": "b",
+          "qty": 1,
+          "baseCost": 50,
+          "unitCost": 50
+        }
+      ],
+      "want": {
+        "price": 300,
+        "priceSource": "override",
+        "computedPrice": 150
+      }
+    },
+    {
+      "why": "agreed 100 and an uncosted part, 300: the agreed quantity doubles, the agreed share follows and the rest stays",
+      "order": {
+        "id": "J-X2",
+        "status": "pending",
+        "price": 300,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "qty": 1,
+            "agreedPrice": 100
+          },
+          {
+            "id": "P0",
+            "name": "u",
+            "printWeight": 10,
+            "qty": 1
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "qty": 2,
+          "agreedPrice": 100
+        },
+        {
+          "id": "P0",
+          "name": "u",
+          "printWeight": 10,
+          "qty": 1
+        }
+      ],
+      "want": {
+        "price": 400,
+        "priceSource": "override",
+        "computedPrice": 200
+      }
+    },
+    {
+      "why": "agreed 100 and an uncosted part, 300, 10% rush known as an amount: the agreed quantity doubles",
+      "order": {
+        "id": "J-X3",
+        "status": "pending",
+        "price": 330,
+        "rushFeeAmount": 30,
+        "rushFee": 30,
+        "paidAmount": 0,
+        "parts": [
+          {
+            "id": "P1",
+            "name": "a",
+            "qty": 1,
+            "agreedPrice": 100
+          },
+          {
+            "id": "P0",
+            "name": "u",
+            "printWeight": 10,
+            "qty": 1
+          }
+        ]
+      },
+      "parts": [
+        {
+          "id": "P1",
+          "name": "a",
+          "qty": 2,
+          "agreedPrice": 100
+        },
+        {
+          "id": "P0",
+          "name": "u",
+          "printWeight": 10,
+          "qty": 1
+        }
+      ],
+      "want": {
+        "price": 440
+      }
+    }
+  ]
+}
