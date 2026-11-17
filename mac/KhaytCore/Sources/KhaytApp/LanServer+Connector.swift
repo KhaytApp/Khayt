@@ -501,6 +501,7 @@ extension LanServer {
 
         // The same bytes already waiting, whichever way they came in.
         if let held = host.slicerInbox().first(where: { $0.sha256 == sha }) {
+            host.slicerDuplicateSeen(name)
             let mine = connectorSlices.values.first { $0.connectorId == caller.id && $0.inboxId == held.id }
             let sliceId = mine?.id ?? Self.freshSliceId()
             if mine == nil {
