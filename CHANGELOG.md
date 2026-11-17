@@ -9762,6 +9762,33 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.40] - 2026-11-17
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release reads the colours of the largest painted projects, keeps a job's price when its parts were never costed, and never changes a quote's price without asking once the quote has gone out.
+
+### What happens on first launch
+
+- **Khayt reads your Library's 3MF colours once more, in the background.** Beta.39 could not read a few very large painted projects and marked them as read. To reach them, this version reads every 3MF whose file is on this Mac again, one model at a time, while you keep working. A large library takes about half an hour. Nothing else about a model changes.
+- **It needs less memory than beta.39 did.** A painted project is now read one model file at a time, so a very large one uses a few GB for a short time, where before it needed all of its files in memory together.
+
+### New
+
+- **The largest painted projects show their colours.** A painted project with more than about 900 MB of model data was too large to read, and its card kept too few dots. These are read now.
+- **The iPhone shows a model's filament swaps on shop Wi-Fi.** The Mac sends each model's swap count to the phone, and whether a slicer counted it.
+
+### Fixed
+
+- **A job's price no longer drops when you add a part to a job whose earlier parts had no cost.** Jobs taken from a phone or app, a subscription, an inventory sale or an older book were priced some other way. Adding a costed part used to bring the price down to that part's cost: a 200 job given a 50 part became 50. The price now stays, as a typed price, with the worked-out figure beside it.
+- **A quote that has gone out is never re-priced without asking.** Changing the parts of a quote moves its price by itself only while Khayt knows the quote is a draft nobody has been sent. Once it has gone out, or if it came from an older version that did not record sending, Khayt asks first: keep the price the customer saw, or use the new one. A quote you followed up, or messaged the customer about, counts as sent.
+- **Four more ways of sending a quote are recorded as sending it:** Copy quote link on the job, saving the quotation as a PDF, printing it, and any WhatsApp message about the quote. Before, a quote sent one of these ways still looked like a draft.
+
+### Known in this beta
+
+- **Pairing a slicer plugin is still hidden** (Settings → Online → Connected apps) until the plugin is ready.
+
 ## [4.0.0-beta.39] - 2026-11-16
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
