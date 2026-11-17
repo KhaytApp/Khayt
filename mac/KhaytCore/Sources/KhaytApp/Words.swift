@@ -6583,6 +6583,7 @@ final class Words {
         "mac.su_gone": ["en": "That file is no longer in the inbox.",
                         "ar": "لم يعد هذا الملف في صندوق الوارد."],
         "mac.su_waiting": ["en": "{n} files from your slicer", "ar": "{n} ملف من برنامج التقطيع"],
+        "mac.su_duplicate": ["en": "{name} was sent again. The same file is already in the From slicer inbox, so it was not added twice.", "ar": "أُرسل {name} مرة أخرى. الملف نفسه موجود في صندوق «من برنامج التقطيع»، فلم يُضَف مرتين."],
         "mac.su_waiting_one": ["en": "{n} file from your slicer", "ar": "ملف واحد من برنامج التقطيع"],
         "mac.su_waiting_two": ["en": "{n} files from your slicer", "ar": "ملفان من برنامج التقطيع"],
         "mac.su_waiting_few": ["en": "{n} files from your slicer", "ar": "{n} ملفات من برنامج التقطيع"],
