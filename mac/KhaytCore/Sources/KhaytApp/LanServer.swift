@@ -2421,7 +2421,10 @@ final class LanServer {
             // delivery must be tried again, not refused as a replay for the
             // life of the replay window.
             forgetSeen(provided)
-            return .json(400, Self.errorBody(String(describing: error)))
+            // Not the error itself: its words can carry a path, a store field or
+            // a library's internals, and this answer goes to whoever called
+            // (beta.40 full review). The provider retries either way.
+            return .json(400, Self.errorBody("The event could not be recorded"))
         }
     }
 
@@ -2494,7 +2497,10 @@ final class LanServer {
             return .json(200, #"{"ok":true}"#)
         } catch {
             forgetSeen(provided)   // see storefrontHook: a failed delivery was never taken
-            return .json(400, Self.errorBody(String(describing: error)))
+            // Not the error itself: its words can carry a path, a store field or
+            // a library's internals, and this answer goes to whoever called
+            // (beta.40 full review). The provider retries either way.
+            return .json(400, Self.errorBody("The event could not be recorded"))
         }
     }
 
