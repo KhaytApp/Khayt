@@ -62,6 +62,7 @@ extension Shop {
         if !fields.isEmpty {
             let r = try await engine.applyJobEdit(
                 order: order, fields: fields, clients: clients, settings: settings, keepPrice: save.keepPrice,
+                marginPct: Self.markupForAddedParts(order, settings: settings),
                 priceSeenOk: save.priceSeenOk,
                 newPartIds: uids("PRT", count: save.parts?.count ?? 0),
                 now: now, editId: uid("edit"), priceId: uid("edit"))
@@ -83,6 +84,33 @@ extension Shop {
         return out
     }
 
+    /// The markup a costed part added to this job is priced at, where the job
+    /// itself cannot say: a job priced WHOLLY from agreed prices has no
+    /// cost-plus share to take a markup from, and with none passed the rule
+    /// charged a costed part at its bare cost (beta.40 review). The shop's
+    /// default markup, then.
+    ///
+    /// ONLY for such a job. Passed for any other, it would override #2523's
+    /// rule that a price nothing explains (parts with no cost on record)
+    /// stays as it is: a 200 job given a 50 part would drop to 65. A job
+    /// that has any part with no agreed price gets none, and the rule judges
+    /// it as before.
+    nonisolated static func markupForAddedParts(_ order: JSONValue,
+                                                settings: [String: JSONValue]) -> Double? {
+        guard case .array(let parts)? = asObject(order)?["parts"], !parts.isEmpty else { return nil }
+        let allAgreed = parts.allSatisfy { row in
+            guard case .object(let p) = row, let v = p["agreedPrice"] else { return false }
+            switch v {
+            case .number(let n): return n >= 0
+            case .string(let s): return Double(s).map { $0 >= 0 } ?? false
+            default: return false
+            }
+        }
+        guard allAgreed else { return nil }
+        if case .number(let m)? = settings["defaultMargin"], m >= 0 { return m }
+        return 30
+    }
+
     /// Every reason the combined edit can refuse with, in the shop's words:
     /// the parts rule's, the customer rule's (`customer.` prefixed, since
     /// `zatca` means a different sentence there), and the paid guard.
@@ -99,8 +127,24 @@ extension Shop {
     /// Part does it (`partEditCost`, its own rates and spool rule), and a new
     /// one costed and written as a new job's parts are (`partRows`). A part
     /// taken off in the sheet is simply not in `drafts`.
-    func partsForSave(_ orderId: Order.ID, drafts: [JobSheet.PartDraft]) async -> [JSONValue] {
+    ///
+    /// A part ADDED here takes the price the job's customer agreed for it
+    /// (`clientId`: the customer the sheet shows, which may be one chosen in
+    /// this same edit), as New Job does; before, it was billed at cost plus
+    /// markup (beta.40 review). The agreement is in the shop's currency and a
+    /// job in another one holds its figures in its own, so it is divided by
+    /// the job's rate, as `newOrder` does (`lib/order-new.js priced`).
+    func partsForSave(_ orderId: Order.ID, drafts: [JobSheet.PartDraft],
+                      clientId: String? = nil) async -> [JSONValue] {
         var out: [JSONValue] = []
+        let added = drafts.filter { d in !(d.storedId.map { rawPart(orderId, partId: $0, at: d.storedIndex) != nil } ?? false) }
+        let agreements = await agreedPrices(for: added.map(\.name), clientId: clientId)
+        var agreedByName: [String: Double] = [:]
+        for (d, price) in zip(added, agreements) { if let price { agreedByName[d.name] = price } }
+        let fx: Double = {
+            guard let row = orderRow(orderId), case .number(let r)? = Self.asObject(row)?["fxRate"], r > 0 else { return 1 }
+            return r
+        }()
         for d in drafts {
             let now = d.fields
             if let stored = d.storedId, var raw = rawPart(orderId, partId: stored, at: d.storedIndex) {
@@ -134,11 +178,21 @@ extension Shop {
                 fresh.grams = d.grams; fresh.hours = d.hours; fresh.qty = d.qty
                 fresh.cost = costed?.cost ?? 0
                 fresh.rates = costed?.rates
+                if let agreed = agreedByName[d.name] {
+                    fresh.agreedPrice = Self.inJobCurrency(agreed, fxRate: fx)
+                }
                 out += Self.partRows([fresh], spools: spools, reclaimsTax: reclaimsTax,
                                      unnamed: words.callIt("mac.a_part"))
             }
         }
         return out
+    }
+
+    /// A shop-currency figure as the job holds it: divided by its rate, to
+    /// the cent (`lib/order-new.js toJob`).
+    nonisolated static func inJobCurrency(_ amount: Double, fxRate: Double) -> Double {
+        guard fxRate > 0, fxRate != 1 else { return amount }
+        return ((amount / fxRate) * 100).rounded() / 100
     }
 
     /// What the sheet's save WOULD do, without writing: the job as it would
