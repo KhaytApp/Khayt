@@ -64,6 +64,8 @@ extension LanServer {
         "all": .init(limit: 600, window: 3600),
         "announce": .init(limit: 30, window: 3600),
         "file": .init(limit: 30, window: 3600),
+        // The tab polls every 15 s while visible, 60 s hidden, with an ETag.
+        "queue": .init(limit: 1, window: 10),
     ]
 
     nonisolated static let connectorSealSalt = "khayt-connector-seal-v1"
@@ -223,7 +225,7 @@ extension LanServer {
     // MARK: - Paths
 
     enum ConnectorPath: Equatable {
-        case pair, me, slices, slice(String), sliceFile(String), unknown
+        case pair, me, slices, slice(String), sliceFile(String), queue, unknown
     }
 
     /// Exact shapes only, never a prefix match. Nil when not a connector path.
@@ -233,6 +235,7 @@ extension LanServer {
         if rest == "pair" || rest.hasPrefix("pair/") { return .pair }
         if rest == "self" { return .me }
         if rest == "slices" { return .slices }
+        if rest == "queue" { return .queue }
         let parts = rest.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         if parts.count == 2, parts[0] == "slices", plausibleSliceId(parts[1]) { return .slice(parts[1]) }
         if parts.count == 3, parts[0] == "slices", plausibleSliceId(parts[1]), parts[2] == "file" {
@@ -391,6 +394,7 @@ extension LanServer {
         case .slices: allowed = ["POST"]
         case .slice: allowed = ["GET"]
         case .sliceFile: allowed = ["PUT"]
+        case .queue: allowed = ["GET"]
         }
         guard allowed.contains(method) else {
             var r = Response.json(405, #"{"ok":false,"reason":"method"}"#)
@@ -425,6 +429,9 @@ extension LanServer {
             answer = await connectorAnnounce(request, path: path, caller: caller)
         case (.slice(let sliceId), _):
             answer = connectorSliceState(sliceId, caller: caller)
+        case (.queue, _):
+            if let limited = connectorRate(caller.id, "queue") { return signedReply(limited, for: caller) }
+            answer = await connectorQueue(request, path: path, caller: caller)
         default:
             answer = await connectorNotFound()
         }
@@ -530,6 +537,35 @@ extension LanServer {
             answer["intentHonoured"] = .bool(false)
         }
         return .json(201, Self.jsonText(answer))
+    }
+
+    /// `GET /api/connectors/queue`: the redacted queue (`lib/connector-queue.js`:
+    /// job number, stage, machine, and the file THIS connector sent — never a
+    /// title, a client, a price or a note), sealed, with an ETag over
+    /// everything but its time. `If-None-Match` that still holds is a 304.
+    func connectorQueue(_ request: Request, path: String, caller: ConnectorCaller) async -> Response {
+        let store = host.store()
+        let shop = (try? await host.engine.lanQuoteShopName(store: .object(store))) ?? "Khayt"
+        guard let pair = try? await host.engine.connectorQueue(
+                book: .object(store), connectorId: caller.id, nowMs: host.now().timeIntervalSince1970 * 1000,
+                shopName: shop, inboxWaiting: host.slicerInbox().count),
+              pair.count == 2 else {
+            return .json(500, #"{"ok":false,"reason":"queue"}"#)
+        }
+        let etag = "\"" + String(Self.hex(SHA256.hash(data: Data(pair[1].utf8))).prefix(32)) + "\""
+        if let asked = request.headers["if-none-match"],
+           asked.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }).contains(etag) {
+            var r = Response(status: 304, headers: [:], body: Data())
+            r.headers["ETag"] = etag
+            return r
+        }
+        let key = Self.sealKey(caller.key, connectorId: caller.id)
+        guard let sealed = Self.seal(Data(pair[0].utf8), key: key, aad: Self.sealAad(method: "GET", path: path)) else {
+            return .json(500, #"{"ok":false,"reason":"seal"}"#)
+        }
+        var r = Response(status: 200, headers: ["Content-Type": "application/json"], body: sealed)
+        r.headers["ETag"] = etag
+        return r
     }
 
     nonisolated static func isoTime(_ date: Date) -> String {
