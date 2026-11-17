@@ -62,7 +62,7 @@ extension Shop {
         if !fields.isEmpty {
             let r = try await engine.applyJobEdit(
                 order: order, fields: fields, clients: clients, settings: settings, keepPrice: save.keepPrice,
-                marginPct: Self.markupForAddedParts(order, settings: settings),
+                marginPct: await Self.markupForAddedParts(order, settings: settings, engine: engine),
                 priceSeenOk: save.priceSeenOk,
                 newPartIds: uids("PRT", count: save.parts?.count ?? 0),
                 now: now, editId: uid("edit"), priceId: uid("edit"))
@@ -95,8 +95,8 @@ extension Shop {
     /// stays as it is: a 200 job given a 50 part would drop to 65. A job
     /// that has any part with no agreed price gets none, and the rule judges
     /// it as before.
-    nonisolated static func markupForAddedParts(_ order: JSONValue,
-                                                settings: [String: JSONValue]) -> Double? {
+    nonisolated static func markupForAddedParts(_ order: JSONValue, settings: [String: JSONValue],
+                                                engine: KhaytEngine) async -> Double? {
         guard case .array(let parts)? = asObject(order)?["parts"], !parts.isEmpty else { return nil }
         let allAgreed = parts.allSatisfy { row in
             guard case .object(let p) = row, let v = p["agreedPrice"] else { return false }
@@ -107,6 +107,12 @@ extension Shop {
             }
         }
         guard allAgreed else { return nil }
+        // …and the agreements explain the WHOLE price. One agreed at 100 on a
+        // job priced 300 (an old typed or imported record) is a price nothing
+        // explains in part; given a markup, the rule would drop it to 165
+        // when a 50 part is added (beta.40 re-review). Asked of the rule; a
+        // rule that cannot say counts as unexplained.
+        guard let share = try? await engine.unexplainedShare(order), share <= 0.005 else { return nil }
         if case .number(let m)? = settings["defaultMargin"], m >= 0 { return m }
         return 30
     }
