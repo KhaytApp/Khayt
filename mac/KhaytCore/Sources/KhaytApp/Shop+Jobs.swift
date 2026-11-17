@@ -2787,7 +2787,7 @@ extension Shop {
     /// The team's activity log — the same collection, shape and cap Khayt uses.
     /// `actor`: who did it when it was not a person at this Mac — a paired
     /// slicer plugin (`connector:<id>`, its name). Nil: the operator signed in.
-    static func appendActivity(_ root: inout [String: JSONValue], text: String,
+    nonisolated static func appendActivity(_ root: inout [String: JSONValue], text: String,
                                        ref: String, settings: [String: JSONValue],
                                        root snapshot: [String: JSONValue],
                                        action: String = "status",

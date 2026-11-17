@@ -73,17 +73,16 @@ extension Shop {
     /// right now (another Mac has it) gets no line; the file is in the inbox
     /// either way.
     func logSlicerArrival(_ item: SlicerUpload, origin: SlicerOrigin) async {
+        // lock: system — a paired slicer plugin's file arriving through the LAN server (its signature checked there); the only write is one activity row naming it.
         guard let build = source.build else { return }
         let actorName = ConnectedApps.name(origin.connectorName, words)
-        try? await StoreWriter.update(
-            storeURL: build.storeURL,
-            owns: { StoreLock.weOwnIt(build) },
-            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-        ) { root in
+        let text = Self.slicerArrivalText(item.name, plugin: actorName), ref = item.id
+        let actor = (id: "connector:" + origin.connectorId, name: actorName)
+        // Off the main thread, on the write chain: a whole-book write.
+        try? await StoreWriter.updateOffMain(build) { root in
             let snapshot = root
-            Self.appendActivity(&root, text: Self.slicerArrivalText(item.name, plugin: actorName),
-                                ref: item.id, settings: Self.settings(root), root: snapshot,
-                                action: "slicer_inbox", actor: ("connector:" + origin.connectorId, actorName))
+            Self.appendActivity(&root, text: text, ref: ref, settings: Self.settings(root), root: snapshot,
+                                action: "slicer_inbox", actor: actor)
         }
     }
 
