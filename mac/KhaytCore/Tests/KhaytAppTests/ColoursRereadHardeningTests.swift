@@ -20,30 +20,55 @@ struct ColoursRereadHardeningTests {
     @Test("due: an older reader, or a budget smaller than this Mac's")
     func dueByBudget() throws {
         let gb = 1 << 30
-        let current = try Self.file(["id": .string("now"), "coloursReader": .number(4)])
-        let old = try Self.file(["id": .string("old"), "coloursReader": .number(3)])
-        let small = try Self.file(["id": .string("small"), "coloursReader": .number(4),
+        let current = try Self.file(["id": .string("now"), "coloursReader": .number(5)])
+        let old = try Self.file(["id": .string("old"), "coloursReader": .number(4)])
+        let small = try Self.file(["id": .string("small"), "coloursReader": .number(5),
                                    "coloursUnreadBudget": .number(Double(gb / 4))])
-        let same = try Self.file(["id": .string("same"), "coloursReader": .number(4),
+        let same = try Self.file(["id": .string("same"), "coloursReader": .number(5),
                                   "coloursUnreadBudget": .number(Double(gb))])
-        let bigger = try Self.file(["id": .string("bigger"), "coloursReader": .number(4),
+        let bigger = try Self.file(["id": .string("bigger"), "coloursReader": .number(5),
                                     "coloursUnreadBudget": .number(Double(2 * gb))])
-        let due = ColoursReread.due([current, old, small, same, bigger], reader: 4, budget: gb).map(\.id)
+        let due = ColoursReread.due([current, old, small, same, bigger], reader: 5, budget: gb).map(\.id)
         #expect(due == ["old", "small"], "a Mac that can hold more tries again; the same Mac does not every launch")
     }
 
-    @Test("a read's fields: marked past the budget, cleared once named, nothing for any other unread")
+    @Test("a read's fields: budget mark past the budget, file mark for any other unread, both cleared once named")
     func marking() throws {
-        let applied: [String: JSONValue] = ["id": .string("pf1"), "colors": .array([]), "coloursReader": .number(4),
-                                            "coloursUnreadBudget": .number(1)]
-        let colours = KhaytEngine.Colours(colors: [], swapCount: 0, slotsKnown: false, reader: 4)
+        let applied: [String: JSONValue] = ["id": .string("pf1"), "colors": .array([]), "coloursReader": .number(5),
+                                            "coloursUnreadBudget": .number(1), "coloursUnreadFile": .string("old:1")]
+        let colours = KhaytEngine.Colours(colors: [], swapCount: 0, slotsKnown: false, reader: 5)
         var over = ColourRead.Read(colours: colours); over.paintUnread = true; over.overBudget = 500
-        #expect(ColoursReread.marked(applied, read: over)?["coloursUnreadBudget"] == .number(500))
+        let o = ColoursReread.marked(applied, read: over, file: "10:20")
+        #expect(o["coloursUnreadBudget"] == .number(500) && o["coloursUnreadFile"] == nil)
         var other = ColourRead.Read(colours: colours); other.paintUnread = true
-        #expect(ColoursReread.marked(applied, read: other) == nil, "no engine or a throw: not a read, stays due")
-        let named = ColourRead.Read(colours: KhaytEngine.Colours(colors: [], swapCount: 0, slotsKnown: true, reader: 4))
-        #expect(ColoursReread.marked(applied, read: named)?["coloursUnreadBudget"] == nil)
-        #expect(ColoursReread.fields.contains("coloursUnreadBudget"), "the compare-and-set covers the mark")
+        let f = ColoursReread.marked(applied, read: other, file: "10:20")
+        #expect(f["coloursUnreadFile"] == .string("10:20") && f["coloursUnreadBudget"] == nil,
+                "the triangle cap, a member that is not text: marked, not retried every launch")
+        let named = ColourRead.Read(colours: KhaytEngine.Colours(colors: [], swapCount: 0, slotsKnown: true, reader: 5))
+        let n = ColoursReread.marked(applied, read: named, file: "10:20")
+        #expect(n["coloursUnreadBudget"] == nil && n["coloursUnreadFile"] == nil)
+        let failed = ColoursReread.failed(["id": .string("pf1"), "colors": .array([]), "coloursReader": .number(3)],
+                                          reader: 5, file: "10:20")
+        #expect(failed["coloursReader"] == .number(5) && failed["coloursUnreadFile"] == .string("10:20"))
+        #expect(ColoursReread.fields.contains("coloursUnreadBudget") && ColoursReread.fields.contains("coloursUnreadFile"),
+                "the compare-and-set covers both marks")
+    }
+
+    @Test("a file mark makes the record a candidate; the pass skips it while the file is unchanged")
+    func fileMark() throws {
+        let marked = try Self.file(["id": .string("m"), "coloursReader": .number(5), "coloursUnreadFile": .string("10:20")])
+        #expect(ColoursReread.due([marked], reader: 5, budget: 1 << 30).map(\.id) == ["m"])
+        let d = FileManager.default.temporaryDirectory.appending(path: "khayt-sig-\(UUID().uuidString).3mf")
+        try Data("abc".utf8).write(to: d)
+        defer { try? FileManager.default.removeItem(at: d) }
+        let sig = try #require(ColoursReread.signature(d))
+        #expect(sig.hasPrefix("3:"))
+        try Data("abcd".utf8).write(to: d)
+        #expect(ColoursReread.signature(d) != sig, "a changed file is a different signature")
+        let src = MenuCoverageTests.source("ColoursReread.swift")
+        #expect(src.contains("file.coloursUnreadFile == sig"))
+        #expect(src.contains("Date().timeIntervalSince(lastWrite) >= ColoursReread.writeEvery"))
+        #expect(ColoursReread.writeEvery == 120)
     }
 
     @Test("past the budget is told from the entries alone, each at the larger of its sizes")
