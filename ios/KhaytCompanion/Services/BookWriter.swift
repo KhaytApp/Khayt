@@ -151,16 +151,19 @@ struct BookWriter {
             guard case .object(let o) = row, o["status"] == .string("quote") else { throw Refusal.notAQuote }
             let editId = Self.lanId("edit", now: now)
             let priceId = Self.lanId("price", now: now)
+            // The quote's customer is read from these: one they were messaged
+            // about is not a draft (`quoteIsDraft`, #2528).
+            let clients = Self.rows(try book.read(), "clients")
             // Asked of the quote as it is first: a revision kept for a change
             // that changes nothing is a version nobody made, and one the rule
             // refuses (a price below a deposit already paid) keeps nothing.
-            let trial = try await engine.applyJobEdit(order: row, fields: fields, settings: settings,
+            let trial = try await engine.applyJobEdit(order: row, fields: fields, clients: clients, settings: settings,
                                                       priceSeenOk: priceSeenOk,
                                                       now: now, editId: editId, priceId: priceId)
             guard trial.ok else { throw JobEditRefused(reason: trial.reason, step: trial.step) }
             guard trial.changed else { return nil }
             let revised = try await engine.reviseQuote(order: row, now: now)
-            let edited = try await engine.applyJobEdit(order: revised, fields: fields, settings: settings,
+            let edited = try await engine.applyJobEdit(order: revised, fields: fields, clients: clients, settings: settings,
                                                        priceSeenOk: priceSeenOk,
                                                        now: now, editId: editId, priceId: priceId)
             guard edited.ok else { throw JobEditRefused(reason: edited.reason, step: edited.step) }
