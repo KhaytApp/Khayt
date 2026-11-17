@@ -73,3 +73,13 @@ test('a large file is read at its edges: head (Bambu, Cura) and footer (Prusa, O
   const mid = G.parseGcodeText(moves + '; filament used [g] = 9\n' + moves);
   assert.equal(mid.filamentGrams, null);
 });
+
+test('characters whose lowercase is longer do not shift the reading (re-review, Nov 17)', () => {
+  // 'İ' lowercases to two characters, 'ẞ' and final 'Σ' change too; a Turkish
+  // or German object name in PrusaSlicer's footer comes before the summary.
+  for (const pre of ['İ', 'İİ', 'İİİ', 'İİİİİİİİİİ', 'ẞẞ', 'ΣΣ', 'ΌΣΟΣ ', 'İẞΣ'.repeat(50)]) {
+    const text = `; object name = ${pre}\n; estimated printing time (normal mode) = 12h 3m\n`;
+    assert.equal(G.parsePrintTimeMins(text), 723, JSON.stringify(pre));
+    assert.equal(G.parseGcodeText(text).printTimeMins, 723, JSON.stringify(pre));
+  }
+});
