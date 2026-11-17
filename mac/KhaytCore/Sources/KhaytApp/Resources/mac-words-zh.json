@@ -857,7 +857,7 @@
  "mac.gross_short": "毛利",
  "mac.group": "分组",
  "mac.group_example": "沙特国王",
- "mac.group_floor": "底价",
+ "mac.group_floor": "车间",
  "mac.group_hint": "先选择它们，然后选取模型库上方的“分组”，或按住 Control 点按它们。",
  "mac.group_in_parent": "在 {name} 中",
  "mac.group_kind_collection": "独立打印成品",
