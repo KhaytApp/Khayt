@@ -102,7 +102,7 @@ extension Shop {
             guard case .object(let p) = row, let v = p["agreedPrice"] else { return false }
             switch v {
             case .number(let n): return n >= 0
-            case .string(let s): return Double(s).map { $0 >= 0 } ?? false
+            case .string(let s): return TypedNumber.parse(s).map { $0 >= 0 } ?? false
             default: return false
             }
         }
