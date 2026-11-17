@@ -36,7 +36,7 @@ struct ColourReadTests {
     func fixturesAgree() async throws {
         let engine = try KhaytEngine()
         let want = try Self.expected()
-        #expect(want.count == 5)
+        #expect(want.count == 6)
         for (name, w) in want {
             let url = Self.fixtures.appending(path: name)
             let entries = try Zip.entries(of: url)
@@ -77,7 +77,7 @@ struct ColourReadTests {
             #expect(raw.compactMap { if case .number(let n) = $0 { return Int(n) }; return nil } == w.paintSlots,
                     Comment(rawValue: name))
         }
-        #expect(painted == 3, "the painted fixtures: with and without a stub slice, and in two members")
+        #expect(painted == 4, "the painted fixtures: with and without a stub slice, in two members, and stored")
     }
 
     /// The budget is on the largest member, not the sum: a project whose
@@ -102,6 +102,30 @@ struct ColourReadTests {
         // The total bounds the work a file can ask for.
         #expect(await ColourRead.slotsByMember(url, entries: entries, studio: studio,
                                                memberLimit: largest, totalLimit: sum - 1) == nil)
+        // A member is costed at the LARGER of its two sizes. A STORED member
+        // is read at its packed size whatever its entry declares, so entries
+        // claiming one byte each over the real data must not pass a budget
+        // the data does not fit. (On the stored fixture: with the budgets on
+        // the declared size alone, both of these read the file and name its
+        // slots.)
+        let stored = Self.fixtures.appending(path: "painted-two-members-stored.3mf")
+        let honest = try Zip.entries(of: stored)
+        let storedModels = honest.filter { $0.name.lowercased().hasSuffix(".model") }
+        #expect(storedModels.count == 3 && storedModels.allSatisfy { $0.method == 0 })
+        #expect(await ColourRead.slotsByMember(stored, entries: honest, studio: studio) == [2, 3, 7])
+        let lying = honest.map { e -> Zip.Entry in
+            guard e.name.lowercased().hasSuffix(".model") else { return e }
+            return Zip.Entry(name: e.name, compressedSize: e.compressedSize, size: 1, method: e.method,
+                             offset: e.offset, flags: e.flags, externalAttributes: e.externalAttributes)
+        }
+        let packed = try #require(storedModels.map(\.compressedSize).max())
+        #expect(await ColourRead.slotsByMember(stored, entries: lying, studio: studio,
+                                               memberLimit: packed - 1) == nil,
+                "declared 1 byte, packed past the member budget")
+        let packedSum = storedModels.reduce(0) { $0 + $1.compressedSize }
+        #expect(await ColourRead.slotsByMember(stored, entries: lying, studio: studio,
+                                               memberLimit: packed, totalLimit: packedSum - 1) == nil,
+                "declared 3 bytes in all, packed past the total")
         // And the colours the card shows are the rule's.
         let want = try #require(try Self.expected()["painted-two-members.3mf"])
         let read = try #require(await ColourRead.colours(url, entries: entries, engine: try KhaytEngine()))
@@ -124,7 +148,7 @@ struct ColourReadTests {
 
     @Test("the paint check: a painted model is found, an unpainted one is not")
     func paintCheck() throws {
-        for (name, painted) in [("painted-1-2-5.3mf", true), ("painted-stub-slice.3mf", true), ("painted-two-members.3mf", true), ("unpainted-slot4.3mf", false)] {
+        for (name, painted) in [("painted-1-2-5.3mf", true), ("painted-stub-slice.3mf", true), ("painted-two-members.3mf", true), ("painted-two-members-stored.3mf", true), ("unpainted-slot4.3mf", false)] {
             let url = Self.fixtures.appending(path: name)
             #expect(ColourRead.painted(try Zip.entries(of: url), in: url) == painted, Comment(rawValue: name))
         }

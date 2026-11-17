@@ -55,7 +55,7 @@ cases['painted-stub-slice.3mf'] = threeMf({ loaded: LOADED8, extruder: 1,
 // member. Part 1 is painted with 3 and keeps some faces (object's filament 2);
 // part 2 is on filament 6 and painted with 7 all over. The paint's slots are
 // 2, 3, 7; the colours add 6, which model_settings names for part 2.
-function twoMembers() {
+function twoMembers(store) {
   const V = '<vertices><vertex x="0" y="0" z="0"/><vertex x="10" y="0" z="0"/><vertex x="0" y="10" z="0"/></vertices>';
   const part = (id, paints) => '<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources>' +
     `<object id="${id}" type="model"><mesh>${V}<triangles>${paints.map((p) => `<triangle v1="0" v2="1" v3="2"${p != null ? ` paint_color="${p}"` : ''}/>`).join('')}</triangles></mesh></object></resources></model>`;
@@ -72,9 +72,13 @@ function twoMembers() {
     { name: 'Metadata/project_settings.config', data: project(LOADED8) },
     { name: 'Metadata/model_settings.config', data: ms },
     { name: 'Metadata/slice_info.config', data: STUB_SLICE },
-  ].map((m) => ({ name: m.name, data: Buffer.from(m.data) })));
+  ].map((m) => ({ name: m.name, data: Buffer.from(m.data), store: !!store })));
 }
 cases['painted-two-members.3mf'] = twoMembers();
+// The same project with every member STORED (method 0), as some writers leave
+// them: a stored member is read at its packed size whatever its entry
+// declares, which is what the Mac's size budgets are tested against.
+cases['painted-two-members-stored.3mf'] = twoMembers(true);
 const expected = {};
 for (const [name, buf] of Object.entries(cases)) {
   fs.writeFileSync(path.join(__dirname, name), buf);

@@ -67,5 +67,21 @@
       3,
       7
     ]
+  },
+  "painted-two-members-stored.3mf": {
+    "hexes": [
+      "#222222",
+      "#333333",
+      "#666666",
+      "#777777"
+    ],
+    "swapCount": 0,
+    "slotsKnown": true,
+    "reader": 4,
+    "paintSlots": [
+      2,
+      3,
+      7
+    ]
   }
 }
