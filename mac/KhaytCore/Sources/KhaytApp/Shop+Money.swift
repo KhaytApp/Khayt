@@ -1117,6 +1117,7 @@ extension Shop {
                 reclaimsTax: reclaims)
             if lent { edited = Self.returningLentId(edited, partId: partId) }
             return try await Self.jobWithParts(of: edited, on: order, keepPrice: keepPrice,
+                                               clients: Self.rows(root, "clients"),
                                                settings: Self.settings(root), engine: engine, refusals: refusals)
         }
     }
@@ -1139,6 +1140,7 @@ extension Shop {
             }
             record["parts"] = .array(rows.filter { Self.recordId($0) != partId })
             return try await Self.jobWithParts(of: .object(record), on: order, keepPrice: keepPrice,
+                                               clients: Self.rows(root, "clients"),
                                                settings: Self.settings(root), engine: engine, refusals: refusals)
         }
     }
@@ -1146,13 +1148,17 @@ extension Shop {
     /// `order` with the parts of `edited`, by the shared rule. Throws the
     /// rule's refusal in the shop's words; hands back the job untouched when
     /// nothing moved.
+    ///
+    /// `clients` is the book's customers: the rule reads the job's customer's
+    /// message log to tell a draft quote from one that has gone out.
     nonisolated static func jobWithParts(of edited: JSONValue, on order: JSONValue, keepPrice: Bool,
+                                         clients: [JSONValue] = [],
                                          settings: [String: JSONValue], engine: KhaytEngine,
                                          refusals: [String: String]) async throws -> OneOrderEdit {
         guard case .array(let parts)? = asObject(edited)?["parts"] else { return OneOrderEdit(order: order) }
         let r = try await engine.applyJobEdit(
-            order: order, fields: ["parts": .array(parts)], settings: settings, keepPrice: keepPrice,
-            now: Date(), editId: uid("edit"), priceId: uid("edit"))
+            order: order, fields: ["parts": .array(parts)], clients: clients, settings: settings,
+            keepPrice: keepPrice, now: Date(), editId: uid("edit"), priceId: uid("edit"))
         guard r.ok else {
             throw MoveRefused(sentence: refusals[r.reason ?? ""] ?? refusals["unknown"]!, code: r.reason)
         }
@@ -1182,7 +1188,9 @@ extension Shop {
     /// shop tries; nil without an engine or the job.
     func partsLock(_ id: Order.ID) async -> KhaytEngine.PartsLock? {
         guard let engine, let row = orderRow(id) else { return nil }
-        return try? await engine.partsLock(row)
+        // With the customers, so a message logged against this quote counts
+        // as its having gone out (`quoteIsDraft`): the sheet then asks.
+        return try? await engine.partsLock(row, clients: clientRows)
     }
 
     /// The spool an edited part is costed at — and whose four fields
