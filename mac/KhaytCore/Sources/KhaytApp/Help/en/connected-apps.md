@@ -12,7 +12,7 @@ Slicers that send sliced files straight to this Mac, and what to do when pairing
 ## Pair a slicer
 
 - Open **Connected apps** in the sidebar, under Floor, and click **Pair a slicer**. For the next two minutes a slicer on your network may ask to pair, and the Mac shows the address to type.
-- In OrcaSlicer, open Khayt → Pair → On this network and type that address exactly.
+- In OrcaSlicer, open the **Khayt** tab, type that address exactly and click **Pair**.
 - The Mac asks **Approve "name"?** and says which app asked and from which address. Check that this is your slicer.
 - Both screens now show a 6-digit number. If the two numbers are the same, click **Numbers match — approve**. The slicer appears under Paired slicers.
 

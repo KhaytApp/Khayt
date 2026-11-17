@@ -1618,6 +1618,7 @@
   "audit.all_members": "All members",
   "audit.system": "—",
   "audit.act_order_created": "Order created",
+  "audit.act_slicer_inbox": "Sent to the inbox by a slicer",
   "audit.act_quote_created": "Quote created",
   "audit.act_status": "Status changed",
   "set.logo": "Business logo",

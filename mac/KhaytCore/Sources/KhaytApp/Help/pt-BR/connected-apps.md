@@ -12,7 +12,7 @@ Os fatiadores que enviam arquivos fatiados direto para este Mac, e o que fazer q
 ## Parear um fatiador
 
 - Abra **Apps conectados** na barra lateral e clique em **Parear um fatiador**. Nos dois minutos seguintes, um fatiador da sua rede pode pedir para parear, e o Mac mostra o endereço a digitar.
-- No OrcaSlicer, abra Khayt → Pair → On this network e digite esse endereço exatamente.
+- No OrcaSlicer, abra a aba **Khayt**, digite esse endereço exatamente e clique em **Pair**.
 - O Mac pergunta **Aprovar “nome”?** e diz qual app pediu e de qual endereço. Confira se é o seu fatiador.
 - As duas telas agora mostram um número de seis dígitos. Se forem iguais, clique em **Os números conferem — aprovar**. O fatiador aparece em Fatiadores pareados.
 
