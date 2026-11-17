@@ -9793,7 +9793,6 @@ This release reads the colours of the largest painted projects, keeps a job's pr
 ### Fixed
 
 - **A job's price no longer drops when you add a part to a job whose earlier parts had no cost.** Jobs taken from a phone or app, a subscription, an inventory sale or an older book were priced some other way. Adding a costed part used to bring the price down to that part's cost: a 200 job given a 50 part became 50. The price now stays, as a typed price, with the worked-out figure beside it.
-- **A job priced from agreed prices follows its parts.** The fix above, as the Windows and Linux app first shipped it (4.10.0), also stopped a job priced wholly from agreed prices from following its parts: three of a part agreed at 100 stayed 100. This version has the corrected rule (300), and no Mac version carried the fault.
 - **A quote that has gone out is never re-priced without asking.** Changing the parts of a quote moves its price by itself only while Khayt knows the quote is a draft nobody has been sent. Once it has gone out, or if it came from an older version that did not record sending, Khayt asks first: keep the price the customer saw, or use the new one. A quote you followed up, or messaged the customer about, counts as sent.
 - **Four more ways of sending a quote are recorded as sending it:** Copy quote link on the job, saving the quotation as a PDF, printing it, and any WhatsApp message about the quote. Before, a quote sent one of these ways still looked like a draft.
 
