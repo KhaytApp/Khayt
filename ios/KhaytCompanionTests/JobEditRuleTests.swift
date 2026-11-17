@@ -530,6 +530,149 @@ final class JobEditRuleTests: XCTestCase {
         }
     }
 
+    // MARK: - The customer's messages about a quote (#2528)
+
+    /// The shared rule reads the job's customer from the book's clients: a
+    /// quote its customer was messaged about (`commLog` entry with this
+    /// job's `orderId`) is not a draft, so a re-price asks. The phone passes
+    /// the book's clients to every `applyJobEdit` (Edit job, its preview, and
+    /// Revise), so its saves see the same.
+    func testAQuoteItsCustomerWasMessagedAboutAsksBeforeARePrice() async throws {
+        func quote(_ id: String) -> JSONValue {
+            .object(["id": .string(id), "project": .string("Bracket"), "status": .string("quote"),
+                     "quoteShareStamped": .bool(true), "quoteVersion": .number(1), "clientId": .string("C-MSG"),
+                     "price": .number(150), "marginPct": .number(50), "paidAmount": .number(0),
+                     "priority": .bool(false), "parts": .array([Self.part("a", base: 60), Self.part("b", base: 40)])])
+        }
+        let log: JSONValue = .array([.object(["id": .string("m1"), "at": .string("2026-11-15T09:00:00Z"),
+                                              "orderId": .string("Q-MSG"), "text": .string("Your quote")])])
+        var store = SampleShop.book()
+        store["printLog"] = .array([quote("Q-MSG"), quote("Q-QUIET")])
+        var clients: [JSONValue] = []
+        if case .array(let c)? = store["clients"] { clients = c }
+        clients.append(.object(["id": .string("C-MSG"), "name": .string("Sample customer"), "commLog": log]))
+        store["clients"] = .array(clients)
+        let book = CompanionBook(directory: dir)
+        try book.replace(with: store, scope: nil)
+        let api = KhaytAPIClient(settings: settings, book: book)
+
+        // Messaged about it: asked first, nothing written.
+        let before = try book.read()
+        do {
+            try await api.editOrder(orderId: "Q-MSG", fields: ["marginPct": .number(25)], now: now)
+            XCTFail("a quote its customer was messaged about is asked first")
+        } catch let refusal as BookWriter.JobEditRefused {
+            XCTAssertTrue(refusal.needsAsking, String(describing: refusal.reason))
+        }
+        XCTAssertEqual(try book.read(), before, "nothing written while asking")
+        // Revise asks the same.
+        do {
+            try await api.reviseQuote(orderId: "Q-MSG", fields: ["marginPct": .number(25)])
+            XCTFail("Revise asks too")
+        } catch let refusal as BookWriter.JobEditRefused {
+            XCTAssertTrue(refusal.needsAsking)
+        }
+        // The same customer's other quote, never messaged about: a draft.
+        let wrote = try await api.editOrder(orderId: "Q-QUIET", fields: ["marginPct": .number(25)], now: now)
+        XCTAssertTrue(wrote)
+        guard case .object(let quiet) = try row(book, "Q-QUIET") else { return XCTFail("the quote") }
+        XCTAssertEqual(quiet["price"], .number(125))
+    }
+
+    /// `test/fixtures/quote-draft-vectors.json` (#2528) through the phone's
+    /// engine, the customer handed over as `client` and as `clients`: a draft
+    /// does not ask, anything else does — and lib in JSC says the same.
+    func testTheSharedQuoteDraftVectorsGiveLibsAnswerOnThePhone() async throws {
+        struct Case: Decodable {
+            let why: String; let order: JSONValue; let ctx: Ctx?; let draft: Bool
+            struct Ctx: Decodable { let client: JSONValue?; let clients: [JSONValue]? }
+        }
+        struct Vectors: Decodable { let cases: [Case] }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "test/fixtures/quote-draft-vectors.json")
+        let cases = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url)).cases
+        XCTAssertGreaterThanOrEqual(cases.count, 12)
+        let engine = try await BookReader(book: {
+            let b = CompanionBook(directory: dir); try b.replace(with: SampleShop.book(), scope: nil); return b }()).sharedEngine()
+        for c in cases {
+            let lock = try await engine.partsLock(c.order, client: c.ctx?.client, clients: c.ctx?.clients)
+            XCTAssertEqual(lock.askPrice, !c.draft, c.why)
+            var ctx: [String: JSONValue] = [:]
+            if let client = c.ctx?.client { ctx["client"] = client }
+            if let clients = c.ctx?.clients { ctx["clients"] = .array(clients) }
+            XCTAssertEqual(try ask("KhaytOrderEdit.quoteIsDraft(\(json(c.order)), \(json(.object(ctx))))"),
+                           .bool(c.draft), "lib: \(c.why)")
+        }
+    }
+
+    /// `test/fixtures/parts-edit-vectors.json` (#2533): what a job's price
+    /// becomes when its parts change, with no markup passed, as Edit job
+    /// calls it — through the phone's engine (KhaytCore's bundled
+    /// order-edit.js) and lib in JSC. #2523 froze an agreed-price job's bill
+    /// on a quantity or part change; the phone runs the same rule.
+    func testTheSharedPartsEditVectorsGiveLibsAnswerOnThePhone() async throws {
+        struct Want: Decodable { let price: Double; let priceSource: String?; let computedPrice: Double? }
+        struct Case: Decodable { let why: String; let order: JSONValue; let parts: JSONValue; let want: Want }
+        struct Ctx: Decodable {
+            let now: Double; let id: String; let priceId: String; let ids: [String]
+            let settings: [String: JSONValue]; let clients: [JSONValue]
+        }
+        struct Vectors: Decodable { let ctx: Ctx; let cases: [Case] }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "test/fixtures/parts-edit-vectors.json")
+        let v = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
+        XCTAssertGreaterThanOrEqual(v.cases.count, 13)
+        let engine = try await BookReader(book: {
+            let b = CompanionBook(directory: dir); try b.replace(with: SampleShop.book(), scope: nil); return b }()).sharedEngine()
+        let at = Date(timeIntervalSince1970: v.ctx.now / 1000)
+        for c in v.cases {
+            let r = try await engine.applyJobEdit(order: c.order, fields: ["parts": c.parts], clients: v.ctx.clients,
+                                                  settings: v.ctx.settings, newPartIds: v.ctx.ids, now: at,
+                                                  editId: v.ctx.id, priceId: v.ctx.priceId)
+            XCTAssertTrue(r.ok, "\(c.why): \(r.reason ?? "")")
+            guard case .object(let o) = r.order else { XCTFail(c.why); continue }
+            XCTAssertEqual(o["price"], .number(c.want.price), c.why)
+            switch c.want.priceSource {
+            case "none"?: XCTAssertNotEqual(o["priceSource"], .string("override"), c.why)
+            case let source?: XCTAssertEqual(o["priceSource"], .string(source), c.why)
+            case nil: break
+            }
+            if let computed = c.want.computedPrice { XCTAssertEqual(o["computedPrice"], .number(computed), c.why) }
+            if case .array(let want) = c.parts, case .array(let got)? = o["parts"] { XCTAssertEqual(got.count, want.count, c.why) }
+            // lib in JSC, the same call.
+            let lib = try ask("""
+                (function () { var o = \(json(c.order));
+                  var r = KhaytOrderEdit.applyJobEdit(o, { parts: \(json(c.parts)) }, { now: \(v.ctx.now),
+                    id: \(json(.string(v.ctx.id))), priceId: \(json(.string(v.ctx.priceId))),
+                    ids: \(json(.array(v.ctx.ids.map(JSONValue.string)))), settings: \(json(.object(v.ctx.settings))),
+                    clients: \(json(.array(v.ctx.clients))) });
+                  return { ok: r.ok, price: o.price }; })()
+                """)
+            XCTAssertEqual(lib, .object(["ok": .bool(true), "price": .number(c.want.price)]), "lib: \(c.why)")
+        }
+    }
+
+    /// Edit job's "asked first" reads the same customers as the save.
+    func testEditJobAsksFirstForAQuoteItsCustomerWasMessagedAbout() async throws {
+        let quote: JSONValue = .object(["id": .string("Q-MSG"), "project": .string("Bracket"), "status": .string("quote"),
+                                        "quoteShareStamped": .bool(true), "clientId": .string("C-MSG"),
+                                        "price": .number(150), "marginPct": .number(50), "paidAmount": .number(0),
+                                        "priority": .bool(false), "parts": .array([Self.part("a", base: 60), Self.part("b", base: 40)])])
+        var store = SampleShop.book()
+        store["printLog"] = .array([quote])
+        var clients: [JSONValue] = []
+        if case .array(let c)? = store["clients"] { clients = c }
+        let api: KhaytAPIClient
+        clients.append(.object(["id": .string("C-MSG"), "commLog": .array([
+            .object(["id": .string("m1"), "orderId": .string("Q-MSG"), "channel": .string("whatsapp")])])]))
+        store["clients"] = .array(clients)
+        let book = CompanionBook(directory: dir)
+        try book.replace(with: store, scope: nil)
+        api = KhaytAPIClient(settings: settings, book: book)
+        let state = await api.markupState(orderId: "Q-MSG")
+        XCTAssertEqual(state?.askPrice, true, "messaged about: the price is asked about before it changes")
+    }
+
     // MARK: - What the shop sees
 
     func testAPriceBelowWhatWasPaidIsRefusedInTheMacsWordsAndNothingIsWritten() async throws {
