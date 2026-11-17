@@ -574,6 +574,9 @@ final class Shop {
         case calculator
         case portfolio
         case giftCards
+        /// Slicer plugins paired with this Mac and what they sent (dark while
+        /// "Pair a slicer" is off: `canShow`).
+        case connectedApps
 
         /// Whether two shelves are the same SCREEN, ignoring which folder or
         /// which stage. The sidebar highlights Jobs while a stage is chosen
@@ -633,6 +636,7 @@ final class Shop {
     var showingCalculator: Bool { shelf == .calculator }
     var showingPortfolio: Bool { shelf == .portfolio }
     var showingGiftCards: Bool { shelf == .giftCards }
+    var showingConnectedApps: Bool { shelf == .connectedApps }
 
     /// The open jobs, grouped by the stage they are in.
     ///

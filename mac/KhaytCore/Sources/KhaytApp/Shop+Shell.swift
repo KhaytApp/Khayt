@@ -111,6 +111,7 @@ extension Shop {
         case .calculator: "mac.calc_title"
         case .colour:     "cmix.title"
         case .giftCards:  "giftCards"
+        case .connectedApps: "mac.apps_title"
         }
     }
 

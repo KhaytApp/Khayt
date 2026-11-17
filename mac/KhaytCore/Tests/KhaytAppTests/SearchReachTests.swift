@@ -28,7 +28,7 @@ struct SearchReachTests {
         let shelves: [Shop.Shelf] = [
             .jobs(nil), .board, .library(nil), .customers, .inventory,
             .expenses, .waste, .portfolio, .giftCards, .catalogue,
-            .dashboard, .machines, .reports, .colour, .calculator,
+            .dashboard, .machines, .reports, .colour, .calculator, .connectedApps,
         ]
         let shop = Shop()
         var searchable: [Shop.Shelf] = []
@@ -38,7 +38,7 @@ struct SearchReachTests {
         }
         // The lists, and only the lists.
         #expect(searchable.count == 10, "searchable shelves: \(searchable)")
-        for shelf in [Shop.Shelf.dashboard, .machines, .reports, .colour, .calculator] {
+        for shelf in [Shop.Shelf.dashboard, .machines, .reports, .colour, .calculator, .connectedApps] {
             shop.shelf = shelf
             #expect(!shop.canSearch, "\(shelf) offers a search field with nothing to search")
         }

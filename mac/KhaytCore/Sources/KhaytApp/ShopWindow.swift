@@ -66,7 +66,7 @@ struct ShopWindow: View {
             && !shop.showingExpenses && !shop.showingWaste && !shop.showingReports
             && !shop.showingCatalogue && !shop.showingColour && !shop.showingPortfolio
             && !shop.showingCalculator
-            && !shop.showingGiftCards
+            && !shop.showingGiftCards && !shop.showingConnectedApps
     }
 
     /// Which window the shop is looking at.
@@ -218,6 +218,8 @@ struct ShopWindow: View {
                 Portfolio(shop: shop)
             } else if shop.showingGiftCards {
                 GiftCards(shop: shop)
+            } else if shop.showingConnectedApps {
+                ConnectedAppsScreen(shop: shop)
             } else if shop.showingCustomers {
                 CustomersTable(shop: shop)
             } else if shop.showingJobPage {
@@ -559,6 +561,7 @@ private struct OwedSummary: View {
         case .calculator: "calculator"
         case .portfolio: "portfolio"
         case .giftCards: "gift-cards"
+        case .connectedApps: "connected-apps"
         case .library(nil): "library"
         case .library(let group?): "library:\(group)"
         }
@@ -606,6 +609,9 @@ private struct OwedSummary: View {
             // empty: a shop with no cards issued still has an Issue button to
             // reach, so the screen is not a dead end the way an empty grid is.
             return .giftCards
+        case "connected-apps":
+            // Only while pairing slicers is switched on: dark, it has no row.
+            return shop.canShow(.connectedApps) ? .connectedApps : nil
         case "portfolio":
             // Only if there is still a photograph. Restoring to an empty grid
             // with no sidebar row to leave by is a corner nobody can get out of.
@@ -1066,6 +1072,6 @@ struct InspectorPane: View {
         shop.showingMachines || shop.showingInventory || shop.showingBoard
             || shop.showingExpenses || shop.showingWaste || shop.showingReports
             || shop.showingCatalogue || shop.showingColour || shop.showingPortfolio
-            || shop.showingCalculator || shop.showingGiftCards
+            || shop.showingCalculator || shop.showingGiftCards || shop.showingConnectedApps
     }
 }

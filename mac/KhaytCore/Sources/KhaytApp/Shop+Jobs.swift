@@ -563,7 +563,7 @@ extension Shop {
         case .jobs, .board, .library, .customers, .inventory,
              .expenses, .waste, .portfolio, .giftCards, .catalogue:
             return true
-        case .dashboard, .machines, .reports, .colour, .calculator:
+        case .dashboard, .machines, .reports, .colour, .calculator, .connectedApps:
             return false
         }
     }
