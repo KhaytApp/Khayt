@@ -86,7 +86,11 @@ function normHex(h) {
  * member at a time, so the projects reader 3 could not fit in memory (and
  * stamped without reading) are read (Nov 2026).
  */
-const COLOURS_READER = 4;
+// Reader 5: the same rule again; beta.40's Mac stamped reader 4 on painted
+// files it could not read (over its memory budget, an error), so they would
+// never be read again. Reader 5 reads every one once more, and the Mac now
+// marks a file it cannot read instead of calling it read (Nov 2026).
+const COLOURS_READER = 5;
 function coloursStale(rec) {
   const r = Number(rec && rec.coloursReader);
   return !(Number.isFinite(r) && r >= COLOURS_READER);

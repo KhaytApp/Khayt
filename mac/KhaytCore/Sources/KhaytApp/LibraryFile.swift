@@ -29,6 +29,15 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// LOADED spools rather than the print's, and it is read again where its
     /// file is here (`ColoursReread`).
     let coloursReader: Int?
+    /// The paint budget (bytes of one model file) a colour read was refused
+    /// under, on the Mac that tried; nil once a read named the slots. A Mac
+    /// with a larger budget reads it again (`ColoursReread.due`).
+    let coloursUnreadBudget: Int?
+    /// The file a colour read failed on for any other reason (a model the
+    /// rule cannot tell, a member that is not text, an error), as
+    /// "size:mtimeMs". The same file is not read again at every launch; a
+    /// changed file is (`ColoursReread.due` and the pass).
+    let coloursUnreadFile: String?
     /// Whether `swapCount` came from a slice. False for an unsliced project,
     /// whose swaps are not known until it is sliced. Absent on records written
     /// before the field: see `swapsKnownGuess`.

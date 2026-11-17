@@ -27,19 +27,36 @@ enum ColoursReread {
         (file.sourceFile?.ext ?? "").lowercased() == "3mf"
     }
 
-    /// The 3MFs whose colours an older reader wrote, or none it can name.
-    static func due(_ files: [LibraryFile], reader: Int) -> [LibraryFile] {
-        files.filter { is3MF($0) && ($0.coloursReader ?? 0) < reader }
+    /// The 3MFs whose colours an older reader wrote, or none it can name; and
+    /// those a Mac with a SMALLER paint budget could not read (`budget` is
+    /// this Mac's, `Converter.paintInlineLimit`). A file refused here is not
+    /// tried again here at every launch; a Mac that can hold it tries it.
+    static func due(_ files: [LibraryFile], reader: Int,
+                    budget: Int = Converter.paintInlineLimit) -> [LibraryFile] {
+        files.filter { f in
+            guard is3MF(f) else { return false }
+            if (f.coloursReader ?? 0) < reader { return true }
+            if let refused = f.coloursUnreadBudget, refused < budget { return true }
+            // A file that failed for another reason: the pass compares its
+            // size and date, a stat, and reads it only if it changed.
+            return f.coloursUnreadFile != nil
+        }
     }
 
-    /// The four fields a colour read may change. Only these are written, onto
+    /// The five fields a colour read may change. Only these are written, onto
     /// the record as read inside the write, so an edit that landed meanwhile
     /// is kept.
-    static let fields = ["colors", "swapCount", "coloursReader", "swapsKnown"]
+    static let fields = ["colors", "swapCount", "coloursReader", "swapsKnown",
+                         "coloursUnreadBudget", "coloursUnreadFile"]
 
     /// Records read before what has been read is written (and so survives a
-    /// launch cut short).
-    static let batch = 10
+    /// launch cut short). Each write is the whole book (and rolls `.prev`),
+    /// so not too often: ten was a whole-book write every few seconds of a
+    /// painted library (beta.40 full review).
+    static let batch = 100
+    /// …and at least this often, so quitting part way loses at most this
+    /// much reading (beta.40 full review).
+    static let writeEvery: TimeInterval = 120
     /// Between two records, so a book of painted models never runs the CPU flat.
     static let pause: Duration = .milliseconds(150)
 
@@ -50,7 +67,47 @@ enum ColoursReread {
         var now: [String: JSONValue]
     }
 
-    /// The four colour fields of a record, those it has.
+    /// A completed read's colour fields, marked by why the paint was not
+    /// read, if it was not:
+    /// - past this Mac's budget: `coloursUnreadBudget`, so a Mac that can
+    ///   hold it reads it;
+    /// - anything else (the triangle cap, a member that is not text, an error
+    ///   decoding): `coloursUnreadFile`, the file's size and date, so it is
+    ///   not decoded again at every launch (up to a minute a file) and is
+    ///   read again once the file changes (beta.40 re-review).
+    /// A read that named the slots clears both.
+    nonisolated static func marked(_ applied: [String: JSONValue], read: ColourRead.Read,
+                                   file: String) -> [String: JSONValue] {
+        var now = colourFields(applied)
+        now.removeValue(forKey: "coloursUnreadBudget")
+        now.removeValue(forKey: "coloursUnreadFile")
+        if read.paintUnread {
+            if let budget = read.overBudget { now["coloursUnreadBudget"] = .number(Double(budget)) }
+            else { now["coloursUnreadFile"] = .string(file) }
+        }
+        return now
+    }
+
+    /// A record whose file could not be read at all (the zip will not list,
+    /// the rule threw): its colours as they are, stamped with today's reader
+    /// and marked with the file, so it is tried again only when it changes.
+    nonisolated static func failed(_ record: [String: JSONValue], reader: Int, file: String) -> [String: JSONValue] {
+        var now = colourFields(record)
+        now["coloursReader"] = .number(Double(reader))
+        now.removeValue(forKey: "coloursUnreadBudget")
+        now["coloursUnreadFile"] = .string(file)
+        return now
+    }
+
+    /// "size:mtimeMs": what `coloursUnreadFile` compares. Nil when the file
+    /// cannot be stat'ed.
+    nonisolated static func signature(_ url: URL) -> String? {
+        guard let a = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = a[.size] as? Int, let date = a[.modificationDate] as? Date else { return nil }
+        return "\(size):\(Int((date.timeIntervalSince1970 * 1000).rounded()))"
+    }
+
+    /// The colour fields of a record, those it has.
     nonisolated static func colourFields(_ o: [String: JSONValue]) -> [String: JSONValue] {
         var out: [String: JSONValue] = [:]
         for k in fields { if let v = o[k] { out[k] = v } }
@@ -102,29 +159,41 @@ extension Shop {
     func rereadColoursIfDue(build: StoreReader.Build, engine: KhaytEngine) {
         let files = self.files
         let rows = libraryShownRows
-        Task(priority: .utility) { [weak self] in
+        let roots = libraryRoots?.roots
+        let source = self.source
+        coloursRereading?.cancel()
+        coloursRereading = Task(priority: .utility) { [weak self] in
             guard let reader = try? await engine.coloursReader() else { return }
             let due = ColoursReread.due(files, reader: reader)
-            guard !due.isEmpty, let self else { return }
+            guard !due.isEmpty else { return }
+            // ITS OWN studio engine. On the shared one, every Studio window,
+            // the 3D viewer and calibration waited behind each painted file
+            // for up to a minute while the re-read ran (beta.40 full review).
+            // One for the whole pass, let go when it ends.
+            guard let studio = await PinWork.run({ try? StudioEngine() }) else { return }
             var raw: [String: [String: JSONValue]] = [:]
             for case .object(let o) in rows { if case .string(let id)? = o["id"] { raw[id] = o } }
             var pending: [String: ColoursReread.Patch] = [:]
             var wroteAny = false
+            var lastWrite = Date()
             func writeReadColours() async -> Bool {
                 guard !pending.isEmpty else { return true }
                 let sending = pending
                 do {
-                    // lock: system — background: colours re-read because the colour reader changed (reader 3).
+                    // lock: system — background: colours re-read because the colour reader changed (reader 4).
                     // NOT STAMPED (`recordingDeletes: false`): what a file is
                     // printed in is read from the file, not an edit, and a
                     // stamped re-read would beat another machine's real edit
                     // to the same record that has not been pulled yet. The
                     // other derived re-reads write the same way (Shop+Library).
+                    // NOT ANNOUNCED: nothing here is for another machine, so
+                    // the write does not start a sync.
                     try await StoreWriter.updateOffMain(
                         storeURL: build.storeURL,
                         owns: { StoreLock.weOwnIt(build) },
                         whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
-                        recordingDeletes: false
+                        recordingDeletes: false,
+                        announce: false
                     ) { root in
                         guard case .array(let rows)? = root["printFiles"] else { throw NothingToWrite() }
                         let done = ColoursReread.apply(sending, to: rows)
@@ -143,28 +212,66 @@ extension Shop {
                 wroteAny = true
                 return true
             }
+            /// Still the book this pass began on: a switch of book cancels the
+            /// pass (above), and this stops one that is mid-file.
+            @MainActor func stillHere() -> Bool {
+                guard !Task.isCancelled, let now = self?.source else { return false }
+                return now == source
+            }
             for file in due {
-                if Task.isCancelled { break }
-                guard let url = self.modelFile(for: file), let record = raw[file.id] else { continue }
-                if file.isLinked, LinkedCloud.isOnlineOnly(url) { continue }
-                guard await PinWork.run({ FileManager.default.fileExists(atPath: url.path) }),
-                      let entries = await PinWork.run({ try? Zip.entries(of: url) }),
-                      var read = await ColourRead.colours(url, entries: entries, engine: engine) else { continue }
+                guard stillHere() else { break }
+                guard let record = raw[file.id] else { continue }
+                // Off the main actor: each is a stat per root, a folder listing,
+                // and for a linked model an iCloud question (beta.40 full review).
+                let linked = file.isLinked
+                guard let (url, sig) = await PinWork.run({ () -> (URL, String)? in
+                    guard let url = Shop.modelFile(for: file, roots: roots) else { return nil }
+                    if linked, LinkedCloud.isOnlineOnly(url) { return nil }
+                    guard let sig = ColoursReread.signature(url) else { return nil }
+                    return (url, sig)
+                }) else { continue }
+                // Failed before on this very file, and nothing else makes it
+                // due: not decoded again.
+                if (file.coloursReader ?? 0) >= reader, file.coloursUnreadFile == sig,
+                   !(file.coloursUnreadBudget.map { $0 < Converter.paintInlineLimit } ?? false) { continue }
+                let was = ColoursReread.colourFields(record)
+                func note(_ now: [String: JSONValue]) async -> Bool {
+                    guard now != was else { return true }
+                    pending[file.id] = ColoursReread.Patch(was: was, now: now)
+                    if pending.count >= ColoursReread.batch || Date().timeIntervalSince(lastWrite) >= ColoursReread.writeEvery {
+                        lastWrite = Date()
+                        return await writeReadColours()
+                    }
+                    return true
+                }
+                guard let entries = await PinWork.run({ try? Zip.entries(of: url) }),
+                      var read = await ColourRead.read(url, entries: entries, engine: engine, studio: studio)
+                else {
+                    if !(await note(ColoursReread.failed(record, reader: reader, file: sig))) { return }
+                    continue
+                }
                 // A completed read is stamped with TODAY's reader, whatever path
                 // the rule took: a file whose project settings are not JSON
                 // falls to the old loaded-spools answer marked reader 1, and
                 // stamped 1 it was due again at every launch, forever (beta.38
                 // review). It was read by this reader; that is what the number says.
-                if (read.reader ?? 0) < reader { read.reader = reader }
-                guard let applied = try? await engine.applyColours(record, read: read),
-                      applied.changed else { continue }
-                pending[file.id] = ColoursReread.Patch(was: ColoursReread.colourFields(record),
-                                                       now: ColoursReread.colourFields(applied.record))
-                if pending.count >= ColoursReread.batch, !(await writeReadColours()) { return }
+                if (read.colours.reader ?? 0) < reader { read.colours.reader = reader }
+                guard let applied = try? await engine.applyColours(record, read: read.colours) else {
+                    if !(await note(ColoursReread.failed(record, reader: reader, file: sig))) { return }
+                    continue
+                }
+                if !(await note(ColoursReread.marked(applied.record, read: read, file: sig))) { return }
                 try? await Task.sleep(for: ColoursReread.pause)
             }
-            guard await writeReadColours(), wroteAny else { return }
-            await self.load(self.source)
+            // What was read is kept even when the pass was cut short. It goes
+            // to the book this pass read (`build.storeURL`), whatever book is
+            // open now, and each record only where its colours are still what
+            // they were when the file was read (compare-and-set). The screen
+            // is reloaded only if it still shows that book.
+            guard await writeReadColours(), wroteAny, let self else { return }
+            let now = self.source
+            guard now == source else { return }
+            await self.load(now)
         }
     }
 }

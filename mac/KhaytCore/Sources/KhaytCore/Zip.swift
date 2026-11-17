@@ -216,6 +216,17 @@ public enum Zip {
     /// `limit` is checked BEFORE anything is read or decompressed, against the
     /// size the directory claims — so a member that says it is 436 MB costs a
     /// comparison rather than 436 MB.
+    /// A STORED member is read at its compressed size, because its bytes are
+    /// its contents; the size it declares is never consulted. A directory
+    /// saying "1 byte" over 20 MB, and every limit checked against the
+    /// declared size, let a crafted zip be read far past them (beta.40 full
+    /// review). For a stored member the two sizes must be the same number.
+    public static func storedSizesAgree(_ entry: Entry) throws {
+        guard entry.method != 0 || entry.size == entry.compressedSize else {
+            throw Failure.corrupt("\(entry.name) is stored, but its two sizes disagree")
+        }
+    }
+
     public static func data(of entry: Entry, in url: URL, limit: Int = defaultLimit) throws -> Data {
         guard entry.size <= limit, entry.compressedSize <= limit else {
             throw Failure.tooBig(name: entry.name, size: max(entry.size, entry.compressedSize),
@@ -224,6 +235,7 @@ public enum Zip {
         guard entry.method == 0 || entry.method == 8 else {
             throw Failure.unsupported(name: entry.name, method: entry.method)
         }
+        try Self.storedSizesAgree(entry)
 
         let handle = try open(url)
         defer { try? handle.close() }
@@ -294,6 +306,12 @@ public enum Zip {
         let limit = min(totalLimit, inflateBudget ?? totalLimit)
         guard entry.method == 0 || entry.method == 8 else {
             throw Failure.unsupported(name: entry.name, method: entry.method)
+        }
+        try Self.storedSizesAgree(entry)
+        // A stored member is the bytes it holds: checked against the limit
+        // before one is read, as an inflated one is while it inflates.
+        if entry.method == 0, entry.compressedSize > limit {
+            throw Failure.tooBig(name: entry.name, size: entry.compressedSize, limit: limit)
         }
         let handle = try open(url)
         defer { try? handle.close() }
