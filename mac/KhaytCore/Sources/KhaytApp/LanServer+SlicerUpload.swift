@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import CryptoKit
 import KhaytCore
 
 /// ── KHAYT AS A PRINTER IN THE SLICER ─────────────────────────────────────
@@ -160,9 +161,12 @@ extension LanServer {
     /// head, then the rest as it comes. The deadline is IDLE time — it is
     /// re-armed by every chunk — and it works the one way a deadline works
     /// here (see `serve`): by cancelling the connection. A failed or short
-    /// read leaves no file behind.
+    /// read leaves no file behind. Returns the SHA-256 of what was written,
+    /// lower-case hex, hashed as it went (a connector's upload is checked
+    /// against the hash it declared, without reading a gigabyte twice).
+    @discardableResult
     nonisolated static func spool(_ connection: NWConnection, on queue: DispatchQueue, start: Data,
-                                  length: Int, to file: URL, idle: TimeInterval) async throws {
+                                  length: Int, to file: URL, idle: TimeInterval) async throws -> String {
         guard FileManager.default.createFile(atPath: file.path, contents: nil,
                                              attributes: [.posixPermissions: 0o600]),
               let handle = try? FileHandle(forWritingTo: file) else {
@@ -170,14 +174,16 @@ extension LanServer {
         }
         do {
             let first = start.prefix(length)
-            if !first.isEmpty { try handle.write(contentsOf: first) }
+            var hasher = SHA256()
+            if !first.isEmpty { try handle.write(contentsOf: first); hasher.update(data: first) }
             if first.count < length {
-                try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                hasher = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<SHA256, Error>) in
                     Spool(connection: connection, queue: queue, handle: handle,
-                          remaining: length - first.count, idle: idle, cont: cont).start()
+                          remaining: length - first.count, idle: idle, hasher: hasher, cont: cont).start()
                 }
             }
             try handle.close()
+            return hasher.finalize().map { String(format: "%02x", $0) }.joined()
         } catch {
             try? handle.close()
             try? FileManager.default.removeItem(at: file) // scratch
@@ -192,16 +198,18 @@ extension LanServer {
         private let handle: FileHandle
         private var remaining: Int
         private let idle: TimeInterval
-        private var cont: CheckedContinuation<Void, Error>?
+        private var hasher: SHA256
+        private var cont: CheckedContinuation<SHA256, Error>?
         private var deadline: DispatchWorkItem?
 
         init(connection: NWConnection, queue: DispatchQueue, handle: FileHandle, remaining: Int,
-             idle: TimeInterval, cont: CheckedContinuation<Void, Error>) {
+             idle: TimeInterval, hasher: SHA256, cont: CheckedContinuation<SHA256, Error>) {
             self.connection = connection
             self.queue = queue
             self.handle = handle
             self.remaining = remaining
             self.idle = idle
+            self.hasher = hasher
             self.cont = cont
         }
 
@@ -221,6 +229,7 @@ extension LanServer {
                 if let data, !data.isEmpty {
                     let take = data.prefix(remaining)
                     do { try handle.write(contentsOf: take) } catch { return finish(error) }
+                    hasher.update(data: take)
                     remaining -= take.count
                     arm()
                 }
@@ -235,7 +244,7 @@ extension LanServer {
             deadline = nil
             guard let cont else { return }
             self.cont = nil
-            if let error { cont.resume(throwing: error) } else { cont.resume() }
+            if let error { cont.resume(throwing: error) } else { cont.resume(returning: hasher) }
         }
     }
 

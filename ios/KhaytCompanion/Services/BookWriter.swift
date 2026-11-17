@@ -219,7 +219,16 @@ struct BookWriter {
     func recordFollowUp(orderId: String, engine: KhaytEngine, now: Date = Date()) async throws {
         try await rewriteOrder(orderId) { row, _ in
             guard case .object(let o) = row, o["status"] == .string("quote") else { throw Refusal.notAQuote }
-            return try await engine.markFollowUp(order: row, now: now)
+            let marked = try await engine.markFollowUp(order: row, now: now)
+            // The follow-up message carries the quote's total to the customer,
+            // so it is a send: stamped `quoteSharedAt` (the first one kept), or
+            // the shared rule (`quoteIsDraft`, #2524) would still take it for
+            // a draft whose price may follow a parts change unasked.
+            guard case .object(var after) = marked else { return marked }
+            if after["quoteSharedAt"] == nil || after["quoteSharedAt"] == .null {
+                after["quoteSharedAt"] = .string(ISO8601DateFormatter().string(from: now))
+            }
+            return .object(after)
         }
     }
 
@@ -1269,6 +1278,12 @@ struct BookWriter {
             order["quoteSentAt"] = .string(day)
             order["quoteExpiresAt"] = .string(localDay(now.addingTimeInterval(days * 86_400), in: zone))
             order["quoteVersion"] = .number(1)
+            // "The app that made this quote stamps `quoteSharedAt` when it is
+            // sent" — this phone does (`markQuoteShared`). Without it the
+            // shared rule cannot tell a draft from a quote an older app sent,
+            // so it asks before every re-price (`lib/order-edit.js`
+            // quoteIsDraft, `newOrder` writes the same, #2524).
+            order["quoteShareStamped"] = .bool(true)
         }
         return order
     }

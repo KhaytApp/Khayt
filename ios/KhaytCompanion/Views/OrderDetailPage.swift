@@ -340,10 +340,11 @@ struct OrderDetailPage: View {
                 OrderPhotosCard(access: photoAccess)
             }
             // The customer's page: its link, and the messages on it.
+            // On a quote, a share from here is a send, stamped as Send quote's is.
             if case .ready(let token)? = photoAccess {
-                PortalCard(token: token)
+                PortalCard(token: token, quoteId: isQuote ? order.id : nil, onQuoteShared: quoteShared)
             } else if case .viewOnly(let token)? = photoAccess {
-                PortalCard(token: token)
+                PortalCard(token: token, quoteId: isQuote ? order.id : nil, onQuoteShared: quoteShared)
             }
             // The shop's connectors: their buttons for a job, and their own
             // fields on it (read-only). Nothing is drawn without one.
@@ -450,6 +451,13 @@ struct OrderDetailPage: View {
         // `-KhaytPaySheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
         if payment != nil, UserDefaults.standard.bool(forKey: "KhaytPaySheet") { recordingPayment = true }
         #endif
+    }
+
+    /// A quote's link was shared from its customer-page card: the next step
+    /// and the list read again, as after Send quote.
+    private func quoteShared() async {
+        rule = await api.nextSteps(orderId: order.id)
+        await onChanged()
     }
 
     /// Open Revise on the quote as the book holds it now.

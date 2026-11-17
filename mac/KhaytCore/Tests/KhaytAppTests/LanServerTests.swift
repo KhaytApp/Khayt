@@ -54,7 +54,9 @@ struct LanServerTests {
              readTimeout: TimeInterval = 15, foldsDeltas: Bool = false,
              rest: Bool = false, printerWebhookToken: String = "",
              identity: Curve25519.Signing.PrivateKey = .init(),
-             port wanted: UInt16 = 0, libraryAsBeforeFilters: Bool = false) async throws {
+             port wanted: UInt16 = 0, libraryAsBeforeFilters: Bool = false,
+             slicerRoot: URL? = nil, slicerMaxBytes: Int = LanServer.maxInflate,
+             connectorsEnabled: Bool = true) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -83,7 +85,7 @@ struct LanServerTests {
             self.pairing = pairing
             host.pairing = pairing
             // Off in beta.38; these tests exercise it, on this window only.
-            let connectorPairing = LanConnectorPairing(clock: { box.now.timeIntervalSince1970 }, enabled: true)
+            let connectorPairing = LanConnectorPairing(clock: { box.now.timeIntervalSince1970 }, enabled: connectorsEnabled)
             self.connectorPairing = connectorPairing
             host.connectorPairing = connectorPairing
             host.library = { [shop] q, folder, offset, limit, filter in
@@ -186,6 +188,23 @@ struct LanServerTests {
                 // Fixed, so a job's tokens and id tag are known: 0x07 is `7`
                 // in the id-tag alphabet's 32 characters.
                 host.randomBytes = { n in Array(repeating: 7, count: n) }
+            }
+            // A "From slicer" inbox in a scratch folder, filed by the app's own
+            // `fileSlicerUpload` (figures read as the app reads them), for the
+            // OctoPrint path and a paired plugin's alike. Off unless asked.
+            if let slicerRoot {
+                host.slicerMaxBytes = slicerMaxBytes
+                host.slicerScratch = SlicerInbox.incoming(root: slicerRoot)
+                host.slicerKey = { "0123456789ABCDEF0123456789ABCDEF" }
+                host.slicerReceive = { file, name in
+                    do { _ = try await Shop.fileSlicerUpload(file, name: name, root: slicerRoot, engine: engine) }
+                    catch is SlicerInbox.Duplicate {}
+                }
+                host.connectorReceive = { file, name, origin in
+                    try await Shop.fileSlicerUpload(file, name: name, root: slicerRoot, engine: engine, origin: origin)
+                }
+                host.slicerInbox = { SlicerInbox.list(root: slicerRoot) }
+                host.sliceFolder = SlicerInbox.sliceRecords(root: slicerRoot)
             }
             let server = LanServer(host: host)
             self.server = server
