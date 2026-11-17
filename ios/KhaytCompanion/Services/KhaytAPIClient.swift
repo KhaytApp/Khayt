@@ -1475,9 +1475,11 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     func markupState(orderId: String) async -> MarkupState? {
-        guard let (row, _, _) = bookOrder(orderId), let reader,
+        guard let (row, _, clients) = bookOrder(orderId), let reader,
               let engine = try? await reader.sharedEngine(),
-              let lock = try? await engine.partsLock(row), lock.edit, !lock.nameOnly else { return nil }
+              // With the book's customers, so "asked first" matches the save
+              // (a quote its customer was messaged about is not a draft).
+              let lock = try? await engine.partsLock(row, clients: clients), lock.edit, !lock.nameOnly else { return nil }
         guard let pct = (try? await engine.marginOf(row)) ?? nil, pct.isFinite else { return nil }
         return MarkupState(percent: pct, askPrice: lock.askPrice)
     }

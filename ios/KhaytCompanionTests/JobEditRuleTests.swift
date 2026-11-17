@@ -579,6 +579,53 @@ final class JobEditRuleTests: XCTestCase {
         XCTAssertEqual(quiet["price"], .number(125))
     }
 
+    /// `test/fixtures/quote-draft-vectors.json` (#2528) through the phone's
+    /// engine, the customer handed over as `client` and as `clients`: a draft
+    /// does not ask, anything else does — and lib in JSC says the same.
+    func testTheSharedQuoteDraftVectorsGiveLibsAnswerOnThePhone() async throws {
+        struct Case: Decodable {
+            let why: String; let order: JSONValue; let ctx: Ctx?; let draft: Bool
+            struct Ctx: Decodable { let client: JSONValue?; let clients: [JSONValue]? }
+        }
+        struct Vectors: Decodable { let cases: [Case] }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "test/fixtures/quote-draft-vectors.json")
+        let cases = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url)).cases
+        XCTAssertGreaterThanOrEqual(cases.count, 12)
+        let engine = try await BookReader(book: {
+            let b = CompanionBook(directory: dir); try b.replace(with: SampleShop.book(), scope: nil); return b }()).sharedEngine()
+        for c in cases {
+            let lock = try await engine.partsLock(c.order, client: c.ctx?.client, clients: c.ctx?.clients)
+            XCTAssertEqual(lock.askPrice, !c.draft, c.why)
+            var ctx: [String: JSONValue] = [:]
+            if let client = c.ctx?.client { ctx["client"] = client }
+            if let clients = c.ctx?.clients { ctx["clients"] = .array(clients) }
+            XCTAssertEqual(try ask("KhaytOrderEdit.quoteIsDraft(\(json(c.order)), \(json(.object(ctx))))"),
+                           .bool(c.draft), "lib: \(c.why)")
+        }
+    }
+
+    /// Edit job's "asked first" reads the same customers as the save.
+    func testEditJobAsksFirstForAQuoteItsCustomerWasMessagedAbout() async throws {
+        let quote: JSONValue = .object(["id": .string("Q-MSG"), "project": .string("Bracket"), "status": .string("quote"),
+                                        "quoteShareStamped": .bool(true), "clientId": .string("C-MSG"),
+                                        "price": .number(150), "marginPct": .number(50), "paidAmount": .number(0),
+                                        "priority": .bool(false), "parts": .array([Self.part("a", base: 60), Self.part("b", base: 40)])])
+        var store = SampleShop.book()
+        store["printLog"] = .array([quote])
+        var clients: [JSONValue] = []
+        if case .array(let c)? = store["clients"] { clients = c }
+        let api: KhaytAPIClient
+        clients.append(.object(["id": .string("C-MSG"), "commLog": .array([
+            .object(["id": .string("m1"), "orderId": .string("Q-MSG"), "channel": .string("whatsapp")])])]))
+        store["clients"] = .array(clients)
+        let book = CompanionBook(directory: dir)
+        try book.replace(with: store, scope: nil)
+        api = KhaytAPIClient(settings: settings, book: book)
+        let state = await api.markupState(orderId: "Q-MSG")
+        XCTAssertEqual(state?.askPrice, true, "messaged about: the price is asked about before it changes")
+    }
+
     // MARK: - What the shop sees
 
     func testAPriceBelowWhatWasPaidIsRefusedInTheMacsWordsAndNothingIsWritten() async throws {
