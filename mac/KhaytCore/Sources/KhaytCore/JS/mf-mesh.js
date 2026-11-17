@@ -224,19 +224,35 @@
   // matches with indexOf: a tag's attributes run to its first ">", a block's body to the first
   // close after it, and the scan resumes after the match. A tag the caller does not want is
   // passed over to its ">" (a regex would also try an opener INSIDE its attributes, which is
-  // not XML). `ci` matches the tag name in any case.
+  // not XML). `ci` matches the tag name in any ASCII case, compared in place: a lowercased
+  // COPY is not the same length when it holds 'İ' (two characters lowercased), so its
+  // indexes are not the text's, and on a huge member it is a second copy of it (re-review).
   const isNameChar = (c) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95;
   function scanTags(s, name, opts) {
     const o = opts || {};
-    const hay = o.ci ? s.toLowerCase() : s;
-    const open = '<' + (o.ci ? name.toLowerCase() : name);
+    const open = '<' + name;
     const close = '</' + name + '>';
+    const lname = name.toLowerCase();
+    // Where the next "<name" starts at or after i, case-folded in ASCII only when ci.
+    const findOpen = (from) => {
+      if (!o.ci) return s.indexOf(open, from);
+      for (let k = s.indexOf('<', from); k >= 0; k = s.indexOf('<', k + 1)) {
+        let ok = true;
+        for (let c = 0; c < lname.length && ok; c++) {
+          let ch = s.charCodeAt(k + 1 + c);
+          if (ch >= 65 && ch <= 90) ch += 32;
+          ok = ch === lname.charCodeAt(c);
+        }
+        if (ok) return k;
+      }
+      return -1;
+    };
     const out = [];
     let i = 0;
     for (;;) {
-      i = hay.indexOf(open, i);
+      i = findOpen(i);
       if (i < 0) break;
-      if (isNameChar(hay.charCodeAt(i + open.length))) { i += open.length; continue; }
+      if (isNameChar(s.charCodeAt(i + open.length))) { i += open.length; continue; }
       const gt = s.indexOf('>', i + open.length);
       if (gt < 0) break;
       let attrs = s.slice(i + open.length, gt);

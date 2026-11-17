@@ -70,3 +70,15 @@ test('the answers did not change on a well-formed file', () => {
   const d = M.digestModelMember('3D/3dmodel.model', SOLID);
   assert.equal(d.objects[0].tris, 1);
 });
+
+test('characters whose lowercase is longer do not shift a case-insensitive tag (re-review, Nov 17)', () => {
+  // `<model unit="inch">` after a comment holding 'İ' (two characters
+  // lowercased), 'ẞ' or Greek capitals: the unit must still read as inch.
+  for (const pre of ['', 'İ', 'İİ', 'İİİİİİ', 'ẞẞ', 'ΣΣΣ', 'İẞΣ'.repeat(40)]) {
+    const xml = `<?xml version="1.0"?><!-- ${pre} --><MODEL unit="inch"><resources><object id="1"><mesh><vertices>`
+      + '<vertex x="0" y="0" z="0"/><vertex x="1" y="0" z="0"/><vertex x="0" y="1" z="0"/></vertices>'
+      + '<triangles><triangle v1="0" v2="1" v3="2"/></triangles></mesh></object></resources><build><item objectid="1"/></build></MODEL>';
+    const r = M.extractMeshFromBuffer(makeZip([{ name: '3D/3dmodel.model', data: xml, method: 8 }]), 1);
+    assert.equal(r.mmPerUnit, 25.4, JSON.stringify(pre));
+  }
+});
