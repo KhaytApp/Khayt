@@ -605,6 +605,53 @@ final class JobEditRuleTests: XCTestCase {
         }
     }
 
+    /// `test/fixtures/parts-edit-vectors.json` (#2533): what a job's price
+    /// becomes when its parts change, with no markup passed, as Edit job
+    /// calls it — through the phone's engine (KhaytCore's bundled
+    /// order-edit.js) and lib in JSC. #2523 froze an agreed-price job's bill
+    /// on a quantity or part change; the phone runs the same rule.
+    func testTheSharedPartsEditVectorsGiveLibsAnswerOnThePhone() async throws {
+        struct Want: Decodable { let price: Double; let priceSource: String?; let computedPrice: Double? }
+        struct Case: Decodable { let why: String; let order: JSONValue; let parts: JSONValue; let want: Want }
+        struct Ctx: Decodable {
+            let now: Double; let id: String; let priceId: String; let ids: [String]
+            let settings: [String: JSONValue]; let clients: [JSONValue]
+        }
+        struct Vectors: Decodable { let ctx: Ctx; let cases: [Case] }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "test/fixtures/parts-edit-vectors.json")
+        let v = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
+        XCTAssertGreaterThanOrEqual(v.cases.count, 13)
+        let engine = try await BookReader(book: {
+            let b = CompanionBook(directory: dir); try b.replace(with: SampleShop.book(), scope: nil); return b }()).sharedEngine()
+        let at = Date(timeIntervalSince1970: v.ctx.now / 1000)
+        for c in v.cases {
+            let r = try await engine.applyJobEdit(order: c.order, fields: ["parts": c.parts], clients: v.ctx.clients,
+                                                  settings: v.ctx.settings, newPartIds: v.ctx.ids, now: at,
+                                                  editId: v.ctx.id, priceId: v.ctx.priceId)
+            XCTAssertTrue(r.ok, "\(c.why): \(r.reason ?? "")")
+            guard case .object(let o) = r.order else { XCTFail(c.why); continue }
+            XCTAssertEqual(o["price"], .number(c.want.price), c.why)
+            switch c.want.priceSource {
+            case "none"?: XCTAssertNotEqual(o["priceSource"], .string("override"), c.why)
+            case let source?: XCTAssertEqual(o["priceSource"], .string(source), c.why)
+            case nil: break
+            }
+            if let computed = c.want.computedPrice { XCTAssertEqual(o["computedPrice"], .number(computed), c.why) }
+            if case .array(let want) = c.parts, case .array(let got)? = o["parts"] { XCTAssertEqual(got.count, want.count, c.why) }
+            // lib in JSC, the same call.
+            let lib = try ask("""
+                (function () { var o = \(json(c.order));
+                  var r = KhaytOrderEdit.applyJobEdit(o, { parts: \(json(c.parts)) }, { now: \(v.ctx.now),
+                    id: \(json(.string(v.ctx.id))), priceId: \(json(.string(v.ctx.priceId))),
+                    ids: \(json(.array(v.ctx.ids.map(JSONValue.string)))), settings: \(json(.object(v.ctx.settings))),
+                    clients: \(json(.array(v.ctx.clients))) });
+                  return { ok: r.ok, price: o.price }; })()
+                """)
+            XCTAssertEqual(lib, .object(["ok": .bool(true), "price": .number(c.want.price)]), "lib: \(c.why)")
+        }
+    }
+
     /// Edit job's "asked first" reads the same customers as the save.
     func testEditJobAsksFirstForAQuoteItsCustomerWasMessagedAbout() async throws {
         let quote: JSONValue = .object(["id": .string("Q-MSG"), "project": .string("Bracket"), "status": .string("quote"),
