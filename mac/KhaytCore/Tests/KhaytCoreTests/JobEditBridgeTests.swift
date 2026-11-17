@@ -144,4 +144,44 @@ struct JobEditBridgeTests {
                                              now: Date(timeIntervalSince1970: 1_800_000_000), editId: "e1", priceId: "e2")
         #expect(z.ok && Self.price(z.order) == 50)
     }
+    // MARK: - The shared parts-edit vectors
+
+    struct PartsVectors: Decodable {
+        struct Want: Decodable { let price: Double; let priceSource: String?; let computedPrice: Double? }
+        struct Case: Decodable { let why: String; let order: JSONValue; let parts: [JSONValue]; let want: Want }
+        let cases: [Case]
+    }
+
+    /// `test/fixtures/parts-edit-vectors.json`, what `test/parts-edit-vectors.test.js`
+    /// holds lib to under node, through the call Edit Job and the part editor
+    /// make (no markup passed). Written when #2523 took a job priced wholly
+    /// from AGREED prices for "a price not built from its parts" and stopped
+    /// re-pricing it: three of a part agreed at 100 stayed 100 (beta.40
+    /// pre-release review).
+    @Test("a parts change prices the job as the shared vectors say")
+    func partsEditVectors() async throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "test/fixtures/parts-edit-vectors.json")
+        let vectors = try JSONDecoder().decode(PartsVectors.self, from: Data(contentsOf: url))
+        #expect(vectors.cases.count >= 13)
+        let engine = try KhaytEngine()
+        for c in vectors.cases {
+            let r = try await engine.applyJobEdit(
+                order: c.order, fields: ["parts": .array(c.parts)], settings: ["currency": .string("SAR")],
+                newPartIds: ["P-new"], now: Date(timeIntervalSince1970: 1_800_000_000), editId: "e1", priceId: "e2")
+            #expect(r.ok, Comment(rawValue: c.why))
+            #expect(Self.price(r.order) == c.want.price, Comment(rawValue: c.why))
+            guard case .object(let after) = r.order else { Issue.record("no order: \(c.why)"); continue }
+            if c.want.priceSource == "none" {
+                #expect(after["priceSource"] != .string("override"), Comment(rawValue: c.why))
+            } else if let source = c.want.priceSource {
+                #expect(after["priceSource"] == .string(source), Comment(rawValue: c.why))
+            }
+            if let computed = c.want.computedPrice {
+                #expect(after["computedPrice"] == .number(computed), Comment(rawValue: c.why))
+            }
+        }
+    }
 }
