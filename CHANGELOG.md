@@ -9805,6 +9805,36 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.41] - 2026-11-18
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release gathers the fixes from a full review of beta.40: job prices that stay where they should, a safer reading of files from strangers, and a library colour read that no longer gets in the way. From here on, Mac betas come at most once a week, each after a full review.
+
+### What happens on first launch
+
+- **Khayt reads your Library's 3MF colours once more, in the background.** Beta.40 marked some painted files as read when it could not read them, and they would never have been read again. This version reads every 3MF whose file is on this Mac one more time, one model at a time, while you keep working. It can take from half an hour to a few hours for a large library of painted models. It now uses its own engine, so Studio and the 3D viewer are not slowed by it, and it stops if you switch to another book.
+- **A very large painted file may use a few GB of memory for a short time** while it is read.
+- **On a Mac with less than 32 GB of memory**, a painted file too large to read here keeps the colours it has and is marked so that a Mac with more memory reads it. A file that cannot be read for another reason is marked too, and is read again only once the file changes, so it is not tried at every launch.
+
+### Fixed
+
+- **A job's price no longer moves where it should not.**
+  - Changing a job's parts, markup, discount or charges now prices it exactly as taking it new would.
+  - A job whose invoice went to ZATCA, or that was voided, credited or cancelled, keeps its price: its discount, typed price, shipping and extra charges can no longer be changed, and the screen says why.
+  - A job priced from agreed prices follows its parts, and a part added in Edit Job for a customer with a price agreement takes the agreed price, in the job's currency.
+  - A costed part added to a job priced wholly from agreed prices is priced at your default markup, not at its bare cost.
+- **Files from customers and linked folders are read more safely.** A zip that lies about its members' sizes is refused before it is unpacked, an archive that unpacks to thousands of files is stopped, and a crafted 3MF or G-code file can no longer freeze Khayt while it is read.
+- **Records that share an id are no longer re-saved on every write**, so they no longer sync as edits nobody made.
+- **The Library's colour read no longer starts a sync**, and saves its progress every two minutes, so quitting part way loses little.
+- **The sidebar's "Floor" group means the shop floor** in Spanish, Japanese, Chinese and Turkish; it had been translated as a price minimum.
+- **A storefront or carrier webhook that fails** answers with a plain sentence instead of the app's internal error.
+
+### Not in this beta
+
+- **Connected apps and pairing a slicer plugin stay hidden** until the plugin is ready.
+
 ## [4.0.0-beta.40] - 2026-11-17
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
