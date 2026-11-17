@@ -1100,6 +1100,10 @@
       const newAgreed = agreedOf(next);
       const after = from.sum(newBase, newAgreed);
       const arithmetic = +after.total.toFixed(2);
+      // The price the job ends at, when it is not `after`: an unbuilt job's
+      // agreed share moving, the rest kept. Its percentage lines are a share
+      // of THAT price (beta.40 money re-review).
+      let kept = null;
       const wasPrice = +order.price || 0;
       if (c.keepPrice === true || from.typed || unbuilt) {
         // The price stays as it stands. It is no longer what its inputs
@@ -1114,7 +1118,8 @@
         // price is left to the cent.
         let stays = wasPrice;
         if (unbuilt && c.keepPrice !== true && !from.typed && Math.abs(newAgreed - agreedOf(before)) > 0.005) {
-          stays = Math.max(0, from.finish(from.sum(from.base, newAgreed).total));
+          kept = from.sum(from.base, newAgreed);
+          stays = Math.max(0, from.finish(kept.total));
           trial.price = stays;
         }
         if ((c.keepPrice === true || unbuilt) && !from.typed && Math.abs(from.finish(after.total) - stays) > 0.011) {
@@ -1134,7 +1139,7 @@
       if (newAgreed > 0) trial.agreedAmount = +newAgreed.toFixed(2); else delete trial.agreedAmount;
       if (newOverhead !== oldOverhead) trial.overheadCost = newOverhead;
       // A percentage line follows the price it is a share of, where the price moved.
-      if (from.withPct && trial.price !== wasPrice) trial.extraLines = resolveLines(from.lines, after);
+      if (from.withPct && trial.price !== wasPrice) trial.extraLines = resolveLines(from.lines, kept || after);
       if (from.rushPct > 0) {
         const rush = +after.rush.toFixed(2);
         trial.rushFeeAmount = rush;
@@ -1201,6 +1206,22 @@
    * Returns `{ ok, reason, step, changed }` — `step` names the rule that
    * refused ('customer' | 'parts' | 'price').
    */
+  /** Whether `details` would change a job's price, discount, shipping or extra lines. */
+  function moneyMoves(order, details) {
+    const d = details || {};
+    const num0 = (v) => Math.max(0, +v || 0);
+    if (has(d, 'discountPct') && Math.abs(Math.min(100, num0(d.discountPct)) - num0(order.discountPct)) > 0.0001) return true;
+    if (has(d, 'shippingCost') && Math.abs(num0(d.shippingCost) - num0(order.shippingCost)) > 0.005) return true;
+    if (has(d, 'price') && optional(d.price) !== null && Math.abs(num0(d.price) - num0(order.price)) > 0.005) return true;
+    if (has(d, 'extraLines')) {
+      const key = (ls) => JSON.stringify((Array.isArray(ls) ? ls : []).map((l) => [
+        String((l && l.label) || ''), l && l.pct != null && l.pct !== '' ? +l.pct : null,
+        l && (l.pct == null || l.pct === '') ? +(+l.amount || 0).toFixed(2) : null, !!(l && l.fee)]));
+      if (key(d.extraLines) !== key(order.extraLines)) return true;
+    }
+    return false;
+  }
+
   function applyJobEdit(order, next, ctx) {
     if (!isObj(order)) return { ok: false, reason: 'missing', step: null, changed: false };
     const n = Object.assign({}, next || {});
@@ -1248,6 +1269,17 @@
       // is the money quietly disappearing from the record. So what was paid
       // is read BEFORE they run, the bill after, and a bill below it is
       // refused: refund or credit note first.
+      // THE MONEY OF A JOB WHOSE INVOICE HAS LEFT THE SHOP DOES NOT MOVE. A
+      // job reported to ZATCA, voided, credited or cancelled kept its parts
+      // locked (partsLock) while its discount, shipping, extra lines and a
+      // typed total still went through: a reported job at 20% off moved to
+      // 50% and its total from 138.89 to 88.89 (beta.40 money review, HIGH).
+      // Refused only when one of them really CHANGES, so a sheet that sends
+      // them unchanged with a note still saves the note.
+      const frozen = partsLock(work, c).code;
+      if (['zatca', 'voided', 'credited', 'cancelled'].indexOf(frozen) !== -1 && moneyMoves(work, details)) {
+        return stop(frozen, 'price');
+      }
       const paidBefore = (optional(work.paidAmount) || 0) + (optional(work.giftCardDiscount) || 0);
       const billedBefore = billedOf(work, c);
       const r = applyDetails(work, details, c);

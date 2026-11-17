@@ -984,6 +984,176 @@
     "price": 300,
     "unexplainedShareBefore": 200
    }
+  },
+  {
+   "why": "a job reported to ZATCA: a new discount is refused (it moved 138.89 to 88.89 before; HIGH)",
+   "order": {
+    "id": "Z",
+    "status": "pending",
+    "price": 120,
+    "paidAmount": 0,
+    "discountPct": 20,
+    "priceBeforeDiscount": 150,
+    "marginPct": 50,
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printWeight": 50,
+      "baseCost": 100
+     }
+    ],
+    "zatcaUuid": "u-1"
+   },
+   "next": {
+    "discountPct": 50
+   },
+   "ctx": {},
+   "want": {
+    "ok": false,
+    "reason": "zatca"
+   }
+  },
+  {
+   "why": "a job reported to ZATCA: the same discount sent with a note still saves the note",
+   "order": {
+    "id": "Z",
+    "status": "pending",
+    "price": 120,
+    "paidAmount": 0,
+    "discountPct": 20,
+    "priceBeforeDiscount": 150,
+    "marginPct": 50,
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printWeight": 50,
+      "baseCost": 100
+     }
+    ],
+    "zatcaUuid": "u-1"
+   },
+   "next": {
+    "discountPct": 20,
+    "notes": "hello"
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 120
+   }
+  },
+  {
+   "why": "a voided job: a changed extra line is refused",
+   "order": {
+    "id": "Z",
+    "status": "pending",
+    "price": 120,
+    "paidAmount": 0,
+    "discountPct": 20,
+    "priceBeforeDiscount": 150,
+    "marginPct": 50,
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printWeight": 50,
+      "baseCost": 100
+     }
+    ],
+    "voidedAt": "2026-11-17T10:00:00Z"
+   },
+   "next": {
+    "extraLines": [
+     {
+      "label": "Box",
+      "amount": 5
+     }
+    ]
+   },
+   "ctx": {},
+   "want": {
+    "ok": false,
+    "reason": "voided"
+   }
+  },
+  {
+   "why": "a cancelled job: a typed total is refused",
+   "order": {
+    "id": "Z",
+    "status": "cancelled",
+    "price": 120,
+    "paidAmount": 0,
+    "discountPct": 20,
+    "priceBeforeDiscount": 150,
+    "marginPct": 50,
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printWeight": 50,
+      "baseCost": 100
+     }
+    ]
+   },
+   "next": {
+    "price": 10
+   },
+   "ctx": {},
+   "want": {
+    "ok": false,
+    "reason": "cancelled"
+   }
+  },
+  {
+   "why": "an unexplained price keeps its share, and its 10% fee is a share of the price it ENDS at (300 = 100 agreed + 170 + fee 30; agreed doubled: 411.11, fee 41.11)",
+   "order": {
+    "id": "U",
+    "status": "pending",
+    "price": 300,
+    "paidAmount": 0,
+    "agreedAmount": 100,
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 100
+     }
+    ],
+    "extraLines": [
+     {
+      "label": "Fee",
+      "pct": 10,
+      "fee": true,
+      "amount": 30
+     }
+    ]
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 2,
+      "agreedPrice": 100
+     }
+    ]
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 411.11,
+    "extraLines": [
+     41.11
+    ],
+    "unexplainedShareBefore": 170
+   }
   }
  ]
 }
