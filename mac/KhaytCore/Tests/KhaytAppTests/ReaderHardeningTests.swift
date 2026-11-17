@@ -41,7 +41,7 @@ struct ReaderHardeningTests {
     @Test("only an unterminated tag is carried, and one past 64 KB makes the part corrupt")
     func tagCarry() throws {
         let b = Array("<a x=\"1\">text<b y".utf8)
-        #expect(Mesh.unterminated(b, from: 0) == 14)
+        #expect(Mesh.unterminated(b, from: 0) == 13, "the `<b` after `<a x=\"1\">text`")
         #expect(Mesh.unterminated(Array("<a>text only".utf8), from: 0) == nil, "text between tags is not carried")
         #expect(Mesh.unterminated(Array("no tags at all".utf8), from: 0) == nil)
 
