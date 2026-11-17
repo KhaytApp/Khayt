@@ -661,7 +661,7 @@
    * A part already handed to the customer (`delivered`) is fixed whatever the
    * job's state — `applyParts` refuses a change to one or its removal.
    */
-  function partsLock(order) {
+  function partsLock(order, ctx) {
     const none = (code) => ({ code, edit: false, addRemove: false, nameOnly: false, askPrice: false });
     if (!isObj(order)) return none('missing');
     if (present(order.zatcaUuid) || isObj(order.zatcaSubmission)) return none('zatca');
@@ -675,7 +675,7 @@
     if (FROZEN_STATUSES.indexOf(order.status) !== -1 || order.materialDeducted === true) {
       return { code: 'deducted', edit: true, addRemove: false, nameOnly: true, askPrice: false };
     }
-    const draftQuote = order.status === 'quote' && quoteIsDraft(order);
+    const draftQuote = order.status === 'quote' && quoteIsDraft(order, ctx);
     return { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: !draftQuote };
   }
 
@@ -691,12 +691,26 @@
    * stamps quoteSharedAt when it is sent" — and no sign of having been sent:
    * `quoteSharedAt`, `quoteAcceptedAt`, a revision (`quoteRevisions`,
    * `quoteVersion` past 1). Anything else asks.
+   *
+   * A follow-up is a send too (it carries the quote's total, lib/quote-
+   * followup.js markFollowUpPatch), and so is any message to the customer
+   * logged against this job: an entry in its customer's `commLog` with this
+   * job's `orderId` (lib/whatsapp-message.js commEntry). That one needs the
+   * customer, so `ctx` may carry `client` or `clients` (iPhone lane and
+   * Dev Hub, Nov 17). Shared vectors: test/fixtures/quote-draft-vectors.json.
    */
-  function quoteIsDraft(order) {
+  function quoteIsDraft(order, ctx) {
     if (!order || order.quoteShareStamped !== true) return false;
     if (present(order.quoteSharedAt) || present(order.quoteAcceptedAt)) return false;
     if (Array.isArray(order.quoteRevisions) && order.quoteRevisions.length) return false;
     if (+order.quoteVersion > 1) return false;
+    if (present(order.followUpSentAt) || +order.followUpCount > 0) return false;
+    const c = ctxOf(ctx);
+    const client = c.client && typeof c.client === 'object' ? c.client
+      : (Array.isArray(c.clients) && order.clientId != null
+        ? c.clients.find((x) => x && String(x.id) === String(order.clientId)) : null);
+    const log = client && Array.isArray(client.commLog) ? client.commLog : [];
+    if (log.some((e) => e && e.orderId != null && String(e.orderId) === String(order.id))) return false;
     return true;
   }
 
@@ -797,7 +811,7 @@
     const wanted = +m.toFixed(2);
     const was = marginOf(order);
     if (was !== null && Math.abs(was - wanted) < 0.005) return { ok: true, reason: null, changes: {} };
-    const lock = partsLock(order);
+    const lock = partsLock(order, c);
     if (!lock.edit || lock.nameOnly) return { ok: false, reason: lock.code || 'locked', changes: {} };
     const from = pricedFrom(order);
     if (from.typed || !(from.costed > 0)) return { ok: false, reason: 'price_fixed', changes: {} };
@@ -894,7 +908,7 @@
   function applyParts(order, parts, ctx) {
     const c = ctxOf(ctx);
     const refuse = (reason) => ({ ok: false, reason, changes: {}, order });
-    const lock = partsLock(order);
+    const lock = partsLock(order, c);
     if (!lock.edit) return refuse(lock.code);
     const before = partsOf(order);
     const incoming = (Array.isArray(parts) ? parts : []).filter(isObj);
@@ -984,7 +998,14 @@
       // its rate, as applyMarkup does.
       const fx = +order.fxRate > 0 && +order.fxRate !== 1 ? +order.fxRate : 1;
       const markupGiven = optional(c.marginPct) !== null;
-      const unbuilt = from.factor === null && !markupGiven && (+order.price || 0) > 0;
+      // …and only where part of the price is NOT explained by what was
+      // agreed (`from.base`, the share that is neither agreed nor fixed).
+      // `from.factor` is null whenever nothing is cost-plus, which is also a
+      // job priced wholly from agreed prices, and that price IS built from
+      // its parts (base 0). Taken for unbuilt, a customer with a price
+      // agreement who ordered 3 instead of 1 was billed for 1, unasked
+      // (beta.40 pre-release review, Nov 17; shipped in desktop 4.10.0).
+      const unbuilt = from.factor === null && !markupGiven && from.base > 0.005;
       const factor = from.factor !== null ? from.factor
         : (1 + Math.max(0, amountOf(c.marginPct)) / 100) / fx;
       const newBase = (costedOf(next) + fixedCosts) * factor;
@@ -996,9 +1017,21 @@
         // The price stays as it stands. It is no longer what its inputs
         // give, so it is a typed one from here on, with the arithmetic
         // beside it — exactly what `adjustPrice` writes for a typed total.
-        if ((c.keepPrice === true || unbuilt) && !from.typed && Math.abs(from.finish(after.total) - wasPrice) > 0.011) {
+        //
+        // One thing still moves in an unbuilt job: what was AGREED. The
+        // share nothing explains stays (`from.base`), and the agreed share
+        // follows its parts, so a job of an agreed part and an uncosted one
+        // (300 = 100 agreed + 200) taken to two of the agreed part is 400,
+        // not 300. Only when the agreed total really changed: otherwise the
+        // price is left to the cent.
+        let stays = wasPrice;
+        if (unbuilt && c.keepPrice !== true && !from.typed && Math.abs(newAgreed - agreedOf(before)) > 0.005) {
+          stays = Math.max(0, from.finish(from.sum(from.base, newAgreed).total));
+          trial.price = stays;
+        }
+        if ((c.keepPrice === true || unbuilt) && !from.typed && Math.abs(from.finish(after.total) - stays) > 0.011) {
           trial.priceSource = 'override';
-          trial.priceOverride = wasPrice;
+          trial.priceOverride = stays;
         }
         if (trial.priceSource === 'override' || (has(trial, 'computedPrice') && trial.computedPrice !== null)) {
           trial.computedPrice = arithmetic;

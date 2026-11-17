@@ -151,16 +151,19 @@ struct BookWriter {
             guard case .object(let o) = row, o["status"] == .string("quote") else { throw Refusal.notAQuote }
             let editId = Self.lanId("edit", now: now)
             let priceId = Self.lanId("price", now: now)
+            // The quote's customer is read from these: one they were messaged
+            // about is not a draft (`quoteIsDraft`, #2528).
+            let clients = Self.rows(try book.read(), "clients")
             // Asked of the quote as it is first: a revision kept for a change
             // that changes nothing is a version nobody made, and one the rule
             // refuses (a price below a deposit already paid) keeps nothing.
-            let trial = try await engine.applyJobEdit(order: row, fields: fields, settings: settings,
+            let trial = try await engine.applyJobEdit(order: row, fields: fields, clients: clients, settings: settings,
                                                       priceSeenOk: priceSeenOk,
                                                       now: now, editId: editId, priceId: priceId)
             guard trial.ok else { throw JobEditRefused(reason: trial.reason, step: trial.step) }
             guard trial.changed else { return nil }
             let revised = try await engine.reviseQuote(order: row, now: now)
-            let edited = try await engine.applyJobEdit(order: revised, fields: fields, settings: settings,
+            let edited = try await engine.applyJobEdit(order: revised, fields: fields, clients: clients, settings: settings,
                                                        priceSeenOk: priceSeenOk,
                                                        now: now, editId: editId, priceId: priceId)
             guard edited.ok else { throw JobEditRefused(reason: edited.reason, step: edited.step) }
@@ -219,7 +222,16 @@ struct BookWriter {
     func recordFollowUp(orderId: String, engine: KhaytEngine, now: Date = Date()) async throws {
         try await rewriteOrder(orderId) { row, _ in
             guard case .object(let o) = row, o["status"] == .string("quote") else { throw Refusal.notAQuote }
-            return try await engine.markFollowUp(order: row, now: now)
+            let marked = try await engine.markFollowUp(order: row, now: now)
+            // The follow-up message carries the quote's total to the customer,
+            // so it is a send: stamped `quoteSharedAt` (the first one kept), or
+            // the shared rule (`quoteIsDraft`, #2524) would still take it for
+            // a draft whose price may follow a parts change unasked.
+            guard case .object(var after) = marked else { return marked }
+            if after["quoteSharedAt"] == nil || after["quoteSharedAt"] == .null {
+                after["quoteSharedAt"] = .string(ISO8601DateFormatter().string(from: now))
+            }
+            return .object(after)
         }
     }
 
@@ -1269,6 +1281,12 @@ struct BookWriter {
             order["quoteSentAt"] = .string(day)
             order["quoteExpiresAt"] = .string(localDay(now.addingTimeInterval(days * 86_400), in: zone))
             order["quoteVersion"] = .number(1)
+            // "The app that made this quote stamps `quoteSharedAt` when it is
+            // sent" — this phone does (`markQuoteShared`). Without it the
+            // shared rule cannot tell a draft from a quote an older app sent,
+            // so it asks before every re-price (`lib/order-edit.js`
+            // quoteIsDraft, `newOrder` writes the same, #2524).
+            order["quoteShareStamped"] = .bool(true)
         }
         return order
     }

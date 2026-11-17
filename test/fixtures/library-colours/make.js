@@ -51,6 +51,34 @@ const STUB_SLICE = '<?xml version="1.0" encoding="UTF-8"?>\n<config>\n  <header>
 // Eight loaded, painted with 2 and 5 and a split, and a stub slice: the same three.
 cases['painted-stub-slice.3mf'] = threeMf({ loaded: LOADED8, extruder: 1,
   paints: [Mesh.encodeSolidPaint(2), Mesh.encodeSolidPaint(5), SPLIT_0_2], slice: STUB_SLICE });
+// The Orca layout: the root model only assembles; each part's mesh is its own
+// member. Part 1 is painted with 3 and keeps some faces (object's filament 2);
+// part 2 is on filament 6 and painted with 7 all over. The paint's slots are
+// 2, 3, 7; the colours add 6, which model_settings names for part 2.
+function twoMembers(store) {
+  const V = '<vertices><vertex x="0" y="0" z="0"/><vertex x="10" y="0" z="0"/><vertex x="0" y="10" z="0"/></vertices>';
+  const part = (id, paints) => '<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources>' +
+    `<object id="${id}" type="model"><mesh>${V}<triangles>${paints.map((p) => `<triangle v1="0" v2="1" v3="2"${p != null ? ` paint_color="${p}"` : ''}/>`).join('')}</triangles></mesh></object></resources></model>`;
+  const root = '<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06"><resources>' +
+    '<object id="10" type="model"><components><component p:path="/3D/Objects/part_1.model" objectid="1"/><component p:path="/3D/Objects/part_2.model" objectid="2"/></components></object>' +
+    '</resources><build><item objectid="10"/></build></model>';
+  const ms = '<?xml version="1.0"?>\n<config>\n<object id="10">\n  <metadata key="name" value="assembly"/>\n  <metadata key="extruder" value="2"/>\n' +
+    '  <part id="1" subtype="normal_part"><metadata key="name" value="a"/></part>\n' +
+    '  <part id="2" subtype="normal_part"><metadata key="name" value="b"/><metadata key="extruder" value="6"/></part>\n</object>\n</config>';
+  return writeZip([
+    { name: '3D/3dmodel.model', data: root },
+    { name: '3D/Objects/part_1.model', data: part(1, [Mesh.encodeSolidPaint(3), null]) },
+    { name: '3D/Objects/part_2.model', data: part(2, [Mesh.encodeSolidPaint(7), Mesh.encodeSolidPaint(7)]) },
+    { name: 'Metadata/project_settings.config', data: project(LOADED8) },
+    { name: 'Metadata/model_settings.config', data: ms },
+    { name: 'Metadata/slice_info.config', data: STUB_SLICE },
+  ].map((m) => ({ name: m.name, data: Buffer.from(m.data), store: !!store })));
+}
+cases['painted-two-members.3mf'] = twoMembers();
+// The same project with every member STORED (method 0), as some writers leave
+// them: a stored member is read at its packed size whatever its entry
+// declares, which is what the Mac's size budgets are tested against.
+cases['painted-two-members-stored.3mf'] = twoMembers(true);
 const expected = {};
 for (const [name, buf] of Object.entries(cases)) {
   fs.writeFileSync(path.join(__dirname, name), buf);

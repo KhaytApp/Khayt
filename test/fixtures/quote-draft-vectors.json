@@ -1,0 +1,17 @@
+{
+  "about": "lib/order-edit.js quoteIsDraft / partsLock: whether a quote is POSITIVELY a draft, so its price may follow a parts change without asking. Every app runs these cases through its own engine. ctx may carry `client` or `clients` (for the customer's commLog). `draft` is quoteIsDraft's answer; partsLock's askPrice is its opposite for a quote.",
+  "cases": [
+    { "why": "made by an app that stamps sharing, nothing sent", "order": { "id": "Q1", "status": "quote", "quoteShareStamped": true, "quoteSentAt": "2026-11-01" }, "draft": true },
+    { "why": "no marker: made by an older app, may have gone out unstamped", "order": { "id": "Q2", "status": "quote" }, "draft": false },
+    { "why": "shared", "order": { "id": "Q3", "status": "quote", "quoteShareStamped": true, "quoteSharedAt": "2026-11-14T10:00:00Z" }, "draft": false },
+    { "why": "accepted", "order": { "id": "Q4", "status": "quote", "quoteShareStamped": true, "quoteAcceptedAt": "2026-11-14" }, "draft": false },
+    { "why": "revised", "order": { "id": "Q5", "status": "quote", "quoteShareStamped": true, "quoteRevisions": [{ "v": 1 }] }, "draft": false },
+    { "why": "version 2", "order": { "id": "Q6", "status": "quote", "quoteShareStamped": true, "quoteVersion": 2 }, "draft": false },
+    { "why": "followed up (the follow-up carries the total)", "order": { "id": "Q7", "status": "quote", "quoteShareStamped": true, "followUpSentAt": "2026-11-15T09:00:00Z", "followUpCount": 1 }, "draft": false },
+    { "why": "a follow-up count alone", "order": { "id": "Q8", "status": "quote", "quoteShareStamped": true, "followUpCount": 2 }, "draft": false },
+    { "why": "a message to the customer logged against this job (ctx.clients)", "order": { "id": "Q9", "status": "quote", "quoteShareStamped": true, "clientId": "C1" }, "ctx": { "clients": [{ "id": "C1", "commLog": [{ "id": "m1", "at": "2026-11-15T09:00:00Z", "orderId": "Q9", "text": "Your quote" }] }] }, "draft": false },
+    { "why": "the same, with ctx.client", "order": { "id": "Q10", "status": "quote", "quoteShareStamped": true, "clientId": "C1" }, "ctx": { "client": { "id": "C1", "commLog": [{ "id": "m1", "at": "2026-11-15T09:00:00Z", "orderId": "Q10", "text": "Your quote" }] } }, "draft": false },
+    { "why": "the customer's messages about OTHER jobs do not count", "order": { "id": "Q11", "status": "quote", "quoteShareStamped": true, "clientId": "C1" }, "ctx": { "clients": [{ "id": "C1", "commLog": [{ "id": "m1", "at": "2026-11-15T09:00:00Z", "orderId": "J-OTHER", "text": "Ready" }, { "id": "m2", "at": "2026-11-15T09:00:00Z", "text": "Hello" }] }] }, "draft": true },
+    { "why": "another customer's log does not count", "order": { "id": "Q12", "status": "quote", "quoteShareStamped": true, "clientId": "C1" }, "ctx": { "clients": [{ "id": "C2", "commLog": [{ "id": "m1", "at": "2026-11-15T09:00:00Z", "orderId": "Q12" }] }] }, "draft": true }
+  ]
+}

@@ -22,8 +22,17 @@ extension KhaytEngine {
         public let askPrice: Bool
     }
 
-    public func partsLock(_ order: JSONValue) throws -> PartsLock {
-        try runtime.call2("globalThis.KhaytOrderEdit.partsLock(ARG0)", [order], as: PartsLock.self)
+    /// `client` (the job's customer record) or `clients` (the book's, the job's
+    /// is found by `clientId`) lets the rule read the customer's message log:
+    /// a message logged against this job means the quote has gone out, so it
+    /// is not a draft and the sheet asks (`quoteIsDraft`, #2528). With
+    /// neither, the rule judges by the job alone, as before; both default to
+    /// nil so every earlier call still compiles and means what it meant.
+    public func partsLock(_ order: JSONValue, client: JSONValue? = nil,
+                          clients: [JSONValue]? = nil) throws -> PartsLock {
+        try runtime.call2("""
+            globalThis.KhaytOrderEdit.partsLock(ARG0, { client: ARG1 || undefined, clients: ARG2 || undefined })
+            """, [order, client ?? .null, clients.map(JSONValue.array) ?? .null], as: PartsLock.self)
     }
 
     /// The margin the job was priced at, in percent, or nil where it cannot

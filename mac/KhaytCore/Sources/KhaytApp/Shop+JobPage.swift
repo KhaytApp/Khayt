@@ -102,9 +102,13 @@ extension Shop {
 
     /// The customer has been sent this quote: stamp `quoteSharedAt`, once.
     ///
-    /// Called where a quote really leaves — its link copied or published, a
-    /// WhatsApp or an email opened with it, a follow-up sent, its paper
-    /// shared. From then on the rule leads with "Take the job" instead of
+    /// Called where a quote really leaves — its link copied or published
+    /// (the tracking page's and the quote's own approval link), a WhatsApp or
+    /// an email opened with it, a follow-up sent, its paper shared, saved as
+    /// a PDF or printed. Since `quoteIsDraft` (#2524) this is also what stops
+    /// a parts change from moving, without asking, a price the customer has
+    /// seen: a path that sends a quote and does not call this leaves it a
+    /// "draft". From then on the rule leads with "Take the job" instead of
     /// "Send quote" (Turki, Nov 11). `quoteSentAt` is not this: it is written
     /// on every quote when it is created.
     ///
