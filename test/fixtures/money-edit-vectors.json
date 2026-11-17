@@ -1,0 +1,989 @@
+{
+ "about": "lib/order-edit.js applyJobEdit on jobs made by newOrder (beta.40 money review, Nov 17). Each `order` is newOrder's record; `next` is what the sheet sends; `ctx` adds to {now, ids, settings {currency SAR, rushPct 25}, clients [], priceSeenOk true}. `want.price` is what a FRESH newOrder of the edited job costs, where one exists. `unexplainedShareBefore` is KhaytOrderEdit.unexplainedShare(order) before the edit (Mac #2537).",
+ "settings": {
+  "currency": "SAR",
+  "rushPct": 25
+ },
+ "cases": [
+  {
+   "why": "100% discount: a costed part doubled, then the discount taken off, prices at the markup (HIGH)",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 5,
+    "price": 40,
+    "discountPct": 100,
+    "priceBeforeDiscount": 150,
+    "agreedAmount": 40,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": "2027-01-16",
+    "priority": false,
+    "marginPct": 50,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 50,
+      "baseCost": 100,
+      "partStatus": "pending"
+     },
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 40,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 100,
+      "baseCost": 200
+     },
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 40
+     }
+    ],
+    "discountPct": 0
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 340
+   }
+  },
+  {
+   "why": "100% discount: doubling a costed part keeps the stored base at the markup",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 5,
+    "price": 0,
+    "discountPct": 100,
+    "priceBeforeDiscount": 150,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": "2027-01-16",
+    "priority": false,
+    "marginPct": 50,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 50,
+      "baseCost": 100,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 100,
+      "baseCost": 200
+     }
+    ]
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 0,
+    "priceBeforeDiscount": 300
+   }
+  },
+  {
+   "why": "a 10% fee line follows the price when the cost doubles (HIGH)",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 5,
+    "price": 111.11,
+    "discountPct": 0,
+    "priceBeforeDiscount": null,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "extraLines": [
+     {
+      "label": "Fee",
+      "pct": 10,
+      "fee": true,
+      "amount": 11.11
+     }
+    ],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": "2027-01-16",
+    "priority": false,
+    "marginPct": 0,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 50,
+      "baseCost": 100,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 100,
+      "baseCost": 200
+     }
+    ]
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 222.22,
+    "extraLines": [
+     22.22
+    ]
+   }
+  },
+  {
+   "why": "a 10% fee line follows a 50% discount (it overcharged)",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 5,
+    "price": 111.11,
+    "discountPct": 0,
+    "priceBeforeDiscount": null,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "extraLines": [
+     {
+      "label": "Fee",
+      "pct": 10,
+      "fee": true,
+      "amount": 11.11
+     }
+    ],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": "2027-01-16",
+    "priority": false,
+    "marginPct": 0,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 50,
+      "baseCost": 100,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "discountPct": 50
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 55.56,
+    "extraLines": [
+     5.56
+    ]
+   }
+  },
+  {
+   "why": "a 5% surcharge follows the price; a fixed line stays as typed",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 5,
+    "price": 112,
+    "discountPct": 0,
+    "priceBeforeDiscount": null,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "extraLines": [
+     {
+      "label": "Card",
+      "pct": 5,
+      "amount": 5
+     },
+     {
+      "label": "Box",
+      "amount": 7
+     }
+    ],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": "2027-01-16",
+    "priority": false,
+    "marginPct": 0,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 50,
+      "baseCost": 100,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 100,
+      "baseCost": 200
+     }
+    ]
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 217,
+    "extraLines": [
+     10,
+     7
+    ]
+   }
+  },
+  {
+   "why": "overhead per hour follows the quantity: 5 h at 4/h, qty 1 to 3 (MED-HIGH)",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 5,
+    "price": 45,
+    "discountPct": 0,
+    "priceBeforeDiscount": null,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": "2027-01-16",
+    "priority": false,
+    "marginPct": 50,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 5,
+      "baseCost": 10,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "overheadCost": 20,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 3,
+      "printTime": 5,
+      "printWeight": 15,
+      "baseCost": 30
+     }
+    ]
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 135,
+    "overheadCost": 60
+   }
+  },
+  {
+   "why": "overhead follows a print-time change",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 5,
+    "price": 45,
+    "discountPct": 0,
+    "priceBeforeDiscount": null,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": "2027-01-16",
+    "priority": false,
+    "marginPct": 50,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 5,
+      "printWeight": 5,
+      "baseCost": 10,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "overheadCost": 20,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "A",
+      "name": "a",
+      "qty": 1,
+      "printTime": 8,
+      "printWeight": 6,
+      "baseCost": 12
+     }
+    ]
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 66,
+    "overheadCost": 32
+   }
+  },
+  {
+   "why": "a fractional quantity counts as newOrder counts it (2.5 of an agreed 100 is 250)",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 0,
+    "price": 100,
+    "discountPct": 0,
+    "priceBeforeDiscount": null,
+    "agreedAmount": 100,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": null,
+    "priority": false,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 100,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 2.5,
+      "agreedPrice": 100
+     }
+    ]
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 250
+   }
+  },
+  {
+   "why": "a negative agreed price is refused, not read as a costed part",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 0,
+    "price": 100,
+    "discountPct": 0,
+    "priceBeforeDiscount": null,
+    "agreedAmount": 100,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": null,
+    "priority": false,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 100,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": -50
+     }
+    ]
+   },
+   "ctx": {},
+   "want": {
+    "ok": false,
+    "reason": "bad_price"
+   }
+  },
+  {
+   "why": "unexplainedShare 0: a clean agreed-100 job plus a 50 part at the shop markup 30 is 165",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 0,
+    "price": 100,
+    "discountPct": 0,
+    "priceBeforeDiscount": null,
+    "agreedAmount": 100,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": null,
+    "priority": false,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 100,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 100
+     },
+     {
+      "name": "c",
+      "qty": 1,
+      "printWeight": 25,
+      "baseCost": 50
+     }
+    ]
+   },
+   "ctx": {
+    "marginPct": 30
+   },
+   "want": {
+    "ok": true,
+    "price": 165,
+    "unexplainedShareBefore": 0
+   }
+  },
+  {
+   "why": "unexplainedShare 0: agreed 100 with rush, shipping 20 and 10% off, plus a 50 part at 30 is 218.13",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 0,
+    "price": 145,
+    "discountPct": 10,
+    "priceBeforeDiscount": 0,
+    "agreedAmount": 100,
+    "shippingCost": 20,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": null,
+    "priority": false,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 100,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFee": 25,
+    "rushFeeAmount": 25,
+    "quoteAcceptedAt": null
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 100
+     },
+     {
+      "name": "c",
+      "qty": 1,
+      "printWeight": 25,
+      "baseCost": 50
+     }
+    ]
+   },
+   "ctx": {
+    "marginPct": 30
+   },
+   "want": {
+    "ok": true,
+    "price": 218.13,
+    "unexplainedShareBefore": 0
+   }
+  },
+  {
+   "why": "an agreed-100 job whose price is 300 keeps 300 (unexplained 200, so no markup is passed)",
+   "order": {
+    "id": "J",
+    "project": "",
+    "clientId": null,
+    "productId": null,
+    "material": "",
+    "printTime": 0,
+    "price": 300,
+    "discountPct": 0,
+    "priceBeforeDiscount": null,
+    "agreedAmount": 100,
+    "shippingCost": 0,
+    "deliveredAt": null,
+    "carrier": null,
+    "trackingNumber": null,
+    "labelUrl": null,
+    "shippedAt": null,
+    "shippingStatus": null,
+    "shippingHistory": [],
+    "shippingService": null,
+    "shipmentMeta": null,
+    "attachedFiles": [],
+    "status": "pending",
+    "queuePos": 1,
+    "machineId": null,
+    "materialDeducted": false,
+    "depositAmount": 0,
+    "paymentStatus": "unpaid",
+    "paidAmount": 0,
+    "paymentMethod": null,
+    "paidAt": null,
+    "notes": "",
+    "internalNotes": "",
+    "invoiceNotes": "",
+    "clientRef": null,
+    "tags": [],
+    "dueDate": null,
+    "priority": false,
+    "printPhotos": [],
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 100,
+      "partStatus": "pending"
+     }
+    ],
+    "components": [],
+    "assemblyQty": 1,
+    "actualPrintTime": null,
+    "actualWeight": null,
+    "rushFeeAmount": 0,
+    "quoteAcceptedAt": null,
+    "priceSource": "override",
+    "priceOverride": 300
+   },
+   "next": {
+    "parts": [
+     {
+      "id": "B",
+      "name": "b",
+      "qty": 1,
+      "agreedPrice": 100
+     },
+     {
+      "name": "c",
+      "qty": 1,
+      "printWeight": 25,
+      "baseCost": 50
+     }
+    ]
+   },
+   "ctx": {},
+   "want": {
+    "ok": true,
+    "price": 300,
+    "unexplainedShareBefore": 200
+   }
+  }
+ ]
+}

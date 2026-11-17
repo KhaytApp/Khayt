@@ -2410,7 +2410,7 @@ function openOrderEditor(orderId) {
       // is billed — is lib/order-edit.js `repriceTerms`, which the Mac's
       // order editor runs too. It reads the OLD extra lines off the order, so
       // it runs before they are replaced below.
-      EditRules().repriceTerms(order, {
+      const repriced = EditRules().repriceTerms(order, {
         discountPct: draft.discountPct,
         shippingCost: draft.shippingCost,
         extraLines: draft.extraLines,
@@ -2422,8 +2422,11 @@ function openOrderEditor(orderId) {
       if (typedPrice !== '') {
         EditRules().applyEdit(order, { price: Math.max(0, +typedPrice || 0) }, { now: Date.now(), id: uid('edit'), settings });
       }
-      // Persist extra lines (after price recalculation to use correct prev values)
-      order.extraLines = draft.extraLines.length > 0 ? draft.extraLines.map(l => ({ ...l })) : undefined;
+      // Persist extra lines (after price recalculation to use correct prev
+      // values). A reprice has already written them with each percentage
+      // line resolved at the new price; writing the draft over that put a
+      // 10% fee back at its old amount (beta.40 money review).
+      if (!repriced) order.extraLines = draft.extraLines.length > 0 ? draft.extraLines.map(l => ({ ...l })) : undefined;
       // Persist custom metadata fields
       const customFields = settings.customFields || [];
       if (customFields.length > 0) {
