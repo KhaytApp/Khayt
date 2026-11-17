@@ -313,6 +313,33 @@ async function testClientCurrencyQuote(window) {
   if (!ok) throw new Error(`client-currency quote failed: ${JSON.stringify(r)}`);
 }
 
+// Edit then Update in the calculator's cart puts back the SAME part: its id
+// and its place. It came back with a new id at the end of the cart, so
+// nothing that pointed at the part found it again (beta.40 review, Nov 17).
+async function testEditedPartKeepsItsId(window) {
+  const r = await window.evaluate(() => {
+    switchTab('calculator-tab');
+    currentBuild = [
+      { id: 'PRT-E2E-A', name: 'first', material: 'PLA', baseCost: 10, printTime: 1, qty: 1, printWeight: 10 },
+      { id: 'PRT-E2E-B', name: 'second', material: 'PLA', baseCost: 20, printTime: 2, qty: 1, printWeight: 20 },
+    ];
+    renderBuild();
+    editPart(0);
+    $('#partName').value = 'first, renamed';
+    addPart();
+    const out = currentBuild.map((p) => [p.id, p.name]);
+    // A part added fresh still gets a new id.
+    $('#partName').value = 'third'; $('#printWeight').value = '5'; $('#printTime').value = '1';
+    addPart();
+    const fresh = currentBuild[currentBuild.length - 1];
+    out.push([/^PRT-/.test(fresh.id) && fresh.id !== 'PRT-E2E-A' && fresh.id !== 'PRT-E2E-B', fresh.name]);
+    currentBuild = []; renderBuild();
+    return out;
+  });
+  const want = [['PRT-E2E-A', 'first, renamed'], ['PRT-E2E-B', 'second'], [true, 'third']];
+  if (JSON.stringify(r) !== JSON.stringify(want)) throw new Error(`edited part lost its id or place: ${JSON.stringify(r)}`);
+}
+
 // The invoice is drawn inside the app window, so the app's `td { color:
 // var(--text) }` used to paint the quantity column in the theme's text colour
 // (pale grey on white under a dark theme, in print and PDF). Every cell must
@@ -792,6 +819,7 @@ try {
   await testMilestoneProforma(window);
   await testInvoiceCellsTakePaperInk(window);
   await testClientCurrencyQuote(window);
+  await testEditedPartKeepsItsId(window);
   await testToastButtonClickable(window);
   await testRestoreBackupKeepsItsSecrets(window);
   const owner = testStoreOwnership();
