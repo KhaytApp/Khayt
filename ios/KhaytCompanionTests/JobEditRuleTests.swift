@@ -530,6 +530,55 @@ final class JobEditRuleTests: XCTestCase {
         }
     }
 
+    // MARK: - The customer's messages about a quote (#2528)
+
+    /// The shared rule reads the job's customer from the book's clients: a
+    /// quote its customer was messaged about (`commLog` entry with this
+    /// job's `orderId`) is not a draft, so a re-price asks. The phone passes
+    /// the book's clients to every `applyJobEdit` (Edit job, its preview, and
+    /// Revise), so its saves see the same.
+    func testAQuoteItsCustomerWasMessagedAboutAsksBeforeARePrice() async throws {
+        func quote(_ id: String) -> JSONValue {
+            .object(["id": .string(id), "project": .string("Bracket"), "status": .string("quote"),
+                     "quoteShareStamped": .bool(true), "quoteVersion": .number(1), "clientId": .string("C-MSG"),
+                     "price": .number(150), "marginPct": .number(50), "paidAmount": .number(0),
+                     "priority": .bool(false), "parts": .array([Self.part("a", base: 60), Self.part("b", base: 40)])])
+        }
+        let log: JSONValue = .array([.object(["id": .string("m1"), "at": .string("2026-11-15T09:00:00Z"),
+                                              "orderId": .string("Q-MSG"), "text": .string("Your quote")])])
+        var store = SampleShop.book()
+        store["printLog"] = .array([quote("Q-MSG"), quote("Q-QUIET")])
+        var clients: [JSONValue] = []
+        if case .array(let c)? = store["clients"] { clients = c }
+        clients.append(.object(["id": .string("C-MSG"), "name": .string("Sample customer"), "commLog": log]))
+        store["clients"] = .array(clients)
+        let book = CompanionBook(directory: dir)
+        try book.replace(with: store, scope: nil)
+        let api = KhaytAPIClient(settings: settings, book: book)
+
+        // Messaged about it: asked first, nothing written.
+        let before = try book.read()
+        do {
+            try await api.editOrder(orderId: "Q-MSG", fields: ["marginPct": .number(25)], now: now)
+            XCTFail("a quote its customer was messaged about is asked first")
+        } catch let refusal as BookWriter.JobEditRefused {
+            XCTAssertTrue(refusal.needsAsking, String(describing: refusal.reason))
+        }
+        XCTAssertEqual(try book.read(), before, "nothing written while asking")
+        // Revise asks the same.
+        do {
+            try await api.reviseQuote(orderId: "Q-MSG", fields: ["marginPct": .number(25)])
+            XCTFail("Revise asks too")
+        } catch let refusal as BookWriter.JobEditRefused {
+            XCTAssertTrue(refusal.needsAsking)
+        }
+        // The same customer's other quote, never messaged about: a draft.
+        let wrote = try await api.editOrder(orderId: "Q-QUIET", fields: ["marginPct": .number(25)], now: now)
+        XCTAssertTrue(wrote)
+        guard case .object(let quiet) = try row(book, "Q-QUIET") else { return XCTFail("the quote") }
+        XCTAssertEqual(quiet["price"], .number(125))
+    }
+
     // MARK: - What the shop sees
 
     func testAPriceBelowWhatWasPaidIsRefusedInTheMacsWordsAndNothingIsWritten() async throws {
