@@ -182,7 +182,10 @@ extension Shop {
             }
             /// Still the book this pass began on: a switch of book cancels the
             /// pass (above), and this stops one that is mid-file.
-            func stillHere() -> Bool { !Task.isCancelled && self?.source == source }
+            @MainActor func stillHere() -> Bool {
+                guard !Task.isCancelled, let now = self?.source else { return false }
+                return now == source
+            }
             for file in due {
                 guard stillHere() else { break }
                 guard let record = raw[file.id] else { continue }
@@ -214,8 +217,10 @@ extension Shop {
             // What was read is kept even when the pass was cut short: each
             // record's write is compare-and-set, so a book switched meanwhile
             // is not this one and nothing in it matches.
-            guard await writeReadColours(), wroteAny, let self, self.source == source else { return }
-            await self.load(self.source)
+            guard await writeReadColours(), wroteAny, let self else { return }
+            let now = self.source
+            guard now == source else { return }
+            await self.load(now)
         }
     }
 }
