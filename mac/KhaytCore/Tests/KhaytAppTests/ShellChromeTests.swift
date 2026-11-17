@@ -221,7 +221,7 @@ struct ShelfTitleTests {
         await shop.load(.sample)
         for shelf in [Shop.Shelf.dashboard, .board, .customers, .machines, .inventory,
                       .expenses, .waste, .reports, .catalogue, .colour, .calculator,
-                      .portfolio, .giftCards] {
+                      .portfolio, .giftCards, .connectedApps] {
             shop.shelf = shelf
             let title = shop.shelfTitle
             #expect(!title.contains("."), Comment(rawValue:

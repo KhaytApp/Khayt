@@ -332,6 +332,9 @@ struct ShellSidebar: View {
                 .init(.machines, "mac.machines", dot: shop.anySiteMachineRunning ? Khayt.thread : nil),
                 .init(.inventory, "mac.inventory", alarm: shop.lowSpools.filter { shop.inSite(spool: $0) }.count),
                 .init(.expenses, "mac.nav_expenses"),
+                // Files waiting from a slicer: news, so a count; none, nothing.
+                .init(.connectedApps, "mac.apps_title",
+                      count: shop.slicerUploads.isEmpty ? nil : shop.slicerUploads.count),
             ])
             group("mac.group_money", [
                 .init(.reports, "mac.nav_reports"),

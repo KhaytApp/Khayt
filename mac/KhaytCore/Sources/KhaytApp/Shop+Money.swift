@@ -663,6 +663,8 @@ extension Shop {
     /// asks, so a mode gate is not explained in the staff lock's words.
     func hiddenByMode(_ shelf: Shelf) -> Bool {
         if let area = Self.lockArea(of: shelf), !lockAllows(area, "view") { return false }
+        // Dark like the pairing itself (`LanConnectorPairing.enabled`).
+        if shelf == .connectedApps, !LanConnectorPairing.enabled { return false }
         guard let gate = Self.gate(of: shelf) else { return false }
         return !has(gate)
     }
