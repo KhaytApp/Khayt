@@ -1194,6 +1194,27 @@ extension Shop {
          "unknown": words.callIt("mac.move_refused")]
     }
 
+    /// The parts-lock codes that also shut the job's PRICE: its invoice has
+    /// gone to ZATCA, it was voided or credited, or it is cancelled. Such a
+    /// job's discount, typed price, shipping and extra charges are not
+    /// offered for editing (beta.40 full review: they were, and the rule did
+    /// not refuse them either). A finished job (`deducted`) keeps its price
+    /// editable, as before.
+    nonisolated static let priceLockCodes: Set<String> = ["zatca", "voided", "credited", "cancelled"]
+
+    nonisolated static func priceShut(_ lock: KhaytEngine.PartsLock?) -> Bool {
+        lock?.code.map { priceLockCodes.contains($0) } ?? false
+    }
+
+    /// Why the price is shut, in the shop's words: the parts sentence's
+    /// reason, with "its price" for "its parts".
+    static func priceLockWords(_ words: Words) -> [String: String] {
+        ["zatca": words.callIt("mac.price_locked_zatca"),
+         "voided": words.callIt("mac.price_locked_voided"),
+         "credited": words.callIt("mac.price_locked_credited"),
+         "cancelled": words.callIt("mac.price_locked_cancelled")]
+    }
+
     /// What may be done to this job's parts, for a sheet to say before the
     /// shop tries; nil without an engine or the job.
     func partsLock(_ id: Order.ID) async -> KhaytEngine.PartsLock? {

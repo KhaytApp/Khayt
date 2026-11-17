@@ -74,7 +74,9 @@ extension Shop {
                     return try await jobSaved(order, rest, clients: clients, settings: settings,
                                               engine: engine, refusals: refusals, now: now)
                 }
-                let key = (r.step == "customer" ? "customer." : "") + (r.reason ?? "")
+                // The customer rule's and the price lock's reasons share codes
+                // with the parts rule's (`zatca`…), and each has its own sentence.
+                let key = (r.step == "customer" ? "customer." : r.step == "price" ? "price." : "") + (r.reason ?? "")
                 throw MoveRefused(sentence: refusals[key] ?? refusals[r.reason ?? ""] ?? refusals["unknown"]!,
                                   code: r.reason)
             }
@@ -123,6 +125,7 @@ extension Shop {
     static func jobSaveRefusalWords(_ words: Words) -> [String: String] {
         var out = partsRefusalWords(words)
         for (reason, said) in customerLockWords(words) { out["customer." + reason] = said }
+        for (reason, said) in priceLockWords(words) { out["price." + reason] = said }
         return out
     }
 
