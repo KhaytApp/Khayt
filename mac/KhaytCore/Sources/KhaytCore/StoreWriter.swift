@@ -91,6 +91,7 @@ public enum StoreWriter {
                                         owns: () -> Bool,
                                         whoHasIt: () -> String?,
                                         recordingDeletes: Bool,
+                                        announce: Bool = true,
                                         mutate: (inout [String: JSONValue]) throws -> Void) throws {
         // Never a write from inside a write: the outer one would save its
         // older copy over this one's change (see `chain`).
@@ -125,7 +126,7 @@ public enum StoreWriter {
         guard owns() else {
             throw Refusal.notOurs(whoHasIt() ?? "Another app took the book")
         }
-        try atomicWrite(next, to: url, keepingRollback: fromRollback)
+        try atomicWrite(next, to: url, keepingRollback: fromRollback, announce: announce)
     }
 
     /// The same, for a change that has to ask the shared JavaScript what to do.
@@ -440,6 +441,7 @@ public enum StoreWriter {
         owns: @escaping @Sendable () -> Bool,
         whoHasIt: @escaping @Sendable () -> String?,
         recordingDeletes: Bool = true,
+        announce: Bool = true,
         mutate: @escaping @Sendable (inout [String: JSONValue]) throws -> T
     ) async throws -> T {
         _ = chainKeyed
@@ -448,7 +450,7 @@ public enum StoreWriter {
                 do {
                     var out: T?
                     try readModifyWrite(storeURL: url, owns: owns, whoHasIt: whoHasIt,
-                                        recordingDeletes: recordingDeletes) { root in
+                                        recordingDeletes: recordingDeletes, announce: announce) { root in
                         out = try mutate(&root)
                     }
                     // `mutate` ran (the write would have thrown otherwise).
@@ -472,7 +474,12 @@ public enum StoreWriter {
     /// `keepingRollback` is for the one write that started from `.prev` because
     /// the book itself was damaged (`readBookNoting`): `.prev` is then the only
     /// good copy, and it is not replaced by the damaged file on the way.
-    public static func atomicWrite(_ data: Data, to url: URL, keepingRollback: Bool = false) throws {
+    ///
+    /// `announce: false` is for a write nothing on another machine needs (a
+    /// derived field read from a file, written unstamped): it does not tell
+    /// `didWrite`, so it starts no sync. Every other write announces.
+    public static func atomicWrite(_ data: Data, to url: URL, keepingRollback: Bool = false,
+                                   announce: Bool = true) throws {
         let tmp = url.deletingLastPathComponent()
             .appending(path: "\(url.lastPathComponent).tmp.\(ProcessInfo.processInfo.processIdentifier).\(UUID().uuidString)")
         let fm = FileManager.default
@@ -528,7 +535,7 @@ public enum StoreWriter {
             throw POSIXError(code)
         }
         // AFTER the swap, and only on success. See `didWrite`.
-        Task { @MainActor in StoreWriter.didWrite?(url) }
+        if announce { Task { @MainActor in StoreWriter.didWrite?(url) } }
     }
 
     // MARK: - Deleting
