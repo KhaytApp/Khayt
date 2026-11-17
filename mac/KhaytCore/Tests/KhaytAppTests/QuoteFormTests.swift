@@ -366,7 +366,7 @@ struct QuoteFormImportTests {
 
     static func run(_ payload: JSONValue, cloud: Cloud, scratch: Scratch, engine: KhaytEngine,
                     existing: @escaping (String) -> String? = { _ in nil },
-                    now: Date = QuoteFormTests.fixedNow, withoutFile: Bool = false) async throws -> Shop.QuoteFormResult {
+                    now: Date = QuoteFormImportTests.fixedNow, withoutFile: Bool = false) async throws -> Shop.QuoteFormResult {
         let item = CloudIntake.Item(id: "21", payload: payload, createdAt: Date())
         let meta = try #require(item.file)
         let order = try await Shop.onlineOrder(item, products: [], stock: .object([:]), engine: engine)
