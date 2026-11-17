@@ -649,6 +649,13 @@ extension Shop {
     /// So the answer lives here once, and everything that can navigate asks.
     /// The waste log is deliberately absent: it is not gated in
     /// `lib/feature-tiers.js` either.
+    /// A screen that exists only while its feature's flag is on: Connected
+    /// apps, dark like "Pair a slicer". Pure, so a test need not touch the
+    /// flag every LAN suite shares.
+    nonisolated static func flagAllows(_ shelf: Shelf, pairingOn: Bool) -> Bool {
+        shelf != .connectedApps || pairingOn
+    }
+
     static func gate(of shelf: Shelf) -> String? {
         switch shelf {
         case .expenses: "expenses"
@@ -664,7 +671,7 @@ extension Shop {
     func hiddenByMode(_ shelf: Shelf) -> Bool {
         if let area = Self.lockArea(of: shelf), !lockAllows(area, "view") { return false }
         // Dark like the pairing itself (`LanConnectorPairing.enabled`).
-        if shelf == .connectedApps, !LanConnectorPairing.enabled { return false }
+        if !Self.flagAllows(shelf, pairingOn: LanConnectorPairing.enabled) { return false }
         guard let gate = Self.gate(of: shelf) else { return false }
         return !has(gate)
     }

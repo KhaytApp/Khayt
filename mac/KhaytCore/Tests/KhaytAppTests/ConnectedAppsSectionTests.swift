@@ -9,18 +9,28 @@ import KhaytCore
 @Suite(.serialized)
 struct ConnectedAppsSectionTests {
 
-    @Test("dark while Pair a slicer is off: no row, not reachable, not restored")
-    func darkWhileOff() async throws {
-        LanConnectorPairing.enabledForTests = false
-        defer { LanConnectorPairing.enabledForTests = false }
-        guard !UserDefaults.standard.bool(forKey: "connectorPairing") else { return }
+    // The flag (`LanConnectorPairing.enabledForTests`) is shared by every LAN
+    // suite, which turn it ON while running in parallel. These tests never
+    // switch it off: the gates are pure and take the flag as an argument.
+
+    @Test("dark while Pair a slicer is off: no row, not reachable, no Help article")
+    func darkWhileOff() {
+        #expect(!Shop.flagAllows(.connectedApps, pairingOn: false))
+        #expect(Shop.flagAllows(.connectedApps, pairingOn: true))
+        for other in [Shop.Shelf.machines, .inventory, .giftCards, .jobs(nil)] {
+            #expect(Shop.flagAllows(other, pairingOn: false), "\(other) is not behind the flag")
+        }
+        #expect(!HelpBook.shown("connected-apps", pairingOn: false))
+        #expect(HelpBook.shown("connected-apps", pairingOn: true))
+        #expect(HelpBook.shown("machines", pairingOn: false), "every other article is always there")
+        #expect(HelpBook.order.contains("connected-apps"))
+    }
+
+    @Test("on: named, restored, its own title, nothing to search")
+    func onScreen() async throws {
+        LanConnectorPairing.enabledForTests = true   // only ever turned ON, as the LAN suites do
         let shop = Shop()
         await shop.load(.sample)
-        #expect(!shop.canShow(.connectedApps))
-        #expect(Shelves.shelf("connected-apps", in: shop) == nil, "a window does not reopen onto it")
-        #expect(!shop.goToScreens().entries.contains { $0.id == "screen:connected-apps" })
-
-        LanConnectorPairing.enabledForTests = true
         #expect(shop.canShow(.connectedApps))
         #expect(Shelves.shelf("connected-apps", in: shop) == .connectedApps)
         #expect(Shelves.name(.connectedApps) == "connected-apps")
@@ -28,18 +38,6 @@ struct ConnectedAppsSectionTests {
         #expect(shop.showingConnectedApps)
         #expect(shop.shelfTitle == shop.words.callIt("mac.apps_title"))
         #expect(!shop.canSearch, "nothing to search on this screen")
-    }
-
-    @Test("the Help article on connected apps is in the book only while Pair a slicer is on")
-    func helpFollowsTheFlag() {
-        LanConnectorPairing.enabledForTests = false
-        defer { LanConnectorPairing.enabledForTests = false }
-        guard !UserDefaults.standard.bool(forKey: "connectorPairing") else { return }
-        #expect(HelpBook.order.contains("connected-apps"))
-        #expect(!HelpBook.shown("connected-apps"))
-        #expect(HelpBook.shown("machines"), "every other article is always there")
-        LanConnectorPairing.enabledForTests = true
-        #expect(HelpBook.shown("connected-apps"))
     }
 
     @Test("Remove keeps the slicer's waiting files and says how many")

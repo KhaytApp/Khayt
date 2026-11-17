@@ -919,6 +919,13 @@ final class Activator: NSObject, NSApplicationDelegate {
             // Only the beta.13 scenes (licence warning and credit, the proof
             // sheet, the From-slicer inbox, payment terms), on the sample, in
             // memory (`SnapshotBeta13.swift`).
+            // Only the Connected apps section (Figma page 16), on the sample,
+            // in memory (`SnapshotConnectedApps.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_APPS"] == "1", let shop = subject {
+                await captureConnectedApps(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_B13"] == "1", let shop = subject {
                 await captureBeta13(shop, into: dir, dark: dark)
                 NSApp.terminate(nil)

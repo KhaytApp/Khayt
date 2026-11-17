@@ -19,21 +19,20 @@ import KhaytCore
 /// sent and never matched to clients.
 struct ConnectedAppsScreen: View {
     @Bindable var shop: Shop
+    /// Read the paired slicers and the inbox again on appearing. Off only for
+    /// a snapshot of the sample, whose slicers and files are in memory.
+    var refreshes = true
+    /// In a scroll view, as the window shows it. A snapshot draws the content
+    /// alone: an offscreen render of a scroll view comes back empty.
+    var scrolls = true
     @State private var removing: LanDevices.Listed?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-                slicers
-                inbox
-                plugin
-            }
-            .padding(28)
-            .frame(maxWidth: 900, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        Group {
+            if scrolls { ScrollView { page } } else { page }
         }
         .task {
+            guard refreshes else { return }
             shop.refreshConnectedApps()
             shop.refreshSlicerInbox()
         }
@@ -44,6 +43,18 @@ struct ConnectedAppsScreen: View {
                   cancel: shop.words.callIt("common.cancel")) { app in
             shop.removeConnector(app.id)
         }
+    }
+
+    private var page: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            header
+            slicers
+            inbox
+            plugin
+        }
+        .padding(28)
+        .frame(maxWidth: 900, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var header: some View {
@@ -77,7 +88,7 @@ struct ConnectedAppsScreen: View {
                         let waiting = Self.filesFrom(app.id, shop: shop)
                         if waiting > 0 {
                             Text(shop.words.counting(waiting, "mac.apps_files_from"))
-                                .font(.caption).foregroundStyle(Khayt.thread)
+                                .font(.caption).foregroundStyle(Khayt.brand)
                         }
                     }
                     Spacer(minLength: 0)
@@ -124,7 +135,7 @@ struct ConnectedAppsScreen: View {
                     id: \.offset) { i, key in
                 Divider()
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(verbatim: String(i + 1)).font(.body.monospaced()).foregroundStyle(Khayt.thread)
+                    Text(verbatim: String(i + 1)).font(.body.monospaced()).foregroundStyle(.secondary)
                     Text(shop.words.callIt(key)).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 9)
