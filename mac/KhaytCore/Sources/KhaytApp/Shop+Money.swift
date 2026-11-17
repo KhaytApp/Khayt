@@ -670,17 +670,22 @@ extension Shop {
     /// asks, so a mode gate is not explained in the staff lock's words.
     func hiddenByMode(_ shelf: Shelf) -> Bool {
         if let area = Self.lockArea(of: shelf), !lockAllows(area, "view") { return false }
-        // Dark like the pairing itself (`LanConnectorPairing.enabled`).
-        if !Self.flagAllows(shelf, pairingOn: LanConnectorPairing.enabled) { return false }
         guard let gate = Self.gate(of: shelf) else { return false }
         return !has(gate)
     }
 
-    func canShow(_ shelf: Shelf) -> Bool {
+    /// `pairingOn` is `LanConnectorPairing.enabled` in the app; a parameter
+    /// so a test can ask both ways without writing the shared flag.
+    func canShow(_ shelf: Shelf, pairingOn: Bool = LanConnectorPairing.enabled) -> Bool {
         // The operator lock first: a screen the person signed in may not see
         // is not reachable by ANY path that asks here — the sidebars, the menu
         // bar, a window restoring onto it, and the content switch itself.
         if let area = Self.lockArea(of: shelf), !lockAllows(area, "view") { return false }
+        // Dark like the pairing itself. It was asked only in `hiddenByMode`,
+        // where false means "not hidden", so Connected apps showed in the
+        // sidebar, Go To and a restored window with a Pair button that did
+        // nothing (beta.41 pre-cut review).
+        if !Self.flagAllows(shelf, pairingOn: pairingOn) { return false }
         guard let gate = Self.gate(of: shelf) else { return true }
         return has(gate)
     }
