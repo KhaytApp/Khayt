@@ -29,6 +29,7 @@ enum Mark: String, CaseIterable {
     case dashboard, jobs, board, machines, filament, library, catalogue
     case calculator, colour, giftCards, portfolio, expenses, waste, reports, clients
     case nozzle, clock
+    case connectedApps
 }
 
 /// What a mark is made of, in the 24-unit square.
@@ -147,6 +148,12 @@ extension Mark {
         // Three spools of filament, overlapping where their colours mix.
         case .colour:
             Ink(rings: [(p(9, 10), 4.6), (p(15, 10), 4.6), (p(12, 15.5), 4.6)])
+
+        // A plug on its cable: what a slicer is joined to the shop by. Not
+        // an antenna or a cloud — it is a cable on this Mac's own network.
+        case .connectedApps:
+            Ink(lines: [[p(9, 3), p(9, 8)], [p(15, 3), p(15, 8)], [p(12, 15), p(12, 19), p(19, 19)]],
+                closed: [[p(5, 8), p(19, 8), p(19, 15), p(5, 15)]])
 
         // A card with a bow above it. A ribbon crossing a card both ways drew
         // a window pane.

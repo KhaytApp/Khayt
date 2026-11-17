@@ -258,7 +258,7 @@ struct ScreenActions: View {
             && !shop.showingMachines && !shop.showingInventory
             && !shop.showingExpenses && !shop.showingWaste && !shop.showingReports
             && !shop.showingCatalogue && !shop.showingColour && !shop.showingPortfolio
-            && !shop.showingCalculator && !shop.showingGiftCards
+            && !shop.showingCalculator && !shop.showingGiftCards && !shop.showingConnectedApps
     }
 
     /// The jobs table: the screen the app falls through to, so it is named by
@@ -268,7 +268,7 @@ struct ScreenActions: View {
             && !shop.showingMachines && !shop.showingInventory && !shop.showingExpenses
             && !shop.showingWaste && !shop.showingReports && !shop.showingCatalogue
             && !shop.showingCalculator && !shop.showingColour && !shop.showingPortfolio
-            && !shop.showingGiftCards && !shop.showingCustomers
+            && !shop.showingGiftCards && !shop.showingCustomers && !shop.showingConnectedApps
     }
 
     /// The screen's primary action — the one thing it exists to add — which

@@ -58,6 +58,18 @@ struct MoveBanners: View {
                 }
             }
         }
+        // A FILE SENT AGAIN, ALREADY WAITING. Not added twice (one hash rule
+        // for every way in), and said so, until the shop dismisses it.
+        if let again = shop.slicerDuplicate {
+            Banner(text: shop.words.callIt("mac.su_duplicate", ["name": .string(again)]),
+                   symbol: "doc.on.doc", tint: Khayt.brand) {
+                Button(shop.words.callIt("mac.review") + "\u{2026}") {
+                    shop.slicerDuplicate = nil
+                    shop.showingSlicerInbox = true
+                }
+                Button(shop.words.callIt("common.close")) { shop.slicerDuplicate = nil }
+            }
+        }
         // FILES A SLICER SENT (`SlicerInboxSheet`), waiting for the shop.
         if !shop.slicerUploads.isEmpty, !shop.showingSlicerInbox {
             Banner(text: shop.words.counting(shop.slicerUploads.count, "mac.su_waiting"),
