@@ -359,9 +359,14 @@ struct QuoteFormImportTests {
         }
     }
 
+    /// The clock these runs are judged at: before the fixture's file expires
+    /// (`expiresAt` 2026-11-05), so a run on a later day is not a different
+    /// test (beta.40 full review).
+    static let fixedNow = ISO8601DateFormatter().date(from: "2026-11-04T10:00:00Z")!
+
     static func run(_ payload: JSONValue, cloud: Cloud, scratch: Scratch, engine: KhaytEngine,
                     existing: @escaping (String) -> String? = { _ in nil },
-                    now: Date = Date(), withoutFile: Bool = false) async throws -> Shop.QuoteFormResult {
+                    now: Date = QuoteFormTests.fixedNow, withoutFile: Bool = false) async throws -> Shop.QuoteFormResult {
         let item = CloudIntake.Item(id: "21", payload: payload, createdAt: Date())
         let meta = try #require(item.file)
         let order = try await Shop.onlineOrder(item, products: [], stock: .object([:]), engine: engine)
