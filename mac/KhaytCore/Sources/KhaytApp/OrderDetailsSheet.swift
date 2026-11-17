@@ -166,9 +166,9 @@ struct OrderDetailsSheet: View {
 
     @ViewBuilder private var money: some View {
         let code = (job?.currency.isEmpty ?? true) ? shop.currency : (job?.currency ?? shop.currency)
-        // Sent to ZATCA, voided, credited or cancelled: said once, in the
-        // parts rule's own words, and the four money fields are shut.
-        if priceLocked, let why = partsLock?.code.flatMap({ Shop.partsRefusalWords(shop.words)[$0] }) {
+        // Sent to ZATCA, voided, credited or cancelled: said once, for the
+        // price, and the money fields are shut.
+        if priceLocked, let why = partsLock?.code.flatMap({ Shop.priceLockWords(shop.words)[$0] }) {
             Label(why, systemImage: "lock")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

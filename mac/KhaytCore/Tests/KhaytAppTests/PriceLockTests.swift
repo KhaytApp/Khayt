@@ -37,7 +37,29 @@ struct PriceLockTests {
         #expect(sheet.components(separatedBy: ".disabled(priceLocked)").count - 1 == 2, "discount, typed price")
         let editor = MenuCoverageTests.source("OrderDetailsSheet.swift")
         #expect(editor.contains("Task { partsLock = await shop.partsLock(id) }"))
+        #expect(editor.contains("Shop.priceLockWords(shop.words)[$0]"), "the price sentence, not the parts one")
         #expect(editor.components(separatedBy: ".disabled(priceLocked)").count - 1 == 7,
                 "discount, shipping, presets, add line, a line's label, amount and remove")
+    }
+
+    @Test("each price sentence names the price, in English and Arabic")
+    func words() {
+        let shop = Shop()
+        let said = Shop.priceLockWords(shop.words)
+        #expect(Set(said.keys) == Shop.priceLockCodes)
+        for (code, sentence) in said {
+            #expect(sentence.contains("price"), Comment(rawValue: code))
+            #expect(!sentence.hasPrefix("mac."), "a key with no words: \(code)")
+        }
+    }
+
+    @Test("the rule's price refusal (step price) is said with the price sentence")
+    func refusalWords() {
+        let shop = Shop()
+        let all = Shop.jobSaveRefusalWords(shop.words)
+        for code in Shop.priceLockCodes {
+            #expect(all["price." + code] == Shop.priceLockWords(shop.words)[code], Comment(rawValue: code))
+        }
+        #expect(MenuCoverageTests.source("Shop+JobSheet.swift").contains(#"r.step == "price" ? "price." : """#))
     }
 }
