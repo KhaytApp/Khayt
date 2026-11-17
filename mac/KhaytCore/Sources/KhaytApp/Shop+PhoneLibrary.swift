@@ -234,6 +234,12 @@ extension Shop {
                 return .object(row)
             }
             if !colours.isEmpty { o["colors"] = .array(colours) }
+            // The swap count and whether a slicer counted it, as the record
+            // holds them (`lib/lan-library.js` itemOf, #2515), so the phone
+            // says "about N swaps" the way this Mac's card does. Left out
+            // when the record has none; never guessed here.
+            if let swaps = file.swapCount, swaps >= 0 { o["swapCount"] = .number(Double(swaps)) }
+            if let known = file.swapsKnown { o["swapsKnown"] = .bool(known) }
             let measurable = Self.phoneMeasurable.contains(ext)
             o["estimable"] = .bool((mins > 0 && grams > 0) || estimates[file.id] != nil
                                    || (measurable && libraryFileOnDisk(file) != nil))

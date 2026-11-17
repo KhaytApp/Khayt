@@ -115,6 +115,25 @@ struct JobPageTests {
                 "publish, WhatsApp (app and copied fallback), email, copy")
         #expect(MenuCoverageTests.source("InvoiceSheet.swift").contains("await shop.noteQuoteShared(subject.id)"))
         #expect(MenuCoverageTests.source("Shop+Quotes.swift").contains("await noteQuoteShared(id)"))
+        // Since `quoteIsDraft` (#2524) a send path that does not stamp leaves
+        // the quote a "draft" whose price moves without asking. The four that
+        // were missing until beta.40: the quote's own approval link copied
+        // from the inspector, its paper saved as a PDF or printed, and any
+        // WhatsApp message about it (stamped in the one function they pass).
+        let inspector = MenuCoverageTests.source("OrderInspector.swift")
+        let copied = try #require(inspector.range(of: "mac.quote_link_copied"))
+        #expect(inspector[copied.upperBound...].prefix(400).contains("await shop.noteQuoteShared(job.id)"),
+                "Copy quote link")
+        let sheet = MenuCoverageTests.source("InvoiceSheet.swift")
+        #expect(sheet.components(separatedBy: "await shop.noteQuoteShared(subject.id)").count - 1 == 2, "share, save as PDF")
+        let printing = MenuCoverageTests.source("Shop+Conventions.swift")
+        #expect(printing.contains("if await paper.printWithPanel(title: number ?? id, over: window) {\n                    await noteQuoteShared(id)"),
+                "printed, and only when the panel was not cancelled")
+        let whatsApp = MenuCoverageTests.source("WhatsApp.swift")
+        let send = try #require(whatsApp.range(of: "func sendWhatsApp(for job: Order"))
+        let next = try #require(whatsApp.range(of: "func openWhatsAppChat"))
+        #expect(whatsApp[send.upperBound..<next.lowerBound].contains("await noteQuoteShared(job.id)"),
+                "every WhatsApp message about a job passes here")
         // Only a quote, only once, and never on the sample: no write is tried.
         let shop = await Self.shop()
         let quote = try #require(shop.orders.first { $0.status == "quote" })
