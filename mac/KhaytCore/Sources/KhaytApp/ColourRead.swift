@@ -131,11 +131,19 @@ enum ColourRead {
         var digests: [JSONValue] = []
         var total = 0
         for entry in entries where entry.name.lowercased().hasSuffix(".model") {
-            guard entry.size <= memberLimit else { return nil }
-            total = total > Int.max - entry.size ? Int.max : total + entry.size
+            // What a member COSTS is the larger of the two sizes its
+            // directory entry claims, not the declared one alone: a stored
+            // member is read at its compressed size whatever it declares, so
+            // an entry saying "1 byte" over 20 MB of data, a thousand times
+            // at one offset, passed every budget and was read in full
+            // (beta.40 pre-release review).
+            let cost = max(entry.size, entry.compressedSize)
+            guard cost <= memberLimit else { return nil }
+            total = total > Int.max - cost ? Int.max : total + cost
             guard total <= totalLimit else { return nil }
             let text: String? = await PinWork.run {
-                guard let data = try? Zip.data(of: entry, in: url, limit: .max) else { return nil }
+                // `Zip.data` refuses on either size too, before reading.
+                guard let data = try? Zip.data(of: entry, in: url, limit: memberLimit) else { return nil }
                 return String(data: data, encoding: .utf8)
             }
             guard let text, let digest = try? await studio.paintDigest(name: entry.name, mesh: text) else { return nil }

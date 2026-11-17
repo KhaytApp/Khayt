@@ -102,6 +102,22 @@ struct ColourReadTests {
         // The total bounds the work a file can ask for.
         #expect(await ColourRead.slotsByMember(url, entries: entries, studio: studio,
                                                memberLimit: largest, totalLimit: sum - 1) == nil)
+        // A member is costed at the LARGER of its two sizes. A stored member
+        // is read at its compressed size whatever it declares, so an entry
+        // claiming one byte over megabytes of data must not pass the budget.
+        let lying = entries.map { e -> Zip.Entry in
+            guard e.name.lowercased().hasSuffix(".model") else { return e }
+            return Zip.Entry(name: e.name, compressedSize: e.compressedSize, size: 1, method: e.method,
+                             offset: e.offset, flags: e.flags, externalAttributes: e.externalAttributes)
+        }
+        let packed = try #require(models.map(\.compressedSize).max())
+        #expect(await ColourRead.slotsByMember(url, entries: lying, studio: studio,
+                                               memberLimit: packed - 1) == nil,
+                "declared 1 byte, packed past the member budget")
+        let packedSum = models.reduce(0) { $0 + max(1, $1.compressedSize) }
+        #expect(await ColourRead.slotsByMember(url, entries: lying, studio: studio,
+                                               memberLimit: packed, totalLimit: packedSum - 1) == nil,
+                "declared 3 bytes in all, packed past the total")
         // And the colours the card shows are the rule's.
         let want = try #require(try Self.expected()["painted-two-members.3mf"])
         let read = try #require(await ColourRead.colours(url, entries: entries, engine: try KhaytEngine()))
