@@ -8064,6 +8064,21 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytConnectorSlice.check(ARG0, { maxFileBytes: ARG1 })",
                           [capture, .number(Double(maxFileBytes))], as: JSONValue.self)
     }
+    /// The queue a paired slicer plugin's tab may see (`lib/connector-queue.js`):
+    /// `[snapshot JSON, the same without its time]` — the second is what the
+    /// route's ETag is taken over, so an unchanged queue is a 304.
+    public func connectorQueue(book: JSONValue, connectorId: String, nowMs: Double, shopName: String,
+                               inboxWaiting: Int) throws -> [String] {
+        try runtime.call2("""
+            (function (b, o) {
+              var s = globalThis.KhaytConnectorQueue.snapshot(b, o);
+              var t = Object.assign({}, s); delete t.at;
+              return [JSON.stringify(s), JSON.stringify(t)];
+            })(ARG0, ARG1)
+            """, [book, .object(["connectorId": .string(connectorId), "now": .number(nowMs),
+                                 "shopName": .string(shopName), "inboxWaiting": .number(Double(inboxWaiting))])],
+            as: [String].self)
+    }
     /// `YYYY-MM-DD` in the shop's own calendar, as the rule compares it.
     public func lanQuoteExpired(order: JSONValue, today: String) throws -> Bool {
         try runtime.call2("globalThis.KhaytLanQuotePage.isQuoteExpired(ARG0, ARG1)",
