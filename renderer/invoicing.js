@@ -243,7 +243,8 @@ function reviseQuote(orderId) {
   KhaytQuoteRevision.revise(order, Date.now());
   saveAll();
   // Open order editor so operator can revise
-  openOrderEditor(orderId);
+  // The revised quote opens for editing on the job sheet (the old editor is retiring).
+  if (typeof openJobSheet === 'function') openJobSheet(orderId);
 }
 
 function openQuoteRevisionsModal(orderId) {
