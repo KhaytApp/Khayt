@@ -3991,6 +3991,7 @@
  "mac.price_locked_credited": "此任务已开具贷记单，无法更改其价格。",
  "mac.parts_locked_cancelled": "此任务已取消，无法更改其零件。",
  "mac.price_locked_cancelled": "此任务已取消，无法更改其价格。",
+ "mac.payment_refused": "付款未记录：维护任务金额的规则拒绝了它。",
  "mac.parts_name_only": "此任务已完成且耗材已入账，只能更改零件名称。其他更改请记录换卷或重印。",
  "mac.parts_delivered_fixed": "客户已收到的零件不能更改或移除。",
  "mac.parts_paid_exceeds": "此更改会使账单低于已付金额。请先退还差额或开具贷记单。",

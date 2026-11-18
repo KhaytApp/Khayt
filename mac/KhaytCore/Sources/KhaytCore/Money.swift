@@ -376,8 +376,14 @@ public struct PaymentRecorded: Decodable, Sendable {
     /// record a payment that owed one.
     public let webhookEffects: [WebhookEffect]?
     /// Why the rule changed nothing, when it refused — `clearPayment` on a job
-    /// whose payment plan has collected rows says `plan_collected`.
+    /// whose payment plan has collected rows says `plan_collected`;
+    /// `recordPayment` below the plan's recorded rows says `plan_recorded`.
+    /// A refused result's `order` is the order as it was: write nothing.
     public let refused: String?
+    /// The rule's own words for the refusal (an i18n key), when it gives them.
+    public var refusedKey: String? = nil
+    /// The lowest total the rule would take, when the refusal is a floor.
+    public var floor: Double? = nil
 }
 
 /// A job handed over, or a job that was not ready to be.
