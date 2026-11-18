@@ -919,8 +919,16 @@ function addPart() {
     return;
   }
   const part = snapshotPartFromForm();
-  part.id = uid('PRT');
-  currentBuild.push(part);
+  // A part coming back from the form after Edit is the SAME part: it keeps
+  // its id and its place in the cart. It was given a new id at the end,
+  // so nothing that pointed at it (lib/part-ids.js, a part sheet, a file
+  // link) found it again (beta.40 review, Nov 17).
+  const editBtn = $('#btnAddPart');
+  const keptId = editBtn && editBtn.dataset.editing ? editBtn.dataset.editingId : '';
+  const keptAt = editBtn && editBtn.dataset.editing ? parseInt(editBtn.dataset.editingAt, 10) : NaN;
+  part.id = keptId || uid('PRT');
+  if (Number.isInteger(keptAt) && keptAt >= 0 && keptAt <= currentBuild.length) currentBuild.splice(keptAt, 0, part);
+  else currentBuild.push(part);
 
   $('#partName').value = '';
   if ($('#partColour')) $('#partColour').value = '';
@@ -960,6 +968,8 @@ function addPart() {
   if (addBtn && addBtn.dataset.editing) {
     addBtn.textContent = t('calc.quote.add_part');
     delete addBtn.dataset.editing;
+    delete addBtn.dataset.editingId;
+    delete addBtn.dataset.editingAt;
   }
   renderBuild();
   saveBuildDraft();
@@ -1048,6 +1058,9 @@ function editPart(index) {
   if (addBtn) {
     addBtn.textContent = t('calc.cart.update');
     addBtn.dataset.editing = '1';
+    // The part's id and place, so Update puts back the same part (addPart).
+    if (part.id) addBtn.dataset.editingId = String(part.id); else delete addBtn.dataset.editingId;
+    addBtn.dataset.editingAt = String(index);
     addBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }

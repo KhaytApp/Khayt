@@ -52,3 +52,12 @@ test('the live cost preview snapshots the same cost inputs as the cart', () => {
       `the live preview omits ${field}, so it will disagree with the cart`);
   }
 });
+
+test('an edited part keeps its id and its place in the cart (beta.40 review)', () => {
+  const addBody = between('function addPart()', 'currentBuild.push(part)');
+  assert.match(addBody, /part\.id = keptId \|\| uid\('PRT'\)/, 'addPart mints a new id for a part coming back from Edit');
+  assert.match(addBody, /currentBuild\.splice\(keptAt, 0, part\)/, 'an edited part goes back to the end, not to its place');
+  const editBody = between('function editPart', '\n}\n');
+  assert.match(editBody, /dataset\.editingId = String\(part\.id\)/);
+  assert.match(editBody, /dataset\.editingAt = String\(index\)/);
+});
