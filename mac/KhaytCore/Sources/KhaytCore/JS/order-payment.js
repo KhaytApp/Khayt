@@ -171,8 +171,8 @@
         return {
           refused: 'plan_recorded',
           floor,
-          notices: [{ type: 'refused', key: 'pay.plan_floor' }],
-          effects: [{ type: 'toast_refused', key: 'pay.plan_floor' }],
+          notices: [{ type: 'refused', key: 'pay.plan_recorded' }],
+          effects: [{ type: 'toast_refused', key: 'pay.plan_recorded' }],
         };
       }
     }

@@ -5464,7 +5464,7 @@
   "ppd.add": "Add a payment",
   "ppd.left": "Still to collect",
   "ppd.trim": "Use the trimmed amounts",
-  "pay.plan_floor": "This job’s payment plan records more than that as paid. Correct the plan’s payments first.",
+  "pay.plan_recorded": "This job’s payment plan records more than that as paid. Correct the plan’s payments first.",
   "ppd.reopened": "Was covered, but the money behind it was corrected, so it is owed again",
   "ppd.no_base_q": "This plan was made before Khayt kept its starting point. Set it to {amount} (what is paid, less the paid payments) and go on?",
   "ppd.no_base_ok": "Set and go on",

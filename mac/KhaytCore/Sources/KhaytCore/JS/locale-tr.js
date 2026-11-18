@@ -5463,7 +5463,7 @@
   "ppd.add": "Ödeme ekle",
   "ppd.left": "Tahsil edilecek",
   "ppd.trim": "Kırpılmış tutarları kullan",
-  "pay.plan_floor": "Bu işin ödeme planı bundan fazlasını ödendi olarak kaydediyor. Önce planın ödemelerini düzeltin.",
+  "pay.plan_recorded": "Bu işin ödeme planı bundan fazlasını ödendi olarak kaydediyor. Önce planın ödemelerini düzeltin.",
   "ppd.reopened": "Karşılanmıştı ama arkasındaki para düzeltildi, yeniden borç",
   "ppd.no_base_q": "Bu plan, Khayt başlangıç noktasını tutmadan önce yapıldı. {amount} olarak ayarlanıp (ödenen eksi ödenmiş taksitler) devam edilsin mi?",
   "ppd.no_base_ok": "Ayarla ve devam et",

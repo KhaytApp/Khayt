@@ -5463,7 +5463,7 @@
   "ppd.add": "Zahlung hinzufügen",
   "ppd.left": "Noch einzuziehen",
   "ppd.trim": "Gekürzte Beträge verwenden",
-  "pay.plan_floor": "Der Zahlungsplan dieses Auftrags verbucht mehr als das als bezahlt. Zuerst die Planzahlungen korrigieren.",
+  "pay.plan_recorded": "Der Zahlungsplan dieses Auftrags verbucht mehr als das als bezahlt. Zuerst die Planzahlungen korrigieren.",
   "ppd.reopened": "War gedeckt, aber das Geld dahinter wurde korrigiert, daher wieder offen",
   "ppd.no_base_q": "Dieser Plan entstand, bevor Khayt seinen Startpunkt speicherte. Auf {amount} setzen (Bezahltes abzüglich bezahlter Raten) und fortfahren?",
   "ppd.no_base_ok": "Setzen und fortfahren",
