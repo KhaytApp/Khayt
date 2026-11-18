@@ -17266,10 +17266,16 @@ private let PAYMENT_SCRIPT = """
       });
     }
   });
+  // A REFUSAL IS CARRIED, not dropped: without it a refused payment looked
+  // like one recorded, on the Mac and on the phone (beta.41 follow-up).
+  var said = (r.notices || []).filter(function (n) { return n && n.type === 'refused' && n.key; })[0];
   return {
     order: order,
     effects: r.effects.map(function (e) { return e.type; }),
     webhookEffects: webhookEffects,
+    refused: r.refused || null,
+    refusedKey: said ? said.key : null,
+    floor: typeof r.floor === 'number' && isFinite(r.floor) ? r.floor : null,
   };
 })()
 """
