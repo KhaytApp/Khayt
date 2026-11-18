@@ -1,0 +1,12 @@
+{
+  "about": "lib/order-edit.js applyJobEdit and a part's colour (Dev Hub, Nov 18): colour is not money. A colour-only change never reprices and never asks keep-or-new, on a price the customer has seen, and a finished job may still correct it. Frozen jobs stay locked. The Mac and the phone run this file.",
+  "part": { "id": "P-1", "name": "body.stl", "material": "PLA", "filamentId": "F-1", "qty": 2, "printWeight": 100, "printTime": 2, "unitCost": 40, "baseCost": 80 },
+  "cases": [
+    { "why": "a seen price (a booked job): a colour-only change saves, the price stays, nothing is asked", "order": { "id": "J1", "status": "pending", "price": 340, "quoteSharedAt": "2026-11-10T08:00:00Z" }, "colour": "Matte black", "ctx": {}, "want": { "ok": true, "price": 340, "priceSource": null } },
+    { "why": "the same without priceSeenOk or keepPrice: still no question, because nothing priced moved", "order": { "id": "J2", "status": "pending", "price": 340 }, "colour": "Signal red", "ctx": { "priceSeenOk": false }, "want": { "ok": true, "price": 340, "priceSource": null } },
+    { "why": "a finished job (materials deducted: names only) may still correct a colour", "order": { "id": "J3", "status": "completed", "price": 340, "materialDeducted": true }, "colour": "Gold", "ctx": {}, "want": { "ok": true, "price": 340, "priceSource": null } },
+    { "why": "taking a colour off (an empty value: a part is merged over its old copy, so leaving the field out keeps it) saves, no reprice", "order": { "id": "J4", "status": "pending", "price": 340 }, "colourBefore": "Blue", "colour": "", "ctx": {}, "want": { "ok": true, "price": 340, "priceSource": null } },
+    { "why": "a voided job stays locked, colour included", "order": { "id": "J5", "status": "pending", "price": 340, "voidedAt": "2026-11-13T09:00:00Z" }, "colour": "Matte black", "ctx": {}, "want": { "ok": false, "reason": "voided" } },
+    { "why": "a job reported to ZATCA stays locked", "order": { "id": "J6", "status": "completed", "price": 340, "zatcaUuid": "u-1" }, "colour": "Matte black", "ctx": {}, "want": { "ok": false, "reason": "zatca" } }
+  ]
+}

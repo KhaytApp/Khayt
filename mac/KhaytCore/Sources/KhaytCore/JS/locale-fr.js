@@ -5473,6 +5473,8 @@
   "js.create_job": "Accepter la commande",
   "js.save_quote": "Enregistrer comme devis",
   "js.sec_job": "Commande",
+  "js.colour_line": "couleur : {colour}",
+  "js.colour_unset": "couleur : non définie",
   "js.due_suggested": "Suggérée d’après la file d’attente. Modifiez-la si vous avez convenu d’une autre date.",
   "js.capacity_note": "La file de {machine} se termine le {date}, après cette échéance",
   "js.capacity_hint": "Vous pouvez quand même enregistrer. Déplacez le travail vers une autre machine depuis sa page, ou choisissez une date plus tardive.",

@@ -109,6 +109,10 @@
     const field = (label, inner, cls) => `<label class="js-field ${cls || ''}"><span>${escapeHtml(label)}</span>${inner}</label>`;
     const clientOpts = [`<option value="">${escapeHtml(t('js.no_customer'))}</option>`]
       .concat(list('clients').map((c) => `<option value="${escapeHtml(c.id)}"${c.id === order.clientId ? ' selected' : ''}>${escapeHtml(localName(c) || c.id)}</option>`)).join('');
+    // The colour the customer asked for, per part (Figma 102:1447): the shop's
+    // filament colours suggested, as the old editor's list was.
+    const colourOpts = [...new Set(Object.values((settings && settings.filamentColours) || {}).flat().filter(Boolean))]
+      .map((c) => `<option value="${escapeHtml(String(c))}">`).join('');
     const filOpts = list('inventory').map((i) => `<option value="${escapeHtml(i.id)}">${escapeHtml(i.material || i.id)}</option>`).join('');
     const marg = isNew ? null : ED().marginOf(order);
     // Job details (Figma 100:1527): the shop's own fields, tags, the two notes.
@@ -153,6 +157,8 @@
       ${lock.edit ? `<div class="js-add" data-js="addRow">
         ${field(t('js.part'), `<input type="text" data-js="pName" placeholder="${escapeHtml(t('js.name'))}">`)}
         ${field(t('js.filament'), `<select data-js="pFil">${filOpts}</select>`)}
+        ${field(t('ord.part_colour'), `<input type="text" data-js="pColour" list="jsColourDL">`)}
+        <datalist id="jsColourDL">${colourOpts}</datalist>
         ${field(t('js.grams'), `<input type="number" min="0" step="any" data-js="pGrams" value="0">`)}
         ${field(t('js.hours'), `<input type="number" min="0" step="any" data-js="pHours" value="0">`)}
         ${field(t('js.qty'), `<input type="number" min="1" step="1" data-js="pQty" value="1">`)}
@@ -323,7 +329,8 @@
       q('partsHead').textContent = t('js.sec_parts', { n: st.parts.length });
       q('parts').innerHTML = st.parts.length ? st.parts.map((p, i) => {
         const g = +p.printWeight || 0;
-        const sub = [`×${Math.max(1, +p.qty || 1)}`, p.material || '', g ? `${Math.round(g)} g` : '', hrs(p.printTime)].filter(Boolean).join(' · ');
+        const colour = String(p.colour || '').trim();
+        const sub = [`×${Math.max(1, +p.qty || 1)}`, p.material || '', colour ? t('js.colour_line', { colour }) : t('js.colour_unset'), g ? `${Math.round(g)} g` : '', hrs(p.printTime)].filter(Boolean).join(' · ');
         const delivered = p.delivered === true;
         return `<div class="js-part${st.editing === i ? ' is-editing' : ''}" data-i="${i}">
           <div><div class="js-part-name">${escapeHtml(p.name || '—')}</div><div class="js-hint">${escapeHtml(sub)}</div></div>
@@ -412,6 +419,7 @@
       st.editing = i;
       q('pName').value = p.name || '';
       if (p.filamentId && list('inventory').some((x) => x.id === p.filamentId)) q('pFil').value = p.filamentId;
+      q('pColour').value = p.colour || '';
       q('pGrams').value = String(+p.printWeight || 0);
       q('pHours').value = String(+p.printTime || 0);
       q('pQty').value = String(Math.max(1, +p.qty || 1));
@@ -425,12 +433,17 @@
       const hours = Math.max(0, num(q('pHours').value));
       const qty = Math.max(1, Math.round(num(q('pQty').value) || 1));
       const filId = q('pFil').value;
+      const colour = q('pColour').value.trim();
       if (st.editing === -1) {
         const fil = filamentFields(filId) || {};
-        st.parts.push(costed(Object.assign({ name, printWeight: grams, printTime: hours, qty }, fil), order));
+        st.parts.push(costed(Object.assign({ name, printWeight: grams, printTime: hours, qty }, fil, colour ? { colour } : {}), order));
       } else {
         const old = st.parts[st.editing];
         let p = Object.assign({}, old, { name });
+        // Colour is not money: it moves on a finished job too, and never re-costs.
+        // Cleared with an empty value: the rule merges each part over its old
+        // copy (applyParts), so a colour left out would come back.
+        if (colour) p.colour = colour; else if (old.colour) p.colour = '';
         if (!lock.nameOnly) {
           const filChanged = filId && filId !== old.filamentId;
           Object.assign(p, { printWeight: grams, printTime: hours, qty }, filChanged ? filamentFields(filId) : {});
@@ -441,7 +454,7 @@
       }
       st.touched = true;
       st.editing = -1;
-      q('pName').value = ''; q('pGrams').value = '0'; q('pHours').value = '0'; q('pQty').value = '1';
+      q('pName').value = ''; q('pColour').value = ''; q('pGrams').value = '0'; q('pHours').value = '0'; q('pQty').value = '1';
       drawParts();
       refresh();
     }
