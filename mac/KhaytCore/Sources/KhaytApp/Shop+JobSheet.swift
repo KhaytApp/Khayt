@@ -58,6 +58,9 @@ extension Shop {
         var fields = save.fields
         if case .some(let to) = save.customer { fields["clientId"] = to.map(JSONValue.string) ?? .null }
         if let parts = save.parts { fields["parts"] = .array(parts) }
+        // The Not business box goes through the same rule, in the same edit
+        // (#2562): refused once a tax invoice is issued, or on a frozen job.
+        if let mark = save.nonBusiness { fields["nonBusiness"] = .bool(mark) }
         var out = order
         if !fields.isEmpty {
             let r = try await engine.applyJobEdit(
@@ -76,13 +79,13 @@ extension Shop {
                 }
                 // The customer rule's and the price lock's reasons share codes
                 // with the parts rule's (`zatca`…), and each has its own sentence.
-                let key = (r.step == "customer" ? "customer." : r.step == "price" ? "price." : "") + (r.reason ?? "")
+                let key = (r.step == "customer" ? "customer." : r.step == "price" ? "price."
+                           : r.step == "business" ? "business." : "") + (r.reason ?? "")
                 throw MoveRefused(sentence: refusals[key] ?? refusals[r.reason ?? ""] ?? refusals["unknown"]!,
                                   code: r.reason)
             }
             if r.changed { out = r.order }
         }
-        if let mark = save.nonBusiness { out = try await engine.setNonBusiness(out, on: mark) }
         return out
     }
 
@@ -126,6 +129,7 @@ extension Shop {
         var out = partsRefusalWords(words)
         for (reason, said) in customerLockWords(words) { out["customer." + reason] = said }
         for (reason, said) in priceLockWords(words) { out["price." + reason] = said }
+        for (reason, said) in businessLockWords(words) { out["business." + reason] = said }
         return out
     }
 

@@ -978,10 +978,12 @@ extension Shop {
     @discardableResult
     func editJob(_ id: Order.ID, fields: [String: JSONValue], nonBusiness: Bool? = nil) async -> Bool {
         guard permitted("orders", "edit") else { return false }
+        let business = Self.businessLockWords(words)
         return await writeToOneOrder(id, named: words.callIt("mac.edit_job"), as: .person("orders", "edit")) { order, engine, root in
             OneOrderEdit(order: try await Self.jobEdited(order, fields: fields, nonBusiness: nonBusiness,
                                                          settings: Self.settings(root), engine: engine,
-                                                         now: Date(), editId: Self.uid("edit")))
+                                                         now: Date(), editId: Self.uid("edit"),
+                                                         businessWords: business))
         }
     }
 
@@ -992,7 +994,8 @@ extension Shop {
     /// write path finds no change, stamps nothing and syncs nothing.
     static func jobEdited(_ order: JSONValue, fields: [String: JSONValue], nonBusiness: Bool?,
                           settings: [String: JSONValue], engine: KhaytEngine,
-                          now: Date, editId: String) async throws -> JSONValue {
+                          now: Date, editId: String,
+                          businessWords: [String: String] = [:]) async throws -> JSONValue {
         var out = order
         if !fields.isEmpty {
             // The shop's settings, so a typed price caps the payment at the
@@ -1000,7 +1003,11 @@ extension Shop {
             out = try await engine.editJob(order: out, fields: fields, settings: settings,
                                            now: now, editId: editId).order
         }
-        if let nonBusiness { out = try await engine.setNonBusiness(out, on: nonBusiness) }
+        // Through the shared rule, which refuses it once the invoice is issued.
+        if let nonBusiness {
+            out = try await markedBusiness(out, nonBusiness: nonBusiness, settings: settings, engine: engine,
+                                           words: businessWords, now: now)
+        }
         return out
     }
 
@@ -1008,8 +1015,10 @@ extension Shop {
     /// itself — or as business again. It leaves revenue, order counts and the
     /// reports; it still wears the nozzle and still took the machine's time.
     func setNonBusiness(_ id: Order.ID, _ on: Bool) async {
-        await writeToOneOrder(id, named: words.callIt("mac.not_business"), as: .person("orders", "edit")) { order, engine, _ in
-            OneOrderEdit(order: try await engine.setNonBusiness(order, on: on))
+        let refusals = Self.businessLockWords(words)
+        await writeToOneOrder(id, named: words.callIt("mac.not_business"), as: .person("orders", "edit")) { order, engine, root in
+            OneOrderEdit(order: try await Self.markedBusiness(order, nonBusiness: on, settings: Self.settings(root),
+                                                              engine: engine, words: refusals, now: Date()))
         }
     }
 
@@ -1031,6 +1040,7 @@ extension Shop {
         }
         let actionName = words.callIt("mac.not_business")
         var undo: [ChangedRecord] = []
+        var marked = 0, locked = 0
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
@@ -1039,10 +1049,16 @@ extension Shop {
             ) { root in
                 undo = []  // the book moved and this runs again: one entry, not two
                 let orders = Self.rows(root, "printLog")
-                let changed = try await Self.markedNotBusiness(orders, ids: ids, engine: engine)
-                Self.write(&root, "printLog", changed: changed, before: orders, into: &undo)
+                let done = try await Self.markedNotBusiness(orders, ids: ids, engine: engine)
+                marked = done.changed.count; locked = done.locked
+                Self.write(&root, "printLog", changed: done.changed, before: orders, into: &undo)
             }
             registerMoveUndo(undo, named: actionName)
+            // Some could not be marked (frozen): said, with how many of each.
+            if locked > 0 {
+                importNote = words.callIt("mac.not_business_some_locked",
+                                          ["n": .number(Double(marked)), "m": .number(Double(locked))])
+            }
             await load(source)
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
@@ -1053,17 +1069,23 @@ extension Shop {
 
     /// The patch `markNotBusiness` writes, with no store in it: the asked-for
     /// jobs that the rule STILL counts as finished and charged nothing, each
-    /// marked by the shared setter. Anything else is left out.
+    /// marked through the shared edit rule (`applyJobEdit`, #2562/#2566),
+    /// which allows it on an issued invoice whose total is zero and refuses it
+    /// on a frozen job (sent to ZATCA, voided, credited, cancelled). Those
+    /// are left as they are and counted (`locked`). Anything else is left out.
     static func markedNotBusiness(_ orders: [JSONValue], ids: [Order.ID],
-                                  engine: KhaytEngine) async throws -> [JSONValue] {
+                                  engine: KhaytEngine) async throws -> (changed: [JSONValue], locked: Int) {
         let still = Set(try await engine.unpricedFinished(orders: orders).ids)
         let wanted = Set(ids).intersection(still)
         var changed: [JSONValue] = []
+        var locked = 0
         for order in orders {
             guard let id = recordId(order), wanted.contains(id) else { continue }
-            changed.append(try await engine.setNonBusiness(order, on: true))
+            let r = try await engine.applyJobEdit(order: order, fields: ["nonBusiness": .bool(true)],
+                                                 now: Date(), editId: uid("edit"), priceId: uid("edit"))
+            if r.ok { if r.changed { changed.append(r.order) } } else { locked += 1 }
         }
-        return changed
+        return (changed, locked)
     }
 
     /// Change one part of a job, and re-cost it.
@@ -1230,6 +1252,32 @@ extension Shop {
             return said == fallback ? fallback : words.callIt(key, params)
         } ?? fallback
         throw MoveRefused(sentence: sentence, code: code)
+    }
+
+    /// Why the Not business mark cannot move, in the shop's words — keyed by
+    /// `lib/order-edit.js`'s reasons for step `business`: an issued tax
+    /// invoice, or a frozen job (#2562).
+    static func businessLockWords(_ words: Words) -> [String: String] {
+        ["invoice_issued": words.callIt("mac.business_locked_invoice_issued"),
+         "zatca": words.callIt("mac.business_locked_zatca"),
+         "voided": words.callIt("mac.business_locked_voided"),
+         "credited": words.callIt("mac.business_locked_credited"),
+         "cancelled": words.callIt("mac.business_locked_cancelled")]
+    }
+
+    /// The Not business mark through the shared rule (`applyJobEdit`), which
+    /// refuses it once a tax invoice is issued or on a frozen job. Throws the
+    /// refusal in the shop's words; hands back the job untouched when the
+    /// mark is already as asked.
+    nonisolated static func markedBusiness(_ order: JSONValue, nonBusiness: Bool, settings: [String: JSONValue],
+                                           engine: KhaytEngine, words: [String: String],
+                                           now: Date) async throws -> JSONValue {
+        let r = try await engine.applyJobEdit(order: order, fields: ["nonBusiness": .bool(nonBusiness)],
+                                             settings: settings, now: now, editId: uid("edit"), priceId: uid("edit"))
+        guard r.ok else {
+            throw MoveRefused(sentence: words[r.reason ?? ""] ?? words["invoice_issued"] ?? "", code: r.reason)
+        }
+        return r.changed ? r.order : order
     }
 
     /// Why the price is shut, in the shop's words: the parts sentence's
