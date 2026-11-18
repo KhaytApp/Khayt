@@ -652,6 +652,48 @@ final class JobEditRuleTests: XCTestCase {
         }
     }
 
+    /// `test/fixtures/business-flag-vectors.json` (#2562): the not-business
+    /// flag moves only before a tax invoice is issued, and never on a frozen
+    /// job — through the phone's engine (KhaytCore's bundled order-edit.js)
+    /// and lib in JSC. The phone has no not-business toggle; this holds its
+    /// copy of the rule to the shared cases all the same.
+    func testTheSharedBusinessFlagVectorsGiveLibsAnswerOnThePhone() async throws {
+        struct Want: Decodable { let ok: Bool; let reason: String?; let step: String?; let nonBusiness: Bool?; let internalNotes: String? }
+        struct Case: Decodable { let why: String; let order: JSONValue; let next: [String: JSONValue]; let want: Want }
+        struct Vectors: Decodable { let cases: [Case] }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "test/fixtures/business-flag-vectors.json")
+        let cases = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url)).cases
+        XCTAssertGreaterThanOrEqual(cases.count, 10)
+        let engine = try await BookReader(book: {
+            let b = CompanionBook(directory: dir); try b.replace(with: SampleShop.book(), scope: nil); return b }()).sharedEngine()
+        for c in cases {
+            let r = try await engine.applyJobEdit(order: c.order, fields: c.next, now: Date(timeIntervalSince1970: 0.001),
+                                                  editId: "e", priceId: "e2")
+            XCTAssertEqual(r.ok, c.want.ok, "\(c.why): \(r.reason ?? "")")
+            guard case .object(let o) = r.order else { XCTFail(c.why); continue }
+            if !c.want.ok {
+                XCTAssertEqual(r.reason, c.want.reason, c.why)
+                XCTAssertEqual(r.step, c.want.step, c.why)
+                XCTAssertEqual(r.order, c.order, "\(c.why): a refusal writes nothing")
+            } else {
+                XCTAssertEqual(o["nonBusiness"] == .bool(true), c.want.nonBusiness == true, c.why)
+                if c.want.nonBusiness != true { XCTAssertNil(o["nonBusiness"], "\(c.why): cleared, not false") }
+                if let notes = c.want.internalNotes { XCTAssertEqual(o["internalNotes"], .string(notes), c.why) }
+            }
+            var wasNonBusiness = false
+            if case .object(let before) = c.order { wasNonBusiness = before["nonBusiness"] == .bool(true) }
+            let lib = try ask("""
+                (function () { var o = \(json(c.order));
+                  var r = KhaytOrderEdit.applyJobEdit(o, \(json(.object(c.next))), { now: 1, id: 'e', priceId: 'e2', settings: {}, clients: [] });
+                  return { ok: r.ok, reason: r.reason || null, nonBusiness: o.nonBusiness === true }; })()
+                """)
+            XCTAssertEqual(lib, .object(["ok": .bool(c.want.ok), "reason": c.want.reason.map(JSONValue.string) ?? .null,
+                                         "nonBusiness": .bool(c.want.ok ? c.want.nonBusiness == true : wasNonBusiness)]),
+                           "lib: \(c.why)")
+        }
+    }
+
     /// Edit job's "asked first" reads the same customers as the save.
     func testEditJobAsksFirstForAQuoteItsCustomerWasMessagedAbout() async throws {
         let quote: JSONValue = .object(["id": .string("Q-MSG"), "project": .string("Bracket"), "status": .string("quote"),
