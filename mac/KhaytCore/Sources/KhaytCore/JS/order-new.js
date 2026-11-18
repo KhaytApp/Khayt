@@ -388,6 +388,21 @@
     return localDateStr(d);
   }
 
+  /**
+   * The share of a job's parts that are priced at cost plus markup, by their
+   * cost: 0 when every part has an agreed price, 1 when none has. A product's
+   * labour and packaging (order-level) go into the PRICE only in this share,
+   * never on top of what the customer agreed (money review of #2581); newOrder
+   * and every edit (lib/order-edit.js) price them by this one rule.
+   */
+  function costedShare(parts) {
+    const list = arrayOf(parts).filter((p) => p && typeof p === 'object');
+    const all = list.reduce((s, p) => s + Math.max(0, num(p.baseCost, 0)), 0);
+    const costed = list.reduce((s, p) => s + (isAgreed(p) ? 0 : Math.max(0, num(p.baseCost, 0))), 0);
+    if (all > 0) return costed / all;
+    return list.some((p) => !isAgreed(p)) ? 1 : 0;
+  }
+
   /** A part the customer has agreed a price for. Zero is a price; absent is not. */
   function isAgreed(p) {
     const v = p && p.agreedPrice;
@@ -562,10 +577,7 @@
     // cost), never on top of what the customer AGREED: a job whose every part
     // has an agreed price priced 300 at 419.63, its invoice lines still
     // summing to 300 (money review of #2581). Always stored as COST, whole.
-    const allCost = parts.reduce((s, p) => s + num(p.baseCost, 0), 0);
-    const costedParts = parts.reduce((s, p) => s + (isAgreed(p) ? 0 : num(p.baseCost, 0)), 0);
-    const costedShare = allCost > 0 ? costedParts / allCost : (parts.some((p) => !isAgreed(p)) ? 1 : 0);
-    const costedAll = costedBase + (labourCost + packagingCost) * costedShare;
+    const costedAll = costedBase + (labourCost + packagingCost) * costedShare(parts);
 
     const P = pricing();
     if (!P) throw new Error('KhaytOrderNew needs KhaytPricing');
@@ -961,7 +973,7 @@
   const TOKEN_BYTES = 16;
 
   const api = {
-    TOKEN_BYTES,
+    costedShare, TOKEN_BYTES,
     allocateInvoice, allocateInvoiceNumber, allocateQuoteSeq, mintOrderId, jobRef, renumber, renumberSnapshot, undoRenumber, avgDailyWorkingHours,
     estimateDueDate, newOrder, previewTotal, canTake, componentsCost, jobCurrency, inShopCurrency, overheadHours, isAgreed,
     invoiceNumberOwed, ensureInvoiceNumber, beganAsQuote, awaitingApproval,
