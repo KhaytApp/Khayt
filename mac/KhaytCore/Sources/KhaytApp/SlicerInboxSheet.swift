@@ -82,7 +82,8 @@ struct SlicerInboxRows: View {
             // Where it came from, and what a plugin ASKED for (never acted on).
             HStack(spacing: 6) {
                 Text(Self.source(item, words: shop.words)).font(.caption).foregroundStyle(.secondary)
-                if let asked = Self.asked(item, words: shop.words) {
+                if let asked = Self.asked(item, words: shop.words,
+                                          machine: { id in shop.machines.first { $0.id == id }?.name }) {
                     Text(asked).font(.caption.weight(.medium))
                         .padding(.horizontal, 6).padding(.vertical, 1)
                         .background(Capsule().fill(Khayt.brand.opacity(0.12)))
@@ -125,12 +126,20 @@ struct SlicerInboxRows: View {
     }
 
     /// What a paired plugin asked for: shown, never done (inbox-first).
-    @MainActor static func asked(_ item: SlicerUpload, words: Words) -> String? {
+    /// `machine`: a machine's name by id, for "Asked: print on U1-01".
+    @MainActor static func asked(_ item: SlicerUpload, words: Words,
+                                 machine: (String) -> String? = { _ in nil }) -> String? {
         guard case .object(let s)? = item.suggested, case .string(let intent)? = s["intent"] else { return nil }
         switch intent {
         case "quote": return words.callIt("mac.su_asked_quote")
         case "job": return words.callIt("mac.su_asked_job")
-        case "print": return words.callIt("mac.su_asked_print")
+        case "print":
+            // The machine by the name the shop knows it; an id it no longer
+            // has is left unsaid rather than shown as a code.
+            if case .string(let id)? = s["machineId"], let name = machine(id), !name.isEmpty {
+                return words.callIt("mac.su_asked_print_on", ["machine": .string(name)])
+            }
+            return words.callIt("mac.su_asked_print")
         case "attach":
             guard case .string(let job)? = s["jobId"] else { return nil }
             return words.callIt("mac.su_asked_attach", ["job": .string(job)])

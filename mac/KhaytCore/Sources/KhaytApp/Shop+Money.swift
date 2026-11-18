@@ -670,17 +670,22 @@ extension Shop {
     /// asks, so a mode gate is not explained in the staff lock's words.
     func hiddenByMode(_ shelf: Shelf) -> Bool {
         if let area = Self.lockArea(of: shelf), !lockAllows(area, "view") { return false }
-        // Dark like the pairing itself (`LanConnectorPairing.enabled`).
-        if !Self.flagAllows(shelf, pairingOn: LanConnectorPairing.enabled) { return false }
         guard let gate = Self.gate(of: shelf) else { return false }
         return !has(gate)
     }
 
-    func canShow(_ shelf: Shelf) -> Bool {
+    /// `pairingOn` is `LanConnectorPairing.enabled` in the app; a parameter
+    /// so a test can ask both ways without writing the shared flag.
+    func canShow(_ shelf: Shelf, pairingOn: Bool = LanConnectorPairing.enabled) -> Bool {
         // The operator lock first: a screen the person signed in may not see
         // is not reachable by ANY path that asks here — the sidebars, the menu
         // bar, a window restoring onto it, and the content switch itself.
         if let area = Self.lockArea(of: shelf), !lockAllows(area, "view") { return false }
+        // Dark like the pairing itself. It was asked only in `hiddenByMode`,
+        // where false means "not hidden", so Connected apps showed in the
+        // sidebar, Go To and a restored window with a Pair button that did
+        // nothing (beta.41 pre-cut review).
+        if !Self.flagAllows(shelf, pairingOn: pairingOn) { return false }
         guard let gate = Self.gate(of: shelf) else { return true }
         return has(gate)
     }
@@ -1192,6 +1197,27 @@ extension Shop {
          "no_parts": words.callIt("mac.parts_last"),
          "missing": words.callIt("mac.move_gone"),
          "unknown": words.callIt("mac.move_refused")]
+    }
+
+    /// The parts-lock codes that also shut the job's PRICE: its invoice has
+    /// gone to ZATCA, it was voided or credited, or it is cancelled. Such a
+    /// job's discount, typed price, shipping and extra charges are not
+    /// offered for editing (beta.40 full review: they were, and the rule did
+    /// not refuse them either). A finished job (`deducted`) keeps its price
+    /// editable, as before.
+    nonisolated static let priceLockCodes: Set<String> = ["zatca", "voided", "credited", "cancelled"]
+
+    nonisolated static func priceShut(_ lock: KhaytEngine.PartsLock?) -> Bool {
+        lock?.code.map { priceLockCodes.contains($0) } ?? false
+    }
+
+    /// Why the price is shut, in the shop's words: the parts sentence's
+    /// reason, with "its price" for "its parts".
+    static func priceLockWords(_ words: Words) -> [String: String] {
+        ["zatca": words.callIt("mac.price_locked_zatca"),
+         "voided": words.callIt("mac.price_locked_voided"),
+         "credited": words.callIt("mac.price_locked_credited"),
+         "cancelled": words.callIt("mac.price_locked_cancelled")]
     }
 
     /// What may be done to this job's parts, for a sheet to say before the

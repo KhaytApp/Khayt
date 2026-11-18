@@ -1618,6 +1618,7 @@
   "audit.all_members": "全部成员",
   "audit.system": "—",
   "audit.act_order_created": "订单已创建",
+  "audit.act_slicer_inbox": "由切片软件发送到收件箱",
   "audit.act_quote_created": "报价已创建",
   "audit.act_status": "状态已更改",
   "set.logo": "企业 Logo",

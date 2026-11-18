@@ -701,3 +701,26 @@ test('a new job can be taken as high or urgent; anything else is normal, in the 
     assert.equal('priorityLevel' in plain, false);
   }
 });
+
+// ── A job made from a paired slicer plugin's inbox file ──────────────────────
+test('a job made from a plugin file keeps where it came from; the plugin tab shows only that file name', () => {
+  const origin = { connectorId: 'dev_SampleStudioPC0001', name: 'Bracket_PLA.gcode',
+    sha256: 'a'.repeat(64), sliceId: 'ABCDEFGHIJKLMNOP', title: 'Keychains for Fatima', clientName: 'Fatima' };
+  const job = N.newOrder(base({ fromSlicer: origin }), ctx());
+  assert.deepEqual(job.fromSlicer, { connectorId: 'dev_SampleStudioPC0001', name: 'Bracket_PLA.gcode',
+    sha256: 'a'.repeat(64), sliceId: 'ABCDEFGHIJKLMNOP' }, 'copied field by field, nothing else rides along');
+  const Q = require('../lib/connector-queue');
+  const snap = Q.snapshot({ printLog: [job] }, { connectorId: 'dev_SampleStudioPC0001' });
+  assert.equal(snap.jobs[0].file, 'Bracket_PLA.gcode', 'the plugin sees its own file on the job');
+  assert.equal(Q.snapshot({ printLog: [job] }, { connectorId: 'dev_OtherPluginDevice1' }).jobs[0].file, null);
+});
+
+test('no plugin, or a malformed origin: the job has no fromSlicer key at all', () => {
+  assert.equal('fromSlicer' in N.newOrder(base(), ctx()), false);
+  for (const bad of [null, 'x', [], { name: 'a.gcode' }, { connectorId: 'not-a-device', name: 'a.gcode' },
+    { connectorId: 'dev_SampleStudioPC0001', name: '' }]) {
+    assert.equal('fromSlicer' in N.newOrder(base({ fromSlicer: bad }), ctx()), false, JSON.stringify(bad));
+  }
+  const odd = N.newOrder(base({ fromSlicer: { connectorId: 'dev_SampleStudioPC0001', name: 'a\u0000b.gcode', sha256: 'XYZ', sliceId: 'bad' } }), ctx()).fromSlicer;
+  assert.deepEqual(odd, { connectorId: 'dev_SampleStudioPC0001', name: 'ab.gcode' });
+});

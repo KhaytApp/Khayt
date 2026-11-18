@@ -1618,6 +1618,7 @@
   "audit.all_members": "すべてのメンバー",
   "audit.system": "—",
   "audit.act_order_created": "注文を作成",
+  "audit.act_slicer_inbox": "スライサーから受信箱に送信",
   "audit.act_quote_created": "見積を作成",
   "audit.act_status": "ステータスを変更",
   "set.logo": "ビジネスロゴ",

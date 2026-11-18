@@ -1660,6 +1660,7 @@
   "audit.all_members": "كل الأعضاء",
   "audit.system": "—",
   "audit.act_order_created": "تم إنشاء طلب",
+  "audit.act_slicer_inbox": "أُرسل إلى الصندوق من برنامج تقطيع",
   "audit.act_quote_created": "تم إنشاء عرض سعر",
   "audit.act_status": "تغيّرت الحالة",
   "set.logo": "شعار المنشأة",

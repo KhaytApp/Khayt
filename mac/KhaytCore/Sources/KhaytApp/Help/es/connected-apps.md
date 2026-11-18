@@ -12,7 +12,7 @@ Los laminadores que envían sus archivos laminados directamente a este Mac, y qu
 ## Emparejar un laminador
 
 - Abre **Apps conectadas** en la barra lateral y haz clic en **Emparejar un laminador**. Durante los dos minutos siguientes, un laminador de tu red puede pedir emparejarse, y el Mac muestra la dirección que hay que escribir.
-- En OrcaSlicer, abre Khayt → Pair → On this network y escribe esa dirección tal cual.
+- En OrcaSlicer, abre la pestaña **Khayt**, escribe esa dirección tal cual y haz clic en **Pair**.
 - El Mac pregunta **¿Aprobar «nombre»?** y dice qué app lo pidió y desde qué dirección. Comprueba que es tu laminador.
 - Ambas pantallas muestran ahora un número de seis cifras. Si son iguales, haz clic en **Los números coinciden — aprobar**. El laminador aparece en Laminadores emparejados.
 
