@@ -705,6 +705,26 @@
     return true;
   }
 
+  /**
+   * Why a job's not-business flag may not move, or null when it may. Frozen
+   * (reported, voided, credited, cancelled): its partsLock code, always. An
+   * issued tax invoice: 'invoice_issued', since VAT is due at issue and the
+   * revenue is reported, UNLESS the invoiced total is zero (the price net of
+   * credit notes is 0, so no revenue and no VAT moves): a finished job
+   * charged nothing may still be marked a gift or a test (Dev Hub decision A,
+   * Nov 18; the Mac's "finished jobs charged nothing" triage).
+   */
+  function nonBusinessLock(order, ctx) {
+    const work = order || {};
+    const frozen = partsLock(work, ctx || {}).code;
+    if (['zatca', 'voided', 'credited', 'cancelled'].indexOf(frozen) !== -1) return frozen;
+    if (!invoiceIssued(work)) return null;
+    const credited = (Array.isArray(work.creditNotes) ? work.creditNotes : [])
+      .reduce((s, cn) => s + (+(cn && cn.amount) || 0), 0);
+    const invoiced = Math.max(0, (+work.price || 0) - credited);
+    return invoiced < 0.005 ? null : 'invoice_issued';
+  }
+
   function partsLock(order, ctx) {
     const none = (code) => ({ code, edit: false, addRemove: false, nameOnly: false, askPrice: false });
     if (!isObj(order)) return none('missing');
@@ -1287,9 +1307,8 @@
     // invoice has left the shop (reported, voided, credited, cancelled).
     // Before an invoice (a quote) it is the shop's to set (Dev Hub, Nov 18).
     if (has(details, 'nonBusiness') && (details.nonBusiness === true) !== (work.nonBusiness === true)) {
-      const frozenCode = partsLock(work, c).code;
-      if (['zatca', 'voided', 'credited', 'cancelled'].indexOf(frozenCode) !== -1) return stop(frozenCode, 'business');
-      if (invoiceIssued(work)) return stop('invoice_issued', 'business');
+      const why = nonBusinessLock(work, c);
+      if (why) return stop(why, 'business');
     }
     if (Object.keys(details).length) {
       // WHATEVER LOWERS THE BILL is held to what has been paid — a typed
@@ -1331,7 +1350,7 @@
     priorityFrom, priorityOf, changesBetween, recordEdit, applyEdit, adjustPrice,
     parseTags, repriceTerms, applyDetails, editLog, timeline,
     customerLocked, canChangeCustomer, changeCustomer,
-    partsLock, invoiceIssued, quoteIsDraft, marginOf, applyMarkup, applyParts, applyJobEdit, unexplainedShare, moneyMoves,
+    partsLock, invoiceIssued, nonBusinessLock, quoteIsDraft, marginOf, applyMarkup, applyParts, applyJobEdit, unexplainedShare, moneyMoves,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderEdit = api;

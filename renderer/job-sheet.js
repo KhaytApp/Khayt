@@ -122,8 +122,8 @@
       || shopFields.some((sf) => (order.customData || {})[sf.id]));
     // Not business moves revenue in or out of the books: the shared rule
     // refuses it once a tax invoice is issued, or on a frozen job.
-    const nbFrozen = !isNew && ['zatca', 'voided', 'credited', 'cancelled'].includes(lock.code) ? lock.code : null;
-    const nbLock = isNew ? null : (nbFrozen || (ED().invoiceIssued && ED().invoiceIssued(order) ? 'invoice_issued' : null));
+    // (The rule's own answer: lib/order-edit.js nonBusinessLock.)
+    const nbLock = isNew ? null : ED().nonBusinessLock(order, { clients: list('clients') });
 
     const bodyHtml = `<div class="job-sheet">
       ${isNew ? '' : `<div class="js-sub">${escapeHtml(ref)}${order.project ? ' · ' + escapeHtml(order.project) : ''}</div>`}
