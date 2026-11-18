@@ -250,11 +250,13 @@ enum Converter {
                 // bound at the same time, so a model in twelve painted parts
                 // costs the sum of them — checking each on its own would let a
                 // file through at twelve times the budget.
-                bound += entry.size
+                // The larger of the two sizes: a member is READ at its
+                // compressed size, whatever it declares (beta.40 full review).
+                bound += max(entry.size, entry.compressedSize)
                 guard bound <= paintInlineLimit else {
                     throw Failure.meshTooBig(entry.name, bytes: bound)
                 }
-                guard let data = try? Zip.data(of: entry, in: source, limit: .max),
+                guard let data = try? Zip.data(of: entry, in: source, limit: paintInlineLimit),
                       let text = String(data: data, encoding: .utf8) else {
                     throw Failure.unreadable("\(entry.name) would not come out as text")
                 }

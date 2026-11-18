@@ -27,9 +27,14 @@ struct StoreWriterTests {
         try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
     }
 
+    /// The SAMPLE book, as CI has it. This Mac's real book only when asked
+    /// for (`KHAYT_STORE_TESTS_REAL=1`): copying a shop's customers and takings
+    /// into the temp folder on every run is not a default (beta.40 full review).
     static func source() throws -> Data {
-        for build in StoreReader.Build.allCases where build.exists {
-            return try Data(contentsOf: build.storeURL)
+        if ProcessInfo.processInfo.environment["KHAYT_STORE_TESTS_REAL"] == "1" {
+            for build in StoreReader.Build.allCases where build.exists {
+                return try Data(contentsOf: build.storeURL)
+            }
         }
         return try Data(contentsOf: Bundle.module.url(forResource: "sample-shop", withExtension: "json")!)
     }
@@ -70,6 +75,11 @@ struct StoreWriterTests {
         case (.object(let p), .object(let q)):
             for key in Set(p.keys).union(q.keys).sorted() where p[key] != q[key] {
                 guard let v = p[key], let w = q[key] else { return "field \(key) \(p[key] == nil ? "appeared" : "vanished")" }
+                // rev and updatedAt are the writer's own stamps, not a shop's
+                // data: said in full, because a re-stamp is the likely cause.
+                if key == "rev" || key == "updatedAt" {
+                    return "field \(key): \(describe(v)) became \(describe(w))"
+                }
                 return "field \(key): " + differ(v, w)
             }
             return "equal objects"
@@ -83,6 +93,34 @@ struct StoreWriterTests {
         default:
             return "a value changed kind"
         }
+    }
+
+    static func describe(_ v: JSONValue) -> String {
+        switch v {
+        case .number(let n): return String(n)
+        case .string(let s): return s
+        default: return "a value"
+        }
+    }
+
+    @Test("two records sharing an id: each compared with its own, so neither is re-stamped")
+    func duplicateIds() throws {
+        let row = { (n: String) -> JSONValue in
+            .object(["id": .string("C1"), "name": .string(n), "rev": .number(3), "updatedAt": .string("2026-11-01T00:00:00.000Z")])
+        }
+        let before: [String: JSONValue] = ["clients": .array([row("first"), row("second")])]
+        var after = before
+        StoreWriter.stampChanged(before: before, after: &after)
+        #expect(after == before, "nothing changed, nothing stamped")
+        // Change the second: only it moves.
+        var edited = before
+        edited["clients"] = .array([row("first"), row("second, edited")])
+        StoreWriter.stampChanged(before: before, after: &edited)
+        guard case .array(let rows)? = edited["clients"], case .object(let a) = rows[0], case .object(let b) = rows[1] else {
+            Issue.record("rows"); return
+        }
+        #expect(a["rev"] == .number(3))
+        #expect(b["rev"] == .number(4))
     }
 
     static func owner() -> Bool { true }

@@ -35,6 +35,22 @@ extension KhaytEngine {
             """, [order, client ?? .null, clients.map(JSONValue.array) ?? .null], as: PartsLock.self)
     }
 
+    /// The share of the job's price explained neither by its parts' cost nor
+    /// by agreed prices (`lib/order-edit.js unexplainedShare`, the rule's
+    /// `pricedFrom(order).base`). Nil where this build's rule does not say,
+    /// which callers must read as "unexplained": a markup passed for such a
+    /// job switches off #2523's rule that its price stays.
+    public func unexplainedShare(_ order: JSONValue) throws -> Double? {
+        try runtime.call2("""
+            (function (o) {
+              var E = globalThis.KhaytOrderEdit;
+              if (!E || typeof E.unexplainedShare !== 'function') return null;
+              var v = E.unexplainedShare(o);
+              return typeof v === 'number' && isFinite(v) ? v : null;
+            })(ARG0)
+            """, [order], as: Double?.self)
+    }
+
     /// The margin the job was priced at, in percent, or nil where it cannot
     /// be said (a typed price, a zero price, no parts): "—, price was typed".
     public func marginOf(_ order: JSONValue) throws -> Double? {

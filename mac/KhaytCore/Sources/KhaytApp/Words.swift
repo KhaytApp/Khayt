@@ -3807,9 +3807,13 @@ final class Words {
         // Parts on an existing job go through the shared rule (S1 B3a):
         // its locks, its refusal, and the price question.
         "mac.parts_locked_zatca": ["en": "This job’s invoice was sent to ZATCA, so its parts can’t be changed.", "ar": "أُرسلت فاتورة هذه المهمة إلى هيئة الزكاة، فلا يمكن تغيير قطعها."],
+        "mac.price_locked_zatca": ["en": "This job’s invoice was sent to ZATCA, so its price can’t be changed.", "ar": "أُرسلت فاتورة هذه المهمة إلى هيئة الزكاة، فلا يمكن تغيير سعرها."],
         "mac.parts_locked_voided": ["en": "This job’s invoice was voided, so its parts can’t be changed.", "ar": "أُلغيت فاتورة هذه المهمة، فلا يمكن تغيير قطعها."],
+        "mac.price_locked_voided": ["en": "This job’s invoice was voided, so its price can’t be changed.", "ar": "أُلغيت فاتورة هذه المهمة، فلا يمكن تغيير سعرها."],
         "mac.parts_locked_credited": ["en": "A credit note was issued for this job, so its parts can’t be changed.", "ar": "صدر إشعار دائن لهذه المهمة، فلا يمكن تغيير قطعها."],
+        "mac.price_locked_credited": ["en": "A credit note was issued for this job, so its price can’t be changed.", "ar": "صدر إشعار دائن لهذه المهمة، فلا يمكن تغيير سعرها."],
         "mac.parts_locked_cancelled": ["en": "This job was cancelled, so its parts can’t be changed.", "ar": "أُلغيت هذه المهمة، فلا يمكن تغيير قطعها."],
+        "mac.price_locked_cancelled": ["en": "This job was cancelled, so its price can’t be changed.", "ar": "أُلغيت هذه المهمة، فلا يمكن تغيير سعرها."],
         "mac.parts_name_only": ["en": "This job is finished and its filament is already counted, so only a part’s name can change. For anything else, record a spool switch or a reprint.", "ar": "هذه المهمة منتهية وخيوطها محسوبة، فلا يمكن تغيير سوى اسم القطعة. لأي شيء آخر سجّل تبديل بكرة أو إعادة طباعة."],
         "mac.parts_delivered_fixed": ["en": "A part the customer already has can’t be changed or removed.", "ar": "لا يمكن تغيير أو حذف قطعة استلمها العميل."],
         "mac.parts_paid_exceeds": ["en": "This change would bring the bill below what has been paid. Refund the difference or issue a credit note first.", "ar": "هذا التغيير يجعل الفاتورة أقل مما دُفع. أعد الفرق أو أصدر إشعارًا دائنًا أولًا."],

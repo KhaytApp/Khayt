@@ -25,8 +25,11 @@ struct StoreRoundTripTests {
 
     /// A store to test against: this Mac's, if there is one, else the sample.
     static func source() throws -> (name: String, data: Data) {
-        for build in StoreReader.Build.allCases where build.exists {
-            return (build.rawValue, try Data(contentsOf: build.storeURL))
+        // The real book only when asked for, as `StoreWriterTests` does.
+        if ProcessInfo.processInfo.environment["KHAYT_STORE_TESTS_REAL"] == "1" {
+            for build in StoreReader.Build.allCases where build.exists {
+                return (build.rawValue, try Data(contentsOf: build.storeURL))
+            }
         }
         let url = Bundle.module.url(forResource: "sample-shop", withExtension: "json")!
         return ("sample", try Data(contentsOf: url))

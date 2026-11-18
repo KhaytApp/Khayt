@@ -57,6 +57,9 @@ struct OrderDetailsSheet: View {
     /// Why the customer cannot be changed (`zatca` | `voided` | `credited` |
     /// `paid`), or nil. Read once when the sheet opens.
     @State private var customerLock: String?
+    /// The parts rule's lock, read for its price codes (`Shop.priceShut`).
+    @State private var partsLock: KhaytEngine.PartsLock?
+    private var priceLocked: Bool { Shop.priceShut(partsLock) }
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
 
@@ -101,6 +104,7 @@ struct OrderDetailsSheet: View {
             form = was
             let id = subject.id
             Task { customerLock = await shop.customerLock(id) }
+            Task { partsLock = await shop.partsLock(id) }
         }
     }
 
@@ -162,14 +166,23 @@ struct OrderDetailsSheet: View {
 
     @ViewBuilder private var money: some View {
         let code = (job?.currency.isEmpty ?? true) ? shop.currency : (job?.currency ?? shop.currency)
+        // Sent to ZATCA, voided, credited or cancelled: said once, for the
+        // price, and the money fields are shut.
+        if priceLocked, let why = partsLock?.code.flatMap({ Shop.priceLockWords(shop.words)[$0] }) {
+            Label(why, systemImage: "lock")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
         HStack(spacing: 16) {
             LabeledContent(shop.words.callIt("oe.discount_pct") + " (%)") {
                 TextField("", value: $form.discountPct, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                     .textFieldStyle(.roundedBorder).frame(width: 70).monospacedDigit()
+                    .disabled(priceLocked)
             }
             LabeledContent(shop.words.callIt("oe.shipping") + " (\(code))") {
                 TextField("", value: $form.shippingCost, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                     .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
+                    .disabled(priceLocked)
             }
         }
         VStack(alignment: .leading, spacing: 6) {
@@ -192,22 +205,27 @@ struct OrderDetailsSheet: View {
                         }
                     }
                     .fixedSize()
+                    .disabled(priceLocked)
                 }
                 Button(shop.words.callIt("calc.add_extra_line")) { form.lines.append(Line()) }
                     .buttonStyle(.link)
+                    .disabled(priceLocked)
             }
             ForEach($form.lines.byID) { $line in
                 HStack(spacing: 8) {
                     TextField(shop.words.callIt("calc.extra_label_ph"), text: $line.label)
                         .textFieldStyle(.roundedBorder)
+                        .disabled(priceLocked)
                     TextField("", value: $line.amount, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                         .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
+                        .disabled(priceLocked)
                     Button {
                         form.lines.removeAll { $0.id == line.id }
                     } label: {
                         Image(systemName: "minus.circle")
                     }
                     .buttonStyle(.borderless)
+                    .disabled(priceLocked)
                     .help(shop.words.callIt("common.delete"))
                     .accessibilityLabel(shop.words.callIt("common.delete"))
                 }

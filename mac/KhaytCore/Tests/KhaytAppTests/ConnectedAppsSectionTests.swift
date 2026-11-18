@@ -26,6 +26,23 @@ struct ConnectedAppsSectionTests {
         #expect(HelpBook.order.contains("connected-apps"))
     }
 
+    /// The gate every path asks (sidebar, Go To, a restored window, the menu
+    /// bar): it asked the flag only where false meant "not hidden", so the
+    /// screen showed with the flag off (beta.41 pre-cut review).
+    @Test("canShow itself is shut while the flag is off, and only for this screen")
+    func canShowIsDark() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(!shop.canShow(.connectedApps, pairingOn: false))
+        #expect(shop.canShow(.connectedApps, pairingOn: true))
+        for other in [Shop.Shelf.machines, .inventory, .giftCards, .dashboard] {
+            #expect(shop.canShow(other, pairingOn: false), "\(other) is not behind the flag")
+        }
+        #expect(!shop.hiddenByMode(.connectedApps), "the flag is not the shop's mode")
+        let src = MenuCoverageTests.source("Shop+Money.swift")
+        #expect(src.contains("if !Self.flagAllows(shelf, pairingOn: pairingOn) { return false }"))
+    }
+
     @Test("on: named, restored, its own title, nothing to search")
     func onScreen() async throws {
         LanConnectorPairing.enabledForTests = true   // only ever turned ON, as the LAN suites do

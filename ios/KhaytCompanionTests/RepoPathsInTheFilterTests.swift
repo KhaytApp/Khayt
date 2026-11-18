@@ -28,11 +28,18 @@ final class RepoPathsInTheFilterTests: XCTestCase {
         XCTAssertTrue(inFilter("ios/KhaytCompanion/App.swift"), "the scan read the real pattern")
         XCTAssertFalse(inFilter("README.md"))
 
+        // The repo's tracked top-level directories, NAMED, not listed from the
+        // checkout at run time: a directory a CI step leaves behind (a build
+        // folder, a cache) must not change what this test counts as a repo
+        // path (#2546 went red on a words-only change). A new top-level
+        // directory a test reads from goes here and in the workflow's pattern.
         let fm = FileManager.default
-        let topDirs = Set(try fm.contentsOfDirectory(atPath: root.path)
-            .filter { !$0.hasPrefix(".") && $0 != "ios" && $0 != "node_modules" }
-            .filter { var d: ObjCBool = false; return fm.fileExists(atPath: root.appending(path: $0).path, isDirectory: &d) && d.boolValue })
-        XCTAssertTrue(topDirs.contains("lib"), "the scan found the repo root")
+        let topDirs: Set<String> = Self.repoTopDirs
+        for dir in topDirs.sorted() {
+            var isDir: ObjCBool = false
+            XCTAssertTrue(fm.fileExists(atPath: root.appending(path: dir).path, isDirectory: &isDir) && isDir.boolValue,
+                          "RepoPathsInTheFilterTests.repoTopDirs names \(dir), which is not a directory in the checkout")
+        }
 
         let tests = root.appending(path: "ios/KhaytCompanionTests")
         // A whole literal with no spaces (a message that names a path is not a read);
@@ -48,6 +55,15 @@ final class RepoPathsInTheFilterTests: XCTestCase {
                 if !inFilter(path) { missed.append("\(name): \(path)") }
             }
         }
-        XCTAssertEqual(missed, [], "add these to ios-contract.yml's pattern, or the iOS job skips PRs that change them")
+        // One line per path, so the job log names it ("Which assertions failed").
+        for miss in missed {
+            XCTFail("repo path not in ios-contract.yml's pattern (the iOS job would skip PRs that change it): \(miss)")
+        }
     }
+
+    /// Every tracked top-level directory but `ios/` and the dot-directories (`git ls-files | cut -d/ -f1 | sort -u`, Nov 17 2026).
+    static let repoTopDirs: Set<String> = [
+        "assets", "contracts", "design", "design-system", "docs", "export", "extension-khayt",
+        "lib", "mac", "plugins", "renderer", "scripts", "site-shots", "store", "test",
+    ]
 }
