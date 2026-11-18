@@ -47,3 +47,13 @@ test('invoiceIssued equals accounting-rows isInvoice for the job as if it were b
   }
   assert.equal(n, statuses.length * flags.length);
 });
+
+test('nonBusinessLock is the rule applyJobEdit refuses by, case for case', () => {
+  for (const c of V.cases) {
+    // Only where the flag moves: sent unchanged, nothing is refused.
+    if ((c.next.nonBusiness === true) === (c.order.nonBusiness === true)) continue;
+    const why = E.nonBusinessLock(clone(c.order), {});
+    if (c.want.ok) assert.equal(why, null, c.why);
+    else assert.equal(why, c.want.reason, c.why);
+  }
+});
