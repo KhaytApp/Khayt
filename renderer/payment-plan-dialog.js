@@ -20,7 +20,7 @@
   const METHODS = ['cash', 'mada', 'transfer', 'stcpay', 'applepay', 'visa', 'other'];
   const byId = (id) => (typeof printLog !== 'undefined' ? printLog.find((o) => o && o.id === id) : null) || null;
   const ctxOf = () => ({ settings, today: localDateStr() });
-  const REASONS = ['over_owed', 'paid_row_locked', 'paid_needs_payment', 'bad_amount', 'over_billed', 'already_paid', 'quote', 'nothing_owed', 'voided', 'cancelled', 'use_recorded', 'not_covered'];
+  const REASONS = ['over_owed', 'paid_row_locked', 'paid_needs_payment', 'bad_amount', 'over_billed', 'already_paid', 'quote', 'nothing_owed', 'voided', 'cancelled', 'use_recorded', 'not_covered', 'no_base'];
   // t() answers the KEY for a missing one, so `t(k) || x` never falls back: name the known reasons.
   const reasonText = (r) => t(REASONS.includes(r.reason) ? 'ppd.refused.' + r.reason : 'js.refused_other', { over: fmt(r.over || 0) });
   let fmt = (n) => String(n);
@@ -52,24 +52,27 @@
       const list = modal.querySelector('[data-pp="rows"]');
       const states = alloc().rows;
       list.innerHTML = rows.length ? rows.map((r, i) => {
-        const locked = !!r.paid;
+        // A covered row whose money was corrected away is owed again (reopened):
+        // it takes a payment like an open one, though it is stored paid.
+        const reopened = !!(states[i] && states[i].reopened);
+        const locked = !!r.paid && !reopened;
         const covered = states[i] && states[i].state === 'covered';
         return `<div class="js-part pp-row${locked ? ' is-paid' : ''}" data-i="${i}">
           <div class="pp-fields">
             <div class="js-part-name">${i + 1} · ${locked ? escapeHtml(t('ppd.due', { date: r.dueDate || '—' })) : ''}</div>
-            ${locked ? '' : `<div class="js-row">
+            ${locked || reopened ? '' : `<div class="js-row">
               <label class="js-field"><span>${escapeHtml(t('ppd.amount'))}</span><input type="number" min="0" step="0.01" data-pp-amt="${i}" value="${escapeHtml(String(r.amount || 0))}"></label>
               <label class="js-field"><span>${escapeHtml(t('ppd.due_date'))}</span><input type="date" data-pp-due="${i}" value="${escapeHtml(r.dueDate || '')}"></label>
               <label class="js-field"><span>${escapeHtml(t('inst.note'))}</span><input type="text" data-pp-note="${i}" value="${escapeHtml(r.note || '')}"></label>
             </div>`}
-            <div class="js-hint">${escapeHtml(covered ? t('ppd.covered') : stateLine(r))}</div>
+            <div class="js-hint">${escapeHtml(covered ? t('ppd.covered') : reopened ? t('ppd.reopened') : stateLine(r))}</div>
           </div>
           <div class="js-part-acts">
             ${locked ? `<span class="js-amt">${escapeHtml(fmt(+r.amount || 0))}</span>` : `
               ${covered
                 ? `<button type="button" class="linkish" data-pp="cover" data-i="${i}">${escapeHtml(t('ppd.cover'))}</button>`
                 : `<button type="button" class="linkish" data-pp="record" data-i="${i}">${escapeHtml(t('ppd.record'))}</button>`}
-              <button type="button" class="linkish" data-pp="remove" data-i="${i}">${escapeHtml(t('jpc.remove'))}</button>`}
+              ${reopened ? '' : `<button type="button" class="linkish" data-pp="remove" data-i="${i}">${escapeHtml(t('jpc.remove'))}</button>`}`}
           </div></div>`;
       }).join('') : `<p class="js-hint">${escapeHtml(t('ppd.empty'))}</p>`;
       summary();
@@ -77,21 +80,36 @@
 
     function summary() {
       const r = trial();
-      const open = PP().round2(rows.filter((x) => !x.paid).reduce((s, x) => s + (+x.amount || 0), 0));
+      const al = alloc();
+      const open = PP().round2(rows.filter((x, i) => !x.paid || (al.rows[i] && al.rows[i].reopened)).reduce((s, x) => s + (+x.amount || 0), 0));
       const line = modal.querySelector('[data-pp="summary"]');
       line.textContent = r.ok ? t('ppd.adds_up', { open: fmt(open), owed: fmt(PP().owedNow(order, ctxOf())) }) : reasonText(r);
       line.classList.toggle('is-refused', !r.ok);
       modal.querySelector('[data-act="save"]').disabled = !r.ok;
       // Money recorded outside the plan pays the oldest payments first (allocate).
-      const outside = alloc().unallocated;
+      const outside = al.unallocated;
       const out = modal.querySelector('[data-pp="outside"]');
       out.textContent = outside > 0.005 ? t('ppd.outside', { amount: fmt(outside) }) : '';
       out.hidden = !(outside > 0.005);
       modal.querySelector('[data-pp="left"]').textContent = fmt(Math.max(0, PP().round2(open - Math.max(0, outside))));
     }
 
+    /**
+     * A plan from before Khayt kept its starting point (instalmentBase) cannot
+     * tell its deposit from plan money. Saving it sets that point to what is
+     * paid less its paid rows (applyPlan); the shop is told first. Resolves
+     * true to go on.
+     */
+    async function baseReady() {
+      if (typeof order.instalmentBase === 'number') return true;
+      const paidRows = rows.filter((x) => x.paid).reduce((s, x) => s + (+x.amount || 0), 0);
+      const base = PP().round2(Math.max(0, (+order.paidAmount || 0) - paidRows));
+      return confirmModal(t('ppd.no_base_q', { amount: fmt(base) }), { okText: t('ppd.no_base_ok') });
+    }
+
     /** A row paid for by money already recorded: stamped paid, no money moves (coverRow). */
-    function cover(i) {
+    async function cover(i) {
+      if (!(await baseReady())) return;
       const row = rows[i];
       if (!row) return;
       const saved = PP().applyPlan(order, rows, ctxOf());
@@ -107,6 +125,7 @@
     async function record(i) {
       const row = rows[i];
       if (!row) return;
+      if (!(await baseReady())) return;
       const method = await askMethod(row);
       if (!method) return;
       const saved = PP().applyPlan(order, rows, ctxOf());

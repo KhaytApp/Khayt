@@ -10,6 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 for (const f of ['tax', 'pricing', 'order-money', 'order-payment', 'part-ids', 'calculator-cost', 'order-new', 'order-edit']) require('../lib/' + f + '.js');
 const PP = require('../lib/payment-plan.js');
+const RX = require('../lib/receivables.js');
 const V = require('./fixtures/payment-plan-apply-vectors.json');
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const ctx = { settings: {}, today: '2026-11-18' };
@@ -22,6 +23,7 @@ for (const c of V.cases) {
       : c.op === 'record' ? PP.recordRowPayment(order, c.rowId, clone(c.payment), ctx)
       : c.op === 'cover' ? PP.coverRow(order, c.rowId, ctx)
       : c.op === 'due' ? { ok: true, due: PP.dueRows(order, c.now).map((x) => x.id) }
+      : c.op === 'cap' ? { ok: true, cap: RX.capInstalments(order, PP.owedNow(order, ctx)).map((x) => [x.ins.id, Math.round(x.amount * 100) / 100]) }
       : Object.assign({ ok: true }, PP.allocate(order));
     assert.equal(r.ok, c.want.ok, r.reason);
     if (!c.want.ok) {
@@ -50,11 +52,12 @@ for (const c of V.cases) {
     }
     if (c.want.unallocated !== undefined) assert.equal(r.unallocated, c.want.unallocated, 'unallocated');
     if (c.want.due) assert.deepEqual(r.due, c.want.due, 'the rows a reminder chases');
+    if (c.want.cap) assert.deepEqual(r.cap, c.want.cap, 'what receivables age as owed');
     if (c.want.states) {
       const got = Object.fromEntries(PP.allocate(order).rows.map((x) => [x.id, x.state]));
       assert.deepEqual(got, c.want.states, 'each row\'s state (allocate)');
     }
-    if (c.op === 'cover' || c.op === 'allocate' || c.op === 'due') assert.equal(order.paidAmount, before.paidAmount, 'no money moves');
+    if (c.op === 'cover' || c.op === 'allocate' || c.op === 'due' || c.op === 'cap') assert.equal(order.paidAmount, before.paidAmount, 'no money moves');
     if (c.want.rowRecorded) {
       const row = order.instalments.find((x) => x.id === c.want.rowRecorded);
       assert.equal(PP.rowState(row), 'recorded');

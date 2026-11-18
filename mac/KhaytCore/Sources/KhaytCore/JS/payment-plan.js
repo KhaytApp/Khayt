@@ -482,11 +482,13 @@ function applyPlan(order, rows, ctx) {
     const n = Number(r.amount);
     if (!Number.isFinite(n) || n <= 0) return { ok: false, reason: 'bad_amount' };
   }
-  // What the unpaid rows still ask for: their total, less the money already
-  // recorded outside the plan (allocate's unallocated, never below 0), which
-  // pays them down: whole rows it covers AND the part of the next one.
-  const outside = Math.max(0, allocate(Object.assign({}, order, { instalments: next })).unallocated);
-  const unpaid = round2(next.filter((r) => !r.paid).reduce((s, r) => s + (Number(r.amount) || 0), 0) - outside);
+  // What the unpaid rows still ask for (rows not paid, and covered rows the
+  // money behind them no longer pays: reopened), less the money already
+  // recorded outside the plan, which pays them down: whole rows it covers AND
+  // the part of the next one.
+  const al = allocate(Object.assign({}, order, { instalments: next }));
+  const outside = Math.max(0, al.unallocated);
+  const unpaid = round2(next.filter((r, i) => !r.paid || al.rows[i].reopened).reduce((s, r) => s + (Number(r.amount) || 0), 0) - outside);
   const owed = owedNow(order, ctx);
   if (unpaid > owed + 0.005) return { ok: false, reason: 'over_owed', over: round2(unpaid - owed) };
   const before = JSON.stringify([order.instalments, order.instalmentBase]);
@@ -494,8 +496,14 @@ function applyPlan(order, rows, ctx) {
     delete order.instalments;
     delete order.instalmentBase;
   } else {
-    // The cash the job already held when the plan was first made (the editor's rule).
-    if (!old.length) order.instalmentBase = Number(order.paidAmount) || 0;
+    // The cash the job already held when the plan was made: for a new plan,
+    // and for a plan from before the base was kept (delta review: without it
+    // every payment outside the plan counted twice), what is paid less the
+    // plan's paid rows. Kept as it is otherwise.
+    if (!old.length || typeof order.instalmentBase !== 'number') {
+      const paidRows = next.filter((r) => r.paid).reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+      order.instalmentBase = round2(Math.max(0, (Number(order.paidAmount) || 0) - paidRows));
+    }
     order.instalments = next.map((r) => {
       // A row that has not changed is copied through BYTE FOR BYTE, as stored:
       // a paid or legacy row from an older book keeps its exact shape (no
@@ -526,30 +534,52 @@ function applyPlan(order, rows, ctx) {
 // A plan with no instalmentBase (made before the base was kept) cannot tell
 // its deposit from plan money, so nothing is covered on it: unallocated 0.
 
-/** Each row's state: 'recorded' | 'legacy' | 'covered' | 'open', and the unallocated money. */
+/**
+ * Each row's state and the unallocated money: { unallocated, known, rows:
+ * [{ id, state: 'recorded' | 'legacy' | 'covered' | 'open', part, reopened }] }.
+ *
+ * REOPENING (delta review): when the payment total is corrected DOWN after a
+ * row was covered, unallocated goes below 0 and money is owed that no row
+ * asks for. Rows that were only COVERED (stamped with no money of their own:
+ * covered: true) reopen, newest first, until it is not; they are 'open'
+ * again, and reminders chase them. A row paid by a real recorded payment
+ * never reopens.
+ *
+ * `part`: what money recorded outside the plan already pays of the first open
+ * row it cannot cover whole; recordRowPayment takes only the rest.
+ */
 function allocate(order) {
   const o = order || {};
   const rows = (Array.isArray(o.instalments) ? o.instalments : []).filter(Boolean);
   const known = typeof o.instalmentBase === 'number' && o.instalmentBase >= 0;
   const paidRows = round2(rows.filter((r) => r.paid).reduce((sum, r) => sum + (Number(r.amount) || 0), 0));
-  const unallocated = known ? round2((Number(o.paidAmount) || 0) - o.instalmentBase - paidRows) : 0;
-  const state = rows.map((r) => (r.paid ? rowState(r) : 'open'));
-  const open = rows.map((r, i) => ({ r, i })).filter((x) => !x.r.paid)
-    .sort((a, b) => {
-      const da = toIsoDay(a.r.dueDate) || '9999-12-31';
-      const db = toIsoDay(b.r.dueDate) || '9999-12-31';
-      return da !== db ? (da < db ? -1 : 1) : a.i - b.i;
-    });
+  let unallocated = known ? round2((Number(o.paidAmount) || 0) - o.instalmentBase - paidRows) : 0;
+  const due = (r) => toIsoDay(r.dueDate) || '9999-12-31';
+  const reopened = new Set();
+  if (unallocated < -0.005) {
+    const onlyCovered = rows.map((r, i) => ({ r, i })).filter((x) => x.r.paid && x.r.covered === true)
+      .sort((a, b) => (due(a.r) !== due(b.r) ? (due(a.r) > due(b.r) ? -1 : 1) : b.i - a.i));
+    for (const { r, i } of onlyCovered) {
+      if (unallocated >= -0.005) break;
+      reopened.add(i);
+      unallocated = round2(unallocated + (Number(r.amount) || 0));
+    }
+  }
+  const state = rows.map((r, i) => (reopened.has(i) ? 'open' : r.paid ? rowState(r) : 'open'));
+  const part = rows.map(() => 0);
+  const open = rows.map((r, i) => ({ r, i })).filter((x) => state[x.i] === 'open')
+    .sort((a, b) => (due(a.r) !== due(b.r) ? (due(a.r) < due(b.r) ? -1 : 1) : a.i - b.i));
   let left = Math.max(0, unallocated);
   for (const { r, i } of open) {
     const amount = round2(Number(r.amount) || 0);
-    if (!(amount > 0) || left + 0.005 < amount) break;
-    state[i] = 'covered';
-    left = round2(left - amount);
+    if (amount > 0 && left + 0.005 >= amount) { state[i] = 'covered'; left = round2(left - amount); continue; }
+    if (left > 0.005 && amount > 0) part[i] = round2(left);
+    break;
   }
-  return { unallocated, known, rows: rows.map((r, i) => ({ id: r.id, state: state[i] })) };
+  return { unallocated, known, rows: rows.map((r, i) => ({ id: r.id, state: state[i], part: part[i], reopened: reopened.has(i) })) };
 }
-const stateIn = (order, rowId) => ((allocate(order).rows.find((x) => x.id === rowId)) || {}).state || null;
+const allocOf = (order, rowId) => allocate(order).rows.find((x) => x.id === rowId) || { state: null, part: 0 };
+const stateIn = (order, rowId) => allocOf(order, rowId).state;
 
 /**
  * Stamp a COVERED row paid: money already recorded outside the plan pays it,
@@ -592,22 +622,32 @@ function recordRowPayment(order, rowId, payment, ctx) {
   if (frozen) return { ok: false, reason: frozen };
   const row = (Array.isArray(order.instalments) ? order.instalments : []).find((r) => r && r.id === rowId);
   if (!row) return { ok: false, reason: 'missing' };
-  if (row.paid) return { ok: false, reason: 'already_paid' };
-  // Money already recorded pays this row: recording it again would count it twice.
-  if (stateIn(order, rowId) === 'covered') return { ok: false, reason: 'use_recorded' };
-  const P = libOf('KhaytOrderPayment', './order-payment.js');
-  if (!P) return { ok: false, reason: 'missing' };
+  const al = allocOf(order, rowId);
+  // Paid, unless it was only covered and the money behind it was corrected away (reopened).
+  if (row.paid && al.state !== 'open') return { ok: false, reason: 'already_paid' };
   const amount = round2(Number(row.amount) || 0);
   if (!(amount > 0)) return { ok: false, reason: 'bad_amount' };
-  if (amount > owedNow(order, ctx) + 0.005) return { ok: false, reason: 'over_billed' };
+  // A plan from before the base was kept cannot tell its deposit from plan
+  // money: saving it once (applyPlan) sets the base; until then, no row.
+  if (typeof order.instalmentBase !== 'number') return { ok: false, reason: 'no_base' };
+  // Money already recorded pays this row: recording it again would count it twice.
+  if (al.state === 'covered') return { ok: false, reason: 'use_recorded' };
+  const P = libOf('KhaytOrderPayment', './order-payment.js');
+  if (!P) return { ok: false, reason: 'missing' };
+  // Only what is left of the row (money outside the plan may pay part of it),
+  // and never more than the job can still take (delta review: a part-covered
+  // last row was refused for ever, and chased for ever).
+  const pay = round2(Math.min(round2(amount - (al.part || 0)), owedNow(order, ctx)));
+  if (!(pay > 0.005)) return { ok: false, reason: 'over_billed' };
   const p = payment || {};
-  const total = round2((Number(order.paidAmount) || 0) + amount);
+  const total = round2((Number(order.paidAmount) || 0) + pay);
   const out = P.recordPayment(order, { amount: total, method: p.method || null, paidAt: p.paidAt }, ctx);
   row.paid = true;
   row.paidAt = order.paidAt || p.paidAt || null;
   row.recorded = true;
+  delete row.covered;  // paid by its own payment now, so it never reopens
   if (p.method) row.method = p.method;
-  return { ok: true, reason: null, effects: out.effects };
+  return { ok: true, reason: null, effects: out.effects, paid: pay };
 }
 
 const api = {

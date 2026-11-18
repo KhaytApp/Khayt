@@ -83,6 +83,10 @@ try {
         { id: 'A', amount: 373.34, dueDate: '2026-12-18', note: '', paid: false, paidAt: null },
         { id: 'B', amount: 373.33, dueDate: '2027-01-18', note: '', paid: false, paidAt: null },
         { id: 'C', amount: 373.33, dueDate: '2027-02-18', note: '', paid: false, paidAt: null }] }),
+      // A plan from before the base was kept: deposit 1,000, A ticked paid, B open.
+      job('JP-NOBASE', { price: 2120, paidAmount: 1373.34, paymentStatus: 'partial', instalments: [
+        { id: 'A', amount: 373.34, dueDate: '2026-12-18', note: '', paid: true, paidAt: '2026-11-01' },
+        { id: 'B', amount: 373.33, dueDate: '2027-01-18', note: '', paid: false, paidAt: null }] }),
       job('JP-USD', { currency: 'USD', fxRate: 3.75, price: 40, paidAmount: 0, paidAt: null, parts: [{ name: 'hook.stl', material: 'PLA', qty: 3, printWeight: 30, printTime: 1, baseCost: 75 }] }),
     );
     operators.push({ id: 'OP-N', name: 'Noura', active: true });
@@ -299,6 +303,31 @@ try {
   await window.waitForSelector('.modal #oeOpenPlan', { state: 'attached', timeout: 5_000 });
   ok(await window.evaluate(() => [...document.querySelectorAll('.modal .inst-amt-inp')].every((x) => x.disabled) && !document.querySelector('.modal #oeGenInstalments')),
     'the old editor shows the plan read-only, with a button to the dialog');
+
+  // Delta review 1: the total corrected DOWN after A was covered reopens A.
+  await window.click('.modal [data-act="cancel"]');
+  await window.waitForSelector('.modal', { state: 'detached', timeout: 5_000 });
+  await window.evaluate(() => { const o = printLog.find((x) => x.id === 'JP-LUMP'); KhaytOrderPayment.recordPayment(o, { amount: 1000, method: 'cash', paidAt: '2026-11-19' }, { settings, today: '2026-11-19' }); saveAll(); });
+  await window.click('#jobPage [data-jp="plan"]');
+  await window.waitForSelector('.modal .pp-dialog', { state: 'visible', timeout: 5_000 });
+  ok(/owed again/.test(await window.textContent('.modal .pp-row[data-i="0"]')) && !!(await window.$('.modal [data-pp="record"][data-i="0"]')),
+    'corrected down to 1,000, the covered row A is owed again and takes a payment');
+  ok(await window.evaluate(() => KhaytPaymentPlan.dueRows(printLog.find((o) => o.id === 'JP-LUMP'), '2027-01-20').map((r) => r.id).join()) === 'A,B', 'and the reminders chase it again');
+  await window.click('.modal [data-act="cancel"]');
+  await window.waitForSelector('.modal', { state: 'detached', timeout: 5_000 });
+  // Delta review 3: a plan with no base warns, sets it, then records.
+  await window.click('#jobPage [data-jp="back"]');
+  await openPage('JP-NOBASE');
+  await window.click('#jobPage [data-jp="plan"]');
+  await window.waitForSelector('.modal .pp-dialog', { state: 'visible', timeout: 5_000 });
+  await window.click('.modal [data-pp="record"][data-i="1"]');
+  await window.waitForFunction(() => /starting point/.test(document.querySelector('.confirm-modal-overlay')?.innerText || ''), null, { timeout: 5_000 });
+  ok(/1,?000\.00/.test(await window.textContent('.confirm-modal-overlay')), 'a plan with no starting point says so, and names it (1,000)');
+  await window.click('.confirm-modal-overlay [data-act="ok"]');
+  await window.waitForSelector('.js-ask [data-ask="ok"]', { state: 'visible', timeout: 5_000 });
+  await window.click('.js-ask [data-ask="ok"]');
+  await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-NOBASE').paidAmount === 1746.67, null, { timeout: 5_000 });
+  ok(await window.evaluate(() => printLog.find((o) => o.id === 'JP-NOBASE').instalmentBase) === 1000, 'then sets it and records B once (1,373.34 → 1,746.67)');
 
   console.log('e2e-job-page: ok');
 

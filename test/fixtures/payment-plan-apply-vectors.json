@@ -1,5 +1,5 @@
 {
-  "about": "lib/payment-plan.js applyPlan and recordRowPayment (Dev Hub, Nov 18; old-editor retirement step 6). The plan is the schedule: applyPlan never touches paidAmount; a row is paid only by recordRowPayment, through lib/order-payment.js recordPayment. A row ticked paid in an older book (paid, no `recorded`) is 'legacy': paid and locked, never rewritten, and the job's paidAmount stays exactly as it is. Settings are empty (no tax). The Mac and the phone run this file. Money review (Nov 18): a plan freezes only on void or cancel; a payment also needs the job to owe at all (not a quote, not credited in full); a credit note or a ZATCA report freezes nothing while money is owed; a row of 0 or less is bad_amount; unchanged rows are copied through byte for byte. Allocation (Dev Hub option 1): money recorded outside the plan (paidAmount − instalmentBase − paid rows) covers the oldest unpaid rows first, whole rows only; one function (allocate) feeds the dialog, recordRowPayment (use_recorded) and the reminders (dueRows).",
+  "about": "lib/payment-plan.js applyPlan and recordRowPayment (Dev Hub, Nov 18; old-editor retirement step 6). The plan is the schedule: applyPlan never touches paidAmount; a row is paid only by recordRowPayment, through lib/order-payment.js recordPayment. A row ticked paid in an older book (paid, no `recorded`) is 'legacy': paid and locked, never rewritten, and the job's paidAmount stays exactly as it is. Settings are empty (no tax). The Mac and the phone run this file. Money review (Nov 18): a plan freezes only on void or cancel; a payment also needs the job to owe at all (not a quote, not credited in full); a credit note or a ZATCA report freezes nothing while money is owed; a row of 0 or less is bad_amount; unchanged rows are copied through byte for byte. Allocation (Dev Hub option 1): money recorded outside the plan (paidAmount − instalmentBase − paid rows) covers the oldest unpaid rows first, whole rows only; one function (allocate) feeds the dialog, recordRowPayment (use_recorded) and the reminders (dueRows). Delta review (Nov 18): a covered row reopens (newest first) when the total is corrected down; a real recorded row never does. A part-covered row records only its remainder, capped at what the job can take. A plan without a base gets one on its first save (paid − paid rows) and takes no recorded row before. Receivables age plan rows through allocate.",
   "base": {
     "id": "PP",
     "status": "pending",
@@ -294,19 +294,47 @@
       }
     },
     {
-      "why": "recording a row that would take paid past what the job can be paid is refused (an overpayment is a credit note)",
+      "why": "with nothing left to take (a 500 credit note on a job paid 1,946.67), recording C is refused: an overpayment is a credit note",
       "order": {
-        "paidAmount": 2000,
+        "instalmentBase": 1000,
+        "paidAmount": 1946.67,
+        "creditNotes": [
+          {
+            "id": "CN",
+            "amount": 500
+          }
+        ],
         "instalments": [
           {
             "id": "A",
             "amount": 373.34,
-            "paid": false
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-12-18",
+            "recorded": true
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
           }
         ]
       },
       "op": "record",
-      "rowId": "A",
+      "rowId": "C",
       "payment": {
         "method": "cash",
         "paidAt": "2026-11-18"
@@ -349,7 +377,8 @@
             "amount": 373.34,
             "paid": false
           }
-        ]
+        ],
+        "instalmentBase": 1000
       },
       "op": "record",
       "rowId": "A",
@@ -379,7 +408,8 @@
             "amount": 373.34,
             "paid": false
           }
-        ]
+        ],
+        "instalmentBase": 1000
       },
       "op": "record",
       "rowId": "A",
@@ -739,7 +769,51 @@
       }
     },
     {
-      "why": "a refund after a row was covered: the row stays recorded, unallocated goes negative, nothing new is covered",
+      "why": "a refund after A was paid by a RECORDED payment: A stays recorded, unallocated goes negative (−173.34), nothing new is covered",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1200,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "allocate",
+      "want": {
+        "ok": true,
+        "unallocated": -173.34,
+        "states": {
+          "A": "recorded",
+          "B": "open",
+          "C": "open"
+        }
+      }
+    },
+    {
+      "why": "a refund to 1,200 after A was only COVERED: A reopens (the delta-review rule), and the 200 left pays part of it",
       "order": {
         "instalmentBase": 1000,
         "paidAmount": 1200,
@@ -775,9 +849,9 @@
       "op": "allocate",
       "want": {
         "ok": true,
-        "unallocated": -173.34,
+        "unallocated": 200,
         "states": {
-          "A": "recorded",
+          "A": "open",
           "B": "open",
           "C": "open"
         }
@@ -909,6 +983,445 @@
         "states": {
           "A": "open"
         }
+      }
+    },
+    {
+      "why": "REOPEN: A was covered by 560 from outside; the total is corrected down to 1,000, so A is owed again (B and C as before)",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1000,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true,
+            "covered": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "allocate",
+      "want": {
+        "ok": true,
+        "unallocated": 0,
+        "states": {
+          "A": "open",
+          "B": "open",
+          "C": "open"
+        }
+      }
+    },
+    {
+      "why": "REOPEN: and the reminders chase A again (20 Jan: A and B are due)",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1000,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true,
+            "covered": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "due",
+      "now": "2027-01-20",
+      "want": {
+        "ok": true,
+        "due": [
+          "A",
+          "B"
+        ]
+      }
+    },
+    {
+      "why": "REOPEN: a reopened A takes its payment, and is then paid by a recorded payment (it never reopens again)",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1000,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true,
+            "covered": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "record",
+      "rowId": "A",
+      "payment": {
+        "method": "cash",
+        "paidAt": "2026-11-20"
+      },
+      "want": {
+        "ok": true,
+        "paidAmount": 1373.34,
+        "paymentStatus": "partial",
+        "rowRecorded": "A",
+        "states": {
+          "A": "recorded",
+          "B": "open",
+          "C": "open"
+        }
+      }
+    },
+    {
+      "why": "REOPEN: a row paid by a real recorded payment does not reopen when the total is corrected down",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1000,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true
+          }
+        ]
+      },
+      "op": "allocate",
+      "want": {
+        "ok": true,
+        "unallocated": -373.34,
+        "states": {
+          "A": "recorded"
+        }
+      }
+    },
+    {
+      "why": "PART: 200 from outside pays part of the last row C; recording C takes only the 173.33 left, and the job is paid in full",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1946.67,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-12-18",
+            "recorded": true
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "record",
+      "rowId": "C",
+      "payment": {
+        "method": "mada",
+        "paidAt": "2027-02-18"
+      },
+      "want": {
+        "ok": true,
+        "paidAmount": 2120,
+        "paymentStatus": "paid",
+        "rowRecorded": "C"
+      }
+    },
+    {
+      "why": "PART: capped at what the job can take (a 100 credit note leaves 73.33): C records 73.33 and is paid",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1946.67,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-12-18",
+            "recorded": true
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ],
+        "creditNotes": [
+          {
+            "id": "CN",
+            "amount": 100
+          }
+        ]
+      },
+      "op": "record",
+      "rowId": "C",
+      "payment": {
+        "method": "cash",
+        "paidAt": "2027-02-18"
+      },
+      "want": {
+        "ok": true,
+        "paidAmount": 2020,
+        "paymentStatus": "paid",
+        "rowRecorded": "C"
+      }
+    },
+    {
+      "why": "NO BASE: a plan from before the base was kept takes no recorded row (its deposit cannot be told from plan money)",
+      "order": {
+        "paidAmount": 1373.34,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "paid": false
+          }
+        ]
+      },
+      "op": "record",
+      "rowId": "A",
+      "payment": {
+        "method": "cash"
+      },
+      "want": {
+        "ok": false,
+        "reason": "no_base"
+      }
+    },
+    {
+      "why": "NO BASE: saving it once sets the base to what is paid less its paid rows (1,373.34 − 373.34 = 1,000)",
+      "order": {
+        "paidAmount": 1373.34,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-01"
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "apply",
+      "rows": [
+        {
+          "id": "A",
+          "amount": 373.34,
+          "dueDate": "2026-12-18",
+          "note": "",
+          "paid": true,
+          "paidAt": "2026-11-01"
+        },
+        {
+          "id": "B",
+          "amount": 373.33,
+          "dueDate": "2027-01-18",
+          "note": "",
+          "paid": false,
+          "paidAt": null
+        }
+      ],
+      "want": {
+        "ok": true,
+        "paidAmount": 1373.34,
+        "instalmentBase": 1000,
+        "rows": 2
+      }
+    },
+    {
+      "why": "RECEIVABLES: with 560 from outside, A is not owed, B owes only the 186.67 left, C all of it (lib/receivables.js capInstalments over allocate)",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1560,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "cap",
+      "want": {
+        "ok": true,
+        "cap": [
+          [
+            "B",
+            186.67
+          ],
+          [
+            "C",
+            373.33
+          ]
+        ]
+      }
+    },
+    {
+      "why": "RECEIVABLES: a covered A reopened by a correction is owed again",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1000,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true,
+            "covered": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "cap",
+      "want": {
+        "ok": true,
+        "cap": [
+          [
+            "A",
+            373.34
+          ],
+          [
+            "B",
+            373.33
+          ],
+          [
+            "C",
+            373.33
+          ]
+        ]
       }
     }
   ]
