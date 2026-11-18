@@ -20,6 +20,8 @@
   const NS = () => global.KhaytOrderNextStep;
   const ED = () => global.KhaytOrderEdit;
   let openId = null;
+  // The actual time being corrected in Activity ('printingStartedAt' | 'completedAt'), or null.
+  let editingTime = null;
 
   const byId = (id) => (typeof printLog !== 'undefined' ? printLog.find((o) => o.id === id) : null);
   const clientName = (o) => {
@@ -134,15 +136,50 @@
       .map((h) => ({ at: h.at, text: t('jp.moved', { stage: stageWord(h.status) }) }));
     if (o.paidAt && +o.paidAmount > 0) items.push({ at: o.paidAt, text: t('jp.paid_event', { amount: money(o, +o.paidAmount) }) });
     if (o.quoteSharedAt) items.push({ at: o.quoteSharedAt, text: t('jp.quote_shared') });
+    // The ACTUAL times, correctable in place (Figma 105:1571): only a stamp
+    // that exists, and only the time moves (lib/order-edit.js actualTimes).
+    if (o.printingStartedAt) items.push({ at: o.printingStartedAt, text: t('jp.actual_start'), k: 'printingStartedAt' });
+    if (o.completedAt) items.push({ at: o.completedAt, text: t('jp.actual_done'), k: 'completedAt' });
     items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
     if (!items.length) return `<p class="jp-empty">${escapeHtml(t('jp.no_activity'))}</p>`;
-    return items.slice(0, 20).map((i) => `<div class="jp-event"><div>${escapeHtml(i.text)}</div><div class="jp-sub">${escapeHtml(day(i.at))}</div></div>`).join('');
+    const when = (iso) => { const d = new Date(iso); return isNaN(d) ? day(iso) : d.toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' }); };
+    return items.slice(0, 20).map((i) => {
+      if (i.k && editingTime === i.k) {
+        return `<div class="jp-event is-editing"><div>${escapeHtml(i.text)}</div>
+          <div class="jp-time-edit"><input type="datetime-local" data-jp-time="${i.k}" value="${escapeHtml(isoToLocalInput(o[i.k]))}" aria-label="${escapeHtml(i.text)}">
+          <button type="button" class="btn small primary" data-jp="time-save">${escapeHtml(t('common.save'))}</button>
+          <button type="button" class="btn small ghost" data-jp="time-cancel">${escapeHtml(t('common.cancel'))}</button></div></div>`;
+      }
+      return `<div class="jp-event"><div>${escapeHtml(i.text)}</div><div class="jp-sub">${escapeHtml(i.k ? when(i.at) : day(i.at))}${i.k ? ` · <button type="button" class="linkish" data-jp="time-edit" data-k="${i.k}">✎ ${escapeHtml(t('jp.edit_time'))}</button>` : ''}</div></div>`;
+    }).join('');
   }
 
   const stepBtn = (s, primary) => {
     const blocked = s.blocked ? ` disabled aria-describedby="jpBlocked"` : '';
     return `<button type="button" class="btn ${primary ? 'primary' : ''}" data-jp-step="${escapeHtml(s.code)}"${blocked}>${escapeHtml(t('jp.step.' + s.code))}</button>`;
   };
+
+  /** Who is working the job (row 17): the active operators, and a past one still named. */
+  function operatorHtml(o) {
+    const ops = typeof operators !== 'undefined' && Array.isArray(operators) ? operators : [];
+    if (!ops.length && !o.operatorId) return '';
+    const live = ops.filter((op) => op && op.active !== false);
+    const cur = o.operatorId && !live.some((op) => op.id === o.operatorId) ? ops.find((op) => op.id === o.operatorId) : null;
+    const opts = [`<option value="">${escapeHtml(t('jp.no_operator'))}</option>`]
+      .concat(live.map((op) => `<option value="${escapeHtml(op.id)}"${op.id === o.operatorId ? ' selected' : ''}>${escapeHtml(op.name || op.id)}</option>`))
+      .concat(o.operatorId && !live.some((op) => op.id === o.operatorId) ? [`<option value="${escapeHtml(o.operatorId)}" selected>${escapeHtml((cur && cur.name) || o.operatorId)}</option>`] : []);
+    return `<label class="jp-op">${escapeHtml(t('jp.operator'))} <select data-jp-op>${opts.join('')}</select></label>`;
+  }
+
+  /** Save one detail through the shared rule; say why when it refuses. */
+  function saveDetail(o, next) {
+    const r = ED().applyJobEdit(o, next, { now: Date.now(), id: uid('edit'), settings, clients: typeof clients !== 'undefined' ? clients : [] });
+    // t() answers the KEY for a missing one, so `t(k) || x` never falls back: name the known reasons.
+    const known = ['no_stamp', 'bad_time', 'future_time', 'completed_before_start'];
+    if (!r.ok) { toast(t(known.includes(r.reason) ? 'jp.refused.' + r.reason : 'js.refused_other'), 'error', 6000); return false; }
+    if (r.changed) saveAll();
+    return true;
+  }
 
   function pageHtml(o) {
     const steps = NS().nextSteps(o, { settings, orders: printLog, today: localDateStr(), canWrite: true });
@@ -160,11 +197,16 @@
           <h2 class="jp-title">${escapeHtml(o.project || ref)}
             <span class="badge ${escapeHtml(steps.pill.stage === 'paid' ? 'pay-paid' : steps.pill.stage)}">${escapeHtml(stageWord(steps.pill.stage))}</span>
             ${steps.late ? `<span class="badge overdue">${escapeHtml(t('jp.late'))}</span>` : ''}</h2>
-          <div class="jp-sub">${escapeHtml(sub)}</div>
+          <div class="jp-sub">${escapeHtml(sub)} · ${operatorHtml(o)}</div>
         </div>
         <div class="jp-steps" role="group" aria-label="${escapeHtml(t('jp.next_steps'))}">
           ${(steps.secondary || []).map((s) => stepBtn(s, false)).join('')}
           <button type="button" class="btn" data-jp="edit">${escapeHtml(t('jp.edit'))}</button>
+          <details class="jp-more"><summary class="btn">${escapeHtml(t('jp.more'))}</summary>
+            <div class="jp-menu" role="menu">
+              <button type="button" role="menuitem" data-jp="status-save">${escapeHtml(t('jp.status_save'))}</button>
+              <button type="button" role="menuitem" data-jp="status-open">${escapeHtml(t('jp.status_open'))}</button>
+            </div></details>
           ${steps.primary ? stepBtn(steps.primary, true) : ''}
         </div>
       </header>
@@ -172,7 +214,9 @@
       ${track ? `<ol class="card jp-track">${track}</ol>` : ''}
       <div class="jp-grid">
         <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.parts'))} · ${(o.parts || []).length}</h3>${partsHtml(o)}</section>
-        <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.money'))}</h3>${moneyHtml(o, steps)}</section>
+        <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.money'))}</h3>${moneyHtml(o, steps)}
+          ${typeof global.payLinkLineHtml === 'function' ? global.payLinkLineHtml(o) : ''}
+          ${typeof global.buildProfitabilityHtml === 'function' ? `<div class="jp-profit" data-simple-pro>${global.buildProfitabilityHtml(o)}</div>` : ''}</section>
       </div>
       ${milestonesHtml(o)}
       <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.activity'))}</h3>${activityHtml(o)}</section>
@@ -218,6 +262,7 @@
 
   function closeJobPage() {
     openId = null;
+    editingTime = null;
     const el = document.getElementById('jobPage');
     if (el) { el.hidden = true; el.innerHTML = ''; }
   }
@@ -253,8 +298,32 @@
     if (b.dataset.jp === 'back') { closeJobPage(); return; }
     if (b.dataset.jp === 'edit') { (typeof openJobSheet === 'function' ? openJobSheet : openOrderEditor)(openId); return; }
     if (b.dataset.jp === 'ms-refresh') { refreshMilestones(); return; }
+    if (b.dataset.jp === 'status-save' || b.dataset.jp === 'status-open') {
+      b.closest('details')?.removeAttribute('open');
+      if (b.dataset.jp === 'status-save') exportOrderStatusPage(openId); else openSavedStatusPage(openId);
+      return;
+    }
+    if (b.dataset.jp === 'time-edit') { editingTime = b.dataset.k; render(); document.querySelector('#jobPage [data-jp-time]')?.focus(); return; }
+    if (b.dataset.jp === 'time-cancel') { editingTime = null; render(); return; }
+    if (b.dataset.jp === 'time-save') {
+      const inp = document.querySelector('#jobPage [data-jp-time]');
+      const o = byId(openId);
+      if (!inp || !o) return;
+      const k = inp.dataset.jpTime;
+      // Written back only when changed: the box shows LOCAL time to the
+      // minute, so an untouched box would drop the seconds (the editor's rule).
+      if (inp.value === isoToLocalInput(o[k])) { editingTime = null; render(); return; }
+      const d = new Date(inp.value);
+      if (saveDetail(o, { [k]: isNaN(d) ? '' : d.toISOString() })) { editingTime = null; render(); }
+      return;
+    }
     if (b.dataset.jp === 'ms-diff') { sendDifference(b.dataset.ms); return; }
     if (b.dataset.jpStep) runStep(b.dataset.jpStep);
+  });
+  document.addEventListener('change', (e) => {
+    const sel = e.target.closest && e.target.closest('#jobPage [data-jp-op]');
+    const o = sel && byId(openId);
+    if (o) saveDetail(o, { operatorId: sel.value });
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && openId && !document.querySelector('.modal-backdrop, .modal-overlay')) closeJobPage();
