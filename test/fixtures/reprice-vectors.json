@@ -1,15 +1,237 @@
 {
-  "about": "lib/order-edit.js applyJobEdit(order, { reprice: { marginPct } }) → repriceFromParts (Turki, Nov 19: \"no way to recalculate a price\"). The job is priced again exactly as lib/order-new.js newOrder prices it: its parts, discount, rush, shipping, extra lines (% re-resolved), overhead, rounding, components, at the job's own fxRate. A typed price is dropped. The locks are a typed price's: frozen refused, a seen price asks (priceSeenOk), the paid floor holds; booked jobs and quotes alike. Each job is made by newOrder from `cart`, then disturbed, then repriced; `want.price` is what newOrder priced it at. The Mac and the phone run this file.",
-  "settings": { "currency": "SAR", "defaultMargin": 30, "rushFeePct": 25, "exchangeRates": { "USD": 3.75 } },
-  "part": { "id": "P1", "name": "body", "qty": 2, "printWeight": 100, "printTime": 2, "baseCost": 80 },
+  "about": "lib/order-edit.js applyJobEdit(order, { reprice: { marginPct } }) → repriceFromParts (Turki, Nov 19: \"no way to recalculate a price\"). The job is priced again exactly as lib/order-new.js newOrder prices it: its parts, discount, rush, shipping, extra lines (% re-resolved), overhead, rounding, components, at the job's own fxRate. A typed price is dropped. The locks are a typed price's: frozen refused, a seen price asks (priceSeenOk), the paid floor holds; booked jobs and quotes alike. Each job is made by newOrder from `cart`, then disturbed, then repriced; `want.price` is what newOrder priced it at. The Mac and the phone run this file. Money review (Nov 19): without a shelf (ctx.consumables) the components keep the cost the job froze (componentsCost); a new price below the ISSUED milestones asks (milestones_issued; milestonesOk once the shop said yes); applyJobEdit returns the markup a reprice used (marginPct).",
+  "settings": {
+    "currency": "SAR",
+    "defaultMargin": 30,
+    "rushFeePct": 25,
+    "exchangeRates": {
+      "USD": 3.75
+    }
+  },
+  "part": {
+    "id": "P1",
+    "name": "body",
+    "qty": 2,
+    "printWeight": 100,
+    "printTime": 2,
+    "baseCost": 80
+  },
   "cases": [
-    { "why": "a typed price (999) on a draft quote goes back to what newOrder prices it at", "cart": {}, "asQuote": true, "typed": 999, "req": {}, "want": { "ok": true, "price": 104, "typedGone": true } },
-    { "why": "a BOOKED job works too (as typing a price does), its seen price asked first", "cart": {}, "asQuote": false, "typed": 999, "req": {}, "ctx": { "priceSeenOk": true }, "want": { "ok": true, "price": 104, "typedGone": true, "logged": true } },
-    { "why": "the customer has seen the price: without priceSeenOk it asks", "cart": {}, "asQuote": false, "typed": 999, "req": {}, "want": { "ok": false, "reason": "ask_price" } },
-    { "why": "a voided job is refused", "cart": {}, "asQuote": false, "typed": 999, "set": { "voidedAt": "2026-11-18T09:00:00Z" }, "req": {}, "ctx": { "priceSeenOk": true }, "want": { "ok": false, "reason": "voided" } },
-    { "why": "the paid floor: 500 paid, and the price from the parts is 104: refused", "cart": {}, "asQuote": false, "typed": 999, "set": { "paidAmount": 500 }, "req": {}, "ctx": { "priceSeenOk": true }, "want": { "ok": false, "reason": "paid_exceeds_price" } },
-    { "why": "discount 10%, shipping 20 and rush come back exactly as newOrder priced them (137)", "cart": { "discountPct": 10, "shippingCost": 20, "rushEnabled": true }, "asQuote": true, "typed": 1, "req": {}, "want": { "ok": true, "price": 137 } },
-    { "why": "a USD job keeps the rate it was taken at (3.75) though the shop's rate is now 4: 27.73", "cart": { "clientId": "CU" }, "asQuote": true, "typed": 99, "laterRates": { "USD": 4 }, "req": {}, "want": { "ok": true, "price": 27.73 } },
-    { "why": "a 3% line is resolved again at the new markup (50%): 123.60, the line 3.60", "cart": { "extraLines": [{ "label": "Card fee", "pct": 3, "amount": 0 }] }, "asQuote": true, "typed": 200, "req": { "marginPct": 50 }, "want": { "ok": true, "price": 123.6, "lineAmounts": [3.6] } }
+    {
+      "why": "a typed price (999) on a draft quote goes back to what newOrder prices it at",
+      "cart": {},
+      "asQuote": true,
+      "typed": 999,
+      "req": {},
+      "want": {
+        "ok": true,
+        "price": 104,
+        "typedGone": true
+      }
+    },
+    {
+      "why": "a BOOKED job works too (as typing a price does), its seen price asked first",
+      "cart": {},
+      "asQuote": false,
+      "typed": 999,
+      "req": {},
+      "ctx": {
+        "priceSeenOk": true
+      },
+      "want": {
+        "ok": true,
+        "price": 104,
+        "typedGone": true,
+        "logged": true
+      }
+    },
+    {
+      "why": "the customer has seen the price: without priceSeenOk it asks",
+      "cart": {},
+      "asQuote": false,
+      "typed": 999,
+      "req": {},
+      "want": {
+        "ok": false,
+        "reason": "ask_price"
+      }
+    },
+    {
+      "why": "a voided job is refused",
+      "cart": {},
+      "asQuote": false,
+      "typed": 999,
+      "set": {
+        "voidedAt": "2026-11-18T09:00:00Z"
+      },
+      "req": {},
+      "ctx": {
+        "priceSeenOk": true
+      },
+      "want": {
+        "ok": false,
+        "reason": "voided"
+      }
+    },
+    {
+      "why": "the paid floor: 500 paid, and the price from the parts is 104: refused",
+      "cart": {},
+      "asQuote": false,
+      "typed": 999,
+      "set": {
+        "paidAmount": 500
+      },
+      "req": {},
+      "ctx": {
+        "priceSeenOk": true
+      },
+      "want": {
+        "ok": false,
+        "reason": "paid_exceeds_price"
+      }
+    },
+    {
+      "why": "discount 10%, shipping 20 and rush come back exactly as newOrder priced them (137)",
+      "cart": {
+        "discountPct": 10,
+        "shippingCost": 20,
+        "rushEnabled": true
+      },
+      "asQuote": true,
+      "typed": 1,
+      "req": {},
+      "want": {
+        "ok": true,
+        "price": 137
+      }
+    },
+    {
+      "why": "a USD job keeps the rate it was taken at (3.75) though the shop's rate is now 4: 27.73",
+      "cart": {
+        "clientId": "CU"
+      },
+      "asQuote": true,
+      "typed": 99,
+      "laterRates": {
+        "USD": 4
+      },
+      "req": {},
+      "want": {
+        "ok": true,
+        "price": 27.73
+      }
+    },
+    {
+      "why": "a 3% line is resolved again at the new markup (50%): 123.60, the line 3.60",
+      "cart": {
+        "extraLines": [
+          {
+            "label": "Card fee",
+            "pct": 3,
+            "amount": 0
+          }
+        ]
+      },
+      "asQuote": true,
+      "typed": 200,
+      "req": {
+        "marginPct": 50
+      },
+      "want": {
+        "ok": true,
+        "price": 123.6,
+        "lineAmounts": [
+          3.6
+        ]
+      }
+    },
+    {
+      "why": "COMPONENTS: no shelf passed (the Mac, the phone): the components keep their frozen 80, the job reprices to newOrder's price, not without them",
+      "cart": {
+        "components": [
+          {
+            "consumableId": "C1",
+            "qtyPerUnit": 1
+          }
+        ]
+      },
+      "makeConsumables": [
+        {
+          "id": "C1",
+          "cost": 80
+        }
+      ],
+      "asQuote": true,
+      "typed": 1,
+      "req": {},
+      "want": {
+        "ok": true,
+        "priceFromNewOrder": true
+      }
+    },
+    {
+      "why": "MILESTONES: a proforma for 250 was issued; the parts price 104 is below it: the shop is asked first",
+      "cart": {},
+      "asQuote": false,
+      "typed": 999,
+      "set": {
+        "milestoneInvoices": [
+          {
+            "id": "M1",
+            "label": "Deposit",
+            "amount": 250,
+            "issuedAt": "2026-11-18"
+          }
+        ]
+      },
+      "req": {},
+      "ctx": {
+        "priceSeenOk": true
+      },
+      "want": {
+        "ok": false,
+        "reason": "milestones_issued"
+      }
+    },
+    {
+      "why": "MILESTONES: once the shop said yes (milestonesOk), the job reprices to 104",
+      "cart": {},
+      "asQuote": false,
+      "typed": 999,
+      "set": {
+        "milestoneInvoices": [
+          {
+            "id": "M1",
+            "label": "Deposit",
+            "amount": 250,
+            "issuedAt": "2026-11-18"
+          }
+        ]
+      },
+      "req": {},
+      "ctx": {
+        "priceSeenOk": true,
+        "milestonesOk": true
+      },
+      "want": {
+        "ok": true,
+        "price": 104
+      }
+    },
+    {
+      "why": "MARKUP: a typed-price job has no markup of its own; it reprices at the shop default and says so (30)",
+      "cart": {},
+      "asQuote": true,
+      "typed": 999,
+      "unset": [
+        "marginPct"
+      ],
+      "req": {},
+      "want": {
+        "ok": true,
+        "price": 104,
+        "usedMarkup": 30
+      }
+    }
   ]
 }

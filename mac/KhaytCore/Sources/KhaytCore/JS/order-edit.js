@@ -797,8 +797,14 @@
     const parts = partsOf(order).map((p) => (fx !== 1 && N.isAgreed && N.isAgreed(p) ? Object.assign({}, p, { agreedPrice: back(p.agreedPrice) }) : p));
     const hours = N.overheadHours ? N.overheadHours(parts, { productId: order.productId }) : 0;
     const ownRate = hours > 0 && +order.overheadCost > 0 ? +order.overheadCost / hours : 0;
+    // Components are costed from the shop's shelf. A host without it (the Mac
+    // and the phone pass none) keeps the cost the job froze when it was taken,
+    // as one costed line: priced at 0 they turned a 180 job into 60.
+    const shelf = Array.isArray(c.consumables) && c.consumables.length > 0;
+    const frozenComp = !shelf && +order.componentsCost > 0
+      ? [{ kind: 'components', name: 'components', qty: 1, printTime: 0, printWeight: 0, baseCost: +order.componentsCost }] : [];
     const input = {
-      parts,
+      parts: parts.concat(frozenComp),
       currency: fx !== 1 ? order.currency : undefined,
       margin,
       discountPct: +order.discountPct || 0,
@@ -808,7 +814,7 @@
       priceRound: order.priceRound || null,
       priceOverride: null,
       overheadPerHour: c.overheadPerHour !== undefined ? c.overheadPerHour : ownRate,
-      components: order.components,
+      components: frozenComp.length ? [] : order.components,
       assemblyQty: order.assemblyQty,
       productId: order.productId,
     };
@@ -835,7 +841,7 @@
     const changes = {};
     if (Math.abs(total - was) >= 0.005) changes.price = { from: was, to: total };
     if (stored !== (costed ? +margin.toFixed(2) : null)) changes.marginPct = { from: stored, to: costed ? +margin.toFixed(2) : null };
-    return { ok: true, reason: null, changes };
+    return { ok: true, reason: null, changes, marginPct: +margin.toFixed(2) };
   }
 
   function partsLock(order, ctx) {
@@ -1383,6 +1389,7 @@
     const work = JSON.parse(JSON.stringify(order));
     const stop = (reason, step) => ({ ok: false, reason, step, changed: false });
     let changed = false;
+    let repriced = null;  // the markup a reprice used, returned to the caller
 
     if (has(n, 'clientId')) {
       const r = changeCustomer(work, n.clientId, c);
@@ -1426,6 +1433,12 @@
       const r = repriceFromParts(work, n.reprice || {}, c);
       if (!r.ok) return stop(r.reason, 'reprice');
       if (r.changes.price && partsLock(order, c).askPrice && c.priceSeenOk !== true) return stop('ask_price', 'reprice');
+      // An issued milestone proforma asks for more than the new price: the
+      // shop is asked, never refused silently (milestonesOk once it said yes).
+      const issued = (Array.isArray(work.milestoneInvoices) ? work.milestoneInvoices : [])
+        .filter((m) => m && m.issuedAt).reduce((sum, m) => sum + (+m.amount || 0), 0);
+      if (issued > (+work.price || 0) + 0.005 && c.milestonesOk !== true) return stop('milestones_issued', 'reprice');
+      repriced = r.marginPct;
       const billedAfter = billedOf(work, c);
       if (paidBefore > billedAfter + 0.005) return stop('paid_exceeds_price', 'reprice');
       if (Object.keys(r.changes).length) {
@@ -1477,10 +1490,11 @@
       }
       if (r.changed) changed = true;
     }
-    if (!changed) return { ok: true, reason: null, step: null, changed: false };
+    const extra = repriced !== null ? { marginPct: repriced } : {};
+    if (!changed) return Object.assign({ ok: true, reason: null, step: null, changed: false }, extra);
     for (const k of Object.keys(order)) if (!has(work, k)) delete order[k];
     Object.assign(order, work);
-    return { ok: true, reason: null, step: null, changed: true };
+    return Object.assign({ ok: true, reason: null, step: null, changed: true }, extra);
   }
 
   const api = {

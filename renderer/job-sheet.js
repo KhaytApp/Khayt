@@ -519,13 +519,22 @@
       const mk = q('margin').value.trim();
       const req = mk !== '' && Number.isFinite(Number(mk)) ? { marginPct: Number(mk) } : {};
       const trial = JSON.parse(JSON.stringify(order));
-      const dry = ED().applyJobEdit(trial, { reprice: req }, ctx);
+      let dry = ED().applyJobEdit(trial, { reprice: req }, ctx);
       const line = modal.parentElement.querySelector('.js-refused');
+      // An issued milestone proforma asks for more than the new price: asked,
+      // never refused silently (money review of #2576).
+      if (!dry.ok && dry.reason === 'milestones_issued') {
+        const issued = (order.milestoneInvoices || []).filter((m) => m && m.issuedAt).reduce((sum, m) => sum + (+m.amount || 0), 0);
+        if (!(await confirmModal(t('js.reprice_ms', { issued: priceText(issued) }), { okText: t('js.reprice_ok') }))) return;
+        ctx.milestonesOk = true;
+        // The refused dry run wrote nothing, so the copy is still as opened.
+        dry = ED().applyJobEdit(trial, { reprice: req }, ctx);
+      }
       if (!dry.ok) { if (line) { line.textContent = reasonText(dry); line.hidden = false; } return; }
       const was = +order.price || 0;
       const now = +trial.price || 0;
       if (Math.abs(now - was) < 0.005 && order.priceSource !== 'override') { toast(t('js.reprice_same'), 'info'); return; }
-      if (!(await confirmModal(t('js.reprice_q', { was: priceText(was), now: priceText(now) }), { okText: t('js.reprice_ok') }))) return;
+      if (!(await confirmModal(t('js.reprice_q', { was: priceText(was), now: priceText(now), pct: String(dry.marginPct) }), { okText: t('js.reprice_ok') }))) return;
       const r = ED().applyJobEdit(order, { reprice: req }, ctx);
       if (!r.ok) { if (line) { line.textContent = reasonText(r); line.hidden = false; } return; }
       if (r.changed) saveAll();
