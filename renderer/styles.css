@@ -6008,3 +6008,7 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .jp-time-edit { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
 .jp-time-edit input { width: auto; }
 .jp-profit { margin-top: 12px; }
+/* Payment plan dialog (Figma 108:1593). */
+.pp-row .pp-fields { flex: 1; min-width: 0; }
+.pp-row.is-paid { background: var(--bg-elev); }
+.pp-summary.is-refused { color: var(--st-late-ink, var(--danger)); }

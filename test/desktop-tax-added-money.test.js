@@ -53,9 +53,11 @@ test('every desktop call site passes the settings (#1718 follow-ups)', () => {
   assert.match(r('currency.js'), /M\(\)\.orderOwedRaw\(o, ctx\(\)\)/, 'orderOwedRaw');
   assert.match(r('wire-events.js'), /A\.restoreDeposit\(entry, \{ settings \}\)/, 'restoreDeposit');
   assert.match(r('order-flows.js'), /applyEdit\(order, \{ price: [^\n]*settings \}\)/, 'price edit');
-  const flows = r('order-flows.js');
-  const ct = flows.slice(flows.indexOf('KhaytPaymentPlan.collectionTotals({'), flows.indexOf('KhaytPaymentPlan.collectionTotals({') + 700);
-  for (const k of ['giftCardDiscount:', 'credited: KhaytOrderMoney.orderCreditedDueRaw(order, { settings })', 'due: KhaytOrderMoney.orderDueRaw(order, { settings })']) assert.ok(ct.includes(k), k);
+  // The editor's plan save no longer calls collectionTotals (money review,
+  // Nov 18): a row is collected by recordRowPayment, which judges what is owed
+  // through lib/order-payment.js cashDue with the settings the dialog passes.
+  assert.match(r('payment-plan-dialog.js'), /const ctxOf = \(\) => \(\{ settings, today: localDateStr\(\) \}\);/, 'the plan dialog passes the settings');
+  assert.equal(r('order-flows.js').includes('KhaytPaymentPlan.collectionTotals({'), false, 'the editor no longer collects');
   assert.match(r('invoicing.js'), /invoiceSummary\(order, _taxProfile\)\.itemsSubtotal/);
 });
 

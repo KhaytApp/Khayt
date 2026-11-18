@@ -180,6 +180,15 @@ test('the base is recorded when a plan is generated, and travels with it', () =>
     'the generator no longer records the cash the order already held');
   assert.match(src, /^\s*instalmentBase: order\.instalmentBase,$/m,
     'the editor draft does not carry it, so save writes undefined back');
-  assert.match(src, /order\.instalmentBase = draft\.instalments\.length > 0 \? draft\.instalmentBase : undefined;/,
-    'it is not written back to the order, or not cleared with the schedule');
+  // Since the money review of Nov 18 the editor shows the plan read-only and
+  // never writes it: lib/payment-plan.js applyPlan (the payment plan dialog)
+  // records the base when a plan is first made, and clears it with the plan.
+  assert.equal(/order\.instalmentBase\s*=/.test(src), false, 'the editor must not write the base');
+  assert.equal(/order\.instalments\s*=/.test(src), false, 'the editor must not write the plan');
+  const PP = require('../lib/payment-plan.js');
+  const job = { id: 'B1', status: 'pending', price: 300, paidAmount: 100 };
+  assert.equal(PP.applyPlan(job, [{ id: 'X', amount: 100 }, { id: 'Y', amount: 100 }], { settings: {} }).ok, true);
+  assert.equal(job.instalmentBase, 100, 'applyPlan records the cash held when the plan was made');
+  assert.equal(PP.applyPlan(job, [], { settings: {} }).ok, true);
+  assert.equal('instalmentBase' in job, false, 'and clears it with the plan');
 });
