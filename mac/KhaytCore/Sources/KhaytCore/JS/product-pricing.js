@@ -73,6 +73,11 @@ function stripUnset(part) {
  * product's rates with the shop's defaults under them (KhaytPrintRates).
  * 0 for a product without rates, or with `labourPerPart` (its labour is in
  * each part then).
+ *
+ * The product's prep and post hours are its own (`rates.prepTime`,
+ * `rates.postTime`): a PART's own prep or post is not used under once-labour
+ * (money review of #2575, finding 4), as the Mac sheet says. Under
+ * `labourPerPart` each part's own hours count, as before.
  */
 function productLabourCost(product, opts) {
   if (!usesProductRates(product) || product.labourPerPart === true) return 0;
@@ -81,6 +86,60 @@ function productLabourCost(product, opts) {
   const r = PRt ? PRt.withRates(productRateDefaults(product), { settings }) : productRateDefaults(product);
   const hours = Math.max(0, +r.prepTime || 0) + Math.max(0, +r.postTime || 0);
   return hours * Math.max(0, +r.laborRate || 0) * (1 + Math.max(0, +r.failureRate || 0) / 100);
+}
+
+/**
+ * What a product with its own rates carries ONCE: its labour and the shop's
+ * packaging (one box per product), each with the product's failure buffer, as
+ * the calculator charges them on a single item. 0 for a product without
+ * rates or with `labourPerPart` (both are in each part then).
+ */
+function productOnceCost(product, opts) {
+  if (!usesProductRates(product) || product.labourPerPart === true) return 0;
+  const PRt = printRates();
+  const settings = (opts && opts.settings) || {};
+  const r = PRt ? PRt.withRates(productRateDefaults(product), { settings }) : productRateDefaults(product);
+  const buffer = 1 + Math.max(0, +r.failureRate || 0) / 100;
+  return productLabourCost(product, opts) + Math.max(0, +settings.defaultPackagingCost || 0) * buffer;
+}
+
+/** A product part with its rates merged as priceProduct costs it (part > product > shop). */
+function ratedPart(product, raw, settings) {
+  const PRt = printRates();
+  const merged = usesProductRates(product) ? Object.assign({}, productRateDefaults(product), stripUnset(raw)) : raw;
+  return PRt ? PRt.withRates(merged, { settings }) : merged;
+}
+
+/**
+ * The parts a JOB taken from the product starts with, costed so that
+ * lib/order-new.js newOrder prices the job exactly as the catalogue prices
+ * the product (money review of #2575, finding 1: a job from a 15-part
+ * product charged the labour 15 times while the catalogue charged it once).
+ * A product with its own rates: each part costed WITHOUT labour and
+ * packaging (`baseCost` for the line, `unitCost` a piece), plus ONE line
+ * `{ kind: 'labour', name, qty: 1, printTime: 0, printWeight: 0, unitCost,
+ * baseCost }` = productOnceCost. A product without rates, or with
+ * labourPerPart: each part costed as it always was, no extra line.
+ */
+function productJobParts(product, opts) {
+  const d = product || {};
+  const CC = (typeof global !== 'undefined' && global.KhaytCalculatorCost) || null;
+  const ctx = { inventory: (opts && opts.inventory) || [], settings: (opts && opts.settings) || {}, consumables: (opts && opts.consumables) || [] };
+  const once = usesProductRates(d) && d.labourPerPart !== true;
+  const o = once ? { labour: false, packaging: false } : undefined;
+  const parts = (Array.isArray(d.parts) ? d.parts : []).filter(Boolean).map((raw) => {
+    const p = ratedPart(d, raw, ctx.settings);
+    const unit = CC ? +CC.computePartBaseCost(p, ctx, o) || 0 : +p.unitCost || 0;
+    const qty = Math.max(1, +p.qty || 1);
+    // To 4 places, not 2: newOrder sums the lines, and 15 lines each rounded
+    // to the halala came to 0.01 more than the catalogue's one rounding.
+    return Object.assign({}, p, { unitCost: +unit.toFixed(4), baseCost: +(unit * qty).toFixed(4) });
+  });
+  if (once) {
+    const cost = +productOnceCost(d, ctx).toFixed(4);
+    if (cost > 0) parts.push({ kind: 'labour', name: 'Labour and packaging', qty: 1, printTime: 0, printWeight: 0, unitCost: cost, baseCost: cost });
+  }
+  return parts;
 }
 
 function priceProduct(product, opts) {
@@ -155,17 +214,17 @@ function priceProduct(product, opts) {
   // new cost" (which gives it rates): nothing re-prices silently.
   const own = usesProductRates(d);
   const once = own && d.labourPerPart !== true;
+  const onceOpts = once ? { labour: false, packaging: false } : undefined;
   const partsCost = list.reduce((sum, raw) => {
-    const merged = own ? Object.assign({}, productRateDefaults(d), stripUnset(raw)) : raw;
-    const p = PRt ? PRt.withRates(merged, { settings: ctx.settings }) : merged;
+    const p = ratedPart(d, raw, ctx.settings);
     if (CC && typeof CC.partTotalCost === 'function') {
-      return sum + (+CC.partTotalCost(p, ctx, once ? { labour: false } : undefined) || 0);
+      return sum + (+CC.partTotalCost(p, ctx, onceOpts) || 0);
     }
     if (CC && typeof CC.computePartBaseCost === 'function') {
-      return sum + (+CC.computePartBaseCost(p, ctx) || 0) * Math.max(1, +(p && p.qty) || 1);
+      return sum + (+CC.computePartBaseCost(p, ctx, onceOpts) || 0) * Math.max(1, +(p && p.qty) || 1);
     }
     return sum + (+(p && p.baseCost) || 0);
-  }, 0) + productLabourCost(d, ctx);
+  }, 0) + productOnceCost(d, ctx);
 
   // Non-printed components folded into the unit cost, for a product that is an
   // assembly rather than a single print. Same module as the per-part cost —
@@ -235,7 +294,7 @@ function pricingFields(product, opts) {
   return { baseCost: p.cost, basePrice: p.basePrice, price: p.price };
 }
 
-const api = { priceProduct, pricingFields, usesProductRates, productLabourCost };
+const api = { priceProduct, pricingFields, usesProductRates, productLabourCost, productOnceCost, productJobParts };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 global.KhaytProductPricing = api;
 

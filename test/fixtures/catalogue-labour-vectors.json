@@ -1,14 +1,121 @@
 {
-  "about": "lib/product-pricing.js priceProduct and labour ONCE per product (Turki, Nov 19; data model: Mac Figma p.18). A product with its own `rates` costs each part's material, wear and power by its own print time, and the labour, (prep + post) × rate × (1 + failure/100), once. `labourPerPart: true` puts labour back in every part. A product with NO `rates` (every product saved before this) costs exactly as before. One part here: 100 g of 90/1000 g filament (9.00), 2 h at wear 0.75 (1.50) and 150 W × 0.18 (0.054), +10% failure = 11.6094 without labour; labour 0.75 h × 90 × 1.1 = 74.25. The Mac and the phone run this file.",
-  "settings": { "defaultMargin": 30 },
-  "rates": { "laborRate": 90, "prepTime": 0.25, "postTime": 0.5, "wearRate": 0.75, "powerDraw": 150, "elecRate": 0.18, "failureRate": 10 },
-  "part": { "printWeight": 100, "printTime": 2, "spoolCost": 90, "spoolWeight": 1000, "qty": 1 },
+  "about": "lib/product-pricing.js priceProduct and labour ONCE per product (Turki, Nov 19; data model: Mac Figma p.18). A product with its own `rates` costs each part's material, wear and power by its own print time, and the labour, (prep + post) × rate × (1 + failure/100), once. `labourPerPart: true` puts labour back in every part. A product with NO `rates` (every product saved before this) costs exactly as before. One part here: 100 g of 90/1000 g filament (9.00), 2 h at wear 0.75 (1.50) and 150 W × 0.18 (0.054), +10% failure = 11.6094 without labour; labour 0.75 h × 90 × 1.1 = 74.25. The Mac and the phone run this file. Money review of #2575: the shop packaging is charged ONCE with the labour (per part only under labourPerPart); a part's own prep/post is not used under once-labour; productJobParts gives a job the parts costed without labour and packaging plus ONE labour line, so newOrder prices it exactly as the catalogue.",
+  "settings": {
+    "defaultMargin": 30
+  },
+  "rates": {
+    "laborRate": 90,
+    "prepTime": 0.25,
+    "postTime": 0.5,
+    "wearRate": 0.75,
+    "powerDraw": 150,
+    "elecRate": 0.18,
+    "failureRate": 10
+  },
+  "part": {
+    "printWeight": 100,
+    "printTime": 2,
+    "spoolCost": 90,
+    "spoolWeight": 1000,
+    "qty": 1
+  },
   "cases": [
-    { "why": "a single item: the catalogue costs it exactly as the calculator does (11.61 + 74.25)", "parts": 1, "productRates": true, "want": { "cost": 85.86, "equalsCalculator": true } },
-    { "why": "4 parts, labour once: 4 × 11.61 + 74.25", "parts": 4, "productRates": true, "want": { "cost": 120.69, "labour": 74.25 } },
-    { "why": "15 parts, labour once: 15 × 11.61 + 74.25 (was 15 × 85.86 = 1,287.89)", "parts": 15, "productRates": true, "want": { "cost": 248.39, "labour": 74.25 } },
-    { "why": "labourPerPart: the explicit override puts labour back in every part: 15 × 85.86", "parts": 15, "productRates": true, "labourPerPart": true, "want": { "cost": 1287.89, "labour": 0 } },
-    { "why": "LEGACY: a product with no rates (6 parts carrying their own) costs exactly as before: 6 × 85.86, no silent re-price", "parts": 6, "productRates": false, "want": { "cost": 515.16, "labour": 0 } },
-    { "why": "a part's own rate wins over the product's: one part at 120 W instead of 150 changes only its power", "parts": 2, "productRates": true, "firstPartOverride": { "powerDraw": 120 }, "want": { "cost": 97.46, "labour": 74.25 } }
+    {
+      "why": "a single item: the catalogue costs it exactly as the calculator does (11.61 + 74.25)",
+      "parts": 1,
+      "productRates": true,
+      "want": {
+        "cost": 85.86,
+        "equalsCalculator": true
+      }
+    },
+    {
+      "why": "4 parts, labour once: 4 × 11.61 + 74.25",
+      "parts": 4,
+      "productRates": true,
+      "want": {
+        "cost": 120.69,
+        "labour": 74.25
+      }
+    },
+    {
+      "why": "15 parts, labour once: 15 × 11.61 + 74.25 (was 15 × 85.86 = 1,287.89)",
+      "parts": 15,
+      "productRates": true,
+      "want": {
+        "cost": 248.39,
+        "labour": 74.25
+      }
+    },
+    {
+      "why": "labourPerPart: the explicit override puts labour back in every part: 15 × 85.86",
+      "parts": 15,
+      "productRates": true,
+      "labourPerPart": true,
+      "want": {
+        "cost": 1287.89,
+        "labour": 0
+      }
+    },
+    {
+      "why": "LEGACY: a product with no rates (6 parts carrying their own) costs exactly as before: 6 × 85.86, no silent re-price",
+      "parts": 6,
+      "productRates": false,
+      "want": {
+        "cost": 515.16,
+        "labour": 0
+      }
+    },
+    {
+      "why": "a part's own rate wins over the product's: one part at 120 W instead of 150 changes only its power",
+      "parts": 2,
+      "productRates": true,
+      "firstPartOverride": {
+        "powerDraw": 120
+      },
+      "want": {
+        "cost": 97.46,
+        "labour": 74.25
+      }
+    },
+    {
+      "why": "PACKAGING once: 15 parts with packaging 5 cost 15 × 11.61 + 74.25 + 5 × 1.1 (was 15 × 5.50 of packaging)",
+      "parts": 15,
+      "productRates": true,
+      "settings": {
+        "defaultMargin": 30,
+        "defaultPackagingCost": 5
+      },
+      "want": {
+        "cost": 253.89,
+        "once": 79.75
+      }
+    },
+    {
+      "why": "a PART's own prep time is not used under once-labour: part 4 with prep 2 h still costs 248.39",
+      "parts": 15,
+      "productRates": true,
+      "partOverride": {
+        "index": 3,
+        "prepTime": 2
+      },
+      "want": {
+        "cost": 248.39
+      }
+    },
+    {
+      "why": "JOB == CATALOGUE: a job taken from a 15-part product with productJobParts is priced by newOrder at the catalogue's base price (330.06)",
+      "parts": 15,
+      "productRates": true,
+      "settings": {
+        "defaultMargin": 30,
+        "defaultPackagingCost": 5
+      },
+      "want": {
+        "cost": 253.89,
+        "jobPrice": 330.06,
+        "jobLines": 16
+      }
+    }
   ]
 }
