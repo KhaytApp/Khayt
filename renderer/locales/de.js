@@ -5473,6 +5473,8 @@
   "js.create_job": "Auftrag annehmen",
   "js.save_quote": "Als Angebot speichern",
   "js.sec_job": "Auftrag",
+  "js.colour_line": "Farbe: {colour}",
+  "js.colour_unset": "Farbe: nicht festgelegt",
   "js.due_suggested": "Aus der Warteschlange vorgeschlagen. Ändern Sie es, wenn ein anderes Datum vereinbart ist.",
   "js.capacity_note": "Die Warteschlange von {machine} ist am {date} abgearbeitet, nach diesem Fälligkeitsdatum",
   "js.capacity_hint": "Speichern ist trotzdem möglich. Verschieben Sie den Auftrag auf seiner Seite auf eine andere Maschine oder wählen Sie ein späteres Datum.",
