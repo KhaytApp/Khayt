@@ -35,6 +35,8 @@ for (const c of V.cases) {
     }
     if (c.want.instalmentBase !== undefined) assert.equal(order.instalmentBase, c.want.instalmentBase);
     if (c.want.rows !== undefined) assert.equal((order.instalments || []).length, c.want.rows);
+    if (c.want.changed !== undefined) assert.equal(r.changed, c.want.changed, 'changed');
+    if (c.want.sameRows) assert.deepEqual(order.instalments, before.instalments, 'every row exactly as stored');
     if (c.want.legacyRow) {
       const row = order.instalments.find((x) => x.id === c.want.legacyRow);
       assert.equal(PP.rowState(row), 'legacy');

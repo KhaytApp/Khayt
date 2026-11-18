@@ -20,7 +20,7 @@
   const METHODS = ['cash', 'mada', 'transfer', 'stcpay', 'applepay', 'visa', 'other'];
   const byId = (id) => (typeof printLog !== 'undefined' ? printLog.find((o) => o && o.id === id) : null) || null;
   const ctxOf = () => ({ settings, today: localDateStr() });
-  const REASONS = ['over_owed', 'paid_row_locked', 'paid_needs_payment', 'bad_amount', 'over_billed', 'already_paid', 'zatca', 'voided', 'credited', 'cancelled'];
+  const REASONS = ['over_owed', 'paid_row_locked', 'paid_needs_payment', 'bad_amount', 'over_billed', 'already_paid', 'quote', 'nothing_owed', 'voided', 'cancelled'];
   // t() answers the KEY for a missing one, so `t(k) || x` never falls back: name the known reasons.
   const reasonText = (r) => t(REASONS.includes(r.reason) ? 'ppd.refused.' + r.reason : 'js.refused_other', { over: fmt(r.over || 0) });
   let fmt = (n) => String(n);

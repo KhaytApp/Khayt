@@ -93,8 +93,12 @@ test('saving instalments cannot destroy a recorded deposit', () => {
   const src = read('renderer/order-flows.js');
   assert.equal(/^\s*order\.paidAmount = instPaid;\s*$/m.test(src), false,
     'the unconditional overwrite destroyed deposits');
-  assert.match(src, /KhaytPaymentPlan\.collectionTotals\(/,
-    'the renderer must reach the shared rule, not re-derive paidAmount');
+  // Since the money review of Nov 18 the editor does not collect at all: no
+  // row is paid by a save (lib/payment-plan.js recordRowPayment records it),
+  // so its save must not rewrite paidAmount from the rows in ANY form.
+  assert.equal(/collectionTotals\(/.test(src), false,
+    'the editor\'s save must not rewrite paidAmount from the plan\'s rows');
+  assert.equal(/order\.paidAmount\s*=\s*totals\./.test(src), false, 'nor through a totals object');
 
   // Driven, not just read: the rule must never return less than it was given.
   for (const [held, base, collected] of [

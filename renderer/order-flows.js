@@ -2382,27 +2382,11 @@ function openOrderEditor(orderId) {
         const d = new Date(cmpEl.value);
         if (!isNaN(d)) order.completedAt = d.toISOString();
       }
-      // What the collected rows do to the order's cash figures — the deposit
-      // that must not be overwritten, the base that must not be double-counted,
-      // and settling against the PRICE rather than the instalment total — is
-      // lib/payment-plan.js's `collectionTotals`, shared with the macOS app.
-      if (draft.instalments.length > 0) {
-        const totals = KhaytPaymentPlan.collectionTotals({
-          price: order.price,
-          paidAmount: order.paidAmount,
-          instalments: draft.instalments,
-          instalmentBase: draft.instalmentBase,
-          // A gift card and a credit note pay an order down too, and a
-          // tax-added shop is owed price + tax, except on an order it settled
-          // before tax-on-top was counted (orderDueRaw, #1730): editing that
-          // order's plan must not flip it back to partial.
-          giftCardDiscount: +order.giftCardDiscount || 0,
-          credited: KhaytOrderMoney.orderCreditedDueRaw(order, { settings }),
-          due: KhaytOrderMoney.orderDueRaw(order, { settings }),
-        });
-        order.paidAmount = totals.paidAmount;
-        order.paymentStatus = totals.paymentStatus;
-      }
+      // No collectionTotals here any more (money review, Nov 18): nothing in
+      // the editor collects a row, so its save must not rewrite paidAmount or
+      // paymentStatus. It did, from the rows' flags, on EVERY save of a job
+      // with a plan: a payment corrected down came back up on a notes-only
+      // save. A row is collected by lib/payment-plan.js recordRowPayment.
       // Delete removed files from disk
       if (pendingFileDeletes.length > 0 && window.hubAPI?.deleteOrderFile) {
         for (const fn of pendingFileDeletes) {

@@ -263,6 +263,16 @@ try {
   const p2 = await plan();
   ok(p2.paidAmount === 1746.67 && p2.instalments.length === 3, 'Save keeps the plan and never moves the paid amount');
   ok(JSON.stringify(p2.instalments[0]) === JSON.stringify({ id: 'A', amount: 373.34, dueDate: '2026-12-18', note: '', paid: true, paidAt: '2026-11-01' }), 'the legacy row is exactly as it was');
+  // Money review finding 1: the old editor's save rewrote paidAmount from the
+  // rows. A payment corrected DOWN (1,746.67 → 1,300) came back up on a
+  // notes-only save, with no payment behind it.
+  await window.evaluate(() => { const o = printLog.find((x) => x.id === 'JP-PLAN'); KhaytOrderPayment.recordPayment(o, { amount: 1300, method: 'cash', paidAt: '2026-11-18' }, { settings, today: '2026-11-18' }); saveAll(); });
+  await window.evaluate(() => openOrderEditor('JP-PLAN'));
+  await window.waitForSelector('.modal [data-f="notes"]', { state: 'visible', timeout: 5_000 });
+  await window.fill('.modal [data-f="notes"]', 'notes only');
+  await window.click('.modal [data-act="save"]');
+  await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-PLAN').notes === 'notes only', null, { timeout: 5_000 });
+  ok((await plan()).paidAmount === 1300, 'a notes-only save in the old editor leaves a corrected payment (1,300) where it is');
 
   console.log('e2e-job-page: ok');
 
