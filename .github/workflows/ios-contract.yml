@@ -64,7 +64,7 @@ jobs:
           # - renderer/invoice.css (the phone's copy must not drift) and
           #   docs/lan-device-keys.vectors.json (shared signing vectors).
           #   RepoPathsInTheFilterTests fails if a test reads a path this misses.
-          pattern='^(ios/|mac/KhaytCore/|lib/|plugins/|renderer/analytics\.js$|renderer/invoice\.css$|renderer/locales/|docs/lan-device-keys\.vectors\.json$|test/fixtures/quote-draft-vectors\.json$|test/fixtures/parts-edit-vectors\.json$|test/fixtures/business-flag-vectors\.json$|test/fixtures/part-colour-vectors\.json$|scripts/ios-contract-|\.github/workflows/ios-contract\.yml$)'
+          pattern='^(ios/|mac/KhaytCore/|lib/|plugins/|renderer/analytics\.js$|renderer/invoice\.css$|renderer/locales/|docs/lan-device-keys\.vectors\.json$|test/fixtures/quote-draft-vectors\.json$|test/fixtures/parts-edit-vectors\.json$|test/fixtures/business-flag-vectors\.json$|test/fixtures/part-colour-vectors\.json$|test/fixtures/actual-times-vectors\.json$|scripts/ios-contract-|\.github/workflows/ios-contract\.yml$)'
           # A here-string, not `printf | grep -q`: under pipefail grep's early
           # exit can SIGPIPE printf on a long list and flip the answer.
           if grep -qE "$pattern" <<< "$files"; then run=true; else run=false; fi

@@ -750,6 +750,47 @@ final class JobEditRuleTests: XCTestCase {
         }
     }
 
+    /// `test/fixtures/actual-times-vectors.json` (#2569): correcting a job's
+    /// actual times moves only that stamp (no finish rule runs again), never
+    /// creates one, and refuses a future time or a completion before the start
+    /// (step `times`) — through the phone's engine and lib in JSC. The phone
+    /// edits no actual time; this holds its copy of the rule to the cases.
+    func testTheSharedActualTimesVectorsGiveLibsAnswerOnThePhone() async throws {
+        struct Case: Decodable { let why: String; let order: [String: JSONValue]; let next: [String: JSONValue]; let want: [String: JSONValue] }
+        struct Vectors: Decodable { let now: String; let cases: [Case] }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "test/fixtures/actual-times-vectors.json")
+        let v = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
+        XCTAssertGreaterThanOrEqual(v.cases.count, 7)
+        let parse = ISO8601DateFormatter()
+        let at = try XCTUnwrap(parse.date(from: v.now), "the fixture's now")
+        let engine = try await BookReader(book: {
+            let b = CompanionBook(directory: dir); try b.replace(with: SampleShop.book(), scope: nil); return b }()).sharedEngine()
+        for c in v.cases {
+            guard case .bool(let ok)? = c.want["ok"] else { XCTFail("\(c.why): want.ok"); continue }
+            let r = try await engine.applyJobEdit(order: .object(c.order), fields: c.next, now: at, editId: "e", priceId: "e2")
+            XCTAssertEqual(r.ok, ok, "\(c.why): \(r.reason ?? "")")
+            guard case .object(let o) = r.order else { XCTFail(c.why); continue }
+            if !ok {
+                XCTAssertEqual(r.reason.map(JSONValue.string) ?? .null, c.want["reason"] ?? .null, c.why)
+                XCTAssertEqual(r.step.map(JSONValue.string) ?? .null, c.want["step"] ?? .null, c.why)
+                XCTAssertEqual(o, c.order, "\(c.why): a refusal writes nothing")
+            } else {
+                let key = try XCTUnwrap(c.next.keys.first)
+                XCTAssertEqual(o[key], c.want[key], c.why)
+                var rest = o; rest[key] = nil
+                var was = c.order; was[key] = nil
+                XCTAssertEqual(rest, was, "\(c.why): only the time moved")
+            }
+            let lib = try ask("""
+                (function () { var o = \(json(.object(c.order)));
+                  var r = KhaytOrderEdit.applyJobEdit(o, \(json(.object(c.next))), { now: Date.parse(\(json(.string(v.now)))), id: 'e', settings: {}, clients: [] });
+                  return { ok: r.ok, reason: r.reason || null }; })()
+                """)
+            XCTAssertEqual(lib, .object(["ok": .bool(ok), "reason": ok ? .null : (c.want["reason"] ?? .null)]), "lib: \(c.why)")
+        }
+    }
+
     /// Edit job's "asked first" reads the same customers as the save.
     func testEditJobAsksFirstForAQuoteItsCustomerWasMessagedAbout() async throws {
         let quote: JSONValue = .object(["id": .string("Q-MSG"), "project": .string("Bracket"), "status": .string("quote"),
