@@ -103,8 +103,13 @@ test('the updater parses the notes and sends the verdict with the offer', () => 
   const src = read('lib/updater.js');
   assert.match(src, /require\('\.\/major-changes'\)/);
   const send = src.slice(src.indexOf("send('update-available'"), src.indexOf("send('update-available'") + 500);
-  assert.match(send, /majorChanges: parseMajorChanges\(notes\)/,
+  // The verdict is every release's since the installed one (notesSince,
+  // test/updater-gate-across-versions.test.js), computed before the send.
+  assert.match(send, /majorChanges: since\.majorChanges/,
     'the offer goes out without the verdict, so the renderer cannot gate on it');
+  const before = src.slice(src.indexOf("send('update-available'") - 600, src.indexOf("send('update-available'"));
+  assert.match(before, /const since = notesSince\(info\.releaseNotes, app\.getVersion\(\)\)/,
+    'the verdict is not taken from every release since the installed one');
 });
 
 test('the download is what is gated, and it is gated on the checkbox', () => {
