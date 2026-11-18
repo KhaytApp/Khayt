@@ -111,6 +111,15 @@
       .concat(list('clients').map((c) => `<option value="${escapeHtml(c.id)}"${c.id === order.clientId ? ' selected' : ''}>${escapeHtml(localName(c) || c.id)}</option>`)).join('');
     const filOpts = list('inventory').map((i) => `<option value="${escapeHtml(i.id)}">${escapeHtml(i.material || i.id)}</option>`).join('');
     const marg = isNew ? null : ED().marginOf(order);
+    // Job details (Figma 100:1527): the shop's own fields, tags, the two notes.
+    const shopFields = ((settings && settings.customFields) || []).filter((sf) => sf && sf.id);
+    const tagsOf = (o) => (Array.isArray(o.tags) ? o.tags : []);
+    const detailsOpen = !!(order.internalNotes || order.invoiceNotes || tagsOf(order).length
+      || shopFields.some((sf) => (order.customData || {})[sf.id]));
+    // Not business moves revenue in or out of the books: the shared rule
+    // refuses it once a tax invoice is issued, or on a frozen job.
+    const nbFrozen = !isNew && ['zatca', 'voided', 'credited', 'cancelled'].includes(lock.code) ? lock.code : null;
+    const nbLock = isNew ? null : (nbFrozen || (ED().invoiceIssued && ED().invoiceIssued(order) ? 'invoice_issued' : null));
 
     const bodyHtml = `<div class="job-sheet">
       ${isNew ? '' : `<div class="js-sub">${escapeHtml(ref)}${order.project ? ' · ' + escapeHtml(order.project) : ''}</div>`}
@@ -121,11 +130,24 @@
           ${custLock ? `<small class="js-hint">${escapeHtml(typeof oeCustomerReasonText === 'function' ? oeCustomerReasonText(custLock) : '')}</small>` : ''}`)}
         ${field(t('js.due'), `<input type="date" data-js="dueDate" value="${escapeHtml(order.dueDate || '')}">`)}
       </div>
+      <p class="js-hint" data-js="dueHint" hidden>${escapeHtml(t('js.due_suggested'))}</p>
+      <div data-js="capacity"></div>
       <div class="js-field"><span>${escapeHtml(t('js.priority'))}</span>
         <div class="js-seg" role="radiogroup" aria-label="${escapeHtml(t('js.priority'))}">
           ${['normal', 'high', 'urgent'].map((l) => `<button type="button" role="radio" data-js-pr="${l}" aria-checked="${l === level}" class="${l === level ? 'on' : ''}">${escapeHtml(t('js.pr_' + l))}</button>`).join('')}
         </div></div>
       ${field(t('js.notes'), `<input type="text" data-js="notes" value="${escapeHtml(order.notes || '')}">`)}
+      <details class="js-details" data-js="details" data-simple-pro${detailsOpen ? ' open' : ''}>
+        <summary class="linkish">${escapeHtml(t('js.details'))}</summary>
+        ${field(t('js.internal_notes'), `<textarea rows="2" data-js="internalNotes">${escapeHtml(order.internalNotes || '')}</textarea>`)}
+        ${field(t('js.invoice_notes'), `<textarea rows="2" data-js="invoiceNotes">${escapeHtml(order.invoiceNotes || '')}</textarea><small class="js-hint">${escapeHtml(t('js.invoice_notes_hint'))}</small>`)}
+        ${field(t('js.tags'), `<input type="text" data-js="tags" value="${escapeHtml(tagsOf(order).join(', '))}" placeholder="${escapeHtml(t('tag.ph'))}">`)}
+        ${shopFields.length ? `<div class="js-hint">${escapeHtml(t('js.shop_fields'))}</div>
+        <div class="js-row">${shopFields.map((sf) => field(sf.label || sf.id, `<input type="text" data-js-cf="${escapeHtml(sf.id)}" value="${escapeHtml(String((order.customData || {})[sf.id] || ''))}">`)).join('')}</div>` : ''}
+      </details>
+      <label class="js-check" data-simple-pro><input type="checkbox" data-js="nonBusiness"${order.nonBusiness === true ? ' checked' : ''}${nbLock ? ' disabled' : ''}>
+        <span>${escapeHtml(t('oe.non_business'))}</span></label>
+      <small class="js-hint" data-simple-pro>${escapeHtml(nbLock ? t(nbLock === 'invoice_issued' ? 'js.nb_invoice' : 'js.nb_locked') : t('oe.non_business_hint'))}</small>
       <h4 class="js-sec" data-js="partsHead"></h4>
       <div class="js-parts" data-js="parts"></div>
       ${lock.edit ? `<div class="js-add" data-js="addRow">
@@ -171,6 +193,7 @@
       if (priority() !== level) n.priorityLevel = priority();
       const notes = q('notes').value;
       if (notes !== (order.notes || '')) n.notes = notes;
+      Object.assign(n, detailsOf(order));
       const disc = Math.min(100, Math.max(0, num(q('discountPct').value)));
       if (disc !== (+order.discountPct || 0)) n.discountPct = disc;
       if (st.touched) n.parts = st.parts;
@@ -184,6 +207,42 @@
       if (typed !== '') n.price = Math.max(0, num(typed));
       else if (st.keepTotal !== undefined) n.price = st.keepTotal;
       return n;
+    }
+    /** The Details fields and Not business, named only when they differ from `base` (applyDetails' contract). */
+    function detailsOf(base) {
+      const n = {};
+      for (const k of ['internalNotes', 'invoiceNotes']) {
+        const v = q(k).value;
+        if (v !== (base[k] || '')) n[k] = v;
+      }
+      const tags = q('tags').value.split(',').map((x) => x.trim()).filter(Boolean);
+      if (tags.join(',') !== tagsOf(base).join(',')) n.tags = tags;
+      const cd = {};
+      modal.querySelectorAll('[data-js-cf]').forEach((el) => {
+        if (el.value.trim() !== String((base.customData || {})[el.dataset.jsCf] || '')) cd[el.dataset.jsCf] = el.value;
+      });
+      if (Object.keys(cd).length) n.customData = cd;
+      const nb = q('nonBusiness').checked;
+      if (nb !== (base.nonBusiness === true)) n.nonBusiness = nb;
+      return n;
+    }
+    /** The machine's queue clears after the due date: the date, or null (the old editor's check, never blocking). */
+    function capacityClash() {
+      const due = q('dueDate').value;
+      if (isNew || !order.machineId || !due || typeof estimateMachineQueueClearDate !== 'function') return null;
+      const clear = estimateMachineQueueClearDate(order.machineId, order.id);
+      if (!(clear instanceof Date) || !(clear > new Date(due + 'T23:59:59'))) return null;
+      const m = list('machines').find((x) => x.id === order.machineId);
+      return { when: clear.toLocaleDateString(localeTag()), machine: (m && m.name) || '' };
+    }
+    function drawCapacity() {
+      const c = capacityClash();
+      const msg = c ? t('js.capacity_note', { machine: c.machine, date: c.when }) : '';
+      q('capacity').innerHTML = c ? `<div class="js-part js-warn" role="status"><div><div class="js-part-name">${escapeHtml(msg)}</div>
+        <div class="js-hint">${escapeHtml(t('js.capacity_hint'))}</div></div></div>` : '';
+      // Repeated beside Save while it applies, so it is seen at save time too.
+      const foot = q('capFoot');
+      if (foot) { foot.textContent = msg; foot.hidden = !c; }
     }
     /** The charges to send: a line with no label and no amount is not one. */
     function linesOut() {
@@ -253,6 +312,7 @@
       if (v.step === 'markup' && ['price_fixed', 'bad_markup', 'ask_price'].includes(v.reason)) {
         return t({ price_fixed: 'js.markup_fixed', bad_markup: 'js.markup_bad', ask_price: 'js.markup_q' }[v.reason]);
       }
+      if (v.step === 'business') return t(v.reason === 'invoice_issued' ? 'js.nb_invoice' : 'js.nb_locked');
       if (v.step === 'customer') return typeof oeCustomerReasonText === 'function' ? oeCustomerReasonText(v.reason) : t('js.refused_other');
       if (['name_only', 'delivered_part', 'no_parts'].includes(v.reason)) return t('js.refused_' + v.reason);
       if (['zatca', 'voided', 'credited', 'cancelled'].includes(v.reason)) return t('js.parts_locked');
@@ -325,6 +385,7 @@
 
     function refresh() {
       const { verdict, trial } = dryRun();
+      drawCapacity();
       drawLoyalty();
       showLineAmounts(verdict.ok ? trial : order);
       const line = modal.parentElement.querySelector('.js-refused') || (() => {
@@ -437,6 +498,10 @@
     function create(asQuote) {
       if (!NEW().canTake(inputOf(asQuote)).ok) { refresh(); return false; }
       const entry = newJob(asQuote);
+      // The Details and Not business, written by the shared rule (applyDetails)
+      // on the new job before it is recorded: nothing written by the sheet.
+      const details = detailsOf({});
+      if (Object.keys(details).length) ED().applyDetails(entry, details, { now: Date.now(), id: uid('edit'), settings });
       if (typeof recordNewJob === 'function') recordNewJob(entry, asQuote);
       else { list('printLog').unshift(entry); saveAll(); }
       if (typeof openJobPage === 'function') setTimeout(() => openJobPage(entry.id), 0);
@@ -451,7 +516,7 @@
         modal = m;
         modal.classList.add('job-sheet-modal');
         const footer = modal.querySelector('.modal-footer');
-        footer.insertAdjacentHTML('afterbegin', `<div class="js-totalbox"><div class="js-hint">${escapeHtml(t('js.total'))}</div><div class="js-total" data-js="total"></div><div class="js-hint js-fixed" data-js="fixed" hidden>${escapeHtml(t('js.price_fixed'))}</div></div>`);
+        footer.insertAdjacentHTML('afterbegin', `<div class="js-totalbox"><div class="js-hint">${escapeHtml(t('js.total'))}</div><div class="js-total" data-js="total"></div><div class="js-hint js-fixed" data-js="fixed" hidden>${escapeHtml(t('js.price_fixed'))}</div><div class="js-hint js-capfoot" data-js="capFoot" role="status" hidden></div></div>`);
         if (isNew) {
           const asQuote = document.createElement('button');
           asQuote.type = 'button';
@@ -464,6 +529,13 @@
           });
         }
         drawParts();
+        // A due date from the queue, for a job that has none (the old
+        // editor's estimate, now suggestDueDate): typing one clears the note.
+        if (!q('dueDate').value && typeof suggestDueDate === 'function') {
+          q('dueDate').value = suggestDueDate();
+          q('dueHint').hidden = false;
+          q('dueDate').addEventListener('input', () => { q('dueHint').hidden = true; }, { once: true });
+        }
         drawLines();
         const syncLine = (el) => {
           if (el.dataset.jsLl !== undefined) { st.lines[+el.dataset.jsLl].label = el.value; st.linesTouched = true; }
