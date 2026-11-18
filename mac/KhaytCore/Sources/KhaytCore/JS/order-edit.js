@@ -445,6 +445,9 @@
     }
     if (has(n, 'dueDate')) order.dueDate = n.dueDate;
     if (has(n, 'priorityLevel')) Object.assign(order, priorityFrom(n.priorityLevel));
+    // Not business (lib/business-scope.js setNonBusiness, the same flag): a
+    // test, a gift, the shop's own. applyJobEdit decides whether it may move.
+    if (has(n, 'nonBusiness')) { if (n.nonBusiness === true) order.nonBusiness = true; else delete order.nonBusiness; }
     // The shop's own order fields (`settings.customFields`), stored as
     // `customData: { [fieldId]: text }`. MERGED, one key at a time: a value
     // for a field this editor was not handed — one the shop has since
@@ -686,6 +689,22 @@
    * A part already handed to the customer (`delivered`) is fixed whatever the
    * job's state — `applyParts` refuses a change to one or its removal.
    */
+  /**
+   * Whether the job has an ISSUED TAX INVOICE, leaving its not-business flag
+   * aside: lib/accounting-rows.js `isInvoice` (the VAT tax point, VAT due
+   * at issue) for the job as if it were business. Written out here because
+   * the Mac's bundle carries this file and not that one; a parity test
+   * (test/business-flag-vectors.test.js) holds the two together.
+   */
+  function invoiceIssued(order) {
+    const o = order || {};
+    if (o.status === 'quote' || o.status === 'cancelled') return false;
+    if (o.status === 'on_hold' && o.hasQuote && !o.quoteAcceptedAt && !o.clientApprovedAt) return false;
+    if (o.voidedAt || o.creditedAt) return false;
+    if (o.status === 'split' && Array.isArray(o.splitInto) && o.splitInto.length > 0) return false;
+    return true;
+  }
+
   function partsLock(order, ctx) {
     const none = (code) => ({ code, edit: false, addRemove: false, nameOnly: false, askPrice: false });
     if (!isObj(order)) return none('missing');
@@ -1204,7 +1223,9 @@
    *   priority, discount, shipping, extra lines, courier…).
    *
    * Returns `{ ok, reason, step, changed }` — `step` names the rule that
-   * refused ('customer' | 'parts' | 'price').
+   * refused ('customer' | 'parts' | 'markup' | 'price' | 'business'). `nonBusiness`
+   * is refused once a tax invoice is issued ('invoice_issued') or the job is
+   * frozen (its partsLock code), step 'business'.
    */
   /** Whether `details` would change a job's price, discount, shipping or extra lines. */
   function moneyMoves(order, details) {
@@ -1260,6 +1281,16 @@
     }
     const details = Object.assign({}, n);
     for (const k of ['clientId', 'project', 'parts', 'marginPct']) delete details[k];
+    // NOT BUSINESS MOVES REVENUE IN OR OUT OF THE BOOKS. Once a tax invoice
+    // is issued, VAT is due (the tax point is issue), so the revenue is
+    // reported: the flag no longer moves, either way. Nor on a job whose
+    // invoice has left the shop (reported, voided, credited, cancelled).
+    // Before an invoice (a quote) it is the shop's to set (Dev Hub, Nov 18).
+    if (has(details, 'nonBusiness') && (details.nonBusiness === true) !== (work.nonBusiness === true)) {
+      const frozenCode = partsLock(work, c).code;
+      if (['zatca', 'voided', 'credited', 'cancelled'].indexOf(frozenCode) !== -1) return stop(frozenCode, 'business');
+      if (invoiceIssued(work)) return stop('invoice_issued', 'business');
+    }
     if (Object.keys(details).length) {
       // WHATEVER LOWERS THE BILL is held to what has been paid — a typed
       // total, and just as much a discount raised, shipping taken off or an
@@ -1300,7 +1331,7 @@
     priorityFrom, priorityOf, changesBetween, recordEdit, applyEdit, adjustPrice,
     parseTags, repriceTerms, applyDetails, editLog, timeline,
     customerLocked, canChangeCustomer, changeCustomer,
-    partsLock, quoteIsDraft, marginOf, applyMarkup, applyParts, applyJobEdit, unexplainedShare,
+    partsLock, invoiceIssued, quoteIsDraft, marginOf, applyMarkup, applyParts, applyJobEdit, unexplainedShare, moneyMoves,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderEdit = api;

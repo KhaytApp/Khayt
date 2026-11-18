@@ -45,6 +45,8 @@ try {
       job('JP-PENDING'),
       job('JP-QUOTE', { status: 'quote', paidAmount: 0, paidAt: null, dueDate: null, statusHistory: [{ status: 'quote', at: '2026-11-13T08:00:00Z' }] }),
       // Taken in USD at 3.75: its part's 75 SAR of cost is 20 USD.
+      job('JP-QC', { status: 'qc', statusHistory: [{ status: 'qc', at: '2026-11-12T08:00:00Z' }] }),
+      job('JP-DONE', { status: 'completed', statusHistory: [{ status: 'completed', at: '2026-11-12T08:00:00Z' }] }),
       // Re-priced from 2,000 to 2,120 after its 50% deposit proforma was sent
       // (Figma 96:1067): the deposit is 60 short, the unsent balance follows.
       job('JP-MS', { price: 2120, paidAmount: 1000, editHistory: [{ id: 'e', at: '2026-10-14T09:00:00Z', fields: { price: { from: 2000, to: 2120 } } }],
@@ -102,6 +104,26 @@ try {
   await window.click('#jobPage [data-jp="back"]');
   await openPage('JP-QUOTE');
 
+  // ── The steps that ask: the desktop's own dialogs, not the old editor (S1) ──
+  const closeModal = async () => { await window.click('.modal [data-act="cancel"]'); await window.waitForSelector('.modal', { state: 'detached', timeout: 5_000 }); };
+  await window.click('#jobPage [data-jp="back"]');
+  await openPage('JP-QC');
+  await window.click('#jobPage [data-jp-step="fail_check"]');
+  await window.waitForSelector('.modal #qcFailReason', { state: 'visible', timeout: 5_000 });
+  ok(true, 'Failed check opens the inspection-failure dialog');
+  await closeModal();
+  await window.click('#jobPage [data-jp-step="hold"]');
+  await window.waitForSelector('.modal #holdReasonInput', { state: 'visible', timeout: 5_000 });
+  await window.fill('.modal #holdReasonInput', 'Waiting for the customer’s file');
+  await window.click('.modal [data-act="save"]');
+  await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-QC').status === 'on_hold', null, { timeout: 5_000 });
+  ok(await window.evaluate(() => printLog.find((o) => o.id === 'JP-QC').holdReason) === 'Waiting for the customer’s file', 'Hold asks why and puts the job on hold with that reason');
+  await window.click('#jobPage [data-jp="back"]');
+  await openPage('JP-DONE');
+  await window.click('#jobPage [data-jp-step="ship"]');
+  await window.waitForSelector('.modal #shipCarrier', { state: 'visible', timeout: 5_000 });
+  ok(await window.evaluate(() => !!document.querySelector('.modal #shipTracking')), 'Ship opens the shipping dialog (carrier and tracking), not the job editor');
+  await closeModal();
   // ── Milestones after a re-price (Turki, Nov 17; Figma 96:1067) ─────────
   await window.click('#jobPage [data-jp="back"]');
   await openPage('JP-MS');

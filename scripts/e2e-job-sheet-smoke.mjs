@@ -10,6 +10,16 @@
  *   - A discount that drops the bill below what was paid shows the refusal
  *     line and Save is disabled (95:596); taking it back clears it.
  *   - A finished job offers no new part and no Remove.
+ *   - Job group (Figma 100:1527): Details (internal and invoice notes, tags,
+ *     shop fields) and Not business save through applyJobEdit; Not business
+ *     is locked once a tax invoice is issued; a job with no due date gets
+ *     the queue's suggestion; a machine queue that clears after the due date
+ *     shows a note under the dates and beside Save, without blocking it.
+ *   - Price group (Figma 98:1269): shipping and an extra charge are priced
+ *     by the shared rule; on a seen price they ask keep-or-new (Keep holds
+ *     the old total); taking shipping off a paid job is refused; a voided
+ *     job's price is read-only; a percentage line shows what the rule made
+ *     of it; the loyalty offer fills the discount.
  *   - Jobs › New job opens the same sheet empty: Take job waits for a part,
  *     records the job as the sheet priced it and opens its page; Save as
  *     quote records a quote.
@@ -72,7 +82,21 @@ try {
       base('JS-DRAFT', { status: 'quote', quoteShareStamped: true, statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }] }),
       base('JS-PAID', { paidAmount: 300, paidAt: '2026-11-12T09:00:00Z' }),
       base('JS-DONE', { status: 'completed', materialDeducted: true, costBasis: 100 }),
+      base('JS-DET', { status: 'quote', quoteShareStamped: true, statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }] }),
+      base('JS-BOOKED', { dueDate: '2099-01-10' }),
+      base('JS-CAP', { machineId: 'M-CAP', dueDate: localDateStr(new Date(Date.now() + 86400000)) }),
+      base('JS-QUEUE', { machineId: 'M-CAP', printTime: 400, dueDate: '2099-01-10' }),
+      base('JS-SHIP'),
+      base('JS-KEEP'),
+      base('JS-SHPAID', { shippingCost: 20, paidAmount: 340, paidAt: '2026-11-12T09:00:00Z' }),
+      base('JS-VOID', { voidedAt: '2026-11-13T09:00:00Z' }),
+      base('JS-PCT', { status: 'quote', quoteShareStamped: true, statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }],
+        extraLines: [{ id: 'EL-P', label: 'Design fee', pct: 10, amount: 34 }] }),
+      base('JS-LOYAL', { clientId: 'C-LOYAL' }),
     );
+    clients.push({ id: 'C-LOYAL', nameEn: 'Loyal Example', phone: '+966500000001' });
+    settings.customFields = [{ id: 'po', label: 'PO number' }];
+    if (!machines.some((m) => m.id === 'M-CAP')) machines.push({ id: 'M-CAP', name: 'Sample X1C' });
     saveAll();
     return flushSave();
   });
@@ -222,6 +246,115 @@ try {
   await window.click('#jobPage [data-jp="back"]');
 
   // ── New job: the same sheet, empty ───────────────────────────────────────
+  // ── Job group: details, not business, due, capacity (Figma 100:1527) ──
+  const cancelSheet = async () => { await window.click('#modalMount .job-sheet-modal .modal-footer [data-act="cancel"]'); await closed(); };
+  await openSheet('JS-DET');
+  ok(!(await window.$eval('#modalMount [data-js="details"]', (d) => d.open)), 'Details is closed when it holds nothing');
+  ok(!(await window.isHidden('#modalMount [data-js="dueHint"]')) && /^\d{4}-\d{2}-\d{2}$/.test(await window.inputValue('#modalMount [data-js="dueDate"]')),
+    'a job with no due date gets the queue\'s suggestion, and says so');
+  const suggested = await window.inputValue('#modalMount [data-js="dueDate"]');
+  ok(suggested === await window.evaluate(() => suggestDueDate()), 'the same date the old editor would suggest (one helper)');
+  await window.click('#modalMount [data-js="details"] > summary');
+  await window.fill('#modalMount [data-js="internalNotes"]', 'Matte plate');
+  await window.fill('#modalMount [data-js="invoiceNotes"]', 'Thank you');
+  await window.fill('#modalMount [data-js="tags"]', 'gift, repeat');
+  await window.fill('#modalMount [data-js-cf="po"]', 'PO-118');
+  ok(await window.isEnabled('#modalMount [data-js="nonBusiness"]'), 'a quote can be marked not business (no invoice yet)');
+  await window.check('#modalMount [data-js="nonBusiness"]');
+  await save(); await closed(); await window.click('#jobPage [data-jp="back"]');
+  const det = await job('JS-DET');
+  ok(det.internalNotes === 'Matte plate' && det.invoiceNotes === 'Thank you' && det.tags.join('|') === 'gift|repeat' && det.customData.po === 'PO-118',
+    'Details save through the shared rule: both notes, the tags, the shop field');
+  ok(det.nonBusiness === true && det.dueDate === suggested, 'and Not business, with the suggested due date');
+  await openSheet('JS-DET');
+  ok(await window.$eval('#modalMount [data-js="details"]', (d) => d.open), 'Details opens by itself once it holds something');
+  await cancelSheet(); await window.click('#jobPage [data-jp="back"]');
+
+  await openSheet('JS-BOOKED');
+  ok(await window.isDisabled('#modalMount [data-js="nonBusiness"]') && /tax invoice is issued/.test(await window.textContent('#modalMount .job-sheet')),
+    'a booked job\'s tax invoice is issued: Not business is locked, and the sheet says why');
+  ok(await window.isHidden('#modalMount [data-js="dueHint"]'), 'a job that has a due date keeps it, with no suggestion');
+  await cancelSheet(); await window.click('#jobPage [data-jp="back"]');
+
+  await openSheet('JS-CAP');
+  ok(/Sample X1C queue clears on/.test(await window.textContent('#modalMount [data-js="capacity"]')), 'a machine queue that clears after the due date shows a note under the dates');
+  ok(!(await window.isHidden('#modalMount [data-js="capFoot"]')) && /queue clears/.test(await window.textContent('#modalMount [data-js="capFoot"]')), 'and again beside Save');
+  await window.fill('#modalMount [data-js="dueDate"]', '2099-01-10');
+  ok(await window.isHidden('#modalMount [data-js="capFoot"]') && !(await window.textContent('#modalMount [data-js="capacity"]')).trim(), 'a later date clears both');
+  await window.fill('#modalMount [data-js="dueDate"]', await window.evaluate(() => localDateStr(new Date(Date.now() + 86400000))));
+  await window.fill('#modalMount [data-js="notes"]', 'Rush it');
+  await save(); await closed(); await window.click('#jobPage [data-jp="back"]');
+  ok((await job('JS-CAP')).notes === 'Rush it', 'the note does not block Save');
+  // ── Price group: shipping, extra charges, loyalty (Figma 98:1269) ───────
+  const money = (s) => +String(s).replace(/[^\d.]/g, '');
+  const totalNow = async () => money(await window.textContent('#modalMount [data-js="total"]'));
+  const cancel = async () => { await window.click('#modalMount .job-sheet-modal .modal-footer [data-act="cancel"]'); await closed(); };
+  const back = () => window.click('#jobPage [data-jp="back"]');
+
+  await openSheet('JS-SHIP');
+  const t0 = await totalNow();
+  await window.fill('#modalMount [data-js="shippingCost"]', '25');
+  const t1 = await totalNow();
+  ok(Math.abs(t1 - t0 - 25) < 0.011, `shipping 25 moves the total by 25, as the shared rule prices it (${t0} → ${t1})`);
+  await window.click('#modalMount [data-js="lineAdd"]');
+  await window.fill('#modalMount [data-js-ll="0"]', 'Gift wrap');
+  await window.fill('#modalMount [data-js-la="0"]', '15');
+  await window.click('#modalMount [data-js-ldone="0"]');
+  const t2 = await totalNow();
+  ok(Math.abs(t2 - t1 - 15) < 0.011 && /Gift wrap/.test(await window.textContent('#modalMount [data-js="lines"]')), `an extra charge of 15 shows as a line and moves the total (${t2})`);
+  await save();
+  await window.waitForSelector('.js-ask [data-ask="new"]', { timeout: 5_000 });
+  ok(/shipping/i.test(await window.textContent('.js-ask')), 'the customer has seen the price: the sheet asks keep-or-new, naming the charges');
+  await window.click('.js-ask [data-ask="new"]');
+  await closed(); await back();
+  const shipped = await job('JS-SHIP');
+  ok(shipped.shippingCost === 25 && shipped.extraLines.length === 1 && shipped.extraLines[0].label === 'Gift wrap' && shipped.extraLines[0].amount === 15,
+    'Use saves the shipping and the charge on the job');
+  ok(Math.abs(shipped.price - 380) < 0.011, `and the price the rule worked out (${shipped.price})`);
+
+  await openSheet('JS-KEEP');
+  await window.fill('#modalMount [data-js="shippingCost"]', '25');
+  await save();
+  await window.waitForSelector('.js-ask [data-ask="keep"]', { timeout: 5_000 });
+  await window.click('.js-ask [data-ask="keep"]');
+  await closed(); await back();
+  const kept = await job('JS-KEEP');
+  ok(kept.shippingCost === 25 && Math.abs(kept.price - 340) < 0.011, `Keep saves the shipping and holds the price the customer saw (${kept.price})`);
+
+  await openSheet('JS-SHPAID');
+  await window.fill('#modalMount [data-js="shippingCost"]', '0');
+  await window.waitForFunction(() => document.querySelector('#modalMount .js-refused') && !document.querySelector('#modalMount .js-refused').hidden, null, { timeout: 5_000 });
+  ok(/paid/i.test(await window.textContent('#modalMount .js-refused')) && await window.isDisabled('#modalMount .job-sheet-modal [data-act="save"]'),
+    'taking shipping off a paid job is refused (95:596) and Save waits');
+  await cancel(); await back();
+  ok((await job('JS-SHPAID')).shippingCost === 20, 'and nothing moved');
+
+  await openSheet('JS-VOID');
+  ok(await window.isDisabled('#modalMount [data-js="shippingCost"]') && await window.isDisabled('#modalMount [data-js="discountPct"]')
+    && !(await window.$('#modalMount [data-js="lineAdd"]')), 'a voided job\'s price is read-only: no shipping, discount or new charge');
+  await cancel(); await back();
+
+  await openSheet('JS-PCT');
+  ok(/10% of the price/.test(await window.textContent('#modalMount [data-js="lines"]')), 'a percentage line says what it is');
+  const pctBefore = await window.textContent('#modalMount [data-js-lamt="0"]');
+  await window.fill('#modalMount [data-js="discountPct"]', '50');
+  const pctAfter = await window.textContent('#modalMount [data-js-lamt="0"]');
+  ok(money(pctAfter) > 0 && money(pctAfter) !== money(pctBefore), `and shows what the rule makes of it as the price moves (${pctBefore.trim()} → ${pctAfter.trim()})`);
+  await save(); await closed(); await back();
+  const pct = await job('JS-PCT');
+  ok(pct.discountPct === 50 && pct.extraLines[0].pct === 10 && Math.abs(pct.extraLines[0].amount - money(pctAfter)) < 0.011,
+    'a draft quote saves without asking, the line kept as 10% at the amount shown');
+
+  await window.evaluate(() => { settings.loyaltyEnabled = true; window.__tier = window.getClientTier; window.getClientTier = (id) => (id === 'C-LOYAL' ? { name: 'Gold', discountPct: 10 } : null); });
+  await openSheet('JS-LOYAL');
+  ok(/Gold customer: 10% loyalty discount/.test(await window.textContent('#modalMount [data-js="loyalty"]')), 'a Gold customer is offered their 10% loyalty discount');
+  await window.click('#modalMount [data-js-loyal]');
+  ok(await window.inputValue('#modalMount [data-js="discountPct"]') === '10' && !(await window.textContent('#modalMount [data-js="loyalty"]')).trim(),
+    'Apply fills the discount, and the offer goes once it is applied');
+  await cancel(); await back();
+  ok(!(await job('JS-LOYAL')).discountPct, 'Apply alone saves nothing');
+  await window.evaluate(() => { settings.loyaltyEnabled = false; window.getClientTier = window.__tier; });
+
   const before = await window.evaluate(() => printLog.length);
   await switchTab(window, 'logs-tab');
   await window.click('#btnNewJobSheet');
@@ -230,6 +363,8 @@ try {
   ok(await window.isDisabled('#modalMount .job-sheet-modal [data-act="save"]'), 'with no part yet, Take job waits');
   ok(await window.evaluate(() => document.querySelector('#modalMount .js-refused')?.hidden !== false), 'and nothing is shown as refused');
   await window.fill('#modalMount [data-js="project"]', 'New sample');
+  await window.click('#modalMount [data-js="details"] > summary');
+  await window.fill('#modalMount [data-js="internalNotes"]', 'From the sheet');
   await addPart('new.stl', 80, 1.5);
   await window.click('#modalMount [data-js-pr="urgent"]');
   const mkShown = await window.textContent('#modalMount [data-js="total"]');
@@ -239,6 +374,7 @@ try {
   const made = await window.evaluate(() => JSON.parse(JSON.stringify(printLog[0])));
   ok(made.project === 'New sample' && made.status === 'pending' && made.parts.length === 1, 'Take job records a pending job with its part');
   ok(made.priorityLevel === 'urgent', 'at the priority picked');
+  ok(made.internalNotes === 'From the sheet', 'with its Details, written by the shared rule');
   ok(mkShown.replace(/[^\d.]/g, '').startsWith(String(made.price.toFixed(2)).replace(/[^\d.]/g, '')), `the job is priced as the sheet showed (${made.price})`);
   await window.waitForSelector('#jobPage:not([hidden]) .jp-title', { timeout: 5_000 });
   ok((await window.textContent('#jobPage .jp-title')).includes('New sample'), 'and its job page opens');

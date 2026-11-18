@@ -5969,3 +5969,15 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .js-refused[hidden] { display: none; }
 .js-ask { max-width: 560px; width: 100%; }
 .js-ask .js-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; padding: 14px 18px; border-radius: var(--radius-sm); background: var(--surface-2, var(--bg)); }
+/* Job sheet, Job group (Figma 100:1527): Details, Not business, the capacity note. */
+.job-sheet .js-details { display: flex; flex-direction: column; gap: 10px; }
+.job-sheet .js-details > summary { cursor: pointer; width: fit-content; }
+.job-sheet .js-details[open] > summary { margin-bottom: 4px; }
+.job-sheet .js-details textarea { resize: vertical; min-height: 48px; }
+.job-sheet .js-check { display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; }
+.job-sheet .js-check input { width: auto; margin: 0; }
+.job-sheet .js-warn { background: var(--st-move-bg); border-color: var(--st-move-dot); color: var(--st-move-ink); }
+.js-totalbox .js-capfoot { color: var(--st-move-ink); max-width: 320px; }
+/* Job sheet, Price group (Figma 98:1269): extra charges edit in place. */
+.job-sheet .js-grow { flex: 1; min-width: 0; }
+.job-sheet .js-amt { font-variant-numeric: tabular-nums; font-family: var(--font-mono, inherit); }

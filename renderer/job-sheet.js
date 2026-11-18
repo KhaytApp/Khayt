@@ -92,7 +92,18 @@
       touched: false,
       editing: -1,
       keepPrice: undefined,
+      // The job's extra charges as the sheet holds them; sent only once touched.
+      lines: (order.extraLines || []).map((l) => Object.assign({}, l)),
+      linesTouched: false,
+      lineEdit: -1,
+      // "Keep" on a price the customer has seen, when shipping, a charge or
+      // the discount moved it: the old total, typed, through the shared rule.
+      keepTotal: undefined,
     };
+    // A job whose invoice has left the shop: its money does not move
+    // (applyJobEdit refuses it; the sheet does not offer it).
+    const frozen = !isNew && ['zatca', 'voided', 'credited', 'cancelled'].includes(lock.code);
+    const dis = frozen ? ' disabled' : '';
     const ref = isNew ? '' : (typeof jobRef === 'function' ? jobRef(order) : order.id);
     const level = isNew ? 'normal' : (ED().priorityOf ? ED().priorityOf(order) : (order.priorityLevel || 'normal'));
     const field = (label, inner, cls) => `<label class="js-field ${cls || ''}"><span>${escapeHtml(label)}</span>${inner}</label>`;
@@ -100,6 +111,15 @@
       .concat(list('clients').map((c) => `<option value="${escapeHtml(c.id)}"${c.id === order.clientId ? ' selected' : ''}>${escapeHtml(localName(c) || c.id)}</option>`)).join('');
     const filOpts = list('inventory').map((i) => `<option value="${escapeHtml(i.id)}">${escapeHtml(i.material || i.id)}</option>`).join('');
     const marg = isNew ? null : ED().marginOf(order);
+    // Job details (Figma 100:1527): the shop's own fields, tags, the two notes.
+    const shopFields = ((settings && settings.customFields) || []).filter((sf) => sf && sf.id);
+    const tagsOf = (o) => (Array.isArray(o.tags) ? o.tags : []);
+    const detailsOpen = !!(order.internalNotes || order.invoiceNotes || tagsOf(order).length
+      || shopFields.some((sf) => (order.customData || {})[sf.id]));
+    // Not business moves revenue in or out of the books: the shared rule
+    // refuses it once a tax invoice is issued, or on a frozen job.
+    const nbFrozen = !isNew && ['zatca', 'voided', 'credited', 'cancelled'].includes(lock.code) ? lock.code : null;
+    const nbLock = isNew ? null : (nbFrozen || (ED().invoiceIssued && ED().invoiceIssued(order) ? 'invoice_issued' : null));
 
     const bodyHtml = `<div class="job-sheet">
       ${isNew ? '' : `<div class="js-sub">${escapeHtml(ref)}${order.project ? ' · ' + escapeHtml(order.project) : ''}</div>`}
@@ -110,11 +130,24 @@
           ${custLock ? `<small class="js-hint">${escapeHtml(typeof oeCustomerReasonText === 'function' ? oeCustomerReasonText(custLock) : '')}</small>` : ''}`)}
         ${field(t('js.due'), `<input type="date" data-js="dueDate" value="${escapeHtml(order.dueDate || '')}">`)}
       </div>
+      <p class="js-hint" data-js="dueHint" hidden>${escapeHtml(t('js.due_suggested'))}</p>
+      <div data-js="capacity"></div>
       <div class="js-field"><span>${escapeHtml(t('js.priority'))}</span>
         <div class="js-seg" role="radiogroup" aria-label="${escapeHtml(t('js.priority'))}">
           ${['normal', 'high', 'urgent'].map((l) => `<button type="button" role="radio" data-js-pr="${l}" aria-checked="${l === level}" class="${l === level ? 'on' : ''}">${escapeHtml(t('js.pr_' + l))}</button>`).join('')}
         </div></div>
       ${field(t('js.notes'), `<input type="text" data-js="notes" value="${escapeHtml(order.notes || '')}">`)}
+      <details class="js-details" data-js="details" data-simple-pro${detailsOpen ? ' open' : ''}>
+        <summary class="linkish">${escapeHtml(t('js.details'))}</summary>
+        ${field(t('js.internal_notes'), `<textarea rows="2" data-js="internalNotes">${escapeHtml(order.internalNotes || '')}</textarea>`)}
+        ${field(t('js.invoice_notes'), `<textarea rows="2" data-js="invoiceNotes">${escapeHtml(order.invoiceNotes || '')}</textarea><small class="js-hint">${escapeHtml(t('js.invoice_notes_hint'))}</small>`)}
+        ${field(t('js.tags'), `<input type="text" data-js="tags" value="${escapeHtml(tagsOf(order).join(', '))}" placeholder="${escapeHtml(t('tag.ph'))}">`)}
+        ${shopFields.length ? `<div class="js-hint">${escapeHtml(t('js.shop_fields'))}</div>
+        <div class="js-row">${shopFields.map((sf) => field(sf.label || sf.id, `<input type="text" data-js-cf="${escapeHtml(sf.id)}" value="${escapeHtml(String((order.customData || {})[sf.id] || ''))}">`)).join('')}</div>` : ''}
+      </details>
+      <label class="js-check" data-simple-pro><input type="checkbox" data-js="nonBusiness"${order.nonBusiness === true ? ' checked' : ''}${nbLock ? ' disabled' : ''}>
+        <span>${escapeHtml(t('oe.non_business'))}</span></label>
+      <small class="js-hint" data-simple-pro>${escapeHtml(nbLock ? t(nbLock === 'invoice_issued' ? 'js.nb_invoice' : 'js.nb_locked') : t('oe.non_business_hint'))}</small>
       <h4 class="js-sec" data-js="partsHead"></h4>
       <div class="js-parts" data-js="parts"></div>
       ${lock.edit ? `<div class="js-add" data-js="addRow">
@@ -129,10 +162,18 @@
       <div class="js-row">
         ${isNew
           ? field(t('js.markup'), `<input type="number" min="0" step="any" data-js="margin" value="${escapeHtml(String(calcMarkup()))}">`)
-          : field(t('js.markup'), `<input type="number" min="0" step="any" data-js="margin" value="${marg === null ? '' : escapeHtml(String(marg))}"${marg === null ? ` placeholder="${escapeHtml(t('jp.margin_typed'))}"` : ''}>`)}
-        ${field(t('js.discount'), `<input type="number" min="0" max="100" step="any" data-js="discountPct" value="${escapeHtml(String(+order.discountPct || 0))}">`)}
-        ${field(t('js.set_price'), `<input type="number" min="0" step="any" data-js="price" placeholder="${escapeHtml(t('js.auto'))}">`)}
+          : field(t('js.markup'), `<input type="number" min="0" step="any" data-js="margin" value="${marg === null ? '' : escapeHtml(String(marg))}"${marg === null ? ` placeholder="${escapeHtml(t('jp.margin_typed'))}"` : ''}${dis}>`)}
+        ${field(t('js.discount'), `<input type="number" min="0" max="100" step="any" data-js="discountPct" value="${escapeHtml(String(+order.discountPct || 0))}"${dis}>`)}
+        ${field(t('js.set_price'), `<input type="number" min="0" step="any" data-js="price" placeholder="${escapeHtml(t('js.auto'))}"${dis}>`)}
       </div>
+      <div class="js-row">
+        ${field(t('js.shipping'), `<input type="number" min="0" step="any" data-js="shippingCost" value="${escapeHtml(String(+order.shippingCost || 0))}"${dis}>`)}
+        <span class="js-field" aria-hidden="true"></span><span class="js-field" aria-hidden="true"></span>
+      </div>
+      <div data-js="loyalty"></div>
+      <div class="js-hint">${escapeHtml(t('js.extra_charges'))}</div>
+      <div class="js-parts" data-js="lines"></div>
+      ${frozen ? `<p class="js-hint">${escapeHtml(t('js.price_frozen'))}</p>` : `<div><button type="button" class="btn" data-js="lineAdd">${escapeHtml(t('js.add_charge'))}</button></div>`}
       ${isNew ? '' : `<button type="button" class="linkish js-more" data-js="more">› ${escapeHtml(t('js.more'))}</button>`}
     </div>`;
 
@@ -152,15 +193,68 @@
       if (priority() !== level) n.priorityLevel = priority();
       const notes = q('notes').value;
       if (notes !== (order.notes || '')) n.notes = notes;
+      Object.assign(n, detailsOf(order));
       const disc = Math.min(100, Math.max(0, num(q('discountPct').value)));
       if (disc !== (+order.discountPct || 0)) n.discountPct = disc;
       if (st.touched) n.parts = st.parts;
       // A new markup goes to the rule as typed: it refuses a bad one itself.
       const mk = q('margin').value.trim();
       if (mk !== '' && (marg === null || Math.abs(Number(mk) - marg) >= 0.005)) n.marginPct = Number(mk);
+      const ship = Math.max(0, num(q('shippingCost').value));
+      if (Math.abs(ship - (+order.shippingCost || 0)) > 0.005) n.shippingCost = ship;
+      if (st.linesTouched) n.extraLines = linesOut();
       const typed = q('price').value.trim();
       if (typed !== '') n.price = Math.max(0, num(typed));
+      else if (st.keepTotal !== undefined) n.price = st.keepTotal;
       return n;
+    }
+    /** The Details fields and Not business, named only when they differ from `base` (applyDetails' contract). */
+    function detailsOf(base) {
+      const n = {};
+      for (const k of ['internalNotes', 'invoiceNotes']) {
+        const v = q(k).value;
+        if (v !== (base[k] || '')) n[k] = v;
+      }
+      const tags = q('tags').value.split(',').map((x) => x.trim()).filter(Boolean);
+      if (tags.join(',') !== tagsOf(base).join(',')) n.tags = tags;
+      const cd = {};
+      modal.querySelectorAll('[data-js-cf]').forEach((el) => {
+        if (el.value.trim() !== String((base.customData || {})[el.dataset.jsCf] || '')) cd[el.dataset.jsCf] = el.value;
+      });
+      if (Object.keys(cd).length) n.customData = cd;
+      const nb = q('nonBusiness').checked;
+      if (nb !== (base.nonBusiness === true)) n.nonBusiness = nb;
+      return n;
+    }
+    /** The machine's queue clears after the due date: the date, or null (the old editor's check, never blocking). */
+    function capacityClash() {
+      const due = q('dueDate').value;
+      if (isNew || !order.machineId || !due || typeof estimateMachineQueueClearDate !== 'function') return null;
+      const clear = estimateMachineQueueClearDate(order.machineId, order.id);
+      if (!(clear instanceof Date) || !(clear > new Date(due + 'T23:59:59'))) return null;
+      const m = list('machines').find((x) => x.id === order.machineId);
+      return { when: clear.toLocaleDateString(localeTag()), machine: (m && m.name) || '' };
+    }
+    function drawCapacity() {
+      const c = capacityClash();
+      const msg = c ? t('js.capacity_note', { machine: c.machine, date: c.when }) : '';
+      q('capacity').innerHTML = c ? `<div class="js-part js-warn" role="status"><div><div class="js-part-name">${escapeHtml(msg)}</div>
+        <div class="js-hint">${escapeHtml(t('js.capacity_hint'))}</div></div></div>` : '';
+      // Repeated beside Save while it applies, so it is seen at save time too.
+      const foot = q('capFoot');
+      if (foot) { foot.textContent = msg; foot.hidden = !c; }
+    }
+    /** The charges to send: a line with no label and no amount is not one. */
+    function linesOut() {
+      return st.lines.filter((l) => String(l.label || '').trim() || +l.amount > 0 || (l.pct != null && l.pct !== ''))
+        .map((l) => Object.assign({}, l, { label: String(l.label || '').trim() }));
+    }
+    /** Whether shipping, a charge or the discount moves the job's money (the shared rule's test). */
+    function termsMove() {
+      const n = nextOf();
+      const d = {};
+      for (const k of ['discountPct', 'shippingCost', 'extraLines']) if (Object.prototype.hasOwnProperty.call(n, k)) d[k] = n[k];
+      return Object.keys(d).length > 0 && ED().moneyMoves(order, d);
     }
     /** A new job's input to lib/order-new.js newOrder, as the sheet holds it. */
     function inputOf(asQuote) {
@@ -173,6 +267,8 @@
         notes: q('notes').value,
         margin: Math.max(0, num(q('margin').value)),
         discountPct: Math.min(100, Math.max(0, num(q('discountPct').value))),
+        shippingCost: Math.max(0, num(q('shippingCost').value)),
+        extraLines: linesOut(),
         priceOverride: typed === '' ? null : Math.max(0, num(typed)),
         overheadPerHour: typeof shopOverheadPerHour === 'function' ? shopOverheadPerHour() : 0,
         priorityLevel: priority(),
@@ -216,6 +312,7 @@
       if (v.step === 'markup' && ['price_fixed', 'bad_markup', 'ask_price'].includes(v.reason)) {
         return t({ price_fixed: 'js.markup_fixed', bad_markup: 'js.markup_bad', ask_price: 'js.markup_q' }[v.reason]);
       }
+      if (v.step === 'business') return t(v.reason === 'invoice_issued' ? 'js.nb_invoice' : 'js.nb_locked');
       if (v.step === 'customer') return typeof oeCustomerReasonText === 'function' ? oeCustomerReasonText(v.reason) : t('js.refused_other');
       if (['name_only', 'delivered_part', 'no_parts'].includes(v.reason)) return t('js.refused_' + v.reason);
       if (['zatca', 'voided', 'credited', 'cancelled'].includes(v.reason)) return t('js.parts_locked');
@@ -245,8 +342,52 @@
       }
     }
 
+    /** The extra charges (Figma 98:1269): each with Edit and Remove, one open at a time. */
+    function drawLines() {
+      const host = q('lines');
+      host.innerHTML = st.lines.map((l, i) => {
+        const pct = l.pct != null && l.pct !== '';
+        if (st.lineEdit === i) {
+          return `<div class="js-part is-editing" data-li="${i}"><div class="js-row js-grow">
+            ${field(t('js.charge_label'), `<input type="text" data-js-ll="${i}" value="${escapeHtml(l.label || '')}">`)}
+            ${field(t('js.charge_amount'), `<input type="number" min="0" step="any" data-js-la="${i}" value="${escapeHtml(String(+l.amount || 0))}">`)}
+          </div><div class="js-part-acts"><button type="button" class="linkish" data-js-ldone="${i}">${escapeHtml(t('js.charge_done'))}</button></div></div>`;
+        }
+        return `<div class="js-part" data-li="${i}">
+          <div><div class="js-part-name">${escapeHtml(l.label || '—')}</div>
+            <div class="js-hint">${escapeHtml(pct ? t('js.charge_pct', { pct: String(+l.pct) }) : t('js.charge_fixed'))}</div></div>
+          <div class="js-part-acts"><span class="js-amt" data-js-lamt="${i}">${escapeHtml(priceText(+l.amount || 0))}</span>
+            ${frozen ? '' : `<button type="button" class="linkish" data-js-ledit="${i}">${escapeHtml(t('js.edit_part'))}</button>
+            <button type="button" class="linkish" data-js-lrm="${i}">${escapeHtml(t('js.remove_part'))}</button>`}</div></div>`;
+      }).join('');
+    }
+    /** What each percentage line comes to at the price the rule worked out (no math here). */
+    function showLineAmounts(job) {
+      const resolved = Array.isArray(job.extraLines) ? job.extraLines : [];
+      st.lines.forEach((l, i) => {
+        const el = modal.querySelector(`[data-js-lamt="${i}"]`);
+        if (!el || l.pct == null || l.pct === '') return;
+        const r = (l.id && resolved.find((x) => x && x.id === l.id)) || (st.linesTouched ? null : resolved[i]);
+        el.textContent = priceText(r ? +r.amount || 0 : +l.amount || 0);
+      });
+    }
+    /** The customer's loyalty tier, offered as the discount (the old editor's offer). */
+    function drawLoyalty() {
+      const host = q('loyalty');
+      const cid = q('clientId').value;
+      const tier = !frozen && cid && settings && settings.loyaltyEnabled && typeof getClientTier === 'function' ? getClientTier(cid) : null;
+      const pct = tier ? +tier.discountPct || 0 : 0;
+      const offer = pct > 0 && Math.abs(num(q('discountPct').value) - pct) > 0.0001;
+      host.innerHTML = offer ? `<div class="js-part"><div><div class="js-part-name">${escapeHtml(t('js.loyalty_offer', { tier: tier.name || '', pct: String(pct) }))}</div>
+        <div class="js-hint">${escapeHtml(t('js.loyalty_hint', { pct: String(pct) }))}</div></div>
+        <div class="js-part-acts"><button type="button" class="linkish" data-js-loyal="${pct}">${escapeHtml(t('js.loyalty_apply', { pct: String(pct) }))}</button></div></div>` : '';
+    }
+
     function refresh() {
       const { verdict, trial } = dryRun();
+      drawCapacity();
+      drawLoyalty();
+      showLineAmounts(verdict.ok ? trial : order);
       const line = modal.parentElement.querySelector('.js-refused') || (() => {
         const p = document.createElement('p');
         p.className = 'oe-refused js-refused';
@@ -306,12 +447,12 @@
     }
 
     /** The customer has seen the price (Figma 95:461): keep it, or use the new one. Resolves true/false, or null when closed. */
-    function askKeep(was, now) {
+    function askKeep(was, now, bodyKey) {
       return new Promise((resolve) => {
         const overlay = appendStackedModal(`<div class="modal js-ask" role="dialog" aria-modal="true" aria-labelledby="jsAskTitle">
           <h3 id="jsAskTitle">${escapeHtml(t('js.ask_title'))}</h3>
           <div class="js-sub">${escapeHtml(ref)}${order.project ? ' · ' + escapeHtml(order.project) : ''}</div>
-          <p>${escapeHtml(t('js.ask_body', { was: priceText(was), now: priceText(now) }))}</p>
+          <p>${escapeHtml(t(bodyKey || 'js.ask_body', { was: priceText(was), now: priceText(now) }))}</p>
           <div class="js-foot"><div><div class="js-hint">${escapeHtml(t('js.ask_saw'))}</div><div class="js-total">${escapeHtml(priceText(was))}</div></div>
             <div class="btn-row"><button type="button" class="btn" data-ask="keep">${escapeHtml(t('js.keep', { amount: priceText(was) }))}</button>
             <button type="button" class="btn primary" data-ask="new">${escapeHtml(t('js.use', { amount: priceText(now) }))}</button></div></div>
@@ -357,6 +498,10 @@
     function create(asQuote) {
       if (!NEW().canTake(inputOf(asQuote)).ok) { refresh(); return false; }
       const entry = newJob(asQuote);
+      // The Details and Not business, written by the shared rule (applyDetails)
+      // on the new job before it is recorded: nothing written by the sheet.
+      const details = detailsOf({});
+      if (Object.keys(details).length) ED().applyDetails(entry, details, { now: Date.now(), id: uid('edit'), settings });
       if (typeof recordNewJob === 'function') recordNewJob(entry, asQuote);
       else { list('printLog').unshift(entry); saveAll(); }
       if (typeof openJobPage === 'function') setTimeout(() => openJobPage(entry.id), 0);
@@ -371,7 +516,7 @@
         modal = m;
         modal.classList.add('job-sheet-modal');
         const footer = modal.querySelector('.modal-footer');
-        footer.insertAdjacentHTML('afterbegin', `<div class="js-totalbox"><div class="js-hint">${escapeHtml(t('js.total'))}</div><div class="js-total" data-js="total"></div><div class="js-hint js-fixed" data-js="fixed" hidden>${escapeHtml(t('js.price_fixed'))}</div></div>`);
+        footer.insertAdjacentHTML('afterbegin', `<div class="js-totalbox"><div class="js-hint">${escapeHtml(t('js.total'))}</div><div class="js-total" data-js="total"></div><div class="js-hint js-fixed" data-js="fixed" hidden>${escapeHtml(t('js.price_fixed'))}</div><div class="js-hint js-capfoot" data-js="capFoot" role="status" hidden></div></div>`);
         if (isNew) {
           const asQuote = document.createElement('button');
           asQuote.type = 'button';
@@ -384,7 +529,26 @@
           });
         }
         drawParts();
-        modal.addEventListener('input', (e) => { if (!e.target.closest('[data-js="addRow"]')) refresh(); });
+        // A due date from the queue, for a job that has none (the old
+        // editor's estimate, now suggestDueDate): typing one clears the note.
+        if (!q('dueDate').value && typeof suggestDueDate === 'function') {
+          q('dueDate').value = suggestDueDate();
+          q('dueHint').hidden = false;
+          q('dueDate').addEventListener('input', () => { q('dueHint').hidden = true; }, { once: true });
+        }
+        drawLines();
+        const syncLine = (el) => {
+          if (el.dataset.jsLl !== undefined) { st.lines[+el.dataset.jsLl].label = el.value; st.linesTouched = true; }
+          if (el.dataset.jsLa !== undefined) {
+            const l = st.lines[+el.dataset.jsLa];
+            l.amount = Math.max(0, num(el.value));
+            // A figure typed over a percentage line makes it a fixed one: the
+            // two would disagree otherwise (the old editor's rule).
+            delete l.pct;
+            st.linesTouched = true;
+          }
+        };
+        modal.addEventListener('input', (e) => { syncLine(e.target); if (!e.target.closest('[data-js="addRow"]')) refresh(); });
         modal.addEventListener('change', (e) => { if (!e.target.closest('[data-js="addRow"]')) refresh(); });
         modal.addEventListener('click', (e) => {
           const pr = e.target.closest('[data-js-pr]');
@@ -403,6 +567,20 @@
             return;
           }
           if (e.target.closest('[data-js="pAdd"]')) { takeRow(); return; }
+          const focusLine = () => modal.querySelector(`[data-js-ll="${st.lineEdit}"]`)?.focus();
+          if (e.target.closest('[data-js="lineAdd"]')) {
+            st.lines.push({ id: uid('EL'), label: '', amount: 0 });
+            st.lineEdit = st.lines.length - 1; st.linesTouched = true;
+            drawLines(); refresh(); focusLine();
+            return;
+          }
+          const le = e.target.closest('[data-js-ledit]');
+          if (le) { st.lineEdit = +le.dataset.jsLedit; drawLines(); refresh(); focusLine(); return; }
+          if (e.target.closest('[data-js-ldone]')) { st.lineEdit = -1; drawLines(); refresh(); return; }
+          const lr = e.target.closest('[data-js-lrm]');
+          if (lr) { st.lines.splice(+lr.dataset.jsLrm, 1); st.lineEdit = -1; st.linesTouched = true; drawLines(); refresh(); return; }
+          const ly = e.target.closest('[data-js-loyal]');
+          if (ly) { q('discountPct').value = ly.dataset.jsLoyal; refresh(); return; }
           if (e.target.closest('[data-js="more"]')) { openOrderEditor(order.id); }
         });
         refresh();
@@ -410,6 +588,7 @@
       async onSave() {
         if (isNew) return create(false);
         st.keepPrice = undefined;
+        st.keepTotal = undefined;
         const typedTotal = q('price').value.trim() !== '';
         // A total typed here is a new price on purpose, so a markup changed
         // with it needs no question either. Without this the save was
@@ -426,12 +605,17 @@
           }
           st.keepPrice = false;
           seenOk = true;
-        } else if (st.touched && lock.askPrice && !typedTotal) {
+        } else if (lock.askPrice && !typedTotal && (st.touched || termsMove())) {
+          // New parts, or shipping, a charge or the discount changed: the
+          // customer has seen the price, so the shop chooses (Figma 95:461).
+          // Keep, when the terms moved it, is the old total typed through the
+          // shared rule, which settles it last.
           const { verdict, trial } = dryRun({ keepPrice: false });
           if (verdict.ok && Math.abs((+trial.price || 0) - (+order.price || 0)) > 0.005) {
-            const keep = await askKeep(+order.price || 0, +trial.price || 0);
+            const keep = await askKeep(+order.price || 0, +trial.price || 0, st.touched ? 'js.ask_body' : 'js.ask_body_terms');
             if (keep === null) return false;
-            st.keepPrice = keep;
+            if (st.touched) st.keepPrice = keep;
+            if (keep && termsMove()) st.keepTotal = +order.price || 0;
           }
         }
         const verdict = ED().applyJobEdit(order, nextOf(), ctxOf({ keepPrice: st.keepPrice, priceSeenOk: seenOk }));

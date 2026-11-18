@@ -1551,6 +1551,25 @@ async function usePrintPhotoAsProductPhoto(productId, photo) {
   return 'added';
 }
 
+/**
+ * A due date from the queue: the jobs waiting or printing, at the average
+ * print time of the last twenty finished, over the shop's working hours a
+ * day; at least tomorrow. The old editor's estimate, shared with the job
+ * sheet (renderer/job-sheet.js) so the two suggest the same date.
+ */
+function suggestDueDate() {
+  const queueDepth = printLog.filter(o => o.status === 'pending' || o.status === 'printing').length;
+  // settings.workingHours is an object ({mon:8,…}); use the numeric helper
+  // (raw object * 60 → NaN → setDate(NaN) → toISOString() RangeError).
+  const workingHoursPerDay = Math.max(1, avgDailyWorkingHours());
+  const recentMins = printLog.filter(o => KhaytOrderStatus.isFinished(o) && o.printTimeMins != null)
+    .slice(-20).map(o => o.printTimeMins).filter(Boolean);
+  const avgPrintMins = recentMins.length > 0 ? recentMins.reduce((s, v) => s + v, 0) / recentMins.length : 120;
+  const daysNeeded = Math.max(1, Math.ceil((queueDepth * avgPrintMins) / (workingHoursPerDay * 60)));
+  const suggested = new Date(); suggested.setDate(suggested.getDate() + daysNeeded);
+  return localDateStr(suggested);
+}
+
 function openOrderEditor(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
@@ -1873,17 +1892,7 @@ function openOrderEditor(orderId) {
       requestAnimationFrame(() => {
         const dueDateInput = modal.querySelector('[data-f="dueDate"]');
         if (dueDateInput && !dueDateInput.value) {
-          const queueDepth = printLog.filter(o => o.status === 'pending' || o.status === 'printing').length;
-          // settings.workingHours is an object ({mon:8,…}); use the numeric helper
-          // (raw object * 60 → NaN → setDate(NaN) → toISOString() RangeError).
-          const workingHoursPerDay = Math.max(1, avgDailyWorkingHours());
-          const recentMins = printLog.filter(o => KhaytOrderStatus.isFinished(o) && o.printTimeMins != null)
-            .slice(-20).map(o => o.printTimeMins).filter(Boolean);
-          const avgPrintMins = recentMins.length > 0 ? recentMins.reduce((s, v) => s + v, 0) / recentMins.length : 120;
-          const totalMinsQueued = queueDepth * avgPrintMins;
-          const daysNeeded = Math.max(1, Math.ceil(totalMinsQueued / (workingHoursPerDay * 60)));
-          const suggested = new Date(); suggested.setDate(suggested.getDate() + daysNeeded);
-          const suggestedStr = localDateStr(suggested);
+          const suggestedStr = suggestDueDate();
           dueDateInput.value = suggestedStr;
           dueDateInput.title = 'Auto-suggested based on current queue';
           draft.dueDate = suggestedStr;
@@ -3489,6 +3498,7 @@ async function captureFailurePhoto(orderId) {
     runPaymentEffects,
     renderOeExtraLinesHtml,
     openOrderEditor,
+    suggestDueDate,
     oeCustomerReasonText,
     recordNewJob,
     openBatchPlannerModal,
