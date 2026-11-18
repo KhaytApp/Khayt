@@ -558,7 +558,14 @@
     const labourCost = positive(i.labourCost);
     const packagingCost = positive(i.packagingCost);
     const costedBase = parts.reduce((s, p) => s + (isAgreed(p) ? 0 : num(p.baseCost, 0)), 0) + compCost;
-    const costedAll = costedBase + labourCost + packagingCost;
+    // In the PRICE only in proportion to the parts that are costed (by their
+    // cost), never on top of what the customer AGREED: a job whose every part
+    // has an agreed price priced 300 at 419.63, its invoice lines still
+    // summing to 300 (money review of #2581). Always stored as COST, whole.
+    const allCost = parts.reduce((s, p) => s + num(p.baseCost, 0), 0);
+    const costedParts = parts.reduce((s, p) => s + (isAgreed(p) ? 0 : num(p.baseCost, 0)), 0);
+    const costedShare = allCost > 0 ? costedParts / allCost : (parts.some((p) => !isAgreed(p)) ? 1 : 0);
+    const costedAll = costedBase + (labourCost + packagingCost) * costedShare;
 
     const P = pricing();
     if (!P) throw new Error('KhaytOrderNew needs KhaytPricing');
