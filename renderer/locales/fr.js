@@ -1618,6 +1618,7 @@
   "audit.all_members": "Tous les membres",
   "audit.system": "—",
   "audit.act_order_created": "Commande créée",
+  "audit.act_slicer_inbox": "Envoyé dans la boîte par un trancheur",
   "audit.act_quote_created": "Devis créé",
   "audit.act_status": "Statut modifié",
   "set.logo": "Logo de l'entreprise",

@@ -12,7 +12,7 @@ Les trancheurs qui envoient leurs fichiers tranchés directement à ce Mac, et q
 ## Associer un trancheur
 
 - Ouvrez **Apps connectées** dans la barre latérale et cliquez sur **Associer un trancheur**. Pendant les deux minutes suivantes, un trancheur de votre réseau peut demander à s'associer, et le Mac affiche l'adresse à saisir.
-- Dans OrcaSlicer, ouvrez Khayt → Pair → On this network et saisissez cette adresse exactement.
+- Dans OrcaSlicer, ouvrez l'onglet **Khayt**, saisissez cette adresse exactement et cliquez sur **Pair**.
 - Le Mac demande **Approuver « nom » ?** et indique quelle app a demandé, depuis quelle adresse. Vérifiez que c'est bien votre trancheur.
 - Les deux écrans affichent un nombre à six chiffres. S'ils sont identiques, cliquez sur **Les nombres correspondent — approuver**. Le trancheur apparaît sous Trancheurs associés.
 

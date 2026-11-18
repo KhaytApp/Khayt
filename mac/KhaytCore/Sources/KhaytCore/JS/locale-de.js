@@ -1618,6 +1618,7 @@
   "audit.all_members": "Alle Mitglieder",
   "audit.system": "—",
   "audit.act_order_created": "Auftrag erstellt",
+  "audit.act_slicer_inbox": "Von einem Slicer in den Eingang gesendet",
   "audit.act_quote_created": "Angebot erstellt",
   "audit.act_status": "Status geändert",
   "set.logo": "Firmenlogo",

@@ -2785,14 +2785,20 @@ extension Shop {
     }
 
     /// The team's activity log — the same collection, shape and cap Khayt uses.
-    static func appendActivity(_ root: inout [String: JSONValue], text: String,
+    /// `actor`: who did it when it was not a person at this Mac — a paired
+    /// slicer plugin (`connector:<id>`, its name). Nil: the operator signed in.
+    nonisolated static func appendActivity(_ root: inout [String: JSONValue], text: String,
                                        ref: String, settings: [String: JSONValue],
                                        root snapshot: [String: JSONValue],
-                                       action: String = "status") {
+                                       action: String = "status",
+                                       actor: (id: String, name: String)? = nil) {
         var log = rows(snapshot, "auditLog")
         var operatorId: JSONValue = .null
         var operatorName = ""
-        if case .string(let opId)? = settings["activeOperatorId"] {
+        if let actor {
+            operatorId = .string(actor.id)
+            operatorName = actor.name
+        } else if case .string(let opId)? = settings["activeOperatorId"] {
             operatorId = .string(opId)
             if let op = rows(snapshot, "operators").first(where: { recordId($0) == opId }),
                case .object(let o) = op, case .string(let name)? = o["name"] {

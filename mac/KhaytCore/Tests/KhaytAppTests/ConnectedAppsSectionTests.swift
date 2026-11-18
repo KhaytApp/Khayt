@@ -96,4 +96,49 @@ struct ConnectedAppsSectionTests {
         octo.suggested = .object(["intent": .string("inbox")])
         #expect(SlicerInboxRows.asked(octo, words: shop.words) == nil)
     }
+
+    @Test("a job made from a plugin's file carries where it came from; an OctoPrint file carries nothing")
+    func jobFromPluginFileCarriesOrigin() {
+        var item = SlicerUpload(id: "SU-1", name: "Bracket_PLA.gcode", arrived: Date(), bytes: 10)
+        #expect(Shop.slicerCarried(item).isEmpty, "the OctoPrint path has no plugin to show the file to")
+        item.source = "connector"; item.connectorId = "dev_SampleStudioPC0001"
+        item.sha256 = String(repeating: "a", count: 64); item.sliceId = "ABCDEFGHIJKLMNOP"
+        item.connectorName = "OrcaSlicer on Studio PC"
+        #expect(Shop.slicerCarried(item) == ["fromSlicer": .object([
+            "connectorId": .string("dev_SampleStudioPC0001"), "name": .string("Bracket_PLA.gcode"),
+            "sha256": .string(String(repeating: "a", count: 64)), "sliceId": .string("ABCDEFGHIJKLMNOP")])],
+                "the plugin's name and suggestion stay in the inbox; the job keeps only what identifies the file")
+    }
+
+    @Test("the activity line names the file and the plugin, and the plugin as the one who did it")
+    func activityLineForAPluginFile() {
+        var root: [String: JSONValue] = ["auditLog": .array([]),
+                                         "settings": .object(["activeOperatorId": .string("op_owner")])]
+        let snapshot = root
+        Shop.appendActivity(&root, text: Shop.slicerArrivalText("Bracket_PLA.gcode", plugin: "OrcaSlicer on Studio PC"),
+                            ref: "SU-1", settings: Shop.settings(root), root: snapshot,
+                            action: "slicer_inbox", actor: ("connector:dev_SampleStudioPC0001", "OrcaSlicer on Studio PC"))
+        guard case .array(let log)? = root["auditLog"], case .object(let row)? = log.last else {
+            Issue.record("no line written"); return
+        }
+        #expect(row["action"] == .string("slicer_inbox"))
+        #expect(row["detail"] == .string("Bracket_PLA.gcode · OrcaSlicer on Studio PC"))
+        #expect(row["ref"] == .string("SU-1"))
+        #expect(row["operatorId"] == .string("connector:dev_SampleStudioPC0001"), "not the person signed in")
+        #expect(row["operatorName"] == .string("OrcaSlicer on Studio PC"))
+    }
+
+    @Test("\"Asked: print\" names the machine the shop knows; an id it no longer has is left unsaid")
+    func askedPrintNamesTheMachine() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        var item = SlicerUpload(id: "SU-1", name: "a.gcode", arrived: Date(), bytes: 1)
+        item.source = "connector"
+        item.suggested = .object(["intent": .string("print"), "machineId": .string("m_1")])
+        let named = SlicerInboxRows.asked(item, words: shop.words, machine: { $0 == "m_1" ? "U1-01" : nil })
+        #expect(named == shop.words.callIt("mac.su_asked_print_on", ["machine": .string("U1-01")]))
+        #expect(named?.contains("U1-01") == true)
+        let gone = SlicerInboxRows.asked(item, words: shop.words, machine: { _ in nil })
+        #expect(gone == shop.words.callIt("mac.su_asked_print"))
+    }
 }

@@ -643,6 +643,24 @@
    * `{ tracking, quoteApproval, id }`: the first two 16 bytes each, `id` at
    * least 4 — the random tag on the job's id (`mintOrderId`).
    */
+  /**
+   * The paired slicer plugin's file this job was made from, as the Mac's
+   * "From slicer" inbox knew it, or null. Copied field by field: the plugin's
+   * Khayt tab shows that plugin its OWN file's name beside the job
+   * (`lib/connector-queue.js fileOf`), and nothing else about the job.
+   */
+  function slicerOrigin(v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    const id = typeof v.connectorId === 'string' && /^dev_[A-Za-z0-9_-]{12,40}$/.test(v.connectorId) ? v.connectorId : null;
+    // eslint-disable-next-line no-control-regex
+    const name = typeof v.name === 'string' ? v.name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 200) : '';
+    if (!id || !name) return null;
+    const out = { connectorId: id, name };
+    if (typeof v.sha256 === 'string' && /^[0-9a-f]{64}$/.test(v.sha256)) out.sha256 = v.sha256;
+    if (typeof v.sliceId === 'string' && /^[A-Z2-7]{16}$/.test(v.sliceId)) out.sliceId = v.sliceId;
+    return out;
+  }
+
   function newOrder(input, ctx) {
     const i = ctxOf(input);
     const c = ctxOf(ctx);
@@ -822,6 +840,9 @@
       ...(asQuote ? { quoteShareStamped: true } : {}),
       quoteRevisions: asQuote ? [] : undefined,
       trackingToken: tokens.tracking ? hex(tokens.tracking) : undefined,
+      // Made from a file a paired slicer plugin sent (the Mac's inbox). ABSENT
+      // otherwise, so every other record keeps its shape.
+      ...(slicerOrigin(i.fromSlicer) ? { fromSlicer: slicerOrigin(i.fromSlicer) } : {}),
     };
   }
 
