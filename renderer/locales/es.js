@@ -5462,6 +5462,8 @@
   "ppd.monthly": "Tres pagos mensuales",
   "ppd.add": "Añadir un pago",
   "ppd.left": "Por cobrar",
+  "ppd.trim": "Usar los importes ajustados",
+  "pay.plan_floor": "El plan de pagos de este trabajo registra más que eso como pagado. Corrige primero los pagos del plan.",
   "ppd.reopened": "Estaba cubierto, pero el dinero detrás se corrigió, así que se debe otra vez",
   "ppd.no_base_q": "Este plan se hizo antes de que Khayt guardara su punto de partida. ¿Fijarlo en {amount} (lo pagado menos los pagos pagados) y seguir?",
   "ppd.no_base_ok": "Fijar y seguir",

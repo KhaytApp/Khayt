@@ -5462,6 +5462,8 @@
   "ppd.monthly": "Trois paiements mensuels",
   "ppd.add": "Ajouter un paiement",
   "ppd.left": "Reste à encaisser",
+  "ppd.trim": "Utiliser les montants ajustés",
+  "pay.plan_floor": "L’échéancier de ce travail enregistre plus que cela comme payé. Corrigez d’abord ses paiements.",
   "ppd.reopened": "Était couvert, mais l’argent derrière a été corrigé : il est de nouveau dû",
   "ppd.no_base_q": "Cet échéancier date d’avant que Khayt garde son point de départ. Le fixer à {amount} (le payé moins les paiements payés) et continuer ?",
   "ppd.no_base_ok": "Fixer et continuer",

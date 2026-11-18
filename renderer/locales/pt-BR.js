@@ -5463,6 +5463,8 @@
   "ppd.monthly": "Três pagamentos mensais",
   "ppd.add": "Adicionar pagamento",
   "ppd.left": "A receber",
+  "ppd.trim": "Usar os valores ajustados",
+  "pay.plan_floor": "O plano de pagamento deste trabalho registra mais do que isso como pago. Corrija primeiro os pagamentos do plano.",
   "ppd.reopened": "Estava coberto, mas o dinheiro por trás foi corrigido, então está devido de novo",
   "ppd.no_base_q": "Este plano foi feito antes de o Khayt guardar seu ponto de partida. Definir em {amount} (o pago menos os pagamentos pagos) e seguir?",
   "ppd.no_base_ok": "Definir e seguir",
