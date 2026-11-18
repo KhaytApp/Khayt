@@ -694,6 +694,62 @@ final class JobEditRuleTests: XCTestCase {
         }
     }
 
+    /// `test/fixtures/part-colour-vectors.json` (#2564): a part's colour is
+    /// not money — a colour-only change never reprices or asks, a finished
+    /// job may still correct it, a frozen one stays locked — through the
+    /// phone's engine and lib in JSC. The phone edits no part colour (no parts
+    /// editor), so this holds its copy of the rule to the shared cases.
+    func testTheSharedPartColourVectorsGiveLibsAnswerOnThePhone() async throws {
+        struct Want: Decodable { let ok: Bool; let reason: String?; let price: Double?; let priceSource: String? }
+        struct Ctx: Decodable { let priceSeenOk: Bool?; let keepPrice: Bool? }
+        struct Case: Decodable {
+            let why: String; let order: [String: JSONValue]; let colourBefore: String?; let colour: String
+            let ctx: Ctx?; let want: Want
+        }
+        struct Vectors: Decodable { let part: [String: JSONValue]; let cases: [Case] }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "test/fixtures/part-colour-vectors.json")
+        let v = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
+        XCTAssertGreaterThanOrEqual(v.cases.count, 6)
+        let engine = try await BookReader(book: {
+            let b = CompanionBook(directory: dir); try b.replace(with: SampleShop.book(), scope: nil); return b }()).sharedEngine()
+        for c in v.cases {
+            var part = v.part
+            if let was = c.colourBefore { part["colour"] = .string(was) }
+            var order = c.order
+            order["parts"] = .array([.object(part)])
+            // Cleared with an empty value: a part is merged over its old copy,
+            // so a colour left OUT would come back.
+            var next = part
+            next["colour"] = .string(c.colour)
+            let r = try await engine.applyJobEdit(order: .object(order), fields: ["parts": .array([.object(next)])],
+                                                  keepPrice: c.ctx?.keepPrice ?? false,
+                                                  priceSeenOk: c.ctx?.priceSeenOk ?? false,
+                                                  now: Date(timeIntervalSince1970: 0.001), editId: "e", priceId: "e2")
+            XCTAssertEqual(r.ok, c.want.ok, "\(c.why): \(r.reason ?? "")")
+            guard case .object(let o) = r.order else { XCTFail(c.why); continue }
+            if !c.want.ok {
+                XCTAssertEqual(r.reason, c.want.reason, c.why)
+                XCTAssertEqual(r.order, .object(order), "\(c.why): a refusal writes nothing")
+                continue
+            }
+            XCTAssertEqual(o["price"], c.want.price.map(JSONValue.number), "\(c.why): the price did not move")
+            XCTAssertEqual(o["priceSource"] ?? .null, c.want.priceSource.map(JSONValue.string) ?? .null, c.why)
+            guard case .array(let parts)? = o["parts"], case .object(let saved)? = parts.first else { XCTFail(c.why); continue }
+            XCTAssertEqual(saved["colour"], .string(c.colour), "\(c.why): the colour is saved, or cleared")
+            for k in ["baseCost", "unitCost", "printWeight", "printTime", "qty"] {
+                XCTAssertEqual(saved[k], part[k], "\(c.why): \(k) unchanged")
+            }
+            let lib = try ask("""
+                (function () { var o = \(json(.object(order)));
+                  var r = KhaytOrderEdit.applyJobEdit(o, { parts: [\(json(.object(next)))] },
+                    { now: 1, id: 'e', priceId: 'e2', settings: {}, clients: [], priceSeenOk: \(c.ctx?.priceSeenOk ?? false) });
+                  return { ok: r.ok, price: o.price }; })()
+                """)
+            XCTAssertEqual(lib, .object(["ok": .bool(c.want.ok), "price": .number(c.want.price ?? 0)]), "lib: \(c.why)")
+        }
+    }
+
     /// Edit job's "asked first" reads the same customers as the save.
     func testEditJobAsksFirstForAQuoteItsCustomerWasMessagedAbout() async throws {
         let quote: JSONValue = .object(["id": .string("Q-MSG"), "project": .string("Bracket"), "status": .string("quote"),
