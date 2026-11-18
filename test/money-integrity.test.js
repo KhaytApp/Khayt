@@ -409,13 +409,18 @@ test('margin figures net credit notes in the order\'s own currency', () => {
   // left alone is gone with it).
   assert.match(read('lib/pnl-report.js'), /money\.orderNetRevenueBase\(o, moneyCtx, known\)/,
     'the P&L rule nets credit notes');
-  assert.match(read('lib/pnl-report.js'), /money\.orderToBase\(cost, o, moneyCtx, known\)/,
-    'and prices the cost in the same currency');
+  // The P&L's cost of goods is costBasis, the SHOP's figure (the parts'
+  // baseCost): it is NOT converted by the job's rate (money review, Nov 19).
+  assert.match(read('lib/pnl-report.js'), /row\.cogs \+= \(\+o\.costBasis \|\| 0\) \* stockShare\(o, c\);/,
+    'and counts the cost in the shop\'s currency, unconverted');
   assert.match(read('renderer/analytics.js'),
     /const net = Math\.max\(0, \(\+o\.price \|\| 0\) - orderCreditedRaw\(o\)\);/,
     'the exported average margin must net credit notes');
-  assert.match(read('renderer/analytics.js'), /rev \+= toBase\(net, o\); cost \+= toBase\(\+o\.costBasis, o\);/,
-    'and convert price and cost alike, at the job\'s own rate');
+  // The PRICE converts at the job's rate; costBasis is the shop's figure
+  // already (the parts' baseCost), so converting it too counted a USD job's
+  // cost 3.75 times (money review, Nov 19).
+  assert.match(read('renderer/analytics.js'), /rev \+= toBase\(net, o\); cost \+= \+o\.costBasis;/,
+    'and convert the price, not the cost, which is the shop\'s already');
   assert.match(read('renderer/logs.js'),
     /const gross = \(\+o\.price \|\| 0\) - \(\+o\.shippingCost \|\| 0\) - credited;/,
     'the orders-log margin column must net credit notes');
