@@ -47,6 +47,11 @@ try {
       // Taken in USD at 3.75: its part's 75 SAR of cost is 20 USD.
       job('JP-QC', { status: 'qc', statusHistory: [{ status: 'qc', at: '2026-11-12T08:00:00Z' }] }),
       job('JP-DONE', { status: 'completed', statusHistory: [{ status: 'completed', at: '2026-11-12T08:00:00Z' }] }),
+      // Re-priced from 2,000 to 2,120 after its 50% deposit proforma was sent
+      // (Figma 96:1067): the deposit is 60 short, the unsent balance follows.
+      job('JP-MS', { price: 2120, paidAmount: 1000, editHistory: [{ id: 'e', at: '2026-10-14T09:00:00Z', fields: { price: { from: 2000, to: 2120 } } }],
+        milestoneInvoices: [{ id: 'MS-1', label: 'Deposit', percentage: 50, amount: 1000, issuedAt: '2026-10-08' },
+          { id: 'MS-2', label: 'Balance', percentage: 50, amount: 1000, issuedAt: null }] }),
       job('JP-USD', { currency: 'USD', fxRate: 3.75, price: 40, paidAmount: 0, paidAt: null, parts: [{ name: 'hook.stl', material: 'PLA', qty: 3, printWeight: 30, printTime: 1, baseCost: 75 }] }),
     );
     saveAll();
@@ -119,6 +124,26 @@ try {
   await window.waitForSelector('.modal #shipCarrier', { state: 'visible', timeout: 5_000 });
   ok(await window.evaluate(() => !!document.querySelector('.modal #shipTracking')), 'Ship opens the shipping dialog (carrier and tracking), not the job editor');
   await closeModal();
+  // ── Milestones after a re-price (Turki, Nov 17; Figma 96:1067) ─────────
+  await window.click('#jobPage [data-jp="back"]');
+  await openPage('JP-MS');
+  const ms = await text('#jobPage .jp-milestones');
+  ok(/no longer add up to the price/.test(ms) && /stays exactly as you sent it/.test(ms), 'the banner says the milestones no longer add up, and a sent proforma stays');
+  ok(/1,?060\.00\s*SAR:\s*60\.00\s*SAR short/.test(ms), 'the sent deposit shows what it is now short (60)');
+  ok(/1,?000\.00\s*SAR\s*→\s*1,?060\.00\s*SAR/.test(ms) && /2,?000\.00\s*SAR\s*of\s*2,?120\.00\s*SAR/.test(ms), 'the unsent balance shows old → new, and the total says 2,000 of 2,120');
+  // Update moves only the unsent one.
+  await window.click('#jobPage [data-jp="ms-refresh"]');
+  const after = await window.evaluate(() => printLog.find((o) => o.id === 'JP-MS').milestoneInvoices.map((m) => [m.id, m.amount, !!m.issuedAt]));
+  ok(JSON.stringify(after) === JSON.stringify([['MS-1', 1000, true], ['MS-2', 1060, false]]), 'Update moved the unsent balance to 1,060 and left the sent deposit at 1,000');
+  ok(!(await window.evaluate(() => !!document.querySelector('#jobPage [data-jp="ms-refresh"]'))), 'with nothing unsent left at its old share, the Update button is gone');
+  // Send the difference: a new proforma for 60, sent at once (the print path is stubbed here).
+  await window.evaluate(() => { window.generateMilestoneInvoice = async (id, m) => { m.issuedAt = '2026-11-18'; saveAll(); }; });
+  await window.click('#jobPage [data-jp="ms-diff"]');
+  await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-MS').milestoneInvoices.length === 3, null, { timeout: 5_000 });
+  const diff = await window.evaluate(() => printLog.find((o) => o.id === 'JP-MS').milestoneInvoices[2]);
+  ok(diff.kind === 'difference' && diff.forMilestoneId === 'MS-1' && diff.amount === 60 && diff.issuedAt, 'Send updated proforma added a 60 proforma for the deposit, and sent it');
+  await window.waitForFunction(() => !/no longer add up/.test(document.querySelector('#jobPage .jp-milestones')?.innerText || ''), null, { timeout: 5_000 });
+  ok(true, 'once both are done, the banner is gone and the card is the plain list');
   await window.click('#jobPage [data-jp="back"]');
   await openPage('JP-QUOTE');
 

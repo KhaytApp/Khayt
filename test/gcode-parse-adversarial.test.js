@@ -26,6 +26,8 @@ const CASES = {};
 for (const u of UNITS) {
   CASES[`parseGcodeText: ${JSON.stringify(u)} × n, no separator`] = (b) => () => G.parseGcodeText(repeatTo(u, b));
 }
+// The marker the head runs to, almost there n times and never whole.
+CASES['parseGcodeText: "; EXECUTABLE_BLOCK_STAR" × n, the marker never whole'] = (b) => () => G.parseGcodeText(repeatTo('; EXECUTABLE_BLOCK_STAR', b));
 // The direct parser, past parseGcodeText's half-megabyte edges.
 CASES['parsePrintTimeMins: the phrase × n, no "="'] = (b) => () => G.parsePrintTimeMins(repeatTo('estimated printing time ', b));
 CASES['parsePrintTimeMins: "=" then a long run of spaces'] = (b) => () => G.parsePrintTimeMins('estimated printing time =' + repeatTo(' ', b));
@@ -82,4 +84,29 @@ test('characters whose lowercase is longer do not shift the reading (re-review, 
     assert.equal(G.parsePrintTimeMins(text), 723, JSON.stringify(pre));
     assert.equal(G.parseGcodeText(text).printTimeMins, 723, JSON.stringify(pre));
   }
+});
+
+test('a Bambu config block pushed past half a megabyte by large thumbnails is still read (head runs to EXECUTABLE_BLOCK_START)', () => {
+  const head = '; HEADER_BLOCK_START\n; total estimated time: 1h 2m 3s\n; HEADER_BLOCK_END\n';
+  const thumbs = '; THUMBNAIL_BLOCK_START\n' + repeatTo('; iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAAgAElEQVR4nOy9\n', 900 * 1024) + '; THUMBNAIL_BLOCK_END\n';
+  const config = '; CONFIG_BLOCK_START\n; filament_type = PETG;PLA\n; filament_colour = #00AE42;#FFFFFF\n; CONFIG_BLOCK_END\n';
+  const moves = '; EXECUTABLE_BLOCK_START\n' + repeatTo('G1 X1 Y1 E0.1\n', 3 << 20);
+  const r = G.parseGcodeText(head + thumbs + config + moves);
+  assert.equal(r.filamentType, 'PETG');
+  assert.equal(r.printTimeMins, 62);
+  // Without the marker the head is half a megabyte, as before.
+  assert.equal(G.parseGcodeText(head + thumbs + config + moves.replace('; EXECUTABLE_BLOCK_START\n', '')).filamentType, null);
+});
+
+test('a marker past 8 MB is not followed: the head stays bounded', () => {
+  const t = repeatTo('; x\n', 9 << 20) + '; EXECUTABLE_BLOCK_START\n; filament_type = ABS\n' + repeatTo('G1 X1\n', 2 << 20);
+  const ms0 = Date.now(); const r = G.parseGcodeText(t);
+  assert.equal(r.filamentType, null);
+  assert.ok(Date.now() - ms0 < 2000);
+});
+
+test('a 32 MB file with no EXECUTABLE_BLOCK_START reads in well under a second', () => {
+  const t = repeatTo('G1 X1 Y1 E0.1\n', 32 << 20);
+  const took = ms(() => G.parseGcodeText(t));
+  assert.ok(took < 1000, `${took.toFixed(0)} ms`);
 });
