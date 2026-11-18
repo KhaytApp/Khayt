@@ -70,8 +70,11 @@ try {
         printPhotos: [{ thumb: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', filename: 'JP-CARDS-0-a.png', source: 'shop' }],
         attachedFiles: [{ filename: 'JP-CARDS-a.stl', originalName: 'arm.stl', size: 18 }, { filename: 'JP-CARDS-b.stl', originalName: 'clip.stl', size: 18 }],
       }),
+      job('JP-TIMES', { status: 'completed', materialDeducted: true, printingStartedAt: '2026-11-17T08:00:00.000Z', completedAt: '2026-11-17T12:00:00.000Z',
+        statusHistory: [{ status: 'completed', at: '2026-11-17T12:00:00.000Z' }] }),
       job('JP-USD', { currency: 'USD', fxRate: 3.75, price: 40, paidAmount: 0, paidAt: null, parts: [{ name: 'hook.stl', material: 'PLA', qty: 3, printWeight: 30, printTime: 1, baseCost: 75 }] }),
     );
+    operators.push({ id: 'OP-N', name: 'Noura', active: true });
     saveAll();
     return flushSave();
   });
@@ -205,6 +208,31 @@ try {
   await window.click('#jobPage .jp-comments #btnPostComment');
   await window.waitForFunction(() => (printLog.find((o) => o.id === 'JP-CARDS').comments || []).length === 1, null, { timeout: 5_000 });
   ok(/Matte finish on the arm/.test(await text('#jobPage .jp-comments')), 'a comment posted on the page is saved and shown');
+
+  // ── Step 5: operator, actual times, More, pay link and profit (Figma 105:1571) ──
+  await window.click('#jobPage [data-jp="back"]');
+  await openPage('JP-TIMES');
+  await window.selectOption('#jobPage [data-jp-op]', 'OP-N');
+  await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-TIMES').operatorId === 'OP-N', null, { timeout: 5_000 });
+  ok(true, 'the operator picked in the header is saved through the shared rule');
+  ok(await window.evaluate(() => !!document.querySelector('#jobPage .qpl-line-host') && !!document.querySelector('#jobPage .jp-profit')), 'the Money card carries the pay-link line and the profit block');
+  await window.click('#jobPage .jp-more > summary');
+  ok(await window.isVisible('#jobPage [data-jp="status-save"]') && await window.isVisible('#jobPage [data-jp="status-open"]'), 'More offers Save status page and Open saved status page');
+  await window.click('#jobPage .jp-more > summary');
+  const timesBefore = await window.evaluate(() => JSON.parse(JSON.stringify(printLog.find((o) => o.id === 'JP-TIMES'))));
+  await window.click('#jobPage [data-jp="time-edit"][data-k="completedAt"]');
+  const local = await window.evaluate(() => isoToLocalInput('2026-11-17T11:30:00.000Z'));
+  await window.fill('#jobPage [data-jp-time="completedAt"]', local);
+  await window.click('#jobPage [data-jp="time-save"]');
+  await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-TIMES').completedAt === '2026-11-17T11:30:00.000Z', null, { timeout: 5_000 });
+  const timesAfter = await window.evaluate(() => JSON.parse(JSON.stringify(printLog.find((o) => o.id === 'JP-TIMES'))));
+  delete timesBefore.completedAt; delete timesAfter.completedAt; delete timesBefore.operatorId; delete timesAfter.operatorId; delete timesAfter.editHistory; delete timesBefore.editHistory;
+  ok(JSON.stringify(timesAfter) === JSON.stringify(timesBefore), 'correcting the completion time moves only the time: status, deduction and the rest are as they were');
+  await window.click('#jobPage [data-jp="time-edit"][data-k="completedAt"]');
+  await window.fill('#jobPage [data-jp-time="completedAt"]', await window.evaluate(() => isoToLocalInput(new Date(Date.now() + 3 * 86400000).toISOString())));
+  await window.click('#jobPage [data-jp="time-save"]');
+  await window.waitForFunction(() => /in the future/.test(document.querySelector('#toastContainer')?.innerText || ''), null, { timeout: 5_000 });
+  ok((await window.evaluate(() => printLog.find((o) => o.id === 'JP-TIMES').completedAt)) === '2026-11-17T11:30:00.000Z', 'a time in the future is refused, and the stamp stays');
 
   console.log('e2e-job-page: ok');
 
