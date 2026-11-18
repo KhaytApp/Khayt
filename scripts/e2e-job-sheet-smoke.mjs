@@ -10,6 +10,11 @@
  *   - A discount that drops the bill below what was paid shows the refusal
  *     line and Save is disabled (95:596); taking it back clears it.
  *   - A finished job offers no new part and no Remove.
+ *   - Job group (Figma 100:1527): Details (internal and invoice notes, tags,
+ *     shop fields) and Not business save through applyJobEdit; Not business
+ *     is locked once a tax invoice is issued; a job with no due date gets
+ *     the queue's suggestion; a machine queue that clears after the due date
+ *     shows a note under the dates and beside Save, without blocking it.
  *   - Jobs › New job opens the same sheet empty: Take job waits for a part,
  *     records the job as the sheet priced it and opens its page; Save as
  *     quote records a quote.
@@ -72,7 +77,13 @@ try {
       base('JS-DRAFT', { status: 'quote', quoteShareStamped: true, statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }] }),
       base('JS-PAID', { paidAmount: 300, paidAt: '2026-11-12T09:00:00Z' }),
       base('JS-DONE', { status: 'completed', materialDeducted: true, costBasis: 100 }),
+      base('JS-DET', { status: 'quote', quoteShareStamped: true, statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }] }),
+      base('JS-BOOKED', { dueDate: '2099-01-10' }),
+      base('JS-CAP', { machineId: 'M-CAP', dueDate: localDateStr(new Date(Date.now() + 86400000)) }),
+      base('JS-QUEUE', { machineId: 'M-CAP', printTime: 400, dueDate: '2099-01-10' }),
     );
+    settings.customFields = [{ id: 'po', label: 'PO number' }];
+    if (!machines.some((m) => m.id === 'M-CAP')) machines.push({ id: 'M-CAP', name: 'Sample X1C' });
     saveAll();
     return flushSave();
   });
@@ -222,6 +233,46 @@ try {
   await window.click('#jobPage [data-jp="back"]');
 
   // ── New job: the same sheet, empty ───────────────────────────────────────
+  // ── Job group: details, not business, due, capacity (Figma 100:1527) ──
+  const cancelSheet = async () => { await window.click('#modalMount .job-sheet-modal .modal-footer [data-act="cancel"]'); await closed(); };
+  await openSheet('JS-DET');
+  ok(!(await window.$eval('#modalMount [data-js="details"]', (d) => d.open)), 'Details is closed when it holds nothing');
+  ok(!(await window.isHidden('#modalMount [data-js="dueHint"]')) && /^\d{4}-\d{2}-\d{2}$/.test(await window.inputValue('#modalMount [data-js="dueDate"]')),
+    'a job with no due date gets the queue\'s suggestion, and says so');
+  const suggested = await window.inputValue('#modalMount [data-js="dueDate"]');
+  ok(suggested === await window.evaluate(() => suggestDueDate()), 'the same date the old editor would suggest (one helper)');
+  await window.click('#modalMount [data-js="details"] > summary');
+  await window.fill('#modalMount [data-js="internalNotes"]', 'Matte plate');
+  await window.fill('#modalMount [data-js="invoiceNotes"]', 'Thank you');
+  await window.fill('#modalMount [data-js="tags"]', 'gift, repeat');
+  await window.fill('#modalMount [data-js-cf="po"]', 'PO-118');
+  ok(await window.isEnabled('#modalMount [data-js="nonBusiness"]'), 'a quote can be marked not business (no invoice yet)');
+  await window.check('#modalMount [data-js="nonBusiness"]');
+  await save(); await closed(); await window.click('#jobPage [data-jp="back"]');
+  const det = await job('JS-DET');
+  ok(det.internalNotes === 'Matte plate' && det.invoiceNotes === 'Thank you' && det.tags.join('|') === 'gift|repeat' && det.customData.po === 'PO-118',
+    'Details save through the shared rule: both notes, the tags, the shop field');
+  ok(det.nonBusiness === true && det.dueDate === suggested, 'and Not business, with the suggested due date');
+  await openSheet('JS-DET');
+  ok(await window.$eval('#modalMount [data-js="details"]', (d) => d.open), 'Details opens by itself once it holds something');
+  await cancelSheet(); await window.click('#jobPage [data-jp="back"]');
+
+  await openSheet('JS-BOOKED');
+  ok(await window.isDisabled('#modalMount [data-js="nonBusiness"]') && /tax invoice is issued/.test(await window.textContent('#modalMount .job-sheet')),
+    'a booked job\'s tax invoice is issued: Not business is locked, and the sheet says why');
+  ok(await window.isHidden('#modalMount [data-js="dueHint"]'), 'a job that has a due date keeps it, with no suggestion');
+  await cancelSheet(); await window.click('#jobPage [data-jp="back"]');
+
+  await openSheet('JS-CAP');
+  ok(/Sample X1C queue clears on/.test(await window.textContent('#modalMount [data-js="capacity"]')), 'a machine queue that clears after the due date shows a note under the dates');
+  ok(!(await window.isHidden('#modalMount [data-js="capFoot"]')) && /queue clears/.test(await window.textContent('#modalMount [data-js="capFoot"]')), 'and again beside Save');
+  await window.fill('#modalMount [data-js="dueDate"]', '2099-01-10');
+  ok(await window.isHidden('#modalMount [data-js="capFoot"]') && !(await window.textContent('#modalMount [data-js="capacity"]')).trim(), 'a later date clears both');
+  await window.fill('#modalMount [data-js="dueDate"]', await window.evaluate(() => localDateStr(new Date(Date.now() + 86400000))));
+  await window.fill('#modalMount [data-js="notes"]', 'Rush it');
+  await save(); await closed(); await window.click('#jobPage [data-jp="back"]');
+  ok((await job('JS-CAP')).notes === 'Rush it', 'the note does not block Save');
+
   const before = await window.evaluate(() => printLog.length);
   await switchTab(window, 'logs-tab');
   await window.click('#btnNewJobSheet');
@@ -230,6 +281,8 @@ try {
   ok(await window.isDisabled('#modalMount .job-sheet-modal [data-act="save"]'), 'with no part yet, Take job waits');
   ok(await window.evaluate(() => document.querySelector('#modalMount .js-refused')?.hidden !== false), 'and nothing is shown as refused');
   await window.fill('#modalMount [data-js="project"]', 'New sample');
+  await window.click('#modalMount [data-js="details"] > summary');
+  await window.fill('#modalMount [data-js="internalNotes"]', 'From the sheet');
   await addPart('new.stl', 80, 1.5);
   await window.click('#modalMount [data-js-pr="urgent"]');
   const mkShown = await window.textContent('#modalMount [data-js="total"]');
@@ -239,6 +292,7 @@ try {
   const made = await window.evaluate(() => JSON.parse(JSON.stringify(printLog[0])));
   ok(made.project === 'New sample' && made.status === 'pending' && made.parts.length === 1, 'Take job records a pending job with its part');
   ok(made.priorityLevel === 'urgent', 'at the priority picked');
+  ok(made.internalNotes === 'From the sheet', 'with its Details, written by the shared rule');
   ok(mkShown.replace(/[^\d.]/g, '').startsWith(String(made.price.toFixed(2)).replace(/[^\d.]/g, '')), `the job is priced as the sheet showed (${made.price})`);
   await window.waitForSelector('#jobPage:not([hidden]) .jp-title', { timeout: 5_000 });
   ok((await window.textContent('#jobPage .jp-title')).includes('New sample'), 'and its job page opens');
