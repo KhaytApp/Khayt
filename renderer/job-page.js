@@ -216,6 +216,7 @@
         <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.parts'))} · ${(o.parts || []).length}</h3>${partsHtml(o)}</section>
         <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.money'))}</h3>${moneyHtml(o, steps)}
           ${typeof global.payLinkLineHtml === 'function' ? global.payLinkLineHtml(o) : ''}
+          ${typeof global.openPaymentPlanDialog === 'function' && !o.voidedAt ? `<div class="jp-actions" data-simple-pro="paymentPlans"><button type="button" class="btn" data-jp="plan">${escapeHtml(t('jp.plan'))}${(o.instalments || []).length ? ` · ${(o.instalments || []).length}` : ''}</button></div>` : ''}
           ${typeof global.buildProfitabilityHtml === 'function' ? `<div class="jp-profit" data-simple-pro>${global.buildProfitabilityHtml(o)}</div>` : ''}</section>
       </div>
       ${milestonesHtml(o)}
@@ -298,6 +299,7 @@
     if (b.dataset.jp === 'back') { closeJobPage(); return; }
     if (b.dataset.jp === 'edit') { (typeof openJobSheet === 'function' ? openJobSheet : openOrderEditor)(openId); return; }
     if (b.dataset.jp === 'ms-refresh') { refreshMilestones(); return; }
+    if (b.dataset.jp === 'plan') { openPaymentPlanDialog(openId); return; }
     if (b.dataset.jp === 'status-save' || b.dataset.jp === 'status-open') {
       b.closest('details')?.removeAttribute('open');
       if (b.dataset.jp === 'status-save') exportOrderStatusPage(openId); else openSavedStatusPage(openId);

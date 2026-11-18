@@ -2084,25 +2084,21 @@ function openOrderEditor(orderId) {
           ${draft.instalments.map((ins, i) => `
             <div class="instalment-row${ins.paid ? ' paid' : ''}">
               <span class="inst-label">
-                <input type="text" class="inst-note-inp" data-ii="${i}" value="${escapeHtml(ins.note || '')}" placeholder="${escapeHtml(t('inst.note'))}" style="width:120px; font-size:12px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 6px; color:var(--text);">
+                <input type="text" class="inst-note-inp" data-ii="${i}"${ins.paid ? ' disabled' : ''} value="${escapeHtml(ins.note || '')}" placeholder="${escapeHtml(t('inst.note'))}" style="width:120px; font-size:12px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 6px; color:var(--text);">
                 ${ins.dueDate ? `<span class="inst-due">${escapeHtml(ins.dueDate)}</span>` : ''}
               </span>
-              <input type="number" class="inst-amt-inp" data-ii="${i}" value="${ins.amount || ''}" min="0" step="0.01" style="width:80px; font-size:12px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 6px; color:var(--text);">
-              <input type="date" class="inst-due-inp" data-ii="${i}" value="${escapeHtml(ins.dueDate || '')}" style="font-size:11px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 4px; color:var(--text);">
-              <button class="btn small${ins.paid ? '' : ' success'} inst-pay-btn" data-ii="${i}">${escapeHtml(ins.paid ? t('inst.paid') : t('inst.mark_paid'))}</button>
-              <button class="btn danger small inst-rm-btn" data-ii="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
+              <input type="number" class="inst-amt-inp" data-ii="${i}"${ins.paid ? ' disabled' : ''} value="${ins.amount || ''}" min="0" step="0.01" style="width:80px; font-size:12px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 6px; color:var(--text);">
+              <input type="date" class="inst-due-inp" data-ii="${i}"${ins.paid ? ' disabled' : ''} value="${escapeHtml(ins.dueDate || '')}" style="font-size:11px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 4px; color:var(--text);">
+              ${/* No "Mark paid" here any more (Dev Hub, Nov 18): it ticked a row and the
+                   save rewrote paidAmount with no payment behind it. A row is paid by
+                   Record payment in the job page's payment plan (lib/payment-plan.js
+                   recordRowPayment). A paid row is shown and locked, never removed. */''}
+              ${ins.paid ? `<span class="inst-paid-label">${escapeHtml(ins.recorded === true ? t('inst.paid') : t('ppd.paid_legacy', { date: ins.paidAt || '' }))}</span>`
+                : `<button class="btn danger small inst-rm-btn" data-ii="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>`}
             </div>`).join('')}`;
         instListEl.querySelectorAll('.inst-note-inp').forEach(inp => { inp.addEventListener('input', () => { draft.instalments[+inp.dataset.ii].note = inp.value; }); });
         instListEl.querySelectorAll('.inst-amt-inp').forEach(inp => { inp.addEventListener('input', () => { draft.instalments[+inp.dataset.ii].amount = Math.max(0, +inp.value || 0); }); });
         instListEl.querySelectorAll('.inst-due-inp').forEach(inp => { inp.addEventListener('input', () => { draft.instalments[+inp.dataset.ii].dueDate = inp.value; }); });
-        instListEl.querySelectorAll('.inst-pay-btn').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const ins = draft.instalments[+btn.dataset.ii];
-            ins.paid = !ins.paid;
-            ins.paidAt = ins.paid ? localDateStr() : null;
-            renderInstalments();
-          });
-        });
         instListEl.querySelectorAll('.inst-rm-btn').forEach(btn => {
           btn.addEventListener('click', () => { draft.instalments.splice(+btn.dataset.ii, 1); renderInstalments(); });
         });
