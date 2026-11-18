@@ -3287,6 +3287,9 @@ async function exportAnalyticsReport() {
       const net = Math.max(0, (+o.price || 0) - orderCreditedRaw(o));
       if (net <= 0) continue;
       rev += toBase(net, o); cost += toBase(+o.costBasis, o);
+      // + a product's labour and packaging carried once (0 on every older job),
+      // converted at the job's own rate as its costBasis is.
+      cost += toBase(KhaytOrderMoney.jobFixedCost(o, { components: false, overhead: false }), o);
     }
     return rev > 0 ? (rev - cost) / rev * 100 : null;
   })();

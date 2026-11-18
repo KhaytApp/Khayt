@@ -898,7 +898,10 @@
       base = discountPct < 100 ? costedPart / (1 - discountPct / 100) : costedPart;
     }
     const rushPct = rushAmt > 0 && subtotal > 0 ? rushAmt / subtotal * 100 : 0;
-    const costed = costedOf(parts) + Math.max(0, +order.componentsCost || 0) + Math.max(0, +order.overheadCost || 0);
+    const Mo = (typeof globalThis !== 'undefined' && globalThis.KhaytOrderMoney) || (typeof require === 'function' ? require('./order-money.js') : null);
+    // Components, overhead, and a product's labour and packaging (order-level):
+    // lib/order-money.js jobFixedCost, the one reader of those fields.
+    const costed = costedOf(parts) + (Mo && Mo.jobFixedCost ? Mo.jobFixedCost(order) : 0);
     // At a 100% discount the base cannot be backed out of a price of 0, but
     // a STORED base still says what the markup was: without it the factor
     // was lost, and taking the discount off later priced the parts at bare
@@ -1152,7 +1155,8 @@
       || newOverhead !== oldOverhead);
     const changes = { parts: { from: partsLine(before), to: partsLine(next) } };
     if (costMoved) {
-      const fixedCosts = Math.max(0, +order.componentsCost || 0) + newOverhead;
+      const Mo = (typeof globalThis !== 'undefined' && globalThis.KhaytOrderMoney) || (typeof require === 'function' ? require('./order-money.js') : null);
+      const fixedCosts = (Mo && Mo.jobFixedCost ? Mo.jobFixedCost(order, { overhead: false }) : 0) + newOverhead;
       // No factor: the old parts cost nothing on record, so the price was not
       // built from them. With no markup given, a price that is there stays
       // (below, as a typed one): it fell to the bare cost of the new part,

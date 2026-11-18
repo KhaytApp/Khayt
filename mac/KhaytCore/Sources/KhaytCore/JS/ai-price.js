@@ -54,7 +54,11 @@ function orderFamilies(o) {
  * shop's price is anyway.
  */
 function realizedMargin(o, profile) {
-  const charged = +o.price || 0, cost = +o.costBasis || 0;
+  // The parts' frozen cost, plus a product's labour and packaging carried once
+  // at the order level (lib/order-money.js jobFixedCost; 0 on every older job).
+  const Mo = (typeof globalThis !== 'undefined' && globalThis.KhaytOrderMoney) || null;
+  const charged = +o.price || 0;
+  const cost = (+o.costBasis || 0) + (Mo && Mo.jobFixedCost && +o.costBasis > 0 ? Mo.jobFixedCost(o, { components: false, overhead: false }) : 0);
   if (charged <= 0 || cost <= 0) return null;
   const T = (typeof globalThis !== 'undefined' && globalThis.KhaytTax) || null;
   const price = (T && profile && typeof T.netOfTax === 'function')

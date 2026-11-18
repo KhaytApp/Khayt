@@ -451,6 +451,12 @@
     const CC = (typeof global !== 'undefined' && global.KhaytCalculatorCost) || null;
     if (!CC || typeof CC.computePartBreakdown !== 'function') return 1;
     const c = ctx || {};
+    // A job carrying a product's labour and packaging ONCE at the order level:
+    // its parts were costed without them, so they are split without them.
+    const Mo = (typeof global !== 'undefined' && global.KhaytOrderMoney)
+      || (typeof require === 'function' ? (() => { try { return require('./order-money.js'); } catch (e) { return null; } })() : null);
+    const once = Mo && Mo.jobFixedCost ? Mo.jobFixedCost(order, { components: false, overhead: false }) > 0 : false;
+    const brOpts = once ? { labour: false, packaging: false } : undefined;
     let whole = 0, stocked = 0;
     for (const p of (order && Array.isArray(order.parts) ? order.parts : [])) {
       if (!p) continue;
@@ -460,7 +466,7 @@
       let br = null;
       const partCtx = { inventory: c.inventory || [], settings: c.settings || {} };
       if (Array.isArray(c.consumables)) partCtx.consumables = c.consumables;
-      try { br = CC.computePartBreakdown(p, partCtx); } catch (_) { br = null; }
+      try { br = CC.computePartBreakdown(p, partCtx, brOpts); } catch (_) { br = null; }
       const total = br ? (br.material + br.machine + br.labor + br.buffer) : 0;
       // The part's own consumables (magnets, inserts — `part.consumables`) are
       // priced INTO the material bucket, but they are not stock: a consumable
@@ -1020,7 +1026,11 @@
       if (!(revenue > 0) && (+o.costBasis || 0) > 0) row.unpriced += 1;
       // What it cost to make, in the shop's currency — `costBasis` is frozen
       // in the ORDER's currency by `order-new`, beside the price it pairs with.
-      const cost = (+o.costBasis || 0) * stockShare(o, c);
+      // A product's packaging carried ONCE at the order level is inventoried
+      // (cost of goods); its labour is not (2026-09-28). costBasis is parts only.
+      const Mo = (typeof global !== 'undefined' && global.KhaytOrderMoney) || null;
+      const oncePackaging = Mo && Mo.jobFixedCost ? Mo.jobFixedCost(o, { components: false, overhead: false, labour: false }) : 0;
+      const cost = (+o.costBasis || 0) * stockShare(o, c) + oncePackaging;
       row.cogs += money
         ? money.orderToBase(cost, o, moneyCtx, known)
         : cost;

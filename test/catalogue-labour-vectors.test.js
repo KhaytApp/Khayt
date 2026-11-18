@@ -31,12 +31,17 @@ for (const c of V.cases) {
     }
     if (c.want.once !== undefined) assert.equal(Math.round(PP.productOnceCost(product, ctx) * 100) / 100, c.want.once, 'labour and packaging, once');
     if (c.want.jobPrice !== undefined) {
-      const lines = PP.productJobParts(product, ctx);
-      assert.equal(lines.length, c.want.jobLines, 'the parts plus one labour line');
-      const job = N.newOrder({ parts: lines, project: 'J', margin: ctx.settings.defaultMargin }, { settings: ctx.settings, orders: [], clients: [], now: new Date('2026-11-19T08:00:00Z'),
-        tokens: { tracking: new Uint8Array(N.TOKEN_BYTES), quoteApproval: new Uint8Array(N.TOKEN_BYTES), id: new Uint8Array(4) } });
+      const jp = PP.productJobParts(product, ctx);
+      assert.equal(jp.parts.length, c.want.jobParts, 'only the real parts: labour is never a part');
+      assert.ok(jp.parts.every((p) => p.kind !== 'labour'));
+      const job = N.newOrder({ parts: jp.parts, labourCost: jp.labourCost, packagingCost: jp.packagingCost, project: 'J', margin: ctx.settings.defaultMargin },
+        { settings: ctx.settings, orders: [], clients: [], now: new Date('2026-11-19T08:00:00Z'),
+          tokens: { tracking: new Uint8Array(N.TOKEN_BYTES), quoteApproval: new Uint8Array(N.TOKEN_BYTES), id: new Uint8Array(4) } });
       assert.equal(job.price, c.want.jobPrice, 'newOrder prices the job');
       assert.equal(job.price, r.basePrice, 'exactly as the catalogue');
+      assert.equal(Math.round(job.labourCost * 100) / 100, c.want.jobLabour, 'labour stored on the job, once');
+      assert.equal(Math.round(job.packagingCost * 100) / 100, c.want.jobPackaging, 'packaging stored on the job, once');
+      assert.equal(job.parts.length, c.want.jobParts);
     }
     if (c.want.equalsCalculator) {
       const calc = CC.computePartBaseCost(PRt.withRates(Object.assign({}, clone(V.rates), clone(V.part)), { settings: ctx.settings }), ctx);

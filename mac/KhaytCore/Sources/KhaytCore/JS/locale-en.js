@@ -5445,6 +5445,7 @@
   "jp.parts": "Parts",
   "jp.money": "Money",
   "jp.activity": "Activity",
+  "jp.labour_once": "Labour and packaging (once)",
   "jp.plan": "Payment plan",
   "ppd.title": "Payment plan",
   "ppd.due": "due {date}",

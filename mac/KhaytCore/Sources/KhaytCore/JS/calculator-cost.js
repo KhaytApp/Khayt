@@ -162,7 +162,11 @@
     return [...sorted].reverse().find((ti) => +part.qty >= +ti.minQty) || null;
   }
 
-  function computePartBreakdown(part, ctx) {
+  function computePartBreakdown(part, ctx, opts) {
+    // The same options as computePartBaseCost: a product's labour and packaging
+    // charged ONCE at the order level are left out of each part.
+    const withLabour = !(opts && opts.labour === false);
+    const withPackaging = !(opts && opts.packaging === false);
     const inventory = (ctx && ctx.inventory) || global.inventory || [];
     const settings = (ctx && ctx.settings) || global.settings || {};
     const spoolCost = Math.max(0, +part.spoolCost || 0);
@@ -183,7 +187,7 @@
       printTime * (Math.max(0, +part.powerDraw || 0) / 1000) * Math.max(0, +part.elecRate || 0);
     const prepTime = Math.max(0, +part.prepTime || 0);
     const postTime = Math.max(0, +part.postTime || 0);
-    const labor = (prepTime + postTime) * Math.max(0, +part.laborRate || 0);
+    const labor = withLabour ? (prepTime + postTime) * Math.max(0, +part.laborRate || 0) : 0;
     // Mirror computePartBaseCost so the live preview equals the committed cart cost:
     // include extra materials + packaging, and apply the failure buffer on the SAME base.
     let extraMatCost = 0;
@@ -195,8 +199,8 @@
         extraMatCost += (em.weight / 1000) * pricePerKg;
       }
     }
-    const packagingCost =
-      Math.max(0, +settings.defaultPackagingCost || 0) / Math.max(1, +part.qty || 1);
+    const packagingCost = withPackaging
+      ? Math.max(0, +settings.defaultPackagingCost || 0) / Math.max(1, +part.qty || 1) : 0;
     // Fold extra materials, packaging and the part's consumables into the
     // material bucket (no separate chip);
     // this keeps the {material, machine, labor, buffer} sum == committed base cost.

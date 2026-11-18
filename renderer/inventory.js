@@ -3086,6 +3086,26 @@ function renderCatalog() {
  *  Catalog parts store raw inputs only — baseCost is recomputed so it reflects
  *  current numbers and any later calculator changes. */
 function appendProductParts(p) {
+  // A product with its own rates (labour once): its parts as a job takes them,
+  // without labour and packaging, which go to the order level
+  // (lib/product-pricing.js productJobParts), so the job costs what the
+  // catalogue says.
+  const PPr = (typeof window !== 'undefined' && window.KhaytProductPricing) || null;
+  if (PPr && PPr.usesProductRates && PPr.usesProductRates(p) && p.labourPerPart !== true && PPr.productJobParts) {
+    const jp = PPr.productJobParts(p, { inventory, settings: typeof settings !== 'undefined' ? settings : {},
+      consumables: typeof consumables !== 'undefined' ? consumables : [] });
+    for (const part of jp.parts) {
+      const partCopy = { ...part, id: uid('PRT') };
+      if (!partCopy.material && partCopy.filamentId) {
+        const inv = inventory.find(i => i.id === partCopy.filamentId);
+        if (inv) partCopy.material = inv.material;
+      }
+      currentBuild.push(partCopy);
+    }
+    currentFixedCosts = { labourCost: (+currentFixedCosts.labourCost || 0) + jp.labourCost,
+      packagingCost: (+currentFixedCosts.packagingCost || 0) + jp.packagingCost };
+    return;
+  }
   for (const part of (p.parts || [])) {
     // At the rates the catalogue costs it at (`KhaytPrintRates.withRates`, as
     // lib/product-pricing.js does): its own, and the shop's default for any it

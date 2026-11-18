@@ -13,7 +13,10 @@ const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 test('the total counts the pending part, and says so', () => {
   const b = read('renderer/build.js');
   const at = b.indexOf('function updateGrandTotal');
-  const body = b.slice(at, at + 9000);
+  // The whole function: a fixed 9000-character window sat 60 characters short
+  // of the note on main, so any addition earlier in the function failed it.
+  const end = b.indexOf('\nfunction ', at + 10);
+  const body = b.slice(at, end > at ? end : at + 20000);
   assert.match(body, /if \(formHasPendingPart\(\)\) \{/);
   assert.match(body, /totalBase \+= pendingBase;/);
   assert.match(body, /calcPendingNote/);

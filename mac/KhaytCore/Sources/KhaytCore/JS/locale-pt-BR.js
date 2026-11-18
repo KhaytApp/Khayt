@@ -5445,6 +5445,7 @@
   "jp.parts": "Peças",
   "jp.money": "Dinheiro",
   "jp.activity": "Atividade",
+  "jp.labour_once": "Mão de obra e embalagem (uma vez)",
   "jp.plan": "Plano de pagamento",
   "ppd.title": "Plano de pagamento",
   "ppd.due": "vence {date}",

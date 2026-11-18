@@ -5444,6 +5444,7 @@
   "jp.parts": "Parçalar",
   "jp.money": "Para",
   "jp.activity": "Etkinlik",
+  "jp.labour_once": "İşçilik ve paketleme (bir kez)",
   "jp.plan": "Ödeme planı",
   "ppd.title": "Ödeme planı",
   "ppd.due": "vade {date}",

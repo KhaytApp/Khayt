@@ -23,6 +23,17 @@ let currentPurgeGrams = 0;
 let currentConsumableLines = [];
 // BOM: non-printed components + assembly count carried from a product into the order.
 let currentComponents = [];
+// A product's labour and packaging, ONCE, at the order level (lib/product-
+// pricing.js productJobParts): never a part. Shop currency. Set when a product
+// with its own rates is added, or a once-labour job is copied; passed to
+// newOrder as labourCost / packagingCost.
+let currentFixedCosts = { labourCost: 0, packagingCost: 0 };
+/** The product's labour and packaging carried once (order-level), costed and
+ *  marked up in the cart as the saved job prices them (newOrder's labourCost /
+ *  packagingCost). updateGrandTotal reads it through a typeof guard. */
+function onceFixedCost() {
+  return Math.max(0, +currentFixedCosts.labourCost || 0) + Math.max(0, +currentFixedCosts.packagingCost || 0);
+}
 let currentAssemblyQty = 1;
 
 // Feature 5: Price tiers for the current part being configured
@@ -181,6 +192,9 @@ if (typeof document !== 'undefined') {
     currentBuildFromProductId = saved.productId || null;
     currentClientId = saved.clientId || null;
     currentExtraLines = saved.extraLines || [];
+    currentFixedCosts = saved.fixedCosts && typeof saved.fixedCosts === 'object'
+      ? { labourCost: +saved.fixedCosts.labourCost || 0, packagingCost: +saved.fixedCosts.packagingCost || 0 }
+      : { labourCost: 0, packagingCost: 0 };
     // Show toast after DOM ready
     document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => toast(t('calc.draft_restored'), 'info', 3000), 600);
@@ -224,6 +238,7 @@ function saveBuildDraft() {
     productId:  currentBuildFromProductId,
     clientId:   currentClientId,
     extraLines: currentExtraLines,
+    fixedCosts: currentFixedCosts,
     savedAt:    new Date().toISOString(),
     // Persist calculator form state
     formState: {
@@ -394,6 +409,8 @@ async function aiSuggestPrice() {
   const cost = (currentBuild.length
     ? currentBuild.reduce((s, p) => s + (+p.baseCost || 0), 0)
     : calculateLivePartCost() * qty) + compCost;
+  // + a product's labour and packaging, once (order-level, as the saved job prices them).
+  const costOnce = cost + (typeof onceFixedCost === 'function' ? onceFixedCost() : 0);
   const grams = currentBuild.length
     ? currentBuild.reduce((s, p) => s + ((+p.printWeight || 0) + (+p.supportWeight || 0)) * (+p.qty || 1), 0)
     : ((clampPositive($('#printWeight').value) + num($('#supportWeight')?.value, 0)) * qty);
@@ -403,7 +420,7 @@ async function aiSuggestPrice() {
   const cur = (typeof currencySymbol === 'function') ? currencySymbol() : '';
 
   // Default to the deterministic suggestion (median realized margin).
-  let reco = { suggestedMargin: comps.suggestedMargin, suggestedPrice: cost > 0 ? Math.round((cost / (1 - comps.suggestedMargin / 100)) * 100) / 100 : null, rationale: '' };
+  let reco = { suggestedMargin: comps.suggestedMargin, suggestedPrice: costOnce > 0 ? Math.round((costOnce / (1 - comps.suggestedMargin / 100)) * 100) / 100 : null, rationale: '' };
 
   const ai = settings.ai || {};
   // Per-feature consent, not just the master switch — see lib/ai-privacy.js.
@@ -412,7 +429,7 @@ async function aiSuggestPrice() {
     const status = toast(t('ai.price_thinking') || 'Analyzing your pricing history…', 'info', 8000);
     try {
       const system = KhaytAiPrice.buildPriceSystem({ shopName: shopField('biz') || 'Khayt', lang: settings.lang });
-      const request = KhaytAiPrice.buildPriceRequest(comps, { material, grams, hours, cost, currency: cur });
+      const request = KhaytAiPrice.buildPriceRequest(comps, { material, grams, hours, cost: costOnce, currency: cur });
       const r = await khaytAiExtract({ apiKey: ai.apiKey, model: ai.model || 'claude-opus-5', task: 'price', system, request, schema: KhaytAiPrice.PRICE_SCHEMA });
       if (r && r.ok) reco = KhaytAiPrice.pickPrice(r, reco) || reco;
     } catch (_) { /* fall back to deterministic */ }
@@ -600,6 +617,8 @@ function updateGrandTotal() {
     totalBase += componentsBase;
     totalCost += componentsBase;
   }
+  const onceFixed = typeof onceFixedCost === 'function' ? onceFixedCost() : 0;
+  totalBase += onceFixed; totalCost += onceFixed;
   const compLine = $('#calcComponentsLine');
   if (compLine) {
     compLine.style.display = componentsBase > 0 ? 'inline' : 'none';
