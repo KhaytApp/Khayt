@@ -87,6 +87,7 @@ try {
       base('JS-DONE', { status: 'completed', materialDeducted: true, costBasis: 100 }),
       base('JS-DET', { status: 'quote', quoteShareStamped: true, statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }] }),
       base('JS-BOOKED', { dueDate: '2099-01-10' }),
+      base('JS-ZERO', { status: 'completed', price: 0, materialDeducted: true, costBasis: 100, dueDate: '2099-01-10' }),
       base('JS-CAP', { machineId: 'M-CAP', dueDate: localDateStr(new Date(Date.now() + 86400000)) }),
       base('JS-QUEUE', { machineId: 'M-CAP', printTime: 400, dueDate: '2099-01-10' }),
       base('JS-SHIP'),
@@ -280,6 +281,13 @@ try {
     'a booked job\'s tax invoice is issued: Not business is locked, and the sheet says why');
   ok(await window.isHidden('#modalMount [data-js="dueHint"]'), 'a job that has a due date keeps it, with no suggestion');
   await cancelSheet(); await window.click('#jobPage [data-jp="back"]');
+
+  // Decision A: an issued invoice for nothing moves no revenue or VAT.
+  await openSheet('JS-ZERO');
+  ok(await window.isEnabled('#modalMount [data-js="nonBusiness"]'), 'a finished job charged nothing can still be marked not business');
+  await window.check('#modalMount [data-js="nonBusiness"]');
+  await save(); await closed(); await window.click('#jobPage [data-jp="back"]');
+  ok((await job('JS-ZERO')).nonBusiness === true, 'and it saves through the shared rule');
 
   await openSheet('JS-CAP');
   ok(/Sample X1C queue clears on/.test(await window.textContent('#modalMount [data-js="capacity"]')), 'a machine queue that clears after the due date shows a note under the dates');

@@ -1,15 +1,232 @@
 {
-  "about": "lib/order-edit.js applyJobEdit and the not-business flag (Dev Hub, Nov 18). Once a tax invoice is issued VAT is due, so the revenue is reported and the flag no longer moves, either way; nor on a frozen job. Before an invoice it is the shop's to set. The Mac and the phone run this file.",
+  "about": "lib/order-edit.js applyJobEdit and the not-business flag (Dev Hub, Nov 18). Once a tax invoice is issued VAT is due, so the revenue is reported and the flag no longer moves, either way; nor on a frozen job. Before an invoice it is the shop's to set. The Mac and the phone run this file. Decision A (Dev Hub, Nov 18): an issued invoice whose total is ZERO (price net of credit notes 0) moves no revenue and no VAT, so the flag may move; frozen jobs stay refused regardless.",
   "cases": [
-    { "why": "a quote may be marked not business", "order": { "id": "Q1", "status": "quote", "price": 100 }, "next": { "nonBusiness": true }, "want": { "ok": true, "nonBusiness": true } },
-    { "why": "and unmarked again", "order": { "id": "Q2", "status": "quote", "price": 100, "nonBusiness": true }, "next": { "nonBusiness": false }, "want": { "ok": true, "nonBusiness": false } },
-    { "why": "a quote on hold awaiting the customer's yes has no invoice yet", "order": { "id": "Q3", "status": "on_hold", "hasQuote": true, "price": 100 }, "next": { "nonBusiness": true }, "want": { "ok": true, "nonBusiness": true } },
-    { "why": "a booked job has an issued invoice: refused", "order": { "id": "J1", "status": "pending", "price": 100 }, "next": { "nonBusiness": true }, "want": { "ok": false, "reason": "invoice_issued", "step": "business" } },
-    { "why": "a finished job: refused", "order": { "id": "J2", "status": "completed", "price": 100 }, "next": { "nonBusiness": true }, "want": { "ok": false, "reason": "invoice_issued", "step": "business" } },
-    { "why": "taking the flag OFF a booked not-business job would put revenue into a reported period: refused too", "order": { "id": "J3", "status": "pending", "price": 100, "nonBusiness": true }, "next": { "nonBusiness": false }, "want": { "ok": false, "reason": "invoice_issued", "step": "business" } },
-    { "why": "a job reported to ZATCA: refused as frozen", "order": { "id": "J4", "status": "completed", "price": 100, "zatcaUuid": "u-1" }, "next": { "nonBusiness": true }, "want": { "ok": false, "reason": "zatca", "step": "business" } },
-    { "why": "a voided job: refused as frozen", "order": { "id": "J5", "status": "pending", "price": 100, "voidedAt": "2026-11-13T09:00:00Z" }, "next": { "nonBusiness": true }, "want": { "ok": false, "reason": "voided", "step": "business" } },
-    { "why": "a cancelled job: refused as frozen", "order": { "id": "J6", "status": "cancelled", "price": 100 }, "next": { "nonBusiness": true }, "want": { "ok": false, "reason": "cancelled", "step": "business" } },
-    { "why": "sending the flag unchanged with a note still saves the note", "order": { "id": "J7", "status": "pending", "price": 100 }, "next": { "nonBusiness": false, "internalNotes": "matte plate" }, "want": { "ok": true, "nonBusiness": false, "internalNotes": "matte plate" } }
+    {
+      "why": "a quote may be marked not business",
+      "order": {
+        "id": "Q1",
+        "status": "quote",
+        "price": 100
+      },
+      "next": {
+        "nonBusiness": true
+      },
+      "want": {
+        "ok": true,
+        "nonBusiness": true
+      }
+    },
+    {
+      "why": "and unmarked again",
+      "order": {
+        "id": "Q2",
+        "status": "quote",
+        "price": 100,
+        "nonBusiness": true
+      },
+      "next": {
+        "nonBusiness": false
+      },
+      "want": {
+        "ok": true,
+        "nonBusiness": false
+      }
+    },
+    {
+      "why": "a quote on hold awaiting the customer's yes has no invoice yet",
+      "order": {
+        "id": "Q3",
+        "status": "on_hold",
+        "hasQuote": true,
+        "price": 100
+      },
+      "next": {
+        "nonBusiness": true
+      },
+      "want": {
+        "ok": true,
+        "nonBusiness": true
+      }
+    },
+    {
+      "why": "a booked job has an issued invoice: refused",
+      "order": {
+        "id": "J1",
+        "status": "pending",
+        "price": 100
+      },
+      "next": {
+        "nonBusiness": true
+      },
+      "want": {
+        "ok": false,
+        "reason": "invoice_issued",
+        "step": "business"
+      }
+    },
+    {
+      "why": "a finished job: refused",
+      "order": {
+        "id": "J2",
+        "status": "completed",
+        "price": 100
+      },
+      "next": {
+        "nonBusiness": true
+      },
+      "want": {
+        "ok": false,
+        "reason": "invoice_issued",
+        "step": "business"
+      }
+    },
+    {
+      "why": "taking the flag OFF a booked not-business job would put revenue into a reported period: refused too",
+      "order": {
+        "id": "J3",
+        "status": "pending",
+        "price": 100,
+        "nonBusiness": true
+      },
+      "next": {
+        "nonBusiness": false
+      },
+      "want": {
+        "ok": false,
+        "reason": "invoice_issued",
+        "step": "business"
+      }
+    },
+    {
+      "why": "a job reported to ZATCA: refused as frozen",
+      "order": {
+        "id": "J4",
+        "status": "completed",
+        "price": 100,
+        "zatcaUuid": "u-1"
+      },
+      "next": {
+        "nonBusiness": true
+      },
+      "want": {
+        "ok": false,
+        "reason": "zatca",
+        "step": "business"
+      }
+    },
+    {
+      "why": "a voided job: refused as frozen",
+      "order": {
+        "id": "J5",
+        "status": "pending",
+        "price": 100,
+        "voidedAt": "2026-11-13T09:00:00Z"
+      },
+      "next": {
+        "nonBusiness": true
+      },
+      "want": {
+        "ok": false,
+        "reason": "voided",
+        "step": "business"
+      }
+    },
+    {
+      "why": "a cancelled job: refused as frozen",
+      "order": {
+        "id": "J6",
+        "status": "cancelled",
+        "price": 100
+      },
+      "next": {
+        "nonBusiness": true
+      },
+      "want": {
+        "ok": false,
+        "reason": "cancelled",
+        "step": "business"
+      }
+    },
+    {
+      "why": "sending the flag unchanged with a note still saves the note",
+      "order": {
+        "id": "J7",
+        "status": "pending",
+        "price": 100
+      },
+      "next": {
+        "nonBusiness": false,
+        "internalNotes": "matte plate"
+      },
+      "want": {
+        "ok": true,
+        "nonBusiness": false,
+        "internalNotes": "matte plate"
+      }
+    },
+    {
+      "why": "decision A: a finished job charged nothing (an issued invoice for 0) may be marked not business",
+      "order": {
+        "id": "Z1",
+        "status": "completed",
+        "price": 0
+      },
+      "next": {
+        "nonBusiness": true
+      },
+      "want": {
+        "ok": true,
+        "nonBusiness": true
+      }
+    },
+    {
+      "why": "decision A: one halala invoiced is revenue: refused",
+      "order": {
+        "id": "Z2",
+        "status": "completed",
+        "price": 0.01
+      },
+      "next": {
+        "nonBusiness": true
+      },
+      "want": {
+        "ok": false,
+        "reason": "invoice_issued",
+        "step": "business"
+      }
+    },
+    {
+      "why": "decision A: charged nothing but reported to ZATCA: refused as frozen",
+      "order": {
+        "id": "Z3",
+        "status": "completed",
+        "price": 0,
+        "zatcaUuid": "u-2"
+      },
+      "next": {
+        "nonBusiness": true
+      },
+      "want": {
+        "ok": false,
+        "reason": "zatca",
+        "step": "business"
+      }
+    },
+    {
+      "why": "decision A: a zero-priced not-business job may be taken back into the business too",
+      "order": {
+        "id": "Z4",
+        "status": "completed",
+        "price": 0,
+        "nonBusiness": true
+      },
+      "next": {
+        "nonBusiness": false
+      },
+      "want": {
+        "ok": true,
+        "nonBusiness": false
+      }
+    }
   ]
 }
