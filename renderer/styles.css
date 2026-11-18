@@ -5929,6 +5929,13 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .jp-row.is-strong { font-weight: 600; }
 .jp-row.is-late .jp-num { color: var(--st-late-ink, var(--danger)); }
 .jp-note, .jp-empty { margin: 4px 0; font-size: 12.5px; color: var(--text-muted); }
+/* Milestones after a re-price (Figma 96:1067): the banner and the total in
+   warn ink on its wash, as the job page's other "needs you" notes. */
+.jp-banner { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 10px; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; }
+.jp-banner strong { font-size: 13px; }
+.jp-banner.is-warn { background: var(--st-move-bg, var(--warn-soft)); color: var(--st-move-ink, var(--warning)); }
+.jp-row.is-warn .jp-num { color: var(--st-move-ink, var(--warning)); }
+.jp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .jp-event { flex-direction: column; align-items: flex-start; gap: 1px; }
 
 /* ── The job edit sheet (S1 · Figma 75:583, 95:461, 95:596) ── */

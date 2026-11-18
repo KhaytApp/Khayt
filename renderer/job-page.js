@@ -71,6 +71,64 @@
       + row(t('jp.margin'), margin === null ? t('jp.margin_typed') : `${margin} %`, 'is-muted');
   }
 
+  const PR = () => global.KhaytPaymentReminder;
+
+  /** The last recorded change of price: { at, from, to }, or null. */
+  function lastRepricing(o) {
+    const h = Array.isArray(o.editHistory) ? o.editHistory : [];
+    for (let i = h.length - 1; i >= 0; i--) {
+      const p = h[i] && h[i].fields && h[i].fields.price;
+      if (p && p.from !== undefined && p.to !== undefined) return { at: h[i].at, from: +p.from, to: +p.to };
+    }
+    return null;
+  }
+
+  /**
+   * The job's milestones, and, when a re-price left them no longer adding up,
+   * what to do about it (Turki, Nov 17; Figma 96:1067). A proforma already
+   * SENT stays exactly as sent: it shows what it is now short, and "Send
+   * updated proforma" issues a new one for that (lib/payment-reminder.js
+   * differenceProforma). One not sent yet shows old → new, and "Update the
+   * unsent milestones" moves it, only when pressed (refreshedMilestones, which
+   * never touches a sent one). Empty when the job has no milestones.
+   */
+  function milestonesHtml(o) {
+    const rows = Array.isArray(o.milestoneInvoices) ? o.milestoneInvoices.filter((m) => m && m.id) : [];
+    const R = PR();
+    if (!rows.length || !R || typeof R.milestoneGap !== 'function') return '';
+    const g = R.milestoneGap(o);
+    const off = new Map(g.rows.map((r) => [r.id, r]));
+    const rp = g.stale ? lastRepricing(o) : null;
+    const banner = g.stale ? `<div class="jp-banner is-warn" role="status">
+        <strong>${escapeHtml(t('jp.ms.banner'))}</strong>
+        <span>${escapeHtml(rp ? t('jp.ms.repriced', { date: day(rp.at), from: money(o, rp.from), to: money(o, rp.to) })
+          : t('jp.ms.price_now', { price: money(o, g.price) }))} ${escapeHtml(t('jp.ms.sent_stays'))}</span>
+      </div>` : '';
+    const lines = rows.map((m) => {
+      const r = off.get(String(m.id));
+      const pct = +m.percentage > 0 ? ` · ${+m.percentage}%` : '';
+      const state = m.kind === 'difference' ? t('jp.ms.difference')
+        : m.issuedAt ? t('jp.ms.sent', { date: day(m.issuedAt) }) : t('jp.ms.unsent');
+      const value = r && !r.issued ? `${money(o, r.amount)} → ${money(o, r.expected)}` : money(o, +m.amount || 0);
+      let sub = '';
+      if (r && r.issued && r.diff > 0) sub = t('jp.ms.short', { share: money(o, r.expected), amount: money(o, r.diff) });
+      else if (r && r.issued && r.diff < 0) sub = t('jp.ms.over', { amount: money(o, -r.diff) });
+      else if (r && !r.issued) sub = t('jp.ms.can_follow');
+      return `<div class="jp-row"><span>${escapeHtml(String(m.label || '') + pct)} · ${escapeHtml(state)}</span>
+          <span class="jp-num">${escapeHtml(value)}</span></div>${sub ? `<p class="jp-note">${escapeHtml(sub)}</p>` : ''}`;
+    }).join('');
+    const sum = rows.reduce((a, m) => a + (+m.amount || 0), 0);
+    const total = g.stale ? `<div class="jp-row is-strong is-warn"><span>${escapeHtml(t('jp.ms.adds_up'))}</span>
+        <span class="jp-num">${escapeHtml(t('jp.ms.of', { sum: money(o, sum), price: money(o, g.price) }))}</span></div>` : '';
+    const sendBtns = g.rows.filter((r) => r.issued && r.diff > 0).map((r) =>
+      `<button type="button" class="btn primary" data-jp="ms-diff" data-ms="${escapeHtml(r.id)}">${escapeHtml(t('jp.ms.send_diff', { amount: money(o, r.diff) }))}</button>`).join('');
+    const unsent = g.rows.filter((r) => !r.issued).length;
+    const refreshBtn = Math.abs(g.unissuedDiff) >= 0.01
+      ? `<button type="button" class="btn" data-jp="ms-refresh">${escapeHtml(t(unsent > 1 ? 'jp.ms.update_many' : 'jp.ms.update_one'))}</button>` : '';
+    return `<section class="card jp-card jp-milestones"><h3 class="jp-card-head">${escapeHtml(t('jp.milestones'))} · ${rows.length}</h3>
+        ${banner}${lines}${total}${refreshBtn || sendBtns ? `<div class="jp-actions">${refreshBtn}${sendBtns}</div>` : ''}</section>`;
+  }
+
   function activityHtml(o) {
     const items = (Array.isArray(o.statusHistory) ? o.statusHistory : [])
       .map((h) => ({ at: h.at, text: t('jp.moved', { stage: stageWord(h.status) }) }));
@@ -116,6 +174,7 @@
         <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.parts'))} · ${(o.parts || []).length}</h3>${partsHtml(o)}</section>
         <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.money'))}</h3>${moneyHtml(o, steps)}</section>
       </div>
+      ${milestonesHtml(o)}
       <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.activity'))}</h3>${activityHtml(o)}</section>`;
   }
 
@@ -169,7 +228,14 @@
     if (code === 'record_payment') { openPaymentModal(o.id); return; }
     if (code === 'send_quote') { openQuoteApprovalLinkModal(o.id); return; }
     if (code === 'hand_over') { markDelivered(o.id); render(); return; }
-    // Steps that ask a question the page does not ask yet: the job editor.
+    // The steps that ask a question open the desktop's own dialog for it, the
+    // one the board and the queue use (renderer/order-flows.js): on hold asks
+    // why, a failed check what failed, shipping the carrier and tracking. Each
+    // saves through saveAll, which redraws this page. They opened the old job
+    // editor (S1, Nov 18).
+    const dialog = { hold: global.holdOrder, fail_check: global.qcFailOrder, ship: global.openShipModal }[code];
+    if (typeof dialog === 'function') { dialog(o.id); return; }
+    // Anything else that asks a question the page does not ask yet: the job editor.
     if (!s.to || s.asks === 'hold' || s.asks === 'qc_fail') { openOrderEditor(o.id); return; }
     updateStatus(o.id, s.to);
     render();
@@ -183,11 +249,35 @@
     if (!b) return;
     if (b.dataset.jp === 'back') { closeJobPage(); return; }
     if (b.dataset.jp === 'edit') { (typeof openJobSheet === 'function' ? openJobSheet : openOrderEditor)(openId); return; }
+    if (b.dataset.jp === 'ms-refresh') { refreshMilestones(); return; }
+    if (b.dataset.jp === 'ms-diff') { sendDifference(b.dataset.ms); return; }
     if (b.dataset.jpStep) runStep(b.dataset.jpStep);
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && openId && !document.querySelector('.modal-backdrop, .modal-overlay')) closeJobPage();
   });
+
+  /** The unsent milestones at their share of the price now; a sent one is never touched. */
+  function refreshMilestones() {
+    const o = byId(openId);
+    if (!o || !PR()) return;
+    o.milestoneInvoices = PR().refreshedMilestones(o);
+    saveAll();
+    render();
+  }
+
+  /** A new proforma for what a sent milestone is now short, issued at once. */
+  async function sendDifference(milestoneId) {
+    const o = byId(openId);
+    if (!o || !PR()) return;
+    const m = (o.milestoneInvoices || []).find((x) => x && String(x.id) === String(milestoneId));
+    const row = PR().differenceProforma(o, milestoneId, { id: uid('MS'), label: t('jp.ms.diff_label', { label: (m && m.label) || '' }) });
+    if (!row) return;
+    o.milestoneInvoices.push(row);
+    saveAll();
+    if (typeof generateMilestoneInvoice === 'function') await generateMilestoneInvoice(o.id, row);
+    render();
+  }
 
   /** Redraw after the job changes elsewhere (a payment, the editor). */
   function refreshJobPage() { if (openId) render(); }
