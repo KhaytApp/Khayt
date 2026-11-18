@@ -32,7 +32,9 @@ struct NonBusinessTests {
     @Test("Edit job's fields and its Not business box are one edit of one record")
     func oneEdit() async throws {
         let engine = try KhaytEngine()
-        let job: JSONValue = .object(["id": .string("j1"), "project": .string("Bracket"), "price": .number(40)])
+        // A quote: no tax invoice yet, so the mark may move (#2562).
+        let job: JSONValue = .object(["id": .string("j1"), "status": .string("quote"), "project": .string("Bracket"),
+                                      "price": .number(40)])
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let both = try await Shop.jobEdited(job, fields: ["project": .string("Bracket v2")], nonBusiness: true,
                                             settings: [:], engine: engine, now: now, editId: "E1")
@@ -129,5 +131,74 @@ struct NonBusinessTests {
                 "the P&L no longer says why a margin is negative")
         #expect(try Self.source("Reports.swift").contains("callIt(\"pnl.cogs\")"),
                 "the net takes the cost of goods off, so the P&L has to show that line")
+    }
+
+    // MARK: - The shared rule (#2562)
+
+    struct Vectors: Decodable {
+        struct Want: Decodable { let ok: Bool; let nonBusiness: Bool?; let reason: String?; let step: String? }
+        struct Case: Decodable { let why: String; let order: JSONValue; let next: [String: JSONValue]; let want: Want }
+        let cases: [Case]
+    }
+
+    /// `test/fixtures/business-flag-vectors.json` through the Mac's engine:
+    /// the mark moves only before a tax invoice is issued, never on a frozen
+    /// job, and a refusal writes nothing.
+    @Test("the shared business-flag vectors, through the engine")
+    func vectors() async throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "test/fixtures/business-flag-vectors.json")
+        let v = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
+        #expect(v.cases.count >= 10)
+        let engine = try KhaytEngine()
+        for c in v.cases {
+            let r = try await engine.applyJobEdit(order: c.order, fields: c.next, now: Date(timeIntervalSince1970: 1),
+                                                 editId: "e", priceId: "e2")
+            #expect(r.ok == c.want.ok, Comment(rawValue: c.why))
+            if !c.want.ok {
+                #expect(r.reason == c.want.reason && r.step == c.want.step, Comment(rawValue: c.why))
+                #expect(r.order == c.order, "a refusal writes nothing: \(c.why)")
+                continue
+            }
+            guard case .object(let o) = r.order else { Issue.record(Comment(rawValue: c.why)); continue }
+            #expect((o["nonBusiness"] == .bool(true)) == (c.want.nonBusiness == true), Comment(rawValue: c.why))
+        }
+    }
+
+    @Test("every Mac path refuses the mark on a booked job, in the shop's words")
+    func pathsRefuse() async throws {
+        let engine = try KhaytEngine()
+        let shop = Shop()
+        let booked: JSONValue = .object(["id": .string("J1"), "status": .string("pending"), "price": .number(100)])
+        let business = Shop.businessLockWords(shop.words)
+        // The single toggle and the older Edit Job.
+        do {
+            _ = try await Shop.markedBusiness(booked, nonBusiness: true, settings: [:], engine: engine,
+                                              words: business, now: Date())
+            Issue.record("marked a booked job")
+        } catch let refused as Shop.MoveRefused {
+            #expect(refused.code == "invoice_issued" && refused.sentence == business["invoice_issued"])
+        }
+        do {
+            _ = try await Shop.jobEdited(booked, fields: [:], nonBusiness: true, settings: [:], engine: engine,
+                                         now: Date(), editId: "E", businessWords: business)
+            Issue.record("Edit job marked a booked job")
+        } catch let refused as Shop.MoveRefused {
+            #expect(refused.code == "invoice_issued")
+        }
+        // The Edit Job sheet: the box in the same edit, the business sentence.
+        var save = Shop.JobSave()
+        save.nonBusiness = true
+        do {
+            _ = try await Shop.jobSaved(booked, save, clients: [], settings: [:], engine: engine,
+                                        refusals: Shop.jobSaveRefusalWords(shop.words), now: Date())
+            Issue.record("the sheet marked a booked job")
+        } catch let refused as Shop.MoveRefused {
+            #expect(refused.sentence == business["invoice_issued"])
+        }
+        #expect(Set(business.keys) == ["invoice_issued", "zatca", "voided", "credited", "cancelled"])
+        for (code, sentence) in business { #expect(!sentence.hasPrefix("mac."), "no words: \(code)") }
     }
 }

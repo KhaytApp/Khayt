@@ -49,14 +49,15 @@ struct JobSheetSaveTests {
         #expect(!id.isEmpty)
     }
 
-    @Test("a refusal anywhere writes nothing — not even the Not business mark")
+    @Test("a refusal anywhere writes nothing")
     func allOrNothing() async throws {
         let engine = try KhaytEngine()
         let shop = Shop()
         let paid = JobPartsRuleTests.job(["paidAmount": .number(150)])
         var save = Shop.JobSave()
         save.fields = ["project": .string("Renamed"), "discountPct": .number(30)]
-        save.nonBusiness = true
+        // (No Not business box here: on a booked job the rule refuses it on
+        // its own since #2562, and that is `NonBusinessTests.pathsRefuse`.)
         do {
             _ = try await Self.saved(paid, save, shop: shop, engine: engine)
             Issue.record("a discount that drops the bill below what was paid was taken")
