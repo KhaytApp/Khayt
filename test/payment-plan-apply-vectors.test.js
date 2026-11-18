@@ -23,6 +23,8 @@ for (const c of V.cases) {
       : c.op === 'record' ? PP.recordRowPayment(order, c.rowId, clone(c.payment), ctx)
       : c.op === 'cover' ? PP.coverRow(order, c.rowId, ctx)
       : c.op === 'due' ? { ok: true, due: PP.dueRows(order, c.now).map((x) => x.id) }
+      : c.op === 'pay' ? ((o) => ({ ok: !o.refused, reason: o.refused || null }))(globalThis.KhaytOrderPayment.recordPayment(order, clone(c.payment), ctx))
+      : c.op === 'trim' ? { ok: true, trimmed: PP.trimToOwed(order, order.instalments, ctx).filter((x) => !x.paid).map((x) => [x.id, Math.round(x.amount * 100) / 100]) }
       : c.op === 'cap' ? { ok: true, cap: RX.capInstalments(order, PP.owedNow(order, ctx)).map((x) => [x.ins.id, Math.round(x.amount * 100) / 100]) }
       : Object.assign({ ok: true }, PP.allocate(order));
     assert.equal(r.ok, c.want.ok, r.reason);
@@ -53,11 +55,16 @@ for (const c of V.cases) {
     if (c.want.unallocated !== undefined) assert.equal(r.unallocated, c.want.unallocated, 'unallocated');
     if (c.want.due) assert.deepEqual(r.due, c.want.due, 'the rows a reminder chases');
     if (c.want.cap) assert.deepEqual(r.cap, c.want.cap, 'what receivables age as owed');
+    if (c.want.trimmed) assert.deepEqual(r.trimmed, c.want.trimmed, 'the trimmed plan');
+    if (c.op === 'trim') {
+      const trimmed = PP.trimToOwed(order, order.instalments, ctx);
+      assert.equal(PP.applyPlan(clone(order), trimmed, ctx).ok, true, 'and the trimmed plan saves');
+    }
     if (c.want.states) {
       const got = Object.fromEntries(PP.allocate(order).rows.map((x) => [x.id, x.state]));
       assert.deepEqual(got, c.want.states, 'each row\'s state (allocate)');
     }
-    if (c.op === 'cover' || c.op === 'allocate' || c.op === 'due' || c.op === 'cap') assert.equal(order.paidAmount, before.paidAmount, 'no money moves');
+    if (c.op === 'cover' || c.op === 'allocate' || c.op === 'due' || c.op === 'cap' || c.op === 'trim') assert.equal(order.paidAmount, before.paidAmount, 'no money moves');
     if (c.want.rowRecorded) {
       const row = order.instalments.find((x) => x.id === c.want.rowRecorded);
       assert.equal(PP.rowState(row), 'recorded');
