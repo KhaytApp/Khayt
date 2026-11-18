@@ -3997,6 +3997,7 @@
  "mac.business_locked_voided": "La factura de este trabajo se anuló, así que no se puede cambiar si cuenta como negocio.",
  "mac.business_locked_credited": "Se emitió una nota de crédito para este trabajo, así que no se puede cambiar si cuenta como negocio.",
  "mac.business_locked_cancelled": "Este trabajo se canceló, así que no se puede cambiar si cuenta como negocio.",
+ "mac.not_business_some_locked": "{n} marcados como no de negocio. {m} no se pudieron marcar: su factura se envió a ZATCA, se anuló o se abonó, o el trabajo se canceló.",
  "mac.parts_name_only": "Este trabajo está terminado y su filamento ya está contado; solo se puede cambiar el nombre de una pieza. Para lo demás, registre un cambio de bobina o una reimpresión.",
  "mac.parts_delivered_fixed": "Una pieza que el cliente ya tiene no se puede cambiar ni quitar.",
  "mac.parts_paid_exceeds": "Este cambio dejaría la factura por debajo de lo pagado. Reembolse la diferencia o emita una nota de crédito primero.",

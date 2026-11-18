@@ -1040,6 +1040,7 @@ extension Shop {
         }
         let actionName = words.callIt("mac.not_business")
         var undo: [ChangedRecord] = []
+        var marked = 0, locked = 0
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
@@ -1048,10 +1049,16 @@ extension Shop {
             ) { root in
                 undo = []  // the book moved and this runs again: one entry, not two
                 let orders = Self.rows(root, "printLog")
-                let changed = try await Self.markedNotBusiness(orders, ids: ids, engine: engine)
-                Self.write(&root, "printLog", changed: changed, before: orders, into: &undo)
+                let done = try await Self.markedNotBusiness(orders, ids: ids, engine: engine)
+                marked = done.changed.count; locked = done.locked
+                Self.write(&root, "printLog", changed: done.changed, before: orders, into: &undo)
             }
             registerMoveUndo(undo, named: actionName)
+            // Some could not be marked (frozen): said, with how many of each.
+            if locked > 0 {
+                importNote = words.callIt("mac.not_business_some_locked",
+                                          ["n": .number(Double(marked)), "m": .number(Double(locked))])
+            }
             await load(source)
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
@@ -1062,17 +1069,23 @@ extension Shop {
 
     /// The patch `markNotBusiness` writes, with no store in it: the asked-for
     /// jobs that the rule STILL counts as finished and charged nothing, each
-    /// marked by the shared setter. Anything else is left out.
+    /// marked through the shared edit rule (`applyJobEdit`, #2562/#2566),
+    /// which allows it on an issued invoice whose total is zero and refuses it
+    /// on a frozen job (sent to ZATCA, voided, credited, cancelled). Those
+    /// are left as they are and counted (`locked`). Anything else is left out.
     static func markedNotBusiness(_ orders: [JSONValue], ids: [Order.ID],
-                                  engine: KhaytEngine) async throws -> [JSONValue] {
+                                  engine: KhaytEngine) async throws -> (changed: [JSONValue], locked: Int) {
         let still = Set(try await engine.unpricedFinished(orders: orders).ids)
         let wanted = Set(ids).intersection(still)
         var changed: [JSONValue] = []
+        var locked = 0
         for order in orders {
             guard let id = recordId(order), wanted.contains(id) else { continue }
-            changed.append(try await engine.setNonBusiness(order, on: true))
+            let r = try await engine.applyJobEdit(order: order, fields: ["nonBusiness": .bool(true)],
+                                                 now: Date(), editId: uid("edit"), priceId: uid("edit"))
+            if r.ok { if r.changed { changed.append(r.order) } } else { locked += 1 }
         }
-        return changed
+        return (changed, locked)
     }
 
     /// Change one part of a job, and re-cost it.

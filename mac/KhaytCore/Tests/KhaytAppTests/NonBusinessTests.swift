@@ -100,9 +100,11 @@ struct NonBusinessTests {
     func markingThemAll() async throws {
         let engine = try KhaytEngine()
         // `paid` is asked for too — a stale card — and must be left alone.
-        let changed = try await Shop.markedNotBusiness(Self.book, ids: ["zero", "missing", "paid", "voided"],
-                                                        engine: engine)
-        #expect(changed.compactMap(Shop.recordId) == ["zero", "missing"])
+        let done = try await Shop.markedNotBusiness(Self.book, ids: ["zero", "missing", "paid", "voided"],
+                                                     engine: engine)
+        let changed = done.changed
+        #expect(changed.compactMap(Shop.recordId) == ["zero", "missing"], "an issued zero-total invoice may move (#2566)")
+        #expect(done.locked == 0, "the voided one is not counted by the card's rule at all")
         for row in changed {
             guard case .object(let o) = row else { Issue.record("not an object"); continue }
             #expect(o["nonBusiness"] == .bool(true))
@@ -200,5 +202,22 @@ struct NonBusinessTests {
         }
         #expect(Set(business.keys) == ["invoice_issued", "zatca", "voided", "credited", "cancelled"])
         for (code, sentence) in business { #expect(!sentence.hasPrefix("mac."), "no words: \(code)") }
+    }
+
+    @Test("the triage card goes through the shared rule: a frozen job charged nothing is counted, not marked")
+    func triageThroughTheRule() async throws {
+        let engine = try KhaytEngine()
+        let frozen = Self.job("frozen", "completed", price: 0, extra: ["zatcaUuid": .string("u")])
+        let book = Self.book + [frozen]
+        let still = try await engine.unpricedFinished(orders: book).ids
+        let done = try await Shop.markedNotBusiness(book, ids: ["zero", "missing", "frozen"], engine: engine)
+        #expect(done.changed.compactMap(Shop.recordId) == ["zero", "missing"])
+        #expect(done.locked == (still.contains("frozen") ? 1 : 0), "sent to ZATCA: refused and counted")
+        let src = try Self.source("Shop+Money.swift")
+        #expect(src.contains("engine.applyJobEdit(order: order, fields: [\"nonBusiness\": .bool(true)]"))
+        #expect(!src.contains("changed.append(try await engine.setNonBusiness(order, on: true))"))
+        #expect(src.contains("\"mac.not_business_some_locked\""))
+        let shop = Shop()
+        #expect(shop.words.callIt("mac.not_business_some_locked", ["n": .number(17), "m": .number(2)]).contains("17"))
     }
 }
