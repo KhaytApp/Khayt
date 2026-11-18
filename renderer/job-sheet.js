@@ -180,6 +180,7 @@
       <div class="js-hint">${escapeHtml(t('js.extra_charges'))}</div>
       <div class="js-parts" data-js="lines"></div>
       ${frozen ? `<p class="js-hint">${escapeHtml(t('js.price_frozen'))}</p>` : `<div><button type="button" class="btn" data-js="lineAdd">${escapeHtml(t('js.add_charge'))}</button></div>`}
+      ${isNew || frozen ? '' : `<button type="button" class="linkish" data-js="reprice">↻ ${escapeHtml(t('js.reprice'))}</button>`}
       ${isNew ? '' : `<button type="button" class="linkish js-more" data-js="more">› ${escapeHtml(t('js.more'))}</button>`}
     </div>`;
 
@@ -507,6 +508,30 @@
       });
     }
 
+    /**
+     * Price the job again from its parts, as a new job would be priced
+     * (lib/order-edit.js repriceFromParts, through applyJobEdit's locks).
+     * The figure is worked out on a copy and shown was → now first; that
+     * question is the seen-price question, so the save passes priceSeenOk.
+     */
+    async function reprice() {
+      const ctx = ctxOf({ priceSeenOk: true, overheadPerHour: typeof shopOverheadPerHour === 'function' ? shopOverheadPerHour() : undefined });
+      const mk = q('margin').value.trim();
+      const req = mk !== '' && Number.isFinite(Number(mk)) ? { marginPct: Number(mk) } : {};
+      const trial = JSON.parse(JSON.stringify(order));
+      const dry = ED().applyJobEdit(trial, { reprice: req }, ctx);
+      const line = modal.parentElement.querySelector('.js-refused');
+      if (!dry.ok) { if (line) { line.textContent = reasonText(dry); line.hidden = false; } return; }
+      const was = +order.price || 0;
+      const now = +trial.price || 0;
+      if (Math.abs(now - was) < 0.005 && order.priceSource !== 'override') { toast(t('js.reprice_same'), 'info'); return; }
+      if (!(await confirmModal(t('js.reprice_q', { was: priceText(was), now: priceText(now) }), { okText: t('js.reprice_ok') }))) return;
+      const r = ED().applyJobEdit(order, { reprice: req }, ctx);
+      if (!r.ok) { if (line) { line.textContent = reasonText(r); line.hidden = false; } return; }
+      if (r.changed) saveAll();
+      modal.querySelector('.modal-footer [data-act="cancel"]')?.click();
+    }
+
     /** Take the job (or save it as a quote): newOrder, then the desktop's one way of recording a new job. */
     function create(asQuote) {
       if (!NEW().canTake(inputOf(asQuote)).ok) { refresh(); return false; }
@@ -594,6 +619,7 @@
           if (lr) { st.lines.splice(+lr.dataset.jsLrm, 1); st.lineEdit = -1; st.linesTouched = true; drawLines(); refresh(); return; }
           const ly = e.target.closest('[data-js-loyal]');
           if (ly) { q('discountPct').value = ly.dataset.jsLoyal; refresh(); return; }
+          if (e.target.closest('[data-js="reprice"]')) { reprice(); return; }
           if (e.target.closest('[data-js="more"]')) { openOrderEditor(order.id); }
         });
         refresh();
