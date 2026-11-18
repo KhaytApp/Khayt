@@ -663,6 +663,7 @@ enum Mesh {
     private static func structuralTags(of entry: Zip.Entry, in url: URL) throws -> String {
         var kept = [UInt8]()
         var carry = [UInt8]()
+        var tagTooLong = false
         let skip = ["<vertex", "<triangle", "<vertices", "<triangles",
                     "</vertex", "</triangle", "</vertices", "</triangles"]
         func consume(_ bytes: UnsafeRawBufferPointer) -> Bool {
@@ -682,10 +683,14 @@ enum Mesh {
                 i = close + 1
                 lastComplete = i
             }
-            if lastComplete < buffer.count { carry = Array(buffer[lastComplete...]) }
+            if let open = Self.unterminated(buffer, from: lastComplete) {
+                guard buffer.count - open <= Self.longestTag else { tagTooLong = true; return false }
+                carry = Array(buffer[open...])
+            }
             return true
         }
         try Zip.stream(entry, in: url, onChunk: consume)
+        if tagTooLong { throw Zip.Failure.corrupt("\(entry.name) has a tag longer than \(Self.longestTag / 1024) KB") }
         return String(decoding: kept, as: UTF8.self)
     }
 
@@ -751,6 +756,7 @@ enum Mesh {
         // A tag can land across a chunk boundary, so the tail after the last
         // complete `>` is carried into the next chunk.
         var carry = [UInt8]()
+        var tagTooLong = false
         // Whether the object being read is the one asked for. True throughout
         // when nothing was asked for.
         var wanted = only == nil
@@ -814,11 +820,15 @@ enum Mesh {
                 i = close + 1
                 lastComplete = i
             }
-            if lastComplete < buffer.count { carry = Array(buffer[lastComplete...]) }
+            if let open = Self.unterminated(buffer, from: lastComplete) {
+                guard buffer.count - open <= Self.longestTag else { tagTooLong = true; return false }
+                carry = Array(buffer[open...])
+            }
             return true
         }
 
         try Zip.stream(entry, in: url, onChunk: consume)
+        if tagTooLong { throw Zip.Failure.corrupt("\(entry.name) has a tag longer than \(Self.longestTag / 1024) KB") }
     }
 
     /// One object's mesh out of a part file, held so several components can
@@ -866,6 +876,7 @@ enum Mesh {
                                         wanted: Set<String>) throws -> [String: PartObject] {
         var out: [String: PartObject] = [:]
         var carry = [UInt8]()
+        var tagTooLong = false
         // The object being read, held out of the dictionary while it grows
         // so an append never copies it.
         var currentId: String?
@@ -913,16 +924,44 @@ enum Mesh {
                 i = close + 1
                 lastComplete = i
             }
-            if lastComplete < buffer.count { carry = Array(buffer[lastComplete...]) }
+            if let open = Self.unterminated(buffer, from: lastComplete) {
+                guard buffer.count - open <= Self.longestTag else { tagTooLong = true; return false }
+                carry = Array(buffer[open...])
+            }
             return true
         }
 
         try Zip.stream(entry, in: url, onChunk: consume)
+        if tagTooLong { throw Zip.Failure.corrupt("\(entry.name) has a tag longer than \(Self.longestTag / 1024) KB") }
         if let id = currentId { out[id] = current }
         return out
     }
 
     // MARK: - Reading a tag
+
+    /// The longest tag a model part may hold. A real 3MF's longest is a
+    /// painted triangle's `paint_color`, at most a few kilobytes.
+    ///
+    /// The readers carry the tail after the last complete tag into the next
+    /// chunk. They carried EVERYTHING after it, text between tags included,
+    /// and copied and rescanned it whole each chunk: a member of `<` and a
+    /// gigabyte of `a` held a gigabyte and did about half a terabyte of work,
+    /// from a 4 MB file a customer can send through intake (beta.40 full
+    /// review). Now only an unterminated tag is carried, and past this size
+    /// the part is refused as corrupt.
+    nonisolated static let longestTag = 64 << 10
+
+    /// Where the tag `bytes` ends inside began, if it does: the last `<` at or
+    /// after `from` with no `>` after it. Text between tags is not carried.
+    nonisolated static func unterminated(_ bytes: [UInt8], from: Int) -> Int? {
+        var i = bytes.count - 1
+        while i >= from {
+            if bytes[i] == UInt8(ascii: ">") { return nil }
+            if bytes[i] == UInt8(ascii: "<") { return i }
+            i -= 1
+        }
+        return nil
+    }
 
     private static func index(of byte: UInt8, in bytes: [UInt8], from: Int) -> Int? {
         var i = from

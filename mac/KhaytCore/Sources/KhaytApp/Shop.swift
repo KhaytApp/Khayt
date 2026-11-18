@@ -1962,6 +1962,9 @@ final class Shop {
     var provenanceReadBooks: Set<String> = []
     /// The pass in flight, so a quit — or a test — can wait for it.
     var remeasuring: Task<Void, Never>?
+    /// The colour re-read's pass (`rereadColoursIfDue`): held so a new pass,
+    /// or a switch of book, stops the old one.
+    var coloursRereading: Task<Void, Never>?
 
     /// The books whose linked folders this launch has already rescanned.
     var linkedScannedBooks: Set<String> = []
@@ -2387,7 +2390,7 @@ final class Shop {
     var slicerInboxProblem: String?
     /// The job or quote to open once the inbox sheet has gone — two sheets
     /// cannot be up at once.
-    var slicerJobAfterSheet: (file: LibraryFile, asQuote: Bool)?
+    var slicerJobAfterSheet: (file: LibraryFile, asQuote: Bool, carried: [String: JSONValue])?
     /// The calendar subscription token, opened, while the server runs.
     var lanCalendarToken: String?
     /// What the last "Copy quote link" did, shown beside the button.

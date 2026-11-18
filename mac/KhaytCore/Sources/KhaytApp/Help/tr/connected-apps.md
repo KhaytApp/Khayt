@@ -12,7 +12,7 @@ Dilimlenmiş dosyaları doğrudan bu Mac'e gönderen dilimleyiciler ve eşleşti
 ## Dilimleyici eşleştirme
 
 - Kenar çubuğunda **Bağlı uygulamalar**'ı açın ve **Dilimleyici eşleştir**'e tıklayın. Sonraki iki dakika boyunca ağınızdaki bir dilimleyici eşleşmek isteyebilir ve Mac yazılacak adresi gösterir.
-- OrcaSlicer'da Khayt → Pair → On this network'ü açın ve bu adresi aynen yazın.
+- OrcaSlicer'da **Khayt** sekmesini açın, bu adresi aynen yazın ve **Pair**'e tıklayın.
 - Mac **"ad" onaylansın mı?** diye sorar ve isteği hangi uygulamanın hangi adresten yaptığını söyler. Bunun sizin dilimleyiciniz olduğunu kontrol edin.
 - İki ekran da şimdi altı haneli bir sayı gösterir. Sayılar aynıysa **Numaralar eşleşiyor — onayla**'ya tıklayın. Dilimleyici Eşleştirilmiş dilimleyiciler altında görünür.
 

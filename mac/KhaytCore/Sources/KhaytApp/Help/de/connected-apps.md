@@ -12,7 +12,7 @@ Slicer, die geslicte Dateien direkt an diesen Mac senden, und was zu tun ist, we
 ## Einen Slicer koppeln
 
 - Öffnen Sie **Verbundene Apps** in der Seitenleiste und klicken Sie auf **Slicer koppeln**. In den nächsten zwei Minuten darf ein Slicer in Ihrem Netzwerk um Kopplung bitten, und der Mac zeigt die einzutippende Adresse.
-- Öffnen Sie in OrcaSlicer Khayt → Pair → On this network und tippen Sie diese Adresse genau ein.
+- Öffnen Sie in OrcaSlicer den Tab **Khayt**, tippen Sie diese Adresse genau ein und klicken Sie auf **Pair**.
 - Der Mac fragt **„Name“ zulassen?** und nennt die App und die Adresse der Anfrage. Prüfen Sie, dass es Ihr Slicer ist.
 - Beide Bildschirme zeigen jetzt eine sechsstellige Zahl. Sind die Zahlen gleich, klicken Sie auf **Zahlen stimmen — zulassen**. Der Slicer erscheint unter Gekoppelte Slicer.
 

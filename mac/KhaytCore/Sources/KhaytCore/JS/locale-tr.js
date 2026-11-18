@@ -1618,6 +1618,7 @@
   "audit.all_members": "Tüm üyeler",
   "audit.system": "—",
   "audit.act_order_created": "Sipariş oluşturuldu",
+  "audit.act_slicer_inbox": "Bir dilimleyici tarafından kutuya gönderildi",
   "audit.act_quote_created": "Teklif oluşturuldu",
   "audit.act_status": "Durum değiştirildi",
   "set.logo": "İşletme logosu",

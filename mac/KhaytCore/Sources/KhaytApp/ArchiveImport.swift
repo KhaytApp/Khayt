@@ -191,7 +191,9 @@ enum ArchiveImport {
             let leaf = (entry.name as NSString).lastPathComponent
             guard !leaf.isEmpty, leaf != ".", leaf != ".." else { continue }
             let dest = uniqueName(in: scratch, leaf: leaf)
-            guard let data = try? Zip.data(of: entry, in: url, limit: .max) else { continue }
+            // Bounded by what the scan allowed the whole archive to unpack to,
+            // on BOTH sizes (`Zip.data` checks each before reading).
+            guard let data = try? Zip.data(of: entry, in: url, limit: Self.unpackedBudget) else { continue }
             do { try data.write(to: dest) } catch { continue }
             if Self.documentKinds.contains(dest.pathExtension.lowercased()) {
                 papersOut.append(dest)
@@ -292,7 +294,7 @@ enum ArchiveImport {
                     done.resume(with: Result {
                         try BoundedProcess.run("/usr/bin/tar", arguments, timeout: Self.tarPatience,
                                                keepOut: 0, every: 0.4,
-                                               watch: { bytes(under: scratch) > unpackedBudget })
+                                               watch: { tooMuch(under: scratch) })
                     })
                 }
             }
@@ -303,7 +305,7 @@ enum ArchiveImport {
         let stopped = ran.stopped
         let said = String(decoding: ran.stderr, as: UTF8.self)
 
-        if stopped || bytes(under: scratch) > unpackedBudget {
+        if stopped || tooMuch(under: scratch) {
             try? FileManager.default.removeItem(at: scratch)
             throw Failure.refused(name, reason: "too-big-unpacked")
         }
@@ -379,14 +381,25 @@ enum ArchiveImport {
     }
 
     /// What has landed so far, in bytes.
-    private nonisolated static func bytes(under dir: URL) -> Int {
+    /// The most files an archive may unpack to: `lib/upload-scan.js`
+    /// MAX_ENTRIES, the figure the scan holds a zip it can list to. A pack of
+    /// a million empty files cost nothing in bytes and a million inodes, and
+    /// the watcher walked all of them twice a second (beta.40 full review).
+    nonisolated static let mostFiles = 2048
+
+    /// Past the byte budget or the file count. Stops walking at whichever it
+    /// passes first, so a huge tree costs one bounded walk, not a full one.
+    nonisolated static func tooMuch(under dir: URL) -> Bool {
         var total = 0
-        let walker = FileManager.default.enumerator(at: dir,
-                                                    includingPropertiesForKeys: [.fileSizeKey])
+        var files = 0
+        let walker = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey])
         while let next = walker?.nextObject() as? URL {
+            files += 1
+            if files > mostFiles { return true }
             total += (try? next.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { $0 } ?? 0
+            if total > unpackedBudget { return true }
         }
-        return total
+        return false
     }
 
     /// libarchive's complaint, on one line.
