@@ -26,6 +26,8 @@ const CASES = {};
 for (const u of UNITS) {
   CASES[`parseGcodeText: ${JSON.stringify(u)} × n, no separator`] = (b) => () => G.parseGcodeText(repeatTo(u, b));
 }
+// The marker the head runs to, almost there n times and never whole.
+CASES['parseGcodeText: "; EXECUTABLE_BLOCK_STAR" × n, the marker never whole'] = (b) => () => G.parseGcodeText(repeatTo('; EXECUTABLE_BLOCK_STAR', b));
 // The direct parser, past parseGcodeText's half-megabyte edges.
 CASES['parsePrintTimeMins: the phrase × n, no "="'] = (b) => () => G.parsePrintTimeMins(repeatTo('estimated printing time ', b));
 CASES['parsePrintTimeMins: "=" then a long run of spaces'] = (b) => () => G.parsePrintTimeMins('estimated printing time =' + repeatTo(' ', b));
@@ -101,4 +103,10 @@ test('a marker past 8 MB is not followed: the head stays bounded', () => {
   const ms0 = Date.now(); const r = G.parseGcodeText(t);
   assert.equal(r.filamentType, null);
   assert.ok(Date.now() - ms0 < 2000);
+});
+
+test('a 32 MB file with no EXECUTABLE_BLOCK_START reads in well under a second', () => {
+  const t = repeatTo('G1 X1 Y1 E0.1\n', 32 << 20);
+  const took = ms(() => G.parseGcodeText(t));
+  assert.ok(took < 1000, `${took.toFixed(0)} ms`);
 });
