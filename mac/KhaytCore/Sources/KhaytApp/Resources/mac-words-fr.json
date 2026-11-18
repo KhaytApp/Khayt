@@ -3991,6 +3991,7 @@
  "mac.price_locked_credited": "Un avoir a été émis pour ce travail ; son prix ne peut pas être modifié.",
  "mac.parts_locked_cancelled": "Ce travail a été annulé ; ses pièces ne peuvent pas être modifiées.",
  "mac.price_locked_cancelled": "Ce travail a été annulé ; son prix ne peut pas être modifié.",
+ "mac.payment_refused": "Le paiement n’a pas été enregistré : la règle qui tient les montants du travail l’a refusé.",
  "mac.parts_name_only": "Ce travail est terminé et son filament est déjà décompté ; seul le nom d’une pièce peut changer. Pour le reste, enregistrez un changement de bobine ou une réimpression.",
  "mac.parts_delivered_fixed": "Une pièce déjà remise au client ne peut être ni modifiée ni retirée.",
  "mac.parts_paid_exceeds": "Ce changement ramènerait la facture sous le montant déjà payé. Remboursez la différence ou émettez d’abord un avoir.",

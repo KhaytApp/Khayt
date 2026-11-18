@@ -3814,6 +3814,7 @@ final class Words {
         "mac.price_locked_credited": ["en": "A credit note was issued for this job, so its price can’t be changed.", "ar": "صدر إشعار دائن لهذه المهمة، فلا يمكن تغيير سعرها."],
         "mac.parts_locked_cancelled": ["en": "This job was cancelled, so its parts can’t be changed.", "ar": "أُلغيت هذه المهمة، فلا يمكن تغيير قطعها."],
         "mac.price_locked_cancelled": ["en": "This job was cancelled, so its price can’t be changed.", "ar": "أُلغيت هذه المهمة، فلا يمكن تغيير سعرها."],
+        "mac.payment_refused": ["en": "The payment was not recorded: the rule that keeps a job's money in order refused it.", "ar": "لم تُسجَّل الدفعة: رفضتها قاعدة ضبط مبالغ المهمة."],
         "mac.parts_name_only": ["en": "This job is finished and its filament is already counted, so only a part’s name can change. For anything else, record a spool switch or a reprint.", "ar": "هذه المهمة منتهية وخيوطها محسوبة، فلا يمكن تغيير سوى اسم القطعة. لأي شيء آخر سجّل تبديل بكرة أو إعادة طباعة."],
         "mac.parts_delivered_fixed": ["en": "A part the customer already has can’t be changed or removed.", "ar": "لا يمكن تغيير أو حذف قطعة استلمها العميل."],
         "mac.parts_paid_exceeds": ["en": "This change would bring the bill below what has been paid. Refund the difference or issue a credit note first.", "ar": "هذا التغيير يجعل الفاتورة أقل مما دُفع. أعد الفرق أو أصدر إشعارًا دائنًا أولًا."],

@@ -879,6 +879,8 @@ extension Shop {
             let done = try await engine.recordPayment(
                 order: order, amount: amount, method: method,
                 paidAt: Self.localDay(paidAt), today: Self.localDay(), settings: settings)
+            // Refused by the rule: nothing is written, and the shop is told why.
+            try Self.throwIfRefused(done, words: self.words, settings: settings)
 
             // ── AND WHAT THE PAYMENT OWES OUTWARD ─────────────────────────
             //
@@ -1209,6 +1211,25 @@ extension Shop {
 
     nonisolated static func priceShut(_ lock: KhaytEngine.PartsLock?) -> Bool {
         lock?.code.map { priceLockCodes.contains($0) } ?? false
+    }
+
+    /// A payment the rule refused, as the refusal the write path shows: the
+    /// rule's own words (`refusedKey`, with the floor as `{amount}` when it
+    /// gives one), else a plain "not recorded". Nothing is written.
+    static func throwIfRefused(_ done: PaymentRecorded, words: Words,
+                               settings: [String: JSONValue]) throws {
+        guard let code = done.refused else { return }
+        var params: [String: JSONValue] = [:]
+        if let floor = done.floor {
+            params["amount"] = .string(Money.text(floor, shopCurrencyOf(settings)))
+            params["floor"] = .number(floor)
+        }
+        let fallback = words.callIt("mac.payment_refused")
+        let sentence = done.refusedKey.map { key -> String in
+            let said = words.callIt(key, fallback: fallback)
+            return said == fallback ? fallback : words.callIt(key, params)
+        } ?? fallback
+        throw MoveRefused(sentence: sentence, code: code)
     }
 
     /// Why the price is shut, in the shop's words: the parts sentence's

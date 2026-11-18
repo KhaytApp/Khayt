@@ -590,7 +590,9 @@ extension Shop {
             let day = localDay(now)
             let done = try await engine.recordPayment(order: job, amount: amount, method: "other",
                                                       paidAt: day, today: day, settings: settingsNow)
-            job = done.order
+            // A new web order has no plan to refuse against; if the rule ever
+            // refuses, the order is filed unpaid rather than marked paid.
+            if done.refused == nil { job = done.order }
             if let asked = done.webhookEffects, !asked.isEmpty, case .object(let o) = job {
                 webhooks = (try? await engine.webhookDeliveries(
                     order: job, effects: asked, settings: DevConnectors.withDev(settingsNow),

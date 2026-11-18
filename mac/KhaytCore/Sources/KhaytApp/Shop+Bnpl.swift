@@ -246,6 +246,7 @@ extension Shop {
             let done = try await engine.recordPayment(
                 order: checked.order, amount: pay.amount, method: pay.method,
                 paidAt: pay.paidAt ?? today, today: today, settings: settings)
+            try Self.throwIfRefused(done, words: self.words, settings: settings)
             if let asked = done.webhookEffects, !asked.isEmpty {
                 owed = (try? await engine.webhookDeliveries(
                     order: done.order, effects: asked, settings: DevConnectors.withDev(settings),
