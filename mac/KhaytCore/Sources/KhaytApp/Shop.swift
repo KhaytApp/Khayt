@@ -574,6 +574,9 @@ final class Shop {
         case calculator
         case portfolio
         case giftCards
+        /// Slicer plugins paired with this Mac and what they sent (dark while
+        /// "Pair a slicer" is off: `canShow`).
+        case connectedApps
 
         /// Whether two shelves are the same SCREEN, ignoring which folder or
         /// which stage. The sidebar highlights Jobs while a stage is chosen
@@ -633,6 +636,7 @@ final class Shop {
     var showingCalculator: Bool { shelf == .calculator }
     var showingPortfolio: Bool { shelf == .portfolio }
     var showingGiftCards: Bool { shelf == .giftCards }
+    var showingConnectedApps: Bool { shelf == .connectedApps }
 
     /// The open jobs, grouped by the stage they are in.
     ///
@@ -1958,6 +1962,9 @@ final class Shop {
     var provenanceReadBooks: Set<String> = []
     /// The pass in flight, so a quit — or a test — can wait for it.
     var remeasuring: Task<Void, Never>?
+    /// The colour re-read's pass (`rereadColoursIfDue`): held so a new pass,
+    /// or a switch of book, stops the old one.
+    var coloursRereading: Task<Void, Never>?
 
     /// The books whose linked folders this launch has already rescanned.
     var linkedScannedBooks: Set<String> = []
@@ -2376,10 +2383,14 @@ final class Shop {
     @ObservationIgnored var quoteFormsInFlight: Set<String> = []
     var showingSlicerInbox = false
     var slicerInboxSaid: String?
+    /// The name of a file a slicer sent again while the same bytes were
+    /// already waiting in the inbox: it is not added twice (one SHA-256 rule
+    /// for every way in), and the window says so until dismissed.
+    var slicerDuplicate: String?
     var slicerInboxProblem: String?
     /// The job or quote to open once the inbox sheet has gone — two sheets
     /// cannot be up at once.
-    var slicerJobAfterSheet: (file: LibraryFile, asQuote: Bool)?
+    var slicerJobAfterSheet: (file: LibraryFile, asQuote: Bool, carried: [String: JSONValue])?
     /// The calendar subscription token, opened, while the server runs.
     var lanCalendarToken: String?
     /// What the last "Copy quote link" did, shown beside the button.

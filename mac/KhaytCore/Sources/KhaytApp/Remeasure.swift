@@ -68,7 +68,9 @@ enum Remeasure {
                 report.missing.append(file.title); continue
             }
             report.measured.append(file.id)
-            guard let box = try? Mesh.measure3MF(model), box.triangleCount > 0,
+            // A blocking read of a whole model: on a dispatch queue, never
+            // the cooperative pool (`swift-pool-starvation`; beta.40 full review).
+            guard let box = await PinWork.run({ try? Mesh.measure3MF(model) }), box.triangleCount > 0,
                   let key = try? await engine.geometryKey(triangleCount: box.triangleCount,
                                                           volumeMm3: box.volumeMm3,
                                                           x: box.x, y: box.y, z: box.z) else {

@@ -83,24 +83,57 @@ enum ColourRead {
     /// The paint, as `colorsFromConfigs` takes it: `{slots:[]}` for an
     /// unpainted model, `{slots:[…]}` from the mesh, `{unread:true}` when a
     /// painted model's mesh could not be read.
-    static func paint(_ url: URL, entries: [Zip.Entry], engine: KhaytEngine) async -> JSONValue {
+    ///
+    /// An unread answer past this Mac's budget also says so (`overBudget`,
+    /// the budget in bytes): a Mac with more memory can read it, and the
+    /// re-read records it for one (`ColoursReread`). `studio` is the engine to
+    /// decode on; nil is the studio's shared one.
+    static func paint(_ url: URL, entries: [Zip.Entry], engine: KhaytEngine,
+                      studio given: StudioEngine? = nil) async -> JSONValue {
         let unread: JSONValue = .object(["unread": .bool(true)])
+        let overBudget: JSONValue = .object(["unread": .bool(true),
+                                             "overBudget": .number(Double(Converter.paintInlineLimit))])
         guard let isPainted = await PinWork.run({ painted(entries, in: url) }) else { return unread }
         guard isPainted else { return .object(["slots": .array([])]) }
         // On the studio's engine, not the shop's: seconds of decoding must not
         // hold the actor every screen's rules wait on.
-        guard let studio = await Studio.engine() else { return unread }
+        guard let studio = await Self.studioOr(given) else { return unread }
         let slots: [Int]?
         if entries.contains(where: { $0.name.lowercased().hasSuffix("slic3r_pe_model.config") }) {
             // A PrusaSlicer multi-volume project: its paint is worked out
             // across members, so it is read whole or not at all.
-            guard let read = try? await Converter.describeOffMain(url, bindMeshes: true) else { return unread }
+            let read: (entries: [Zip.Entry], described: [JSONValue], meshes: [String: String])
+            do { read = try await Converter.describeOffMain(url, bindMeshes: true) }
+            catch Converter.Failure.meshTooBig { return overBudget }
+            catch { return unread }
             slots = try? await studio.paintSlots(read.described, meshes: read.meshes)
         } else {
+            if Self.pastBudget(entries) { return overBudget }
             slots = await slotsByMember(url, entries: entries, studio: studio)
         }
         guard let slots else { return unread }
         return .object(["slots": .array(slots.map { .number(Double($0)) })])
+    }
+
+    private static func studioOr(_ given: StudioEngine?) async -> StudioEngine? {
+        if let given { return given }
+        return await Studio.engine()
+    }
+
+    /// Whether `slotsByMember` would refuse this file on size: a member past
+    /// `memberLimit`, or all of them past `totalLimit`, each counted at the
+    /// larger of its two sizes.
+    nonisolated static func pastBudget(_ entries: [Zip.Entry],
+                                       memberLimit: Int = Converter.paintInlineLimit,
+                                       totalLimit: Int = Converter.rebuildLimit) -> Bool {
+        var total = 0
+        for entry in entries where entry.name.lowercased().hasSuffix(".model") {
+            let cost = max(entry.size, entry.compressedSize)
+            if cost > memberLimit { return true }
+            total = total > Int.max - cost ? Int.max : total + cost
+            if total > totalLimit { return true }
+        }
+        return false
     }
 
     /// The painted slots, read one `.model` member at a time.
@@ -131,11 +164,19 @@ enum ColourRead {
         var digests: [JSONValue] = []
         var total = 0
         for entry in entries where entry.name.lowercased().hasSuffix(".model") {
-            guard entry.size <= memberLimit else { return nil }
-            total = total > Int.max - entry.size ? Int.max : total + entry.size
+            // What a member COSTS is the larger of the two sizes its
+            // directory entry claims, not the declared one alone: a stored
+            // member is read at its compressed size whatever it declares, so
+            // an entry saying "1 byte" over 20 MB of data, a thousand times
+            // at one offset, passed every budget and was read in full
+            // (beta.40 pre-release review).
+            let cost = max(entry.size, entry.compressedSize)
+            guard cost <= memberLimit else { return nil }
+            total = total > Int.max - cost ? Int.max : total + cost
             guard total <= totalLimit else { return nil }
             let text: String? = await PinWork.run {
-                guard let data = try? Zip.data(of: entry, in: url, limit: .max) else { return nil }
+                // `Zip.data` refuses on either size too, before reading.
+                guard let data = try? Zip.data(of: entry, in: url, limit: memberLimit) else { return nil }
                 return String(data: data, encoding: .utf8)
             }
             guard let text, let digest = try? await studio.paintDigest(name: entry.name, mesh: text) else { return nil }
@@ -172,15 +213,37 @@ enum ColourRead {
         return c
     }
 
-    /// A 3MF's colours, under reader 3: the configs and the paint.
+    /// A 3MF's colours, under today's reader: the configs and the paint.
     static func colours(_ url: URL, entries: [Zip.Entry], engine: KhaytEngine) async -> KhaytEngine.Colours? {
+        await read(url, entries: entries, engine: engine)?.colours
+    }
+
+    /// What a colour read found, and whether the paint was left unread.
+    struct Read: Sendable {
+        var colours: KhaytEngine.Colours
+        /// The paint was painted and could not be read (the rule then names
+        /// no colours).
+        var paintUnread = false
+        /// …because a model file was past this Mac's budget, in bytes.
+        var overBudget: Int?
+    }
+
+    /// The same read, saying why the paint was not read where it was not.
+    static func read(_ url: URL, entries: [Zip.Entry], engine: KhaytEngine,
+                     studio: StudioEngine? = nil) async -> Read? {
         let c = await PinWork.run { configs(entries, in: url) }
         // A sliced file names its colours from the slice; the paint is not needed.
-        if let sliced = await slice(c, engine: engine) { return sliced }
-        return try? await engine.coloursFromConfigs(
+        if let sliced = await slice(c, engine: engine) { return Read(colours: sliced) }
+        let paint = await paint(url, entries: entries, engine: engine, studio: studio)
+        guard let colours = try? await engine.coloursFromConfigs(
             sliceInfo: c.sliceInfo, projectSettings: c.project, modelSettings: c.model,
-            prusa: c.prusa, layerRanges: c.layerRanges,
-            paint: await paint(url, entries: entries, engine: engine))
+            prusa: c.prusa, layerRanges: c.layerRanges, paint: paint) else { return nil }
+        var out = Read(colours: colours)
+        if case .object(let p) = paint, p["unread"] == .bool(true) {
+            out.paintUnread = true
+            if case .number(let b)? = p["overBudget"] { out.overBudget = Int(b) }
+        }
+        return out
     }
 
     /// The colours a SLICE names, or nil when the file is not sliced.

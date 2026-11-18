@@ -300,6 +300,7 @@ verify. Per connector: 600 requests, 30 announces and 30 files an hour (429 with
 | `POST /api/connectors/slices` | sealed capture, ≤ 64 KB | 201 `{sliceId, state:"awaiting-file", uploadBy, dropped, intentHonoured?}`; 200 `{…, duplicate:true}` when the same bytes are waiting; 422 with the shared rule's `reason`/`field`; 409 `inbox-full` |
 | `PUT /api/connectors/slices/{sliceId}/file` | the raw file, exact `Content-Length`, `x-khayt-content-sha256` | 201 `{sliceId, state:"in-inbox"}`; 422 `hash-mismatch` (`retry` once) |
 | `GET /api/connectors/slices/{sliceId}` | none | `{sliceId, state}`: `awaiting-file`, `in-inbox`, `left-inbox`, `expired` |
+| `GET /api/connectors/queue` | none | 200 sealed `{v, at, shop:{name}, jobs:[{id, number, stage, machine, file}], machines:[{id, name, state}], inbox:{waiting}, more?}` with `ETag`; 304 on a matching `If-None-Match`; 1 per 10 s |
 
 **Sealed capture.** `{"v":1,"alg":"A256GCM","nonce":b64(12 bytes),"ct":b64(ciphertext ‖ 16-byte tag)}`
 under `HKDF-SHA256(K, salt "khayt-connector-seal-v1", info connectorId)`, AAD
@@ -325,8 +326,12 @@ Slice records (id, connector, state, hash, size, times; never a file name)
 are kept beside the inbox in `From slicer/.slices/`, swept at launch: a slice
 still waiting for its file when the app stopped is `expired`, and the plugin
 announces again.
-Vectors: `docs/connector-routes.vectors.json`. `GET /api/connectors/queue` comes
-next. The desktop (`lib/lan-server.js`) has none of this yet.
+**The queue** is `lib/connector-queue.js`: open jobs from `printLog`, each with
+its number, stage, machine name and `file` (only the name of a file THIS
+connector sent for that job; null otherwise). Never a title (a title can hold a
+client's name), a client, a price or a note. Sealed as the capture is, with AAD
+`"GET /api/connectors/queue"`; the ETag covers everything but `at`.
+Vectors: `docs/connector-routes.vectors.json`. The desktop (`lib/lan-server.js`) has none of this yet.
 
 ### `GET /api/library`, its thumbnails, and `POST /api/library/{id}/estimate` — pricing a model from the phone
 

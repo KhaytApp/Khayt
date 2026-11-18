@@ -124,12 +124,19 @@ enum SlicerInbox {
         return out.sorted { $0.arrived > $1.arrived }
     }
 
+    /// One filing at a time, whichever way the file came in. The duplicate
+    /// check and the 100-item cap read the folder, then the filing writes it:
+    /// two identical uploads arriving together both passed the check and were
+    /// both filed (beta.40 review). Held for the whole read-decide-write.
+    private static let filing = NSLock()
+
     /// Move `upload` into the inbox and write what is known about it.
     /// `origin`: a paired plugin's, with the hash it declared and the server
     /// checked while spooling; nil (OctoPrint) hashes the file here.
     static func file(_ upload: URL, name: String, figures: [String: JSONValue]?, root: URL,
                      now: Date = Date(), origin: SlicerOrigin? = nil) throws -> SlicerUpload {
         // lock: system — a slicer's upload through the LAN server, which checked its API key (or a paired plugin's signature); it only fills this Mac's own inbox folder.
+        filing.lock(); defer { filing.unlock() }
         let waiting = list(root: root)
         let hash = origin?.sha256 ?? sha256(of: upload)
         if let hash, let same = waiting.first(where: { $0.sha256 == hash }) { throw Duplicate(item: same) }

@@ -58,7 +58,7 @@ extension Shop {
     static let goToShelves: [Shelf] = [
         .dashboard, .jobs(nil), .board, .library(nil), .catalogue, .customers,
         .machines, .inventory, .expenses, .waste,
-        .reports, .portfolio, .calculator, .colour, .giftCards,
+        .reports, .portfolio, .calculator, .colour, .giftCards, .connectedApps,
     ]
 
     /// The screens this shop may open and the commands it may run right now,

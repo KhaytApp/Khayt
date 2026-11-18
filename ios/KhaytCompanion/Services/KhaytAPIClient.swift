@@ -1261,11 +1261,15 @@ final class KhaytAPIClient: ObservableObject {
         }
         var settings: [String: JSONValue] = [:]
         if case .object(let s)? = store["settings"] { settings = s }
+        // The job's customer is read from these: a quote they were messaged
+        // about is not a draft (`quoteIsDraft`, #2528).
+        var clients: [JSONValue] = []
+        if case .array(let c)? = store["clients"] { clients = c }
         // The shared edit (`applyJobEdit`), all or nothing: a typed price
         // below what was paid is REFUSED with its reason, never settled by
         // capping what was paid, and nothing is written.
         let edited = try await reader.sharedEngine().applyJobEdit(
-            order: row, fields: fields, settings: settings, priceSeenOk: priceSeenOk, now: now,
+            order: row, fields: fields, clients: clients, settings: settings, priceSeenOk: priceSeenOk, now: now,
             editId: BookWriter.lanId("edit", now: now), priceId: BookWriter.lanId("price", now: now))
         guard edited.ok else { throw BookWriter.JobEditRefused(reason: edited.reason, step: edited.step) }
         guard edited.changed, case .object(let after) = edited.order else { return false }
@@ -1471,9 +1475,11 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     func markupState(orderId: String) async -> MarkupState? {
-        guard let (row, _) = bookOrder(orderId), let reader,
+        guard let (row, _, clients) = bookOrder(orderId), let reader,
               let engine = try? await reader.sharedEngine(),
-              let lock = try? await engine.partsLock(row), lock.edit, !lock.nameOnly else { return nil }
+              // With the book's customers, so "asked first" matches the save
+              // (a quote its customer was messaged about is not a draft).
+              let lock = try? await engine.partsLock(row, clients: clients), lock.edit, !lock.nameOnly else { return nil }
         guard let pct = (try? await engine.marginOf(row)) ?? nil, pct.isFinite else { return nil }
         return MarkupState(percent: pct, askPrice: lock.askPrice)
     }
@@ -1483,17 +1489,19 @@ final class KhaytAPIClient: ObservableObject {
     /// markup makes before it is saved. As if the price question were
     /// answered yes — it is asked on Save. Throws the rule's refusal.
     func previewJobEdit(orderId: String, fields: [String: JSONValue], now: Date = Date()) async throws -> Double? {
-        guard let (row, settings) = bookOrder(orderId), let reader else { return nil }
+        guard let (row, settings, clients) = bookOrder(orderId), let reader else { return nil }
         let r = try await reader.sharedEngine().applyJobEdit(
-            order: row, fields: fields, settings: settings, priceSeenOk: true, now: now,
+            order: row, fields: fields, clients: clients, settings: settings, priceSeenOk: true, now: now,
             editId: "preview", priceId: "preview")
         guard r.ok else { throw BookWriter.JobEditRefused(reason: r.reason, step: r.step) }
         guard case .object(let o) = r.order, case .number(let price)? = o["price"] else { return nil }
         return price
     }
 
-    /// A job's row in this phone's book, and the book's settings.
-    private func bookOrder(_ orderId: String) -> (JSONValue, [String: JSONValue])? {
+    /// A job's row in this phone's book, the book's settings, and its
+    /// customers (the shared rule reads the job's customer from them: a quote
+    /// whose customer was messaged about it is not a draft, #2528).
+    private func bookOrder(_ orderId: String) -> (JSONValue, [String: JSONValue], [JSONValue])? {
         guard let book, book.exists, let store = try? book.read(),
               case .array(let rows)? = store["printLog"],
               let row = rows.first(where: {
@@ -1502,7 +1510,9 @@ final class KhaytAPIClient: ObservableObject {
               }) else { return nil }
         var settings: [String: JSONValue] = [:]
         if case .object(let s)? = store["settings"] { settings = s }
-        return (row, settings)
+        var clients: [JSONValue] = []
+        if case .array(let c)? = store["clients"] { clients = c }
+        return (row, settings, clients)
     }
 
     /// The models behind a job that may not be sold today (`LibraryCopy.saleProblems`).

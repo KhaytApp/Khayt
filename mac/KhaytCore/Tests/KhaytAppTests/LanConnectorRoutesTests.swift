@@ -310,9 +310,12 @@ struct LanConnectorRoutesTests {
         #expect(state.json["state"] as? String == "in-inbox")
         #expect(Set(state.json.keys) == ["sliceId", "state"], "no job details go back")
 
-        // The same file again: the item that holds it, not a second one.
+        // The same file again: the item that holds it, not a second one —
+        // and the shop is told (beta.40 review: it used to happen silently).
+        #expect(bench.slicerDuplicates.calls.isEmpty)
         let (dup, dupId) = try await Self.announce(bench, peer, Self.gcode)
         #expect(dup.status == 200 && dup.json["duplicate"] as? Bool == true)
+        #expect(bench.slicerDuplicates.calls == ["Bracket_PLA.gcode"])
         #expect(dupId == sliceId)
         #expect(SlicerInbox.list(root: root).count == 1)
 

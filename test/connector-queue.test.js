@@ -20,7 +20,7 @@ function book() {
       { id: 'm_2', name: 'Old Ender', status: 'retired' },
       { id: 'm_3', name: 'Bench P1S', isOffline: true },
     ],
-    orders: [
+    printLog: [
       { id: 'J-1001-ab12', jobNumber: 'J-1001', status: 'pending', queuePos: 2, machineId: 'm_1',
         clientId: 'c_1', clientName: CLIENT.name, clientPhone: CLIENT.phone, clientEmail: CLIENT.email,
         title: 'Keychains for Fatima Alharbi', project: 'Fatima Alharbi wedding', notes: 'secret note',
@@ -105,7 +105,7 @@ test('the shop name and inbox count are the caller\'s; time is the injected cloc
 });
 
 test('strings are cut and stripped of control characters', () => {
-  const b = { orders: [{ id: 'J-1', status: 'pending', jobNumber: 'J\u0000-1\u2028', fromSlicer: { connectorId: 'dev_conn_A', name: 'x'.repeat(500) } }] };
+  const b = { printLog: [{ id: 'J-1', status: 'pending', jobNumber: 'J\u0000-1\u2028', fromSlicer: { connectorId: 'dev_conn_A', name: 'x'.repeat(500) } }] };
   const j = snap(b).jobs[0];
   assert.equal(j.number, 'J-1');
   assert.equal(j.file.length, Q.MAX_TEXT);
@@ -113,14 +113,19 @@ test('strings are cut and stripped of control characters', () => {
 
 test('a huge queue is capped and says how many more', () => {
   const orders = Array.from({ length: Q.MAX_JOBS + 7 }, (_, i) => ({ id: `J-${i}`, status: 'pending', queuePos: i }));
-  const s = snap({ orders });
+  const s = snap({ printLog: orders });
   assert.equal(s.jobs.length, Q.MAX_JOBS);
   assert.equal(s.more, 7);
   assert.equal(snap().more, undefined);
 });
 
+test('jobs are read from printLog, where the book keeps them; an `orders` key is not a queue', () => {
+  const s = snap({ orders: [{ id: 'J-X', status: 'pending' }], printLog: [{ id: 'J-Y', status: 'pending' }] });
+  assert.deepEqual(s.jobs.map((j) => j.id), ['J-Y']);
+});
+
 test('a broken book gives an empty queue, not a throw', () => {
-  for (const b of [null, undefined, 42, [], { orders: 'x', machines: {} }, { orders: [null, 1, 'x'] }]) {
+  for (const b of [null, undefined, 42, [], { printLog: 'x', machines: {} }, { printLog: [null, 1, 'x'] }]) {
     const s = Q.snapshot(b, {});
     assert.deepEqual(s.jobs, []);
     assert.deepEqual(s.machines, []);

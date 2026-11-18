@@ -62,7 +62,7 @@ struct ConnectorEventTests {
             entry: entry, trigger: .event("order_shipped"), order: Self.order, customer: nil, settings: nil,
             secrets: ["webhookPath": "123/made-up"], engine: engine,
             post: { p in sent.posts.append(p); return (204, Data(#"{"id":"x"}"#.utf8)) },
-            now: Date(), delivery: "dlv_11111111-2222-4333-8444-555555555555")
+            now: Date(timeIntervalSince1970: 1_800_000_000), delivery: "dlv_11111111-2222-4333-8444-555555555555")
         #expect(outcome == .sent(.object([:])), "an event's answer was read into the book")
         let post = try #require(sent.posts.first)
         #expect(post.url.absoluteString == "https://discord.com/api/webhooks/123/made-up")
@@ -77,7 +77,7 @@ struct ConnectorEventTests {
         let (engine, entry) = try await Self.discord()
         let down = await Shop.connectorSend(entry: entry, trigger: .event("order_shipped"), order: Self.order, customer: nil, settings: nil,
                                             secrets: ["webhookPath": "1/x"], engine: engine,
-                                            post: { _ in (503, nil) }, now: Date(), delivery: "dlv_a")
+                                            post: { _ in (503, nil) }, now: Date(timeIntervalSince1970: 1_800_000_000), delivery: "dlv_a")
         #expect(down == .failed("HTTP 503", status: 503))
         let next = try await engine.webhookNext(status: 503, attempt: 1)
         #expect(next.retry && next.afterMs == 30_000)
@@ -87,7 +87,7 @@ struct ConnectorEventTests {
         let tried = Sent()
         let noKey = await Shop.connectorSend(entry: entry, trigger: .event("order_shipped"), order: Self.order, customer: nil, settings: nil,
                                              secrets: [:], engine: engine,
-                                             post: { p in tried.posts.append(p); return (200, nil) }, now: Date(), delivery: "dlv_b")
+                                             post: { p in tried.posts.append(p); return (200, nil) }, now: Date(timeIntervalSince1970: 1_800_000_000), delivery: "dlv_b")
         guard case .refused = noKey else { Issue.record("sent without its webhook path: \(noKey)"); return }
         #expect(tried.posts.isEmpty)
     }

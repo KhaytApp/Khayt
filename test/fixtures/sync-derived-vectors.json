@@ -1,0 +1,239 @@
+{
+  "about": "lib/sync.js applyDeltas at EQUAL rev for a printFiles record: what each device keeps when the incoming copy differs from the local one. Derived reader fields (colors, swapCount, swapsKnown, coloursReader, geometryReader, coloursUnreadBudget, coloursUnreadFile) are not an edit: a difference only there is never a conflict, and the higher reader's copy wins, then a full read over an over-budget one (coloursUnreadBudget/coloursUnreadFile), then the higher budget, then a stable compare. `keep` is 'incoming' or 'local'; `conflict` is whether a conflict is reported. Every app runs these through its engine.",
+  "cases": [
+    {
+      "why": "only the colours differ; incoming read by a higher reader",
+      "local": {
+        "name": "Bracket",
+        "colors": [
+          {
+            "hex": "#111111"
+          }
+        ],
+        "coloursReader": 3
+      },
+      "incoming": {
+        "name": "Bracket",
+        "colors": [
+          {
+            "hex": "#222222"
+          }
+        ],
+        "coloursReader": 4
+      },
+      "keep": "incoming",
+      "conflict": false
+    },
+    {
+      "why": "only the colours differ; local read by a higher reader",
+      "local": {
+        "name": "Bracket",
+        "colors": [
+          {
+            "hex": "#222222"
+          }
+        ],
+        "coloursReader": 5
+      },
+      "incoming": {
+        "name": "Bracket",
+        "colors": [
+          {
+            "hex": "#111111"
+          }
+        ],
+        "coloursReader": 4
+      },
+      "keep": "local",
+      "conflict": false
+    },
+    {
+      "why": "colour reader equal, geometry reader decides",
+      "local": {
+        "name": "B",
+        "coloursReader": 4,
+        "geometryReader": 1,
+        "swapCount": 2
+      },
+      "incoming": {
+        "name": "B",
+        "coloursReader": 4,
+        "geometryReader": 2,
+        "swapCount": 3
+      },
+      "keep": "incoming",
+      "conflict": false
+    },
+    {
+      "why": "a reader that never ran counts as 0",
+      "local": {
+        "name": "B",
+        "colors": []
+      },
+      "incoming": {
+        "name": "B",
+        "colors": [
+          {
+            "hex": "#333333"
+          }
+        ],
+        "coloursReader": 1
+      },
+      "keep": "incoming",
+      "conflict": false
+    },
+    {
+      "why": "the unread-budget fields alone differ, same readers: the full read wins (no conflict)",
+      "local": {
+        "name": "B",
+        "coloursReader": 5,
+        "coloursUnreadBudget": 900000000,
+        "coloursUnreadFile": "1:2"
+      },
+      "incoming": {
+        "name": "B",
+        "coloursReader": 5
+      },
+      "keep": "incoming",
+      "conflict": false
+    },
+    {
+      "why": "the same, seen from the other device: it keeps its full read",
+      "local": {
+        "name": "B",
+        "coloursReader": 5
+      },
+      "incoming": {
+        "name": "B",
+        "coloursReader": 5,
+        "coloursUnreadBudget": 900000000,
+        "coloursUnreadFile": "1:2"
+      },
+      "keep": "local",
+      "conflict": false
+    },
+    {
+      "why": "a real edit differs too: the ordinary tie-break, reported as a conflict",
+      "local": {
+        "name": "Bracket",
+        "coloursReader": 5,
+        "updatedAt": "2026-11-17T10:00:00Z"
+      },
+      "incoming": {
+        "name": "Bracket v2",
+        "coloursReader": 3,
+        "updatedAt": "2026-11-17T11:00:00Z"
+      },
+      "keep": "incoming",
+      "conflict": true
+    },
+    {
+      "why": "identical: a re-send",
+      "local": {
+        "name": "B",
+        "coloursReader": 4
+      },
+      "incoming": {
+        "name": "B",
+        "coloursReader": 4
+      },
+      "keep": "local",
+      "conflict": false
+    },
+    {
+      "why": "a 3-dot full read against a 1-dot over-budget copy at the same reader (a string compare would pick the 1-dot one): the full read wins, incoming side",
+      "local": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#FFFFFF"
+          }
+        ],
+        "swapCount": 0,
+        "coloursUnreadBudget": 900000000,
+        "coloursUnreadFile": "1500000000:1763370000000"
+      },
+      "incoming": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#AA0000"
+          },
+          {
+            "hex": "#BB0000"
+          },
+          {
+            "hex": "#CC0000"
+          }
+        ],
+        "swapCount": 2
+      },
+      "keep": "incoming",
+      "conflict": false
+    },
+    {
+      "why": "the same from the machine holding the full read: it keeps it",
+      "local": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#AA0000"
+          },
+          {
+            "hex": "#BB0000"
+          },
+          {
+            "hex": "#CC0000"
+          }
+        ],
+        "swapCount": 2
+      },
+      "incoming": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#FFFFFF"
+          }
+        ],
+        "swapCount": 0,
+        "coloursUnreadBudget": 900000000,
+        "coloursUnreadFile": "1500000000:1763370000000"
+      },
+      "keep": "local",
+      "conflict": false
+    },
+    {
+      "why": "both over budget: the higher budget wins",
+      "local": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#FFFFFF"
+          }
+        ],
+        "swapCount": 0,
+        "coloursUnreadBudget": 400000000,
+        "coloursUnreadFile": "1500000000:1763370000000"
+      },
+      "incoming": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#FFFFFF"
+          }
+        ],
+        "swapCount": 0,
+        "coloursUnreadBudget": 900000000,
+        "coloursUnreadFile": "1500000000:1763370000000"
+      },
+      "keep": "incoming",
+      "conflict": false
+    }
+  ]
+}

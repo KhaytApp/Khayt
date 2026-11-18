@@ -44,6 +44,7 @@ extension Shop {
             slicerUploads.insert(item, at: 0)
         } catch is SlicerInbox.Duplicate {
             refreshSlicerInbox()
+            slicerDuplicate = name
         }
     }
 
@@ -54,10 +55,40 @@ extension Shop {
     /// server to answer.
     func receiveConnectorUpload(_ file: URL, name: String, origin: SlicerOrigin) async throws -> SlicerUpload {
         guard let root = slicerInboxRoot else { throw CocoaError(.fileWriteNoPermission) }
-        let item = try await Self.fileSlicerUpload(file, name: name, root: root, engine: engine, origin: origin)
-        slicerUploads.removeAll { $0.id == item.id }
-        slicerUploads.insert(item, at: 0)
-        return item
+        do {
+            let item = try await Self.fileSlicerUpload(file, name: name, root: root, engine: engine, origin: origin)
+            slicerUploads.removeAll { $0.id == item.id }
+            slicerUploads.insert(item, at: 0)
+            await logSlicerArrival(item, origin: origin)
+            return item
+        } catch let same as SlicerInbox.Duplicate {
+            slicerDuplicate = name
+            throw same
+        }
+    }
+
+    /// One line in the team's activity log: "<file> · sent to the inbox by
+    /// <plugin>". The only thing a plugin's file writes to the book, and only
+    /// the log: no job, quote, client or spool. A book this Mac does not hold
+    /// right now (another Mac has it) gets no line; the file is in the inbox
+    /// either way.
+    func logSlicerArrival(_ item: SlicerUpload, origin: SlicerOrigin) async {
+        // lock: system — a paired slicer plugin's file arriving through the LAN server (its signature checked there); the only write is one activity row naming it.
+        guard let build = source.build else { return }
+        let actorName = ConnectedApps.name(origin.connectorName, words)
+        let text = Self.slicerArrivalText(item.name, plugin: actorName), ref = item.id
+        let actor = (id: "connector:" + origin.connectorId, name: actorName)
+        // Off the main thread, on the write chain: a whole-book write.
+        try? await StoreWriter.updateOffMain(build) { root in
+            let snapshot = root
+            Self.appendActivity(&root, text: text, ref: ref, settings: Self.settings(root), root: snapshot,
+                                action: "slicer_inbox", actor: actor)
+        }
+    }
+
+    /// The log line's detail: the file, then which plugin sent it.
+    nonisolated static func slicerArrivalText(_ file: String, plugin: String) -> String {
+        file + " · " + plugin
     }
 
     /// Throw one away — the file and its folder, nothing else.
@@ -101,8 +132,16 @@ extension Shop {
         SlicerInbox.remove(item, root: root)
         refreshSlicerInbox()
         if let asQuote {
-            slicerJobAfterSheet = (record, asQuote)
-            showingSlicerInbox = false
+            let carried = Self.slicerCarried(item)
+            if showingSlicerInbox {
+                slicerJobAfterSheet = (record, asQuote, carried)
+                showingSlicerInbox = false
+            } else {
+                // From the Connected apps screen there is no sheet to close
+                // first: the job opens now (it waited for a dismiss that never
+                // came, so New Job did nothing there).
+                await startJob(fromModels: [record], asQuote: asQuote, carried: carried)
+            }
         } else {
             slicerInboxSaid = words.callIt("mac.su_added", ["name": .string(record.title)])
         }
@@ -113,6 +152,18 @@ extension Shop {
         guard let pending = slicerJobAfterSheet else { return }
         slicerJobAfterSheet = nil
         shelf = .jobs(nil)
-        await startJob(fromModels: [pending.file], asQuote: pending.asQuote)
+        await startJob(fromModels: [pending.file], asQuote: pending.asQuote, carried: pending.carried)
+    }
+
+    /// What a job made from a paired plugin's file keeps of where it came
+    /// from (`lib/order-new.js fromSlicer`): the plugin's own file name shows
+    /// beside the job in that plugin's Khayt tab, and nowhere else. Nothing
+    /// for a file the OctoPrint path sent.
+    nonisolated static func slicerCarried(_ item: SlicerUpload) -> [String: JSONValue] {
+        guard item.source == "connector", let id = item.connectorId else { return [:] }
+        var origin: [String: JSONValue] = ["connectorId": .string(id), "name": .string(item.name)]
+        if let sha = item.sha256 { origin["sha256"] = .string(sha) }
+        if let slice = item.sliceId { origin["sliceId"] = .string(slice) }
+        return ["fromSlicer": .object(origin)]
     }
 }

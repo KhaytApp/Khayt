@@ -218,6 +218,9 @@ final class LanServer {
         /// (`LanServer+Connector`): beside the inbox, never in the book. Nil
         /// keeps them in memory only.
         var sliceFolder: URL? = nil
+        /// A slicer plugin announced a file whose bytes are already waiting in
+        /// the inbox (`LanServer+Connector`): the shop is told, nothing is added.
+        var slicerDuplicateSeen: @MainActor (_ name: String) -> Void = { _ in }
         /// What is waiting in the inbox now — for a plugin's dedupe and the
         /// inbox's state, never its contents.
         var slicerInbox: @MainActor () -> [SlicerUpload] = { [] }
@@ -2418,7 +2421,10 @@ final class LanServer {
             // delivery must be tried again, not refused as a replay for the
             // life of the replay window.
             forgetSeen(provided)
-            return .json(400, Self.errorBody(String(describing: error)))
+            // Not the error itself: its words can carry a path, a store field or
+            // a library's internals, and this answer goes to whoever called
+            // (beta.40 full review). The provider retries either way.
+            return .json(400, Self.errorBody("The event could not be recorded"))
         }
     }
 
@@ -2491,7 +2497,10 @@ final class LanServer {
             return .json(200, #"{"ok":true}"#)
         } catch {
             forgetSeen(provided)   // see storefrontHook: a failed delivery was never taken
-            return .json(400, Self.errorBody(String(describing: error)))
+            // Not the error itself: its words can carry a path, a store field or
+            // a library's internals, and this answer goes to whoever called
+            // (beta.40 full review). The provider retries either way.
+            return .json(400, Self.errorBody("The event could not be recorded"))
         }
     }
 
@@ -3221,6 +3230,7 @@ extension Shop {
             return try await self.receiveConnectorUpload(file, name: name, origin: origin)
         }
         host.slicerInbox = { [weak self] in self?.slicerUploads ?? [] }
+        host.slicerDuplicateSeen = { [weak self] name in self?.slicerDuplicate = name }
         if let root = slicerInboxRoot {
             host.sliceFolder = SlicerInbox.sliceRecords(root: root)
             host.slicerScratch = SlicerInbox.incoming(root: root)

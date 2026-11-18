@@ -1618,6 +1618,7 @@
   "audit.all_members": "Todos los miembros",
   "audit.system": "—",
   "audit.act_order_created": "Pedido creado",
+  "audit.act_slicer_inbox": "Enviado a la bandeja por un laminador",
   "audit.act_quote_created": "Presupuesto creado",
   "audit.act_status": "Estado cambiado",
   "set.logo": "Logotipo del negocio",
