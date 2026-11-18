@@ -5969,3 +5969,6 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .js-refused[hidden] { display: none; }
 .js-ask { max-width: 560px; width: 100%; }
 .js-ask .js-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; padding: 14px 18px; border-radius: var(--radius-sm); background: var(--surface-2, var(--bg)); }
+/* Job sheet, Price group (Figma 98:1269): extra charges edit in place. */
+.job-sheet .js-grow { flex: 1; min-width: 0; }
+.job-sheet .js-amt { font-variant-numeric: tabular-nums; font-family: var(--font-mono, inherit); }
