@@ -5473,6 +5473,8 @@
   "js.create_job": "ジョブを受ける",
   "js.save_quote": "見積もりとして保存",
   "js.sec_job": "ジョブ",
+  "js.colour_line": "色：{colour}",
+  "js.colour_unset": "色：未設定",
   "js.due_suggested": "キューから提案した日付です。別の日付で合意している場合は変更してください。",
   "js.capacity_note": "{machine} のキューが空くのは {date} で、この納期より後です",
   "js.capacity_hint": "このまま保存できます。案件ページから別のマシンに移すか、より後の日付を選んでください。",

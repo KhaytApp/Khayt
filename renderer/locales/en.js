@@ -5474,6 +5474,8 @@
   "js.create_job": "Take job",
   "js.save_quote": "Save as quote",
   "js.sec_job": "Job",
+  "js.colour_line": "colour: {colour}",
+  "js.colour_unset": "colour: not set",
   "js.due_suggested": "Suggested from the queue. Change it if you agreed another date.",
   "js.capacity_note": "The {machine} queue clears on {date}, after this due date",
   "js.capacity_hint": "You can still save. Move the job to another machine from its page, or pick a later date.",

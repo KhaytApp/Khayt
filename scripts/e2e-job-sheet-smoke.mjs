@@ -20,6 +20,9 @@
  *     the old total); taking shipping off a paid job is refused; a voided
  *     job's price is read-only; a percentage line shows what the rule made
  *     of it; the loyalty offer fills the discount.
+ *   - Part colour (Figma 102:1447): set on a seen-price job saves with no
+ *     question and no new price; a finished job may correct it; cleared, it
+ *     reads "not set".
  *   - Jobs › New job opens the same sheet empty: Take job waits for a part,
  *     records the job as the sheet priced it and opens its page; Save as
  *     quote records a quote.
@@ -93,6 +96,8 @@ try {
       base('JS-PCT', { status: 'quote', quoteShareStamped: true, statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }],
         extraLines: [{ id: 'EL-P', label: 'Design fee', pct: 10, amount: 34 }] }),
       base('JS-LOYAL', { clientId: 'C-LOYAL' }),
+      base('JS-COL', { dueDate: '2099-01-10' }),
+      base('JS-COLDONE', { status: 'completed', materialDeducted: true, costBasis: 100, dueDate: '2099-01-10' }),
     );
     clients.push({ id: 'C-LOYAL', nameEn: 'Loyal Example', phone: '+966500000001' });
     settings.customFields = [{ id: 'po', label: 'PO number' }];
@@ -354,6 +359,29 @@ try {
   await cancel(); await back();
   ok(!(await job('JS-LOYAL')).discountPct, 'Apply alone saves nothing');
   await window.evaluate(() => { settings.loyaltyEnabled = false; window.getClientTier = window.__tier; });
+
+  // ── Part colour (Figma 102:1447) ────────────────────────────────────────
+  const editColour = async (id, colour) => {
+    await openSheet(id);
+    await window.click('#modalMount [data-js-edit="0"]');
+    await window.fill('#modalMount [data-js="pColour"]', colour);
+    await window.click('#modalMount [data-js="pAdd"]');
+    const line = await window.textContent('#modalMount [data-js="parts"]');
+    await save();
+    await closed();
+    await window.click('#jobPage [data-jp="back"]');
+    return line;
+  };
+  const colLine = await editColour('JS-COL', 'Matte black');
+  ok(/colour: Matte black/.test(colLine), 'the part line shows the colour');
+  const col = await job('JS-COL');
+  ok(col.parts[0].colour === 'Matte black' && col.price === 340 && !col.priceSource, 'a seen-price job saves a colour with no question and no new price');
+  const colDone = await job('JS-COLDONE');
+  await editColour('JS-COLDONE', 'Gold');
+  const colDone2 = await job('JS-COLDONE');
+  ok(colDone2.parts[0].colour === 'Gold' && colDone2.price === colDone.price, 'a finished job may still correct a colour');
+  const cleared = await editColour('JS-COL', '');
+  ok(/colour: not set/.test(cleared) && (await job('JS-COL')).parts[0].colour === '', 'a cleared colour is saved as cleared and reads "not set"');
 
   const before = await window.evaluate(() => printLog.length);
   await switchTab(window, 'logs-tab');
