@@ -78,6 +78,11 @@ try {
         { id: 'A', amount: 373.34, dueDate: '2026-12-18', note: '', paid: true, paidAt: '2026-11-01' },
         { id: 'B', amount: 373.33, dueDate: '2027-01-18', note: '', paid: false, paidAt: null },
         { id: 'C', amount: 373.33, dueDate: '2027-02-18', note: '', paid: false, paidAt: null }] }),
+      // 560 recorded outside the plan (a phone payment, say): it covers row A whole.
+      job('JP-LUMP', { price: 2120, paidAmount: 1560, paymentStatus: 'partial', instalmentBase: 1000, instalments: [
+        { id: 'A', amount: 373.34, dueDate: '2026-12-18', note: '', paid: false, paidAt: null },
+        { id: 'B', amount: 373.33, dueDate: '2027-01-18', note: '', paid: false, paidAt: null },
+        { id: 'C', amount: 373.33, dueDate: '2027-02-18', note: '', paid: false, paidAt: null }] }),
       job('JP-USD', { currency: 'USD', fxRate: 3.75, price: 40, paidAmount: 0, paidAt: null, parts: [{ name: 'hook.stl', material: 'PLA', qty: 3, printWeight: 30, printTime: 1, baseCost: 75 }] }),
     );
     operators.push({ id: 'OP-N', name: 'Noura', active: true });
@@ -273,6 +278,27 @@ try {
   await window.click('.modal [data-act="save"]');
   await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-PLAN').notes === 'notes only', null, { timeout: 5_000 });
   ok((await plan()).paidAmount === 1300, 'a notes-only save in the old editor leaves a corrected payment (1,300) where it is');
+
+  // Money recorded outside the plan (Dev Hub option 1): allocate, the one rule.
+  await window.click('.modal [data-act="cancel"]').catch(() => {});
+  await window.waitForSelector('.modal', { state: 'detached', timeout: 5_000 }).catch(() => {});
+  await window.click('#jobPage [data-jp="back"]');
+  await openPage('JP-LUMP');
+  await window.click('#jobPage [data-jp="plan"]');
+  await window.waitForSelector('.modal .pp-dialog', { state: 'visible', timeout: 5_000 });
+  ok(/560\.00/.test(await window.textContent('.modal [data-pp="outside"]')), 'the dialog says 560 was recorded outside the plan');
+  ok(!!(await window.$('.modal [data-pp="cover"][data-i="0"]')) && !(await window.$('.modal [data-pp="record"][data-i="0"]')) && !!(await window.$('.modal [data-pp="record"][data-i="1"]')),
+    'row A (covered whole) offers "Covered by a payment already recorded", not Record payment; row B (in part) still records');
+  await window.click('.modal [data-pp="cover"][data-i="0"]');
+  await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-LUMP').instalments[0].paid === true, null, { timeout: 5_000 });
+  const lump = await window.evaluate(() => JSON.parse(JSON.stringify(printLog.find((o) => o.id === 'JP-LUMP'))));
+  ok(lump.paidAmount === 1560 && lump.instalments[0].recorded === true && lump.instalments[0].covered === true, 'covering A stamps it paid with no money moving (paid stays 1,560)');
+  await window.click('.modal [data-act="cancel"]');
+  await window.waitForSelector('.modal .pp-dialog', { state: 'detached', timeout: 5_000 });
+  await window.evaluate(() => openOrderEditor('JP-LUMP'));
+  await window.waitForSelector('.modal #oeOpenPlan', { state: 'attached', timeout: 5_000 });
+  ok(await window.evaluate(() => [...document.querySelectorAll('.modal .inst-amt-inp')].every((x) => x.disabled) && !document.querySelector('.modal #oeGenInstalments')),
+    'the old editor shows the plan read-only, with a button to the dialog');
 
   console.log('e2e-job-page: ok');
 

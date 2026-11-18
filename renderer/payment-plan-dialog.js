@@ -20,7 +20,7 @@
   const METHODS = ['cash', 'mada', 'transfer', 'stcpay', 'applepay', 'visa', 'other'];
   const byId = (id) => (typeof printLog !== 'undefined' ? printLog.find((o) => o && o.id === id) : null) || null;
   const ctxOf = () => ({ settings, today: localDateStr() });
-  const REASONS = ['over_owed', 'paid_row_locked', 'paid_needs_payment', 'bad_amount', 'over_billed', 'already_paid', 'quote', 'nothing_owed', 'voided', 'cancelled'];
+  const REASONS = ['over_owed', 'paid_row_locked', 'paid_needs_payment', 'bad_amount', 'over_billed', 'already_paid', 'quote', 'nothing_owed', 'voided', 'cancelled', 'use_recorded', 'not_covered'];
   // t() answers the KEY for a missing one, so `t(k) || x` never falls back: name the known reasons.
   const reasonText = (r) => t(REASONS.includes(r.reason) ? 'ppd.refused.' + r.reason : 'js.refused_other', { over: fmt(r.over || 0) });
   let fmt = (n) => String(n);
@@ -40,6 +40,9 @@
       return t('ppd.not_paid');
     };
 
+    /** Each row's state as the plan stands in the dialog (lib/payment-plan.js allocate: the one rule). */
+    const alloc = () => PP().allocate(Object.assign({}, order, { instalments: rows }));
+
     function trial() {
       const copy = JSON.parse(JSON.stringify(order));
       return PP().applyPlan(copy, rows, ctxOf());
@@ -47,8 +50,10 @@
 
     function draw() {
       const list = modal.querySelector('[data-pp="rows"]');
+      const states = alloc().rows;
       list.innerHTML = rows.length ? rows.map((r, i) => {
         const locked = !!r.paid;
+        const covered = states[i] && states[i].state === 'covered';
         return `<div class="js-part pp-row${locked ? ' is-paid' : ''}" data-i="${i}">
           <div class="pp-fields">
             <div class="js-part-name">${i + 1} · ${locked ? escapeHtml(t('ppd.due', { date: r.dueDate || '—' })) : ''}</div>
@@ -57,11 +62,13 @@
               <label class="js-field"><span>${escapeHtml(t('ppd.due_date'))}</span><input type="date" data-pp-due="${i}" value="${escapeHtml(r.dueDate || '')}"></label>
               <label class="js-field"><span>${escapeHtml(t('inst.note'))}</span><input type="text" data-pp-note="${i}" value="${escapeHtml(r.note || '')}"></label>
             </div>`}
-            <div class="js-hint">${escapeHtml(stateLine(r))}</div>
+            <div class="js-hint">${escapeHtml(covered ? t('ppd.covered') : stateLine(r))}</div>
           </div>
           <div class="js-part-acts">
             ${locked ? `<span class="js-amt">${escapeHtml(fmt(+r.amount || 0))}</span>` : `
-              <button type="button" class="linkish" data-pp="record" data-i="${i}">${escapeHtml(t('ppd.record'))}</button>
+              ${covered
+                ? `<button type="button" class="linkish" data-pp="cover" data-i="${i}">${escapeHtml(t('ppd.cover'))}</button>`
+                : `<button type="button" class="linkish" data-pp="record" data-i="${i}">${escapeHtml(t('ppd.record'))}</button>`}
               <button type="button" class="linkish" data-pp="remove" data-i="${i}">${escapeHtml(t('jpc.remove'))}</button>`}
           </div></div>`;
       }).join('') : `<p class="js-hint">${escapeHtml(t('ppd.empty'))}</p>`;
@@ -75,7 +82,25 @@
       line.textContent = r.ok ? t('ppd.adds_up', { open: fmt(open), owed: fmt(PP().owedNow(order, ctxOf())) }) : reasonText(r);
       line.classList.toggle('is-refused', !r.ok);
       modal.querySelector('[data-act="save"]').disabled = !r.ok;
-      modal.querySelector('[data-pp="left"]').textContent = fmt(open);
+      // Money recorded outside the plan pays the oldest payments first (allocate).
+      const outside = alloc().unallocated;
+      const out = modal.querySelector('[data-pp="outside"]');
+      out.textContent = outside > 0.005 ? t('ppd.outside', { amount: fmt(outside) }) : '';
+      out.hidden = !(outside > 0.005);
+      modal.querySelector('[data-pp="left"]').textContent = fmt(Math.max(0, PP().round2(open - Math.max(0, outside))));
+    }
+
+    /** A row paid for by money already recorded: stamped paid, no money moves (coverRow). */
+    function cover(i) {
+      const row = rows[i];
+      if (!row) return;
+      const saved = PP().applyPlan(order, rows, ctxOf());
+      if (!saved.ok) { toast(reasonText(saved), 'error', 6000); return; }
+      const r = PP().coverRow(order, row.id, ctxOf());
+      if (!r.ok) { toast(reasonText(r), 'error', 6000); return; }
+      saveAll();
+      rows = (order.instalments || []).map((x) => Object.assign({}, x));
+      draw();
     }
 
     /** Collect one row: the plan is saved first (applyPlan), then the payment is recorded (recordRowPayment). */
@@ -123,6 +148,7 @@
       bodyHtml: `<div class="job-sheet pp-dialog">
         <div class="js-sub">${escapeHtml(typeof jobRef === 'function' ? jobRef(order) : order.id)}${order.project ? ' · ' + escapeHtml(order.project) : ''}</div>
         <div class="js-parts" data-pp="rows"></div>
+        <p class="js-hint" data-pp="outside" hidden></p>
         <p class="js-hint pp-summary" data-pp="summary" role="status"></p>
         <div class="jp-actions">
           <button type="button" class="btn" data-pp="monthly">${escapeHtml(t('ppd.monthly'))}</button>
@@ -148,6 +174,7 @@
           if (b.dataset.pp === 'add') { rows.push({ id: uid('INS'), amount: 0, dueDate: '', note: '', paid: false, paidAt: null }); draw(); return; }
           if (b.dataset.pp === 'remove') { rows.splice(i, 1); draw(); return; }
           if (b.dataset.pp === 'record') { record(i); return; }
+          if (b.dataset.pp === 'cover') { cover(i); return; }
           if (b.dataset.pp === 'monthly') {
             const owed = PP().owedNow(order, ctxOf());
             if (owed <= 0) { toast(t((+order.price || 0) <= 0 ? 'inst.need_price' : 'inst.nothing_owed'), 'error'); return; }

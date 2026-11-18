@@ -18,9 +18,11 @@ for (const c of V.cases) {
   test(c.why, () => {
     const order = Object.assign(clone(V.base), clone(c.order));
     const before = clone(order);
-    const r = c.op === 'apply'
-      ? PP.applyPlan(order, clone(c.rows), ctx)
-      : PP.recordRowPayment(order, c.rowId, clone(c.payment), ctx);
+    const r = c.op === 'apply' ? PP.applyPlan(order, clone(c.rows), ctx)
+      : c.op === 'record' ? PP.recordRowPayment(order, c.rowId, clone(c.payment), ctx)
+      : c.op === 'cover' ? PP.coverRow(order, c.rowId, ctx)
+      : c.op === 'due' ? { ok: true, due: PP.dueRows(order, c.now).map((x) => x.id) }
+      : Object.assign({ ok: true }, PP.allocate(order));
     assert.equal(r.ok, c.want.ok, r.reason);
     if (!c.want.ok) {
       assert.equal(r.reason, c.want.reason);
@@ -46,11 +48,19 @@ for (const c of V.cases) {
       const tot = PP.collectionTotals({ price: order.price, paidAmount: order.paidAmount, instalments: order.instalments, instalmentBase: order.instalmentBase });
       assert.equal(tot.paidAmount, c.want.collectionTotalsPaid, 'collectionTotals keeps the legacy book\'s paidAmount: no rise, no drop');
     }
+    if (c.want.unallocated !== undefined) assert.equal(r.unallocated, c.want.unallocated, 'unallocated');
+    if (c.want.due) assert.deepEqual(r.due, c.want.due, 'the rows a reminder chases');
+    if (c.want.states) {
+      const got = Object.fromEntries(PP.allocate(order).rows.map((x) => [x.id, x.state]));
+      assert.deepEqual(got, c.want.states, 'each row\'s state (allocate)');
+    }
+    if (c.op === 'cover' || c.op === 'allocate' || c.op === 'due') assert.equal(order.paidAmount, before.paidAmount, 'no money moves');
     if (c.want.rowRecorded) {
       const row = order.instalments.find((x) => x.id === c.want.rowRecorded);
       assert.equal(PP.rowState(row), 'recorded');
-      assert.equal(order.paymentStatus, c.want.paymentStatus);
-      assert.ok(Array.isArray(r.effects) && r.effects.some((e) => e.type === 'save'), 'recordPayment\'s own effects come back for the host');
+      if (c.op === 'record') assert.equal(order.paymentStatus, c.want.paymentStatus);
+      if (c.op === 'record') assert.ok(Array.isArray(r.effects) && r.effects.some((e) => e.type === 'save'), 'recordPayment\'s own effects come back for the host');
+      if (c.op === 'cover') assert.equal(r.effects, undefined, 'a cover moves no money: no payment effects');
     }
   });
 }

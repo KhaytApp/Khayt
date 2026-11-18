@@ -1,5 +1,5 @@
 {
-  "about": "lib/payment-plan.js applyPlan and recordRowPayment (Dev Hub, Nov 18; old-editor retirement step 6). The plan is the schedule: applyPlan never touches paidAmount; a row is paid only by recordRowPayment, through lib/order-payment.js recordPayment. A row ticked paid in an older book (paid, no `recorded`) is 'legacy': paid and locked, never rewritten, and the job's paidAmount stays exactly as it is. Settings are empty (no tax). The Mac and the phone run this file. Money review (Nov 18): a plan freezes only on void or cancel; a payment also needs the job to owe at all (not a quote, not credited in full); a credit note or a ZATCA report freezes nothing while money is owed; a row of 0 or less is bad_amount; unchanged rows are copied through byte for byte.",
+  "about": "lib/payment-plan.js applyPlan and recordRowPayment (Dev Hub, Nov 18; old-editor retirement step 6). The plan is the schedule: applyPlan never touches paidAmount; a row is paid only by recordRowPayment, through lib/order-payment.js recordPayment. A row ticked paid in an older book (paid, no `recorded`) is 'legacy': paid and locked, never rewritten, and the job's paidAmount stays exactly as it is. Settings are empty (no tax). The Mac and the phone run this file. Money review (Nov 18): a plan freezes only on void or cancel; a payment also needs the job to owe at all (not a quote, not credited in full); a credit note or a ZATCA report freezes nothing while money is owed; a row of 0 or less is bad_amount; unchanged rows are copied through byte for byte. Allocation (Dev Hub option 1): money recorded outside the plan (paidAmount − instalmentBase − paid rows) covers the oldest unpaid rows first, whole rows only; one function (allocate) feeds the dialog, recordRowPayment (use_recorded) and the reminders (dueRows).",
   "base": {
     "id": "PP",
     "status": "pending",
@@ -567,6 +567,348 @@
         "rows": 2,
         "changed": false,
         "sameRows": true
+      }
+    },
+    {
+      "why": "a lump of 560 recorded outside the plan covers row A (373.34) whole and B only in part: A covered, B and C still owed",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1560,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "allocate",
+      "want": {
+        "ok": true,
+        "unallocated": 560,
+        "states": {
+          "A": "covered",
+          "B": "open",
+          "C": "open"
+        }
+      }
+    },
+    {
+      "why": "recording a covered row again is refused: the money is already on the books",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1560,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "record",
+      "rowId": "A",
+      "payment": {
+        "method": "cash"
+      },
+      "want": {
+        "ok": false,
+        "reason": "use_recorded"
+      }
+    },
+    {
+      "why": "\"Covered by a payment already recorded\" stamps A paid with no money moving",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1560,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "cover",
+      "rowId": "A",
+      "want": {
+        "ok": true,
+        "paidAmount": 1560,
+        "rowRecorded": "A",
+        "states": {
+          "A": "recorded",
+          "B": "open",
+          "C": "open"
+        }
+      }
+    },
+    {
+      "why": "B is not covered (only 186.66 of it), so it cannot be stamped",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1560,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "cover",
+      "rowId": "B",
+      "want": {
+        "ok": false,
+        "reason": "not_covered"
+      }
+    },
+    {
+      "why": "a refund after a row was covered: the row stays recorded, unallocated goes negative, nothing new is covered",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1200,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true,
+            "covered": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "allocate",
+      "want": {
+        "ok": true,
+        "unallocated": -173.34,
+        "states": {
+          "A": "recorded",
+          "B": "open",
+          "C": "open"
+        }
+      }
+    },
+    {
+      "why": "reminders chase only open rows: on 20 Jan, A is covered (not chased), B is due, C is not yet",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1560,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "due",
+      "now": "2027-01-20",
+      "want": {
+        "ok": true,
+        "due": [
+          "B"
+        ]
+      }
+    },
+    {
+      "why": "with the lump, the plan still saves: the covered row is not owed again",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1560,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "apply",
+      "rows": [
+        {
+          "id": "A",
+          "amount": 373.34,
+          "dueDate": "2026-12-18",
+          "note": "",
+          "paid": false,
+          "paidAt": null
+        },
+        {
+          "id": "B",
+          "amount": 373.33,
+          "dueDate": "2027-01-25",
+          "note": "moved",
+          "paid": false,
+          "paidAt": null
+        },
+        {
+          "id": "C",
+          "amount": 373.33,
+          "dueDate": "2027-02-18",
+          "note": "",
+          "paid": false,
+          "paidAt": null
+        }
+      ],
+      "want": {
+        "ok": true,
+        "paidAmount": 1560,
+        "rows": 3
+      }
+    },
+    {
+      "why": "a plan from before the base was kept covers nothing (its deposit cannot be told from plan money)",
+      "order": {
+        "paidAmount": 1560,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "paid": false
+          }
+        ]
+      },
+      "op": "allocate",
+      "want": {
+        "ok": true,
+        "unallocated": 0,
+        "states": {
+          "A": "open"
+        }
       }
     }
   ]

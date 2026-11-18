@@ -172,8 +172,9 @@ function buildNotifications() {
     for (const o of printLog) {
       if (!o || !Array.isArray(o.instalments) || !o.instalments.length) continue;
       if (typeof payStatus === 'function' && payStatus(o) === 'paid') continue;
-      const sched = o.instalments.map(ins => ({ dueDate: ins.dueDate, amount: ins.amount, paidAt: ins.paid ? 'x' : null }));
-      const due = KhaytPaymentPlan.dueInstallments(sched, today);
+      // The rows still owed (lib/payment-plan.js dueRows over allocate): a row
+      // already paid for by money recorded outside the plan is never chased.
+      const due = KhaytPaymentPlan.dueRows(o, today);
       if (!due.length) continue;
       const key = 'instdue:' + o.id;
       if (isDismissed(key)) continue;

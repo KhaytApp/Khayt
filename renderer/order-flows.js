@@ -1804,8 +1804,11 @@ function openOrderEditor(orderId) {
     <div data-simple-pro="paymentPlans" id="oeInstalmentsBlock" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
         <label style="margin:0; flex:1; font-size:12.5px; font-weight:600;">${escapeHtml(t('inst.title'))}</label>
-        <button class="btn ghost small" id="oeGenInstalments" type="button">${escapeHtml(t('inst.generate') || 'Generate plan')}</button>
-        <button class="btn ghost small" id="oeAddInstalment" type="button">${escapeHtml(t('inst.add'))}</button>
+        ${/* The plan is edited in the job page's payment plan dialog now
+             (lib/payment-plan.js applyPlan: over-owed, paid rows locked). Here
+             it is shown read-only and this editor never writes it (money
+             review, Nov 18). */''}
+        <button class="btn ghost small" id="oeOpenPlan" type="button">${escapeHtml(t('jp.plan'))}</button>
       </div>
       <div id="oeInstalmentList"></div>
     </div>
@@ -2084,17 +2087,16 @@ function openOrderEditor(orderId) {
           ${draft.instalments.map((ins, i) => `
             <div class="instalment-row${ins.paid ? ' paid' : ''}">
               <span class="inst-label">
-                <input type="text" class="inst-note-inp" data-ii="${i}"${ins.paid ? ' disabled' : ''} value="${escapeHtml(ins.note || '')}" placeholder="${escapeHtml(t('inst.note'))}" style="width:120px; font-size:12px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 6px; color:var(--text);">
+                <input type="text" class="inst-note-inp" data-ii="${i}" disabled value="${escapeHtml(ins.note || '')}" placeholder="${escapeHtml(t('inst.note'))}" style="width:120px; font-size:12px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 6px; color:var(--text);">
                 ${ins.dueDate ? `<span class="inst-due">${escapeHtml(ins.dueDate)}</span>` : ''}
               </span>
-              <input type="number" class="inst-amt-inp" data-ii="${i}"${ins.paid ? ' disabled' : ''} value="${ins.amount || ''}" min="0" step="0.01" style="width:80px; font-size:12px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 6px; color:var(--text);">
-              <input type="date" class="inst-due-inp" data-ii="${i}"${ins.paid ? ' disabled' : ''} value="${escapeHtml(ins.dueDate || '')}" style="font-size:11px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 4px; color:var(--text);">
+              <input type="number" class="inst-amt-inp" data-ii="${i}" disabled value="${ins.amount || ''}" min="0" step="0.01" style="width:80px; font-size:12px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 6px; color:var(--text);">
+              <input type="date" class="inst-due-inp" data-ii="${i}" disabled value="${escapeHtml(ins.dueDate || '')}" style="font-size:11px; border:1px solid var(--border); background:var(--surface-2); border-radius:4px; padding:2px 4px; color:var(--text);">
               ${/* No "Mark paid" here any more (Dev Hub, Nov 18): it ticked a row and the
                    save rewrote paidAmount with no payment behind it. A row is paid by
                    Record payment in the job page's payment plan (lib/payment-plan.js
                    recordRowPayment). A paid row is shown and locked, never removed. */''}
-              ${ins.paid ? `<span class="inst-paid-label">${escapeHtml(ins.recorded === true ? t('inst.paid') : t('ppd.paid_legacy', { date: ins.paidAt || '' }))}</span>`
-                : `<button class="btn danger small inst-rm-btn" data-ii="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>`}
+              ${ins.paid ? `<span class="inst-paid-label">${escapeHtml(ins.recorded === true ? t('inst.paid') : t('ppd.paid_legacy', { date: ins.paidAt || '' }))}</span>` : ''}
             </div>`).join('')}`;
         instListEl.querySelectorAll('.inst-note-inp').forEach(inp => { inp.addEventListener('input', () => { draft.instalments[+inp.dataset.ii].note = inp.value; }); });
         instListEl.querySelectorAll('.inst-amt-inp').forEach(inp => { inp.addEventListener('input', () => { draft.instalments[+inp.dataset.ii].amount = Math.max(0, +inp.value || 0); }); });
@@ -2104,6 +2106,7 @@ function openOrderEditor(orderId) {
         });
       }
       renderInstalments();
+      modal.querySelector('#oeOpenPlan')?.addEventListener('click', () => openPaymentPlanDialog(order.id));
       modal.querySelector('#oeAddInstalment')?.addEventListener('click', () => {
         draft.instalments.push({ id: uid('INS'), amount: 0, note: '', dueDate: '', paid: false, paidAt: null });
         renderInstalments();
@@ -2362,9 +2365,8 @@ function openOrderEditor(orderId) {
       order.courierName = draft.courierName || undefined;
       order.trackingNumber = draft.trackingNumber || undefined;
       order.deliveryAddress = draft.deliveryAddress || undefined;
-      order.instalments = draft.instalments.length > 0 ? draft.instalments.map(ins => ({ ...ins })) : undefined;
-      // Meaningless without a schedule, so it goes when the schedule does.
-      order.instalmentBase = draft.instalments.length > 0 ? draft.instalmentBase : undefined;
+      // The plan (instalments, instalmentBase) is not written here: it is saved
+      // by the payment plan dialog through lib/payment-plan.js applyPlan.
       // Feature 2: Persist actual timestamps
       const psaEl = document.getElementById('oePrintingStartedAt');
       const cmpEl = document.getElementById('oeCompletedAt');
