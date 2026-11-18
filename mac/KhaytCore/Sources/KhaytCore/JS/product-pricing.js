@@ -46,6 +46,43 @@ const printRates = () => {
  * @returns {{cost:number, basePrice:number, price:number, priceSource:string,
  *            parts:number, hours:number, grams:number}}
  */
+const RATE_KEYS = ['laborRate', 'prepTime', 'postTime', 'wearRate', 'powerDraw', 'elecRate', 'failureRate'];
+/** A rate field the product or part actually says (a number), not blank. */
+const said = (v) => v !== undefined && v !== null && v !== '' && Number.isFinite(+v);
+/** Whether the product is costed the new way: it carries its own `rates`. */
+function usesProductRates(product) {
+  const r = product && product.rates;
+  return !!(r && typeof r === 'object' && !Array.isArray(r));
+}
+/** The product's own rates, the fields it says. */
+function productRateDefaults(product) {
+  const r = (product && product.rates) || {};
+  const out = {};
+  for (const k of RATE_KEYS) if (said(r[k])) out[k] = +r[k];
+  return out;
+}
+/** A part without its blank rate fields, so the product's rate shows through. */
+function stripUnset(part) {
+  const p = Object.assign({}, part || {});
+  for (const k of RATE_KEYS) if (!said(p[k])) delete p[k];
+  return p;
+}
+/**
+ * The labour a product with its own rates carries ONCE:
+ * (prepTime + postTime) × laborRate × (1 + failureRate / 100), from the
+ * product's rates with the shop's defaults under them (KhaytPrintRates).
+ * 0 for a product without rates, or with `labourPerPart` (its labour is in
+ * each part then).
+ */
+function productLabourCost(product, opts) {
+  if (!usesProductRates(product) || product.labourPerPart === true) return 0;
+  const PRt = printRates();
+  const settings = (opts && opts.settings) || {};
+  const r = PRt ? PRt.withRates(productRateDefaults(product), { settings }) : productRateDefaults(product);
+  const hours = Math.max(0, +r.prepTime || 0) + Math.max(0, +r.postTime || 0);
+  return hours * Math.max(0, +r.laborRate || 0) * (1 + Math.max(0, +r.failureRate || 0) / 100);
+}
+
 function priceProduct(product, opts) {
   const d = product || {};
   opts = opts || {};
@@ -103,16 +140,32 @@ function priceProduct(product, opts) {
   // with; it is priced again only when somebody opens and saves it, on a
   // sheet that shows the figure it will save.
   const PRt = printRates();
+  // ── LABOUR ONCE PER PRODUCT (Turki, Nov 19; data model: Mac Figma p.18) ──
+  //
+  // A product WITH its own `rates` ({ laborRate, prepTime, postTime, wearRate,
+  // powerDraw, elecRate, failureRate }) is costed the new way: each part's
+  // material, wear and power by its own print time (a part's own rate wins,
+  // then the product's, then the shop's), and the labour, prep and assembly,
+  // ONCE for the product: (prep + post) × rate × (1 + failure / 100). With
+  // `labourPerPart: true` each part carries its labour again, as before.
+  // A 6-part product at 0.75 h × 90 cost 6 × 67.50 = 405; the work is 67.50.
+  //
+  // A product with NO `rates` (every product saved before this) is costed
+  // exactly as it was, labour in every part, until the shop presses "Use the
+  // new cost" (which gives it rates): nothing re-prices silently.
+  const own = usesProductRates(d);
+  const once = own && d.labourPerPart !== true;
   const partsCost = list.reduce((sum, raw) => {
-    const p = PRt ? PRt.withRates(raw, { settings: ctx.settings }) : raw;
+    const merged = own ? Object.assign({}, productRateDefaults(d), stripUnset(raw)) : raw;
+    const p = PRt ? PRt.withRates(merged, { settings: ctx.settings }) : merged;
     if (CC && typeof CC.partTotalCost === 'function') {
-      return sum + (+CC.partTotalCost(p, ctx) || 0);
+      return sum + (+CC.partTotalCost(p, ctx, once ? { labour: false } : undefined) || 0);
     }
     if (CC && typeof CC.computePartBaseCost === 'function') {
       return sum + (+CC.computePartBaseCost(p, ctx) || 0) * Math.max(1, +(p && p.qty) || 1);
     }
     return sum + (+(p && p.baseCost) || 0);
-  }, 0);
+  }, 0) + productLabourCost(d, ctx);
 
   // Non-printed components folded into the unit cost, for a product that is an
   // assembly rather than a single print. Same module as the per-part cost —
@@ -182,7 +235,7 @@ function pricingFields(product, opts) {
   return { baseCost: p.cost, basePrice: p.basePrice, price: p.price };
 }
 
-const api = { priceProduct, pricingFields };
+const api = { priceProduct, pricingFields, usesProductRates, productLabourCost };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 global.KhaytProductPricing = api;
 
