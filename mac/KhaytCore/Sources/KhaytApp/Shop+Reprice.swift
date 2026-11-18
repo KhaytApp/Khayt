@@ -1,0 +1,90 @@
+import Foundation
+import KhaytCore
+
+/// Price a job again from its parts (Turki, Nov 19: "no way to recalculate a
+/// price"; Figma Mac file p.19).
+///
+/// Once a price was kept as a typed one (typed in "Or set the price", kept on
+/// a seen quote, or kept by the rule for a price its parts do not explain) the
+/// markup could not be edited and clearing the price field sent nothing: there
+/// was no way back to the arithmetic. The shared rule (`lib/order-edit.js`
+/// `applyJobEdit { reprice }`, #2576) prices the job exactly as `newOrder`
+/// would from its parts at a markup, drops the typed price and logs the
+/// change, under the same locks as any price edit: a frozen job is refused,
+/// the price may not go below what was paid, and a price the customer has
+/// seen, or an issued proforma above the new price, is asked about first.
+extension Shop {
+
+    /// What a reprice would do, or why it cannot.
+    enum RepriceAnswer: Equatable {
+        /// The job as it would be saved, its price before and after, and the
+        /// markup the rule used.
+        case ready(order: JSONValue, was: Double, now: Double, markup: Double?)
+        /// Needs the shop's yes first: `ask_price` (the customer has seen the
+        /// price) or `milestones_issued` (a sent proforma asks for more).
+        case ask(String)
+        /// Refused, in the shop's words.
+        case refused(String)
+    }
+
+    /// The rule's answer for this job, on a copy; nothing is written.
+    nonisolated static func repriced(_ order: JSONValue, marginPct: Double?, priceSeenOk: Bool,
+                                     milestonesOk: Bool, clients: [JSONValue],
+                                     settings: [String: JSONValue], overheadPerHour: Double?,
+                                     engine: KhaytEngine, refusals: [String: String]) async -> RepriceAnswer {
+        let req: JSONValue = .object(marginPct.map { ["marginPct": .number($0)] } ?? [:])
+        guard let r = try? await engine.applyJobEdit(
+            order: order, fields: ["reprice": req], clients: clients, settings: settings,
+            priceSeenOk: priceSeenOk, milestonesOk: milestonesOk, overheadPerHour: overheadPerHour,
+            now: Date(), editId: uid("edit"), priceId: uid("edit")) else {
+            return .refused(refusals["unknown"] ?? "")
+        }
+        guard r.ok else {
+            let code = r.reason ?? "unknown"
+            if code == "ask_price" || code == "milestones_issued" { return .ask(code) }
+            return .refused(refusals["price." + code] ?? refusals[code] ?? refusals["unknown"] ?? code)
+        }
+        let was = plainNumber(asObject(order)?["price"]) ?? 0
+        let now = plainNumber(asObject(r.order)?["price"]) ?? was
+        return .ready(order: r.changed ? r.order : order, was: was, now: now, markup: r.marginPct)
+    }
+
+    /// The refusals a reprice can say: the price lock's and the parts rule's.
+    static func repriceRefusalWords(_ words: Words) -> [String: String] {
+        jobSaveRefusalWords(words)
+    }
+
+    /// The preview the sheet shows, as if the shop had said yes to every
+    /// question: the questions are asked on Save.
+    func previewReprice(_ id: Order.ID, marginPct: Double?) async -> RepriceAnswer? {
+        guard let engine, let row = orderRow(id) else { return nil }
+        return await Self.repriced(row, marginPct: marginPct, priceSeenOk: true, milestonesOk: true,
+                                   clients: clientRows, settings: settingsDict, overheadPerHour: overheadPerHour,
+                                   engine: engine, refusals: Self.repriceRefusalWords(words))
+    }
+
+    /// Reprice the job, inside the write, on the book as it is on disk.
+    /// Returns the rule's answer: `.ready` when it was written, `.ask` when the
+    /// shop must say yes first (nothing written), `.refused` with the reason.
+    @discardableResult
+    func reprice(_ id: Order.ID, marginPct: Double?, priceSeenOk: Bool,
+                 milestonesOk: Bool) async -> RepriceAnswer? {
+        guard permitted("orders", "edit") else { return nil }
+        let refusals = Self.repriceRefusalWords(words)
+        let overhead = overheadPerHour
+        var answer: RepriceAnswer?
+        let wrote = await writeToOneOrder(id, named: words.callIt("mac.rc_title"), as: .person("orders", "edit")) { order, engine, root in
+            let a = await Self.repriced(order, marginPct: marginPct, priceSeenOk: priceSeenOk,
+                                        milestonesOk: milestonesOk, clients: Self.rows(root, "clients"),
+                                        settings: Self.settings(root), overheadPerHour: overhead,
+                                        engine: engine, refusals: refusals)
+            answer = a
+            switch a {
+            case .ready(let out, _, _, _): return OneOrderEdit(order: out)
+            case .ask, .refused: return OneOrderEdit(order: order)
+            }
+        }
+        if !wrote, answer == nil { return nil }
+        return answer
+    }
+}

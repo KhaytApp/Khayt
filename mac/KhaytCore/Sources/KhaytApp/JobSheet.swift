@@ -85,6 +85,8 @@ struct JobSheet: View {
     @State private var askingPrice = false
     /// A new markup on a price the customer has seen: asked before it moves.
     @State private var askingMarkup = false
+    /// "Recalculate from parts" open (Figma Mac file p.19).
+    @State private var recalculating = false
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
     private var currency: String { (job?.currency.isEmpty == false ? job?.currency : nil) ?? shop.currency }
@@ -110,6 +112,14 @@ struct JobSheet: View {
         }
         .onAppear(perform: open)
         .task(id: Signature(form: form, parts: parts)) { await preview() }
+        .sheet(isPresented: $recalculating) {
+            RecalculateSheet(shop: shop, jobId: subject.id, currency: currency) { saved in
+                recalculating = false
+                // Saved: the price, markup and lines moved on disk. Read the
+                // job again so this sheet does not save the old price back.
+                if saved { started = false; open() }
+            }
+        }
         .confirmationDialog(shop.words.callIt("mac.parts_price_q"), isPresented: $askingPrice) {
             Button(shop.words.callIt("mac.parts_keep_price")) { commit(keepPrice: true) }
             Button(shop.words.callIt("mac.parts_use_new_price")) { commit(keepPrice: false) }
@@ -322,6 +332,16 @@ struct JobSheet: View {
                 TextField(shop.words.callIt("pe.price_override_ph"), text: $form.price)
                     .textFieldStyle(.roundedBorder).frame(width: 110).monospacedDigit()
                     .disabled(priceLocked)
+            }
+            GridRow {
+                Color.clear.frame(width: 1, height: 1)
+                // Back to the arithmetic: a typed or kept price had no way
+                // back (Turki, Nov 19). The shared rule's locks decide; a
+                // frozen job says why in the sheet.
+                Button(shop.words.callIt("mac.rc_link")) { recalculating = true }
+                    .buttonStyle(.link)
+                    .disabled(changed || parts.isEmpty || priceLocked)
+                    .help(changed ? shop.words.callIt("common.save") : "")
             }
             GridRow {
                 Color.clear.frame(width: 1, height: 1)
