@@ -5538,6 +5538,8 @@
   "js.create_job": "接单",
   "js.save_quote": "保存为报价",
   "js.sec_job": "订单",
+  "js.colour_line": "颜色：{colour}",
+  "js.colour_unset": "颜色：未设置",
   "js.due_suggested": "根据队列建议。如已约定其他日期，请修改。",
   "js.capacity_note": "{machine} 的队列在 {date} 才能完成，晚于此交期",
   "js.capacity_hint": "仍可保存。可在工作页面将其移到其他机器，或选择更晚的日期。",

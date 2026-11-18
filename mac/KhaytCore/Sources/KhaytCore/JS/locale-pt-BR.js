@@ -5539,6 +5539,8 @@
   "js.create_job": "Aceitar pedido",
   "js.save_quote": "Salvar como orçamento",
   "js.sec_job": "Pedido",
+  "js.colour_line": "cor: {colour}",
+  "js.colour_unset": "cor: não definida",
   "js.due_suggested": "Sugerida pela fila. Altere se combinou outra data.",
   "js.capacity_note": "A fila da {machine} termina em {date}, depois deste prazo",
   "js.capacity_hint": "Você ainda pode salvar. Mova o trabalho para outra máquina pela página dele ou escolha uma data posterior.",

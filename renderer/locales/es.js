@@ -5538,6 +5538,8 @@
   "js.create_job": "Aceptar trabajo",
   "js.save_quote": "Guardar como presupuesto",
   "js.sec_job": "Trabajo",
+  "js.colour_line": "color: {colour}",
+  "js.colour_unset": "color: sin definir",
   "js.due_suggested": "Sugerida según la cola. Cámbiala si acordaste otra fecha.",
   "js.capacity_note": "La cola de {machine} termina el {date}, después de esta fecha de entrega",
   "js.capacity_hint": "Puedes guardar igualmente. Mueve el trabajo a otra máquina desde su página o elige una fecha posterior.",

@@ -5538,6 +5538,8 @@
   "js.create_job": "İşi al",
   "js.save_quote": "Teklif olarak kaydet",
   "js.sec_job": "İş",
+  "js.colour_line": "renk: {colour}",
+  "js.colour_unset": "renk: belirtilmedi",
   "js.due_suggested": "Kuyruğa göre önerildi. Başka bir tarih kararlaştırdıysanız değiştirin.",
   "js.capacity_note": "{machine} kuyruğu {date} tarihinde boşalıyor, bu teslim tarihinden sonra",
   "js.capacity_hint": "Yine de kaydedebilirsiniz. İşi sayfasından başka bir makineye taşıyın veya daha sonraki bir tarih seçin.",
