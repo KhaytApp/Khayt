@@ -79,6 +79,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   pickAndSaveOrderFile:   (orderId) => ipcRenderer.invoke('hub:pick-and-save-order-file', orderId),
   openOrderFile:          (filename) => ipcRenderer.invoke('hub:open-order-file', filename),
   deleteOrderFile:        (filename) => ipcRenderer.invoke('hub:delete-order-file', filename),
+  // The job page's Remove: to the system Trash ('photo' | 'file' | 'vault'); { ok, gone?, error? }.
+  trashJobFile:           (kind, name) => ipcRenderer.invoke('hub:trash-job-file', kind, name),
   pickAndSaveProductDoc:  (productId) => ipcRenderer.invoke('hub:pick-and-save-product-doc', productId),
   openProductDoc:         (filename) => ipcRenderer.invoke('hub:open-product-doc', filename),
   deleteProductDoc:       (filename) => ipcRenderer.invoke('hub:delete-product-doc', filename),

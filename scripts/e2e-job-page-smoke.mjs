@@ -13,10 +13,24 @@
  *
  * Run: npm run test:e2e:jobpage
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { launchApp, dismissWizard, makeUserDataDir, switchTab } from './e2e/helpers.mjs';
 
 const ok = (c, m) => { if (!c) throw new Error('ASSERT FAILED: ' + m); console.log('  ✓ ' + m); };
-const { electronApp, window } = await launchApp(makeUserDataDir());
+// The job page cards (S1 step 4): a photo and two attached files on disk, and
+// a stand-in for the system Trash (main.js honours KHAYT_E2E_TRASH_DIR only in
+// an unpackaged build), so Remove can be seen to MOVE the file, not delete it.
+const userData = makeUserDataDir();
+const trashDir = path.join(userData, 'trash-stand-in');
+process.env.KHAYT_E2E_TRASH_DIR = trashDir;
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+fs.mkdirSync(path.join(userData, 'order-photos'), { recursive: true });
+fs.mkdirSync(path.join(userData, 'order-files'), { recursive: true });
+fs.writeFileSync(path.join(userData, 'order-photos', 'JP-CARDS-0-a.png'), Buffer.from(PNG, 'base64'));
+fs.writeFileSync(path.join(userData, 'order-files', 'JP-CARDS-a.stl'), 'solid a\nendsolid a\n');
+fs.writeFileSync(path.join(userData, 'order-files', 'JP-CARDS-b.stl'), 'solid b\nendsolid b\n');
+const { electronApp, window } = await launchApp(userData);
 let failed = false;
 
 const openPage = async (id) => {
@@ -52,6 +66,10 @@ try {
       job('JP-MS', { price: 2120, paidAmount: 1000, editHistory: [{ id: 'e', at: '2026-10-14T09:00:00Z', fields: { price: { from: 2000, to: 2120 } } }],
         milestoneInvoices: [{ id: 'MS-1', label: 'Deposit', percentage: 50, amount: 1000, issuedAt: '2026-10-08' },
           { id: 'MS-2', label: 'Balance', percentage: 50, amount: 1000, issuedAt: null }] }),
+      job('JP-CARDS', {
+        printPhotos: [{ thumb: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', filename: 'JP-CARDS-0-a.png', source: 'shop' }],
+        attachedFiles: [{ filename: 'JP-CARDS-a.stl', originalName: 'arm.stl', size: 18 }, { filename: 'JP-CARDS-b.stl', originalName: 'clip.stl', size: 18 }],
+      }),
       job('JP-USD', { currency: 'USD', fxRate: 3.75, price: 40, paidAmount: 0, paidAt: null, parts: [{ name: 'hook.stl', material: 'PLA', qty: 3, printWeight: 30, printTime: 1, baseCost: 75 }] }),
     );
     saveAll();
@@ -152,7 +170,44 @@ try {
   await window.waitForSelector('.modal', { state: 'visible', timeout: 5_000 });
   ok(true, 'Edit opens the existing job editor');
 
+  // ── Cards: photos, files, comments, connected apps (S1 step 4, Figma 103:1531) ──
+  // The editor Edit opened above closes first.
+  await window.click('.modal [data-act="cancel"]');
+  await window.waitForSelector('.modal', { state: 'detached', timeout: 5_000 });
+  await window.click('#jobPage [data-jp="back"]');
+  await openPage('JP-CARDS');
+  ok(await window.evaluate(() => !document.querySelector('#jobPage .jp-apps')), 'with connectors off, the Connected apps card renders nothing');
+  ok(await window.isVisible('#jobPage .jp-photos .jp-photo img'), 'the photo shows in the Photos card');
+  await window.click('#jobPage [data-jpc="rm-photo"]');
+  await window.waitForSelector('.modal [data-act="ok"]', { state: 'visible', timeout: 5_000 });
+  const askPhoto = await window.textContent('.modal');
+  ok(/Trash/.test(askPhoto) && /get it back/.test(askPhoto), 'Remove asks first, and says the photo goes to the Trash, where it can be got back');
+  await window.click('.modal [data-act="ok"]');
+  await window.waitForFunction(() => (printLog.find((o) => o.id === 'JP-CARDS').printPhotos || []).length === 0, null, { timeout: 5_000 });
+  ok(fs.existsSync(path.join(trashDir, 'JP-CARDS-0-a.png')) && !fs.existsSync(path.join(userData, 'order-photos', 'JP-CARDS-0-a.png')),
+    'the photo file was MOVED to the Trash, not deleted');
+  await window.click('#jobPage [data-jpc="rm-file"][data-i="0"]');
+  await window.waitForSelector('.modal [data-act="ok"]', { state: 'visible', timeout: 5_000 });
+  await window.click('.modal [data-act="ok"]');
+  await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-CARDS').attachedFiles.length === 1, null, { timeout: 5_000 });
+  ok(fs.existsSync(path.join(trashDir, 'JP-CARDS-a.stl')) && !fs.existsSync(path.join(userData, 'order-files', 'JP-CARDS-a.stl')), 'an attached file goes to the Trash too');
+  // A Trash that refuses (here: a folder already where the file would go).
+  fs.mkdirSync(path.join(trashDir, 'JP-CARDS-b.stl', 'blocker'), { recursive: true });
+  await window.click('#jobPage [data-jpc="rm-file"][data-i="0"]');
+  await window.waitForSelector('.modal [data-act="ok"]', { state: 'visible', timeout: 5_000 });
+  await window.click('.modal [data-act="ok"]');
+  await window.waitForFunction(() => /can.t be recovered/.test(document.querySelector('.modal')?.innerText || ''), null, { timeout: 5_000 });
+  ok(true, 'when the Trash refuses, it asks again, saying the file can\'t be recovered');
+  await window.click('.modal [data-act="ok"]');
+  await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-CARDS').attachedFiles.length === 0, null, { timeout: 5_000 });
+  ok(!fs.existsSync(path.join(userData, 'order-files', 'JP-CARDS-b.stl')), 'and only then deletes it for good');
+  await window.fill('#jobPage .jp-comments #commentInput', 'Matte finish on the arm');
+  await window.click('#jobPage .jp-comments #btnPostComment');
+  await window.waitForFunction(() => (printLog.find((o) => o.id === 'JP-CARDS').comments || []).length === 1, null, { timeout: 5_000 });
+  ok(/Matte finish on the arm/.test(await text('#jobPage .jp-comments')), 'a comment posted on the page is saved and shown');
+
   console.log('e2e-job-page: ok');
+
 } catch (err) {
   failed = true;
   console.error('e2e-job-page FAILED:', err && err.message);
