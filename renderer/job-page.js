@@ -228,7 +228,14 @@
     if (code === 'record_payment') { openPaymentModal(o.id); return; }
     if (code === 'send_quote') { openQuoteApprovalLinkModal(o.id); return; }
     if (code === 'hand_over') { markDelivered(o.id); render(); return; }
-    // Steps that ask a question the page does not ask yet: the job editor.
+    // The steps that ask a question open the desktop's own dialog for it, the
+    // one the board and the queue use (renderer/order-flows.js): on hold asks
+    // why, a failed check what failed, shipping the carrier and tracking. Each
+    // saves through saveAll, which redraws this page. They opened the old job
+    // editor (S1, Nov 18).
+    const dialog = { hold: global.holdOrder, fail_check: global.qcFailOrder, ship: global.openShipModal }[code];
+    if (typeof dialog === 'function') { dialog(o.id); return; }
+    // Anything else that asks a question the page does not ask yet: the job editor.
     if (!s.to || s.asks === 'hold' || s.asks === 'qc_fail') { openOrderEditor(o.id); return; }
     updateStatus(o.id, s.to);
     render();

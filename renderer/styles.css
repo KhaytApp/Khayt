@@ -5978,3 +5978,6 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .job-sheet .js-check input { width: auto; margin: 0; }
 .job-sheet .js-warn { background: var(--st-move-bg); border-color: var(--st-move-dot); color: var(--st-move-ink); }
 .js-totalbox .js-capfoot { color: var(--st-move-ink); max-width: 320px; }
+/* Job sheet, Price group (Figma 98:1269): extra charges edit in place. */
+.job-sheet .js-grow { flex: 1; min-width: 0; }
+.job-sheet .js-amt { font-variant-numeric: tabular-nums; font-family: var(--font-mono, inherit); }

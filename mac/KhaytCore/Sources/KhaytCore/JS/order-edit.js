@@ -1331,7 +1331,7 @@
     priorityFrom, priorityOf, changesBetween, recordEdit, applyEdit, adjustPrice,
     parseTags, repriceTerms, applyDetails, editLog, timeline,
     customerLocked, canChangeCustomer, changeCustomer,
-    partsLock, invoiceIssued, quoteIsDraft, marginOf, applyMarkup, applyParts, applyJobEdit, unexplainedShare,
+    partsLock, invoiceIssued, quoteIsDraft, marginOf, applyMarkup, applyParts, applyJobEdit, unexplainedShare, moneyMoves,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderEdit = api;
