@@ -867,8 +867,10 @@ function exportAccountingCSV() {
 /* ============================================================
    Round 12 — Feature 10: Per-job internal comment thread
    ============================================================ */
-function renderOrderComments(orderId) {
-  const el = $('#orderCommentsSection');
+// `host`: where to draw it. The old editor's section by default; the job page
+// passes its own Comments card (renderer/job-page-cards.js).
+function renderOrderComments(orderId, host) {
+  const el = host || $('#orderCommentsSection');
   if (!el) return;
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
@@ -910,7 +912,7 @@ function renderOrderComments(orderId) {
       createdAt: new Date().toISOString(),
     });
     saveAll();
-    renderOrderComments(orderId);
+    if (el.isConnected) renderOrderComments(orderId, el);
   });
 }
 

@@ -731,6 +731,46 @@ ipcMain.handle('hub:delete-order-file', async (_e, filename) => {
 
 ipcMain.handle('hub:reveal-order-files-folder', async () => shell.openPath(orderFilesDir()));
 
+// --- Moving a job's photo, attached file or job-folder copy to the Trash ---
+//
+// The job page removes at once (the old editor waited for Save, so its Cancel
+// was the undo). So the page MOVES the file to the system Trash, where the
+// owner can get it back, and only if that fails does it ask again and delete
+// for good through the handlers above (Dev Hub, Nov 18). The same confinement
+// as each delete handler: a bare name inside the photos or files folder, or a
+// path inside the job-folder root.
+//
+// KHAYT_E2E_TRASH_DIR, honoured only in an unpackaged build, stands in for
+// the Trash: the file is moved there, so a test can see it arrived without
+// filling the developer's real Trash.
+ipcMain.handle('hub:trash-job-file', async (_e, kind, name) => {
+  let full = null;
+  if (kind === 'photo') full = path.join(orderPhotosDir(), path.basename(String(name || '')));
+  else if (kind === 'file') full = path.join(orderFilesDir(), path.basename(String(name || '')));
+  else if (kind === 'vault') {
+    const safe = path.resolve(String(name || ''));
+    if (safe.startsWith(path.resolve(fileVaultDir()) + path.sep)) full = safe;
+  }
+  if (!name || !full) return { ok: false, error: 'not allowed' };
+  try { await fs.promises.lstat(full); } catch (e) {
+    if (e && e.code === 'ENOENT') return { ok: true, gone: true };  // already gone: the end state
+    return { ok: false, error: String(e && e.message || e) };
+  }
+  try {
+    const stand = !app.isPackaged && process.env.KHAYT_E2E_TRASH_DIR;
+    if (stand) {
+      await fs.promises.mkdir(stand, { recursive: true });
+      await fs.promises.rename(full, path.join(stand, path.basename(full)));
+    } else {
+      await shell.trashItem(full);
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error('hub:trash-job-file: could not move to the Trash, kept', full, e);
+    return { ok: false, error: String(e && e.message || e) };
+  }
+});
+
 // --- Product documents (assembly instructions, safety sheets, drawings) ------
 //
 // Attached to a PRODUCT rather than to a part or an order, and that is the whole

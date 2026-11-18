@@ -175,7 +175,8 @@
         <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.money'))}</h3>${moneyHtml(o, steps)}</section>
       </div>
       ${milestonesHtml(o)}
-      <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.activity'))}</h3>${activityHtml(o)}</section>`;
+      <section class="card jp-card"><h3 class="jp-card-head">${escapeHtml(t('jp.activity'))}</h3>${activityHtml(o)}</section>
+      ${global.KhaytJobPageCards ? global.KhaytJobPageCards.html(o) : ''}`;
   }
 
   function host() {
@@ -196,6 +197,8 @@
     const el = host();
     if (!o || !NS()) { closeJobPage(); return; }
     el.innerHTML = pageHtml(o);
+    // Photos, files, comments, updates, connected apps (renderer/job-page-cards.js).
+    if (global.KhaytJobPageCards) global.KhaytJobPageCards.after(el, o);
   }
 
   function openJobPage(id) {
