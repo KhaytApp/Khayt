@@ -82,7 +82,10 @@ struct PrintKitsTests {
         #expect(abs(kit.rollup.actualGrams - 290) < 0.005,
                 Comment(rawValue: "grams came to \(kit.rollup.actualGrams)"))
         #expect(kit.rollup.cost == 56)
-        #expect(kit.rollup.currency == "SAR")
+        // A kit's cost is the shop's currency (costBasis is the parts' baseCost
+        // in every job), so lib/print-kits.js leaves the label to the caller:
+        // Kits.swift shows `r.currency ?? shop.currency` (#2582).
+        #expect(kit.rollup.currency == nil)
         #expect(kit.complete, "every job is counted and measured; the kit is not finished")
     }
 
@@ -158,18 +161,19 @@ struct PrintKitsTests {
         #expect(abs(off - 9.1) < 0.05, Comment(rawValue: "delta came out \(off)%"))
     }
 
-    @Test("two currencies in a kit refuse to add rather than add wrongly")
+    @Test("jobs in two currencies still add up: their costs are all the shop's")
     func mixedCurrencyRefuses() async throws {
-        // "12 SAR + 3 EUR = 15 of nothing."
+        // costBasis is the parts' baseCost, the SHOP's figure whatever currency
+        // the customer paid in (newOrder converts the price, never the cost), so
+        // a EUR job's cost is riyals too and the kit adds (money review, #2582).
         let engine = try KhaytEngine()
         var jobs = Self.dragon
         jobs[1] = Self.job("O2", kit: "K1", estHours: 3, estGrams: 80,
                            actualHours: 3.2, actualGrams: 82, cost: 16, currency: "EUR")
         let kit = try #require(try await engine.kits(orders: jobs,
                                                      defs: [Self.def("K1", "Dragon")]).first)
-        #expect(kit.rollup.mixedCurrency)
-        #expect(kit.rollup.cost == nil, "two currencies were added together")
-        // The hours and grams are still real — only money has a currency.
+        #expect(!kit.rollup.mixedCurrency)
+        #expect(kit.rollup.cost == 56, "the shop's costs did not add up")
         #expect(abs(kit.rollup.actualHours - 12.0) < 0.005)
     }
 
