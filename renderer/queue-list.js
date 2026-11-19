@@ -203,8 +203,8 @@
       host.addEventListener('click', (e) => {
         if (!e.target.closest('button, a, input, select, textarea')) {
           const row = e.target.closest('.ql-row.is-openable');
-          if (row && host.contains(row) && typeof openOrderEditor === 'function') {
-            openOrderEditor(row.dataset.orderId);
+          if (row && host.contains(row) && typeof openJobPage === 'function') {
+            openJobPage(row.dataset.orderId);
             return;
           }
         }
@@ -226,7 +226,7 @@
         const row = e.target.closest('.ql-row.is-openable');
         if (!row || !host.contains(row)) return;
         e.preventDefault();
-        if (typeof openOrderEditor === 'function') openOrderEditor(row.dataset.orderId);
+        if (typeof openJobPage === 'function') openJobPage(row.dataset.orderId);
       });
     }
 

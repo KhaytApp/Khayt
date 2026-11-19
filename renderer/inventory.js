@@ -620,7 +620,7 @@ function routeKhaytScan(raw) {
     const order = scan.type === 'order'
       ? (printLog || []).find((o) => o.id === scan.id)
       : (printLog || []).find((o) => o.trackingToken === scan.token);
-    if (order && typeof openOrderEditor === 'function') openOrderEditor(order.id);
+    if (order && typeof openJobPage === 'function') openJobPage(order.id);
     else toast(t('scan.order_missing') || 'That order was not found.', 'error');
   }
   return true;

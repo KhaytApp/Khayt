@@ -252,7 +252,7 @@
       if (!b) return;
       const act = b.dataset.qpl;
       if (act === 'close') { closeSheet(); return; }
-      if (act === 'open-job') { closeSheet(); openOrderEditor(order.id); return; }
+      if (act === 'open-job') { closeSheet(); if (typeof openJobPage === 'function') openJobPage(order.id); return; }
       if (act === 'settings') { closeSheet(); openSettingsSection('store'); return; }
       if (act === 'copy') {
         const url = await sign();
