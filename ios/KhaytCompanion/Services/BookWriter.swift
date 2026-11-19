@@ -439,6 +439,10 @@ struct BookWriter {
         case noSuchOrder
         /// Recording it would owe a webhook or an email this phone cannot send.
         case paymentWouldReach([String])
+        /// The shop's payment rule refused it (`KhaytOrderPayment.recordPayment`
+        /// `refused`, e.g. `plan_recorded`: a total below what the job's payment
+        /// plan records as paid), in the rule's own words. Nothing was written.
+        case paymentRefused(String, String)
         /// An expense of nothing, which the endpoint answers 400.
         case noAmount
         /// A revision or a follow-up for a job that is no longer a quote.
@@ -468,6 +472,8 @@ struct BookWriter {
             case .paymentWouldReach(let channels):
                 let names = Set(channels.map { $0 == "email" ? L10n.tr("pay.reach.email") : L10n.tr("pay.reach.webhook") })
                 return L10n.format("pay.refused", ListFormatter.localizedString(byJoining: names.sorted()))
+            case .paymentRefused(_, let words):
+                return words
             case .noAmount:
                 return L10n.tr("error.amount_required")
             case .notAQuote:
@@ -916,6 +922,16 @@ struct BookWriter {
         let day = Self.localDay(now)
         let done = try await engine.recordPayment(order: order, amount: max(0, totalPaid), method: method,
                                                   paidAt: day, today: day, settings: settings)
+        // REFUSED: nothing written, and never "saved". Today the rule refuses a
+        // total below what the job's payment plan records as paid
+        // (`plan_recorded`, #2572); the sheet shows the rule's words, read
+        // from the shared catalogue in the app's language.
+        if let code = done.refused {
+            let key = done.refusedKey ?? "pay.\(code)"
+            let words = try? await engine.translations(language: L10n.engineLanguage)
+            let english = words?[key] == nil ? try? await engine.translations(language: "en") : nil
+            throw Refusal.paymentRefused(code, words?[key] ?? english?[key] ?? key)
+        }
         guard case .object(let paid) = done.order else { throw Refusal.noSuchOrder }
         try book.updateRecord(collection: "printLog", id: orderId) { record in
             for key in ["paidAmount", "paidGross", "paymentMethod", "paidAt", "paymentStatus"] {
