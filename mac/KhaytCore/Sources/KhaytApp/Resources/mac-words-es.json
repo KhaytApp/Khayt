@@ -4074,6 +4074,6 @@
  "mac.apps_deny": "Denegar",
  "mac.apps_timed_out": "Ningún laminador se emparejó a tiempo. Haz clic en Emparejar un laminador para volver a intentarlo.",
  "mac.apps_pin_unreadable": "No se pudo leer el PIN de la red local del llavero, así que no se emparejó nada. Vuelve a establecer el PIN arriba y empareja el laminador.",
- "mac.rc_parts_cost": "Coste de las piezas",
- "mac.rc_kept_hint": "Se mantiene como se escribió: {kept}. Las piezas suman ahora {price} con un margen del {pct} %."
+ "mac.rc_kept_hint": "Se mantiene como se escribió: {kept}. Las piezas suman ahora {price} con un margen del {pct} %.",
+ "mac.rc_cost": "Coste"
 }

@@ -90,6 +90,64 @@ import KhaytCore
         }
     }
 
+    /// A booked job the customer has seen, with a proforma for 250 sent: the
+    /// rule asks the seen price, then the proforma. The sheet answers the way
+    /// it does on screen, one yes per save, and must end at a price. Money
+    /// review, Nov 19: the second save dropped the first yes and was asked the
+    /// seen price again, forever.
+    @MainActor @Test("both questions answered: the second save carries the first yes")
+    func bothQuestions() async throws {
+        let engine = try KhaytEngine()
+        let v = try Self.vectors()
+        let settings = Self.obj(v["settings"])
+        let out = try await engine.newOrder(["parts": .array([v["part"] ?? .null]), "project": .string("R"),
+                                             "margin": settings["defaultMargin"] ?? .number(0), "asQuote": .bool(false)],
+                                            orders: [], settings: settings, now: Date(timeIntervalSince1970: 1_795_593_600),
+                                            tokens: (tracking: Array(repeating: 0, count: 16), quoteApproval: Array(repeating: 0, count: 16)))
+        var order = Self.obj(out.order)
+        order["price"] = .number(999); order["priceSource"] = .string("override")
+        order["priceOverride"] = .number(999); order["computedPrice"] = .number(999)
+        order["milestoneInvoices"] = .array([.object(["id": .string("M1"), "label": .string("Deposit"),
+                                                      "amount": .number(250), "issuedAt": .string("2026-11-18")])])
+        let words = Shop.repriceRefusalWords(Words())
+        var answered: Set<String> = []
+        var asked: [String] = []
+        var final: Shop.RepriceAnswer?
+        for _ in 0..<4 {
+            let yes = Shop.repriceYeses(answered)
+            let a = await Shop.repriced(.object(order), marginPct: nil, priceSeenOk: yes.priceSeen,
+                                        milestonesOk: yes.milestones, clients: [], settings: settings,
+                                        overheadPerHour: nil, engine: engine, refusals: words)
+            if case .ask(let code) = a { asked.append(code); answered.insert(code); continue }
+            final = a; break
+        }
+        #expect(asked == ["ask_price", "milestones_issued"])
+        guard case .ready(_, let was, let now, _)? = final else { Issue.record("never priced: \(String(describing: final))"); return }
+        #expect(was == 999 && now != 999)
+    }
+
+    /// The cost row is in the JOB's currency: `jobCost` is the shop's, so a USD
+    /// job taken at 3.75 divides by its own rate (money review, Nov 19).
+    @Test("the cost row is in the job's currency")
+    func costInJobCurrency() async throws {
+        let engine = try KhaytEngine()
+        let v = try Self.vectors()
+        let settings = Self.obj(v["settings"])
+        let out = try await engine.newOrder(["parts": .array([v["part"] ?? .null]), "project": .string("R"),
+                                             "margin": .number(30)],
+                                            orders: [], settings: settings, now: Date(),
+                                            tokens: (tracking: Array(repeating: 0, count: 16), quoteApproval: Array(repeating: 0, count: 16)))
+        var order = Self.obj(out.order)
+        let shopCost = try await engine.jobCost(.object(order))
+        #expect(shopCost > 0)
+        #expect(await Shop.repriceCost(.object(order), engine: engine) == shopCost)
+        order["currency"] = .string("USD"); order["fxRate"] = .number(3.75)
+        let shopCostUSDJob = try await engine.jobCost(.object(order))
+        let usd = try #require(await Shop.repriceCost(.object(order), engine: engine))
+        #expect(usd == ((shopCostUSDJob / 3.75) * 100).rounded() / 100)
+        #expect(usd != shopCostUSDJob)
+    }
+
     /// The sheet's mapping: questions are asked, refusals are said in words,
     /// a yes goes through. On the sample book, nothing written to disk.
     @MainActor @Test("the shop's answer: ask, refuse, ready")

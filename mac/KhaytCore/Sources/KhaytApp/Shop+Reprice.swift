@@ -49,6 +49,22 @@ extension Shop {
         return .ready(order: r.changed ? r.order : order, was: was, now: now, markup: r.marginPct)
     }
 
+    /// What the sheet sends for the questions answered so far. Both yeses go
+    /// together: the rule asks the seen price before a sent proforma, so a
+    /// save that carried only the latest yes was asked the first again.
+    nonisolated static func repriceYeses(_ answered: Set<String>) -> (priceSeen: Bool, milestones: Bool) {
+        (answered.contains("ask_price"), answered.contains("milestones_issued"))
+    }
+
+    /// The repriced job's cost in the JOB's currency. `lib/order-money.js
+    /// jobCost` is in the shop's currency; a USD job taken at 3.75 shows its
+    /// SAR cost divided by its own rate, as the job page does.
+    nonisolated static func repriceCost(_ order: JSONValue, engine: KhaytEngine) async -> Double? {
+        guard let shopCost = try? await engine.jobCost(order) else { return nil }
+        let fx: Double = { if case .number(let r)? = asObject(order)?["fxRate"], r > 0 { return r }; return 1 }()
+        return inJobCurrency(shopCost, fxRate: fx)
+    }
+
     /// The refusals a reprice can say: the price lock's and the parts rule's.
     static func repriceRefusalWords(_ words: Words) -> [String: String] {
         jobSaveRefusalWords(words)

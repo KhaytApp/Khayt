@@ -15,7 +15,11 @@ struct RecalculateSheet: View {
     @State private var preview: Shop.RepriceAnswer?
     @State private var asking: String?
     @State private var saving = false
-    @State private var partsCost: Double?
+    @State private var cost: Double?
+    /// Every question the shop has said yes to while this sheet is open. The
+    /// rule asks one at a time (the seen price, then a sent proforma), so the
+    /// second save must carry the first yes too, or it is asked again forever.
+    @State private var answered: Set<String> = []
 
     private var typedMarkup: Double? {
         let t = markup.trimmingCharacters(in: .whitespaces)
@@ -35,12 +39,12 @@ struct RecalculateSheet: View {
             switch preview {
             case .ready(_, let was, let now, _)?:
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                    // What the markup is put on (Figma 174:235): the repriced
-                    // job's cost by the shared rule, `lib/order-money.js jobCost`.
-                    if let partsCost {
+                    // The repriced job's cost (Figma 174:235) by the shared
+                    // rule, in the JOB's currency: `Shop.repriceCost`.
+                    if let cost {
                         GridRow {
-                            Text(shop.words.callIt("mac.rc_parts_cost"))
-                            Text(Money.text(partsCost, currency)).monospacedDigit().gridColumnAlignment(.trailing)
+                            Text(shop.words.callIt("mac.rc_cost"))
+                            Text(Money.text(cost, currency)).monospacedDigit().gridColumnAlignment(.trailing)
                         }
                     }
                     GridRow {
@@ -111,11 +115,12 @@ struct RecalculateSheet: View {
         try? await Task.sleep(for: .milliseconds(250))
         if Task.isCancelled { return }
         asking = nil
+        answered = []
         preview = await shop.previewReprice(jobId, marginPct: typedMarkup)
         if case .ready(let out, _, _, _)? = preview, let engine = shop.engine {
-            partsCost = try? await engine.jobCost(out)
+            cost = await Shop.repriceCost(out, engine: engine)
         } else {
-            partsCost = nil
+            cost = nil
         }
     }
 
@@ -123,9 +128,10 @@ struct RecalculateSheet: View {
     private func save(saidYes: String?) async {
         saving = true
         defer { saving = false }
+        if let saidYes { answered.insert(saidYes) }
+        let yes = Shop.repriceYeses(answered)
         let answer = await shop.reprice(jobId, marginPct: typedMarkup,
-                                        priceSeenOk: saidYes == "ask_price" || asking == "ask_price",
-                                        milestonesOk: saidYes == "milestones_issued" || asking == "milestones_issued")
+                                        priceSeenOk: yes.priceSeen, milestonesOk: yes.milestones)
         switch answer {
         case .ready?: done(true)
         case .ask(let code)?: asking = code

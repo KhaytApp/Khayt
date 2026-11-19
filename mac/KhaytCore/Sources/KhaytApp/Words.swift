@@ -3805,7 +3805,7 @@ final class Words {
         "mac.rc_link": ["en": "Recalculate from parts…", "ar": "إعادة الحساب من القطع…"],
         "mac.rc_title": ["en": "Recalculate from parts", "ar": "إعادة الحساب من القطع"],
         "mac.rc_markup_note": ["en": "% on the parts’ cost", "ar": "% على تكلفة القطع"],
-        "mac.rc_parts_cost": ["en": "Parts cost", "ar": "تكلفة القطع"],
+        "mac.rc_cost": ["en": "Cost", "ar": "التكلفة"],
         "mac.rc_kept_hint": ["en": "Kept as typed at {kept}. The parts now come to {price} at a {pct}% markup.", "ar": "أُبقي السعر كما أُدخل: {kept}. القطع الآن تساوي {price} بهامش {pct}%."],
         "mac.rc_price_now": ["en": "Price now", "ar": "السعر الحالي"],
         "mac.rc_new_price": ["en": "New price", "ar": "السعر الجديد"],

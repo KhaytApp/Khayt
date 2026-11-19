@@ -4074,6 +4074,6 @@
  "mac.apps_deny": "Refuser",
  "mac.apps_timed_out": "Aucun trancheur associé à temps. Cliquez sur Associer un trancheur pour réessayer.",
  "mac.apps_pin_unreadable": "Le code PIN du réseau local n’a pas pu être lu dans le trousseau : rien n’a été associé. Définissez de nouveau le code PIN ci-dessus, puis associez le trancheur.",
- "mac.rc_parts_cost": "Coût des pièces",
- "mac.rc_kept_hint": "Conservé tel que saisi : {kept}. Les pièces donnent maintenant {price} avec une marge de {pct} %."
+ "mac.rc_kept_hint": "Conservé tel que saisi : {kept}. Les pièces donnent maintenant {price} avec une marge de {pct} %.",
+ "mac.rc_cost": "Coût"
 }
