@@ -74,6 +74,9 @@ extension LanServer {
     nonisolated static let connectorSealSalt = "khayt-connector-seal-v1"
     /// A price request's facts, opened (plan: ≤ 8 KB).
     nonisolated static let connectorPriceMaxBytes = 8 * 1024
+    /// The same request sealed: 8 KB opened is under 11 KB as base64 in the
+    /// envelope, so anything over 12 KB is refused before it is decrypted.
+    nonisolated static let connectorPriceMaxSealedBytes = 12 * 1024
     nonisolated static let connectorEtagSalt = "khayt-connector-etag-v1"
     nonisolated static let connectorReplyPrefix = "khayt-reply-v1"
     /// The header a file upload names its body's hash in; the signature
@@ -515,7 +518,7 @@ extension LanServer {
     /// simply chose not to show prices. A device granted `price` never sees
     /// the cost or margin, though the rule always works them out.
     func connectorPrice(_ request: Request, path: String, caller: ConnectorCaller) async -> Response {
-        guard request.body.count <= Self.connectorMaxSealedBytes else {
+        guard request.body.count <= Self.connectorPriceMaxSealedBytes else {
             return .json(413, #"{"ok":false,"reason":"too-large"}"#)
         }
         let key = Self.sealKey(caller.key, connectorId: caller.id)

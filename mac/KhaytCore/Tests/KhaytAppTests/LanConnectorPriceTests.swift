@@ -188,6 +188,13 @@ struct LanConnectorPriceTests {
         #expect(refused.status == 403)
         let plain = try await LanConnectorRoutesTests.call(bench, peer, "POST", Self.path, body: f.facts)
         #expect(plain.status == 400)
+        // Over the sealed cap: refused before anything is decrypted.
+        let big = Data(repeating: 0x20, count: LanServer.connectorPriceMaxSealedBytes + 1)
+        let tooBig = try await LanConnectorRoutesTests.call(bench, peer, "POST", Self.path, body: big)
+        #expect(tooBig.status == 413)
+        // The largest facts the rule takes still fit once sealed.
+        let most = Data(repeating: 0x20, count: LanServer.connectorPriceMaxBytes)
+        #expect(LanConnectorRoutesTests.sealed(most, for: peer, path: Self.path).count <= LanServer.connectorPriceMaxSealedBytes)
     }
 
     @Test("a grant is stored per connector, and only a known grant")
