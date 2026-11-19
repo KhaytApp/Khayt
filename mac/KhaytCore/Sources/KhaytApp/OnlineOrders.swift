@@ -751,6 +751,7 @@ extension Shop {
     /// the shop pressed the button.
     func onlineJobInput(_ order: OnlineOrder) async -> [String: JSONValue] {
         var drafts: [NewJobSheet.Draft] = []
+        var onceCosts = ProductOnceCosts.none
         // For each draft: the line it came from and its count per ONE piece,
         // so `printOnly` can size it to what the shelf cannot cover.
         var origin: [(line: Int, perPiece: Int)?] = []
@@ -797,7 +798,11 @@ extension Shop {
             products += 1
             onlyProduct = products == 1 ? product : nil
             if products == 1 { margin = product.margin ?? defaultMargin }
-            for var part in await jobParts(from: product) {
+            let built = await jobFrom(product)
+            // Labour and packaging per piece, as the parts are, until the
+            // qty decision (Dev Hub #3).
+            onceCosts = onceCosts + built.once.times(line.qty)
+            for var part in built.parts {
                 // The product's part count is PER ONE. Six hoods is six times
                 // each of a hood's parts.
                 let perPiece = max(1, part.qty)
@@ -841,7 +846,7 @@ extension Shop {
             // productId would report the sale against the wrong catalogue row
             // — and bring that product's packaging and assembly with it.
             fromProduct: onlyProduct,
-            rule: rule)
+            rule: rule, onceCosts: onceCosts)
         // The product's components are PER ONE assembled piece, and the shared
         // deduction draws `qtyPerUnit × assemblyQty`. Six hoods take six sets
         // of magnets, not one.

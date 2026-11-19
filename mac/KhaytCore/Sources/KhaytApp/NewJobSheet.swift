@@ -221,6 +221,8 @@ struct NewJobSheet: View {
     /// What the product's components add (magnets, a box) — priced with the
     /// cart at cost plus margin, as the shared rule saves the job.
     @State private var componentsCost: Double = 0
+    /// The product's labour and packaging, once, at the job level (#2581).
+    @State private var onceCosts: ProductOnceCosts = .none
     /// How many assemblies the job makes: what the components are counted
     /// by (`lib/order-new.js`, `qtyPerUnit × assemblyQty`). Starts at the
     /// product's own, and the paper's Components line can change it.
@@ -328,7 +330,11 @@ struct NewJobSheet: View {
                 // COSTED, not just measured: see `Shop.jobParts`. The engine
                 // is asked once per part, so the cart fills in a beat later
                 // than the name — and the total with it.
-                Task { parts = await shop.jobParts(from: taken) }
+                Task {
+                    let built = await shop.jobFrom(taken)
+                    parts = built.parts
+                    onceCosts = built.once
+                }
                 assemblyQty = Shop.assemblyQty(of: taken)
                 Task { componentsCost = await shop.jobComponentsCost(of: taken, assemblyQty: Double(assemblyQty)) }
             }
@@ -1198,10 +1204,17 @@ struct NewJobSheet: View {
         // worked out at. They have to agree, so they are asked for together
         // rather than computed twice from the same inputs.
         defer { Task { await readComparables() } }
+        // A hand part beside a product that charges its labour once: whether
+        // it shares those is the shop's rule (`addedPartMark`), asked of this
+        // cart's once-costs BEFORE costing it.
+        let cart: JSONValue = .object(["labourCost": .number(product == nil ? 0 : onceCosts.labour),
+                                       "packagingCost": .number(product == nil ? 0 : onceCosts.packaging)])
+        let mark = await shop.handPartMark(cart)
+        if mark { next.raw["orderLevelCosts"] = .bool(true) }
         let costed = await shop.costedPart(spoolId: next.spoolId,
                                            grams: TypedNumber.parse(next.grams) ?? 0,
                                            hours: TypedNumber.parse(next.hours) ?? 0,
-                                           qty: next.qty)
+                                           qty: next.qty, extra: next.raw)
         next.cost = costed?.cost ?? 0
         next.parts = costed?.parts
         next.rates = costed?.rates
@@ -1293,6 +1306,7 @@ struct NewJobSheet: View {
             // The rate the preview was priced at, so the job is saved at the
             // price the sheet showed.
             overheadPerHour: shop.overheadPerHour,
+            onceCosts: product == nil ? .none : onceCosts,
             notes: notes, dueDate: promised && !asQuote ? Shop.localDay(promisedDay) : nil,
             priorityLevel: priority,
             carried: carried)
