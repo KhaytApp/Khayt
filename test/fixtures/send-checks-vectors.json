@@ -1,0 +1,926 @@
+{
+ "about": "lib/send-checks.js sendChecks(file, machine, loaded): the findings before a send (C8). `file.headerText` is a hand-written slicer header (never a customer file), read with gcode-parse.parsePrinterHeader; `loaded.ptc` is a U1 print_task_config read with loaded-colours.fromPrintTaskConfig, `loaded.loaded` slots set by hand. Synthetic.",
+ "cases": [
+  {
+   "why": "a clean send: fits, sliced for this printer, the loaded PLA black",
+   "file": {
+    "name": "plate.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n; printable_area = 0x0,270x0,270x270,0x270\n; printable_height = 270\n",
+    "filaments": [
+     {
+      "slot": 1,
+      "type": "PLA",
+      "colour": "#1E1E1E"
+     }
+    ],
+    "bounds": {
+     "x": 100,
+     "y": 100,
+     "z": 50
+    }
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": {
+    "ptc": {
+     "filament_color_rgba": [
+      "1E1E1EFF",
+      "FFFFFFFF",
+      "C0392BFF",
+      "000000FF"
+     ],
+     "filament_type": [
+      "PLA",
+      "PLA",
+      "PETG",
+      "NONE"
+     ],
+     "filament_sub_type": [
+      "",
+      "",
+      "",
+      ""
+     ],
+     "filament_exist": [
+      true,
+      false,
+      true,
+      true
+     ]
+    }
+   },
+   "want": []
+  },
+  {
+   "why": "type-unsupported (block): a plain model .stl to a Moonraker printer",
+   "file": {
+    "name": "model.stl"
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": [
+    {
+     "code": "type-unsupported",
+     "severity": "block",
+     "reason": "not_sliced",
+     "kind": null
+    }
+   ]
+  },
+  {
+   "why": "type-unsupported (block): a .3mf project to Moonraker (only Bambu runs a sliced project)",
+   "file": {
+    "name": "plate.gcode.3mf"
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": [
+    {
+     "code": "type-unsupported",
+     "severity": "block",
+     "reason": "wrong_kind",
+     "kind": "3mf"
+    }
+   ]
+  },
+  {
+   "why": "bed-footprint (block): 300 x 300 on a 270 bed, not even rotated",
+   "file": {
+    "name": "p.gcode",
+    "bounds": {
+     "x": 300,
+     "y": 300,
+     "z": 10
+    }
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": [
+    {
+     "code": "bed-footprint",
+     "severity": "block",
+     "over": {
+      "x": 30,
+      "y": 30,
+      "z": 0
+     }
+    }
+   ]
+  },
+  {
+   "why": "bed-height (block): 280 mm tall on a 270 mm U1",
+   "file": {
+    "name": "p.gcode",
+    "bounds": {
+     "x": 100,
+     "y": 100,
+     "z": 280
+    }
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": [
+    {
+     "code": "bed-height",
+     "severity": "block",
+     "over": {
+      "x": 0,
+      "y": 0,
+      "z": 10
+     }
+    }
+   ]
+  },
+  {
+   "why": "bed-rotate (warn): 300 x 200 on a 310 x 250 bed fits a quarter turn",
+   "file": {
+    "name": "p.gcode",
+    "bounds": {
+     "x": 200,
+     "y": 300,
+     "z": 10
+    }
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 310,
+     "y": 250,
+     "z": 300
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": [
+    {
+     "code": "bed-rotate",
+     "severity": "warn",
+     "over": {
+      "x": 0,
+      "y": 50,
+      "z": 0
+     }
+    }
+   ]
+  },
+  {
+   "why": "an unknown bed: no bed finding",
+   "file": {
+    "name": "p.gcode",
+    "bounds": {
+     "x": 999,
+     "y": 999,
+     "z": 999
+    }
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": null,
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": []
+  },
+  {
+   "why": "an unmeasured model: no bed finding",
+   "file": {
+    "name": "p.gcode"
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": []
+  },
+  {
+   "why": "sliced-for-other (warn): an Orca header for a Bambu A1, sent to the U1",
+   "file": {
+    "name": "p.gcode",
+    "headerText": "; printer_model = Bambu Lab A1\n; printable_area = 0x0,256x0,256x256,0x256\n; printable_height = 256\n"
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": [
+    {
+     "code": "sliced-for-other",
+     "severity": "warn",
+     "model": "Bambu Lab A1",
+     "bed": {
+      "x": 256,
+      "y": 256,
+      "z": 256
+     }
+    }
+   ]
+  },
+  {
+   "why": "sliced for a U1 sent to an A1: another model, and a bigger bed",
+   "file": {
+    "name": "p.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n; printable_area = 0x0,270x0,270x270,0x270\n; printable_height = 270\n"
+   },
+   "machine": {
+    "model": "Bambu Lab A1",
+    "toolheads": 1,
+    "bed": {
+     "x": 256,
+     "y": 256,
+     "z": 256
+    },
+    "printerApi": {
+     "type": "bambu"
+    }
+   },
+   "loaded": null,
+   "want": [
+    {
+     "code": "sliced-for-other",
+     "severity": "warn",
+     "model": "Snapmaker U1",
+     "bed": {
+      "x": 270,
+      "y": 270,
+      "z": 270
+     }
+    }
+   ]
+  },
+  {
+   "why": "the same model written differently (\"Snapmaker_U1\"): not another printer",
+   "file": {
+    "name": "p.gcode",
+    "headerText": "; printer_model = Snapmaker_U1\n"
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": []
+  },
+  {
+   "why": "material-mismatch (warn): PLA sliced for head 3, PETG loaded there",
+   "file": {
+    "name": "p.gcode",
+    "filaments": [
+     {
+      "slot": 3,
+      "type": "PLA",
+      "colour": "#C0392B"
+     }
+    ]
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": {
+    "ptc": {
+     "filament_color_rgba": [
+      "1E1E1EFF",
+      "FFFFFFFF",
+      "C0392BFF",
+      "000000FF"
+     ],
+     "filament_type": [
+      "PLA",
+      "PLA",
+      "PETG",
+      "NONE"
+     ],
+     "filament_sub_type": [
+      "",
+      "",
+      "",
+      ""
+     ],
+     "filament_exist": [
+      true,
+      false,
+      true,
+      true
+     ]
+    }
+   },
+   "want": [
+    {
+     "code": "material-mismatch",
+     "severity": "warn",
+     "slot": 3,
+     "want": {
+      "type": "PLA",
+      "colour": "#C0392B"
+     },
+     "have": {
+      "material": "PETG",
+      "colour": "#C0392B"
+     }
+    }
+   ]
+  },
+  {
+   "why": "colour-far (warn): PLA white sliced for head 1, PLA black loaded",
+   "file": {
+    "name": "p.gcode",
+    "filaments": [
+     {
+      "slot": 1,
+      "type": "PLA",
+      "colour": "#FFFFFF"
+     }
+    ]
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": {
+    "ptc": {
+     "filament_color_rgba": [
+      "1E1E1EFF",
+      "FFFFFFFF",
+      "C0392BFF",
+      "000000FF"
+     ],
+     "filament_type": [
+      "PLA",
+      "PLA",
+      "PETG",
+      "NONE"
+     ],
+     "filament_sub_type": [
+      "",
+      "",
+      "",
+      ""
+     ],
+     "filament_exist": [
+      true,
+      false,
+      true,
+      true
+     ]
+    }
+   },
+   "want": [
+    {
+     "code": "colour-far",
+     "severity": "warn",
+     "slot": 1,
+     "want": {
+      "type": "PLA",
+      "colour": "#FFFFFF"
+     },
+     "have": {
+      "material": "PLA",
+      "colour": "#1E1E1E"
+     },
+     "deltaE": 83.2
+    }
+   ]
+  },
+  {
+   "why": "head-not-reported (info): head 2 has filament_exist:false, never a mismatch",
+   "file": {
+    "name": "p.gcode",
+    "filaments": [
+     {
+      "slot": 2,
+      "type": "PETG",
+      "colour": "#00FF00"
+     }
+    ]
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": {
+    "ptc": {
+     "filament_color_rgba": [
+      "1E1E1EFF",
+      "FFFFFFFF",
+      "C0392BFF",
+      "000000FF"
+     ],
+     "filament_type": [
+      "PLA",
+      "PLA",
+      "PETG",
+      "NONE"
+     ],
+     "filament_sub_type": [
+      "",
+      "",
+      "",
+      ""
+     ],
+     "filament_exist": [
+      true,
+      false,
+      true,
+      true
+     ]
+    }
+   },
+   "want": [
+    {
+     "code": "head-not-reported",
+     "severity": "info",
+     "slot": 2
+    }
+   ]
+  },
+  {
+   "why": "head-not-reported (info): head 4 reports type NONE, never a mismatch",
+   "file": {
+    "name": "p.gcode",
+    "filaments": [
+     {
+      "slot": 4,
+      "type": "ABS",
+      "colour": "#FF0000"
+     }
+    ]
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": {
+    "ptc": {
+     "filament_color_rgba": [
+      "1E1E1EFF",
+      "FFFFFFFF",
+      "C0392BFF",
+      "000000FF"
+     ],
+     "filament_type": [
+      "PLA",
+      "PLA",
+      "PETG",
+      "NONE"
+     ],
+     "filament_sub_type": [
+      "",
+      "",
+      "",
+      ""
+     ],
+     "filament_exist": [
+      true,
+      false,
+      true,
+      true
+     ]
+    }
+   },
+   "want": [
+    {
+     "code": "head-not-reported",
+     "severity": "info",
+     "slot": 4
+    }
+   ]
+  },
+  {
+   "why": "5 slots on a 4-head U1: the fifth is a mismatch with nothing to load it on",
+   "file": {
+    "name": "p.gcode",
+    "filaments": [
+     {
+      "slot": 1,
+      "type": "PLA",
+      "colour": "#1E1E1E"
+     },
+     {
+      "slot": 2,
+      "type": "PLA",
+      "colour": "#1E1E1E"
+     },
+     {
+      "slot": 3,
+      "type": "PLA",
+      "colour": "#1E1E1E"
+     },
+     {
+      "slot": 4,
+      "type": "PLA",
+      "colour": "#1E1E1E"
+     },
+     {
+      "slot": 5,
+      "type": "PLA",
+      "colour": "#1E1E1E"
+     }
+    ]
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": {
+    "ptc": {
+     "filament_color_rgba": [
+      "1E1E1EFF",
+      "FFFFFFFF",
+      "C0392BFF",
+      "000000FF"
+     ],
+     "filament_type": [
+      "PLA",
+      "PLA",
+      "PETG",
+      "NONE"
+     ],
+     "filament_sub_type": [
+      "",
+      "",
+      "",
+      ""
+     ],
+     "filament_exist": [
+      true,
+      false,
+      true,
+      true
+     ]
+    }
+   },
+   "want": [
+    {
+     "code": "material-mismatch",
+     "severity": "warn",
+     "slot": 3,
+     "want": {
+      "type": "PLA",
+      "colour": "#1E1E1E"
+     },
+     "have": {
+      "material": "PETG",
+      "colour": "#C0392B"
+     }
+    },
+    {
+     "code": "material-mismatch",
+     "severity": "warn",
+     "slot": 5,
+     "want": {
+      "type": "PLA",
+      "colour": "#1E1E1E"
+     },
+     "have": null
+    },
+    {
+     "code": "head-not-reported",
+     "severity": "info",
+     "slot": 2
+    },
+    {
+     "code": "head-not-reported",
+     "severity": "info",
+     "slot": 4
+    }
+   ]
+  },
+  {
+   "why": "a printer that reports nothing loaded: no filament findings at all",
+   "file": {
+    "name": "p.gcode",
+    "filaments": [
+     {
+      "slot": 1,
+      "type": "PLA",
+      "colour": "#FFFFFF"
+     }
+    ]
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": {
+    "loaded": []
+   },
+   "want": []
+  },
+  {
+   "why": "loaded set by hand on a one-head printer: PLA black vs a PETG file",
+   "file": {
+    "name": "p.gcode",
+    "filaments": [
+     {
+      "slot": 1,
+      "type": "PETG",
+      "colour": "#1E1E1E"
+     }
+    ]
+   },
+   "machine": {
+    "model": "Bambu Lab A1",
+    "toolheads": 1,
+    "bed": {
+     "x": 256,
+     "y": 256,
+     "z": 256
+    },
+    "printerApi": {
+     "type": "bambu"
+    }
+   },
+   "loaded": {
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "#1E1E1E",
+      "material": "PLA Basic"
+     }
+    ]
+   },
+   "want": [
+    {
+     "code": "material-mismatch",
+     "severity": "warn",
+     "slot": 1,
+     "want": {
+      "type": "PETG",
+      "colour": "#1E1E1E"
+     },
+     "have": {
+      "material": "PLA Basic",
+      "colour": "#1E1E1E"
+     }
+    }
+   ]
+  },
+  {
+   "why": "everything at once, worst first: block, then warn by slot, then info",
+   "file": {
+    "name": "p.gcode",
+    "headerText": "; printer_model = Bambu Lab A1\n; printable_area = 0x0,256x0,256x256,0x256\n; printable_height = 256\n",
+    "bounds": {
+     "x": 300,
+     "y": 200,
+     "z": 100
+    },
+    "filaments": [
+     {
+      "slot": 1,
+      "type": "PLA",
+      "colour": "#1E1E1E"
+     },
+     {
+      "slot": 2,
+      "type": "PLA",
+      "colour": "#FFFFFF"
+     },
+     {
+      "slot": 3,
+      "type": "PLA",
+      "colour": "#C0392B"
+     },
+     {
+      "slot": 4,
+      "type": "PLA",
+      "colour": "#000000"
+     },
+     {
+      "slot": 5,
+      "type": "PLA",
+      "colour": "#00FF00"
+     }
+    ]
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": {
+    "ptc": {
+     "filament_color_rgba": [
+      "1E1E1EFF",
+      "FFFFFFFF",
+      "C0392BFF",
+      "000000FF"
+     ],
+     "filament_type": [
+      "PLA",
+      "PLA",
+      "PETG",
+      "NONE"
+     ],
+     "filament_sub_type": [
+      "",
+      "",
+      "",
+      ""
+     ],
+     "filament_exist": [
+      true,
+      false,
+      true,
+      true
+     ]
+    }
+   },
+   "want": [
+    {
+     "code": "bed-footprint",
+     "severity": "block",
+     "over": {
+      "x": 30,
+      "y": 0,
+      "z": 0
+     }
+    },
+    {
+     "code": "sliced-for-other",
+     "severity": "warn",
+     "model": "Bambu Lab A1",
+     "bed": {
+      "x": 256,
+      "y": 256,
+      "z": 256
+     }
+    },
+    {
+     "code": "material-mismatch",
+     "severity": "warn",
+     "slot": 3,
+     "want": {
+      "type": "PLA",
+      "colour": "#C0392B"
+     },
+     "have": {
+      "material": "PETG",
+      "colour": "#C0392B"
+     }
+    },
+    {
+     "code": "material-mismatch",
+     "severity": "warn",
+     "slot": 5,
+     "want": {
+      "type": "PLA",
+      "colour": "#00FF00"
+     },
+     "have": null
+    },
+    {
+     "code": "head-not-reported",
+     "severity": "info",
+     "slot": 2
+    },
+    {
+     "code": "head-not-reported",
+     "severity": "info",
+     "slot": 4
+    }
+   ]
+  }
+ ]
+}

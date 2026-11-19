@@ -321,6 +321,38 @@ function edges(s) {
   return s.slice(0, headEnd) + '\n' + s.slice(s.length - EDGE_BYTES);
 }
 
+/**
+ * Which printer a file was sliced for, from its own header: `{ printerModel,
+ * bed: {x, y, z} }`, each null when the slicer did not say. Orca, Bambu
+ * Studio and PrusaSlicer write `printer_model`, and the bed as
+ * `printable_area` (Orca, Bambu) or `bed_shape` (PrusaSlicer), "0x0,270x0,
+ * 270x270,0x270", with `printable_height` / `max_print_height`. The bed is
+ * the polygon's span. Read within the same head/foot window as every other
+ * figure here (send-time checks, C8).
+ */
+function parsePrinterHeader(text) {
+  const s = edges(String(text || ''));
+  const model = commentValue(s, 'printer_model');
+  const area = commentValue(s, 'printable_area') || commentValue(s, 'bed_shape');
+  const height = numberList(commentValue(s, 'printable_height') || commentValue(s, 'max_print_height'))[0];
+  let bed = null;
+  if (area) {
+    const xs = [], ys = [];
+    // A bed outline is a handful of corners. A header with thousands is not
+    // one, and spreading them into Math.max would overflow: the first 64.
+    for (const pt of area.slice(0, 4096).split(',').slice(0, 64)) {
+      const m = /^\s*(-?\d+(?:\.\d+)?)x(-?\d+(?:\.\d+)?)\s*$/.exec(pt);
+      if (m) { xs.push(+m[1]); ys.push(+m[2]); }
+    }
+    if (xs.length >= 3) {
+      const x = Math.max(...xs) - Math.min(...xs), y = Math.max(...ys) - Math.min(...ys);
+      if (x > 0 && y > 0) bed = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, z: height > 0 ? height : 0 };
+    }
+  }
+  const printerModel = model ? model.replace(/^"|"$/g, '').trim() || null : null;
+  return { printerModel, bed };
+}
+
 function parseGcodeText(text, opts = {}) {
   const s = edges(String(text || ''));
   const cm3 = parseFilamentCm3(s);
@@ -351,6 +383,7 @@ const api = {
   parseFilamentType,
   parseFilamentCost,
   parseFilaments,
+  parsePrinterHeader,
   detectSlicer,
   EDGE_BYTES,
 };
