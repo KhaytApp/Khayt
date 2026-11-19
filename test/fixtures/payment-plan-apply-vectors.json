@@ -1,5 +1,5 @@
 {
-  "about": "lib/payment-plan.js applyPlan and recordRowPayment (Dev Hub, Nov 18; old-editor retirement step 6). The plan is the schedule: applyPlan never touches paidAmount; a row is paid only by recordRowPayment, through lib/order-payment.js recordPayment. A row ticked paid in an older book (paid, no `recorded`) is 'legacy': paid and locked, never rewritten, and the job's paidAmount stays exactly as it is. Settings are empty (no tax). The Mac and the phone run this file. Money review (Nov 18): a plan freezes only on void or cancel; a payment also needs the job to owe at all (not a quote, not credited in full); a credit note or a ZATCA report freezes nothing while money is owed; a row of 0 or less is bad_amount; unchanged rows are copied through byte for byte. Allocation (Dev Hub option 1): money recorded outside the plan (paidAmount − instalmentBase − paid rows) covers the oldest unpaid rows first, whole rows only; one function (allocate) feeds the dialog, recordRowPayment (use_recorded) and the reminders (dueRows). Delta review (Nov 18): a covered row reopens (newest first) when the total is corrected down; a real recorded row never does. A part-covered row records only its remainder, capped at what the job can take. A plan without a base gets one on its first save (paid − paid rows) and takes no recorded row before. Receivables age plan rows through allocate.",
+  "about": "lib/payment-plan.js applyPlan and recordRowPayment (Dev Hub, Nov 18; old-editor retirement step 6). The plan is the schedule: applyPlan never touches paidAmount; a row is paid only by recordRowPayment, through lib/order-payment.js recordPayment. A row ticked paid in an older book (paid, no `recorded`) is 'legacy': paid and locked, never rewritten, and the job's paidAmount stays exactly as it is. Settings are empty (no tax). The Mac and the phone run this file. Money review (Nov 18): a plan freezes only on void or cancel; a payment also needs the job to owe at all (not a quote, not credited in full); a credit note or a ZATCA report freezes nothing while money is owed; a row of 0 or less is bad_amount; unchanged rows are copied through byte for byte. Allocation (Dev Hub option 1): money recorded outside the plan (paidAmount − instalmentBase − paid rows) covers the oldest unpaid rows first, whole rows only; one function (allocate) feeds the dialog, recordRowPayment (use_recorded) and the reminders (dueRows). Delta review (Nov 18): a covered row reopens (newest first) when the total is corrected down; a real recorded row never does. A part-covered row records only its remainder, capped at what the job can take. A plan without a base gets one on its first save (paid − paid rows) and takes no recorded row before. Receivables age plan rows through allocate. Follow-ups (Nov 18): lib/order-payment.js recordPayment refuses a total below instalmentBase + the RECORDED rows (plan_recorded), as clearPayment does; trimToOwed offers a plan trimmed to what is owed, oldest rows first.",
   "base": {
     "id": "PP",
     "status": "pending",
@@ -1416,6 +1416,166 @@
           [
             "B",
             373.33
+          ],
+          [
+            "C",
+            373.33
+          ]
+        ]
+      }
+    },
+    {
+      "why": "FLOOR: a payment total below the base + A (recorded by its own payment) is refused, and nothing changes",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1373.34,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "pay",
+      "payment": {
+        "amount": 1300,
+        "method": "cash",
+        "paidAt": "2026-11-20"
+      },
+      "want": {
+        "ok": false,
+        "reason": "plan_recorded"
+      }
+    },
+    {
+      "why": "FLOOR: exactly the base + A is allowed",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1500,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "pay",
+      "payment": {
+        "amount": 1373.34,
+        "method": "cash",
+        "paidAt": "2026-11-20"
+      },
+      "want": {
+        "ok": true,
+        "paidAmount": 1373.34
+      }
+    },
+    {
+      "why": "FLOOR: a row only COVERED does not hold the floor up: the total may go to the base (and A reopens)",
+      "order": {
+        "instalmentBase": 1000,
+        "paidAmount": 1373.34,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": true,
+            "paidAt": "2026-11-18",
+            "recorded": true,
+            "covered": true
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "pay",
+      "payment": {
+        "amount": 1000,
+        "method": "cash",
+        "paidAt": "2026-11-20"
+      },
+      "want": {
+        "ok": true,
+        "paidAmount": 1000,
+        "states": {
+          "A": "open",
+          "B": "open"
+        }
+      }
+    },
+    {
+      "why": "TRIM: a plan asking 1,120 of a job that owes 560 is trimmed oldest first: A goes, B keeps 186.67, C stays",
+      "order": {
+        "instalmentBase": 1560,
+        "paidAmount": 1560,
+        "instalments": [
+          {
+            "id": "A",
+            "amount": 373.34,
+            "dueDate": "2026-12-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "B",
+            "amount": 373.33,
+            "dueDate": "2027-01-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          },
+          {
+            "id": "C",
+            "amount": 373.33,
+            "dueDate": "2027-02-18",
+            "note": "",
+            "paid": false,
+            "paidAt": null
+          }
+        ]
+      },
+      "op": "trim",
+      "want": {
+        "ok": true,
+        "trimmed": [
+          [
+            "B",
+            186.67
           ],
           [
             "C",

@@ -1446,7 +1446,9 @@ function openPaymentModal(orderId) {
         paidAt: draft.paidAt,
       }, { today: localDateStr(), settings });   // the cap is price + tax for a tax-added shop
       runPaymentEffects(order, out.effects);
-      return true;
+      // Refused (below what the job's payment plan recorded): nothing changed,
+      // the toast says why, and the dialog stays open to correct the figure.
+      return !out.refused;
     }
   });
 }

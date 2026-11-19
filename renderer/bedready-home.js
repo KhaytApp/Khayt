@@ -314,7 +314,7 @@
       var r = k.rollup;
       var partial = r.measuredTime < r.jobs
         ? ' <span style="color:var(--warning);">(' + r.measuredTime + '/' + r.jobs + ' ' + esc(tr('kit.measured', 'measured')) + ')</span>' : '';
-      var money = r.mixedCurrency ? esc(tr('kit.mixed_currency', 'mixed currencies')) : (r.cost + ' ' + esc(r.currency || ''));
+      var money = r.mixedCurrency ? esc(tr('kit.mixed_currency', 'mixed currencies')) : (r.cost + ' ' + esc(r.currency || (typeof settings !== 'undefined' && settings && settings.currency) || ''));
       var delta = (k.accuracy && k.accuracy.time !== null)
         ? ' <span style="color:var(--text-muted);">· ' + (k.accuracy.time > 0 ? '+' : '') + k.accuracy.time + '% ' + esc(tr('kit.vs_estimate', 'vs estimate')) + '</span>' : '';
       return '<div class="br-kit-row" style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--border-soft);">'

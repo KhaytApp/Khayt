@@ -85,7 +85,28 @@
     return Number.isFinite(raw) && raw > 0 ? raw : 0;
   }
 
-  function computePartBaseCost(part, ctx) {
+  /**
+   * One part's labour: (prep + post hours) × the labour rate. Inside
+   * computePartBaseCost for a single item (the calculator); left out of each
+   * part, and charged ONCE, for a product with its own rates
+   * (lib/product-pricing.js productLabourCost).
+   */
+  function labourCostOf(part) {
+    const p = part || {};
+    return (Math.max(0, +p.prepTime || 0) + Math.max(0, +p.postTime || 0)) * Math.max(0, +p.laborRate || 0);
+  }
+
+  /**
+   * `opts.labour === false`: the part WITHOUT its labour, and
+   * `opts.packaging === false` without the shop's packaging: a product with
+   * its own rates charges both ONCE (lib/product-pricing.js productOnceCost).
+   * Anything else: with them, as always.
+   */
+  function computePartBaseCost(part, ctx, opts) {
+    const withLabour = !(opts && opts.labour === false);
+    // A product charges the shop's packaging ONCE too, beside its labour
+    // (money review of #2575): per part it was 15 parts × 5 = 82.50 for one box.
+    const withPackaging = !(opts && opts.packaging === false);
     const inventory = (ctx && ctx.inventory) || global.inventory || [];
     const settings = (ctx && ctx.settings) || global.settings || {};
 
@@ -115,10 +136,7 @@
     const elecRate = Math.max(0, +part.elecRate || 0);
     const powerCost = printTime * (powerDraw / 1000) * elecRate;
 
-    const prepTime = Math.max(0, +part.prepTime || 0);
-    const postTime = Math.max(0, +part.postTime || 0);
-    const laborRate = Math.max(0, +part.laborRate || 0);
-    const laborCost = (prepTime + postTime) * laborRate;
+    const laborCost = withLabour ? labourCostOf(part) : 0;
 
     const failureRate = Math.max(0, +part.failureRate || 0);
     let extraMatCost = 0;
@@ -130,8 +148,8 @@
         extraMatCost += (em.weight / 1000) * pricePerKg;
       }
     }
-    const packagingCost =
-      Math.max(0, +settings.defaultPackagingCost || 0) / Math.max(1, +part.qty || 1);
+    const packagingCost = withPackaging
+      ? Math.max(0, +settings.defaultPackagingCost || 0) / Math.max(1, +part.qty || 1) : 0;
     const consumablesCost = partConsumablesCost(part, ctx);
     const baseCost = materialCost + wearCost + powerCost + laborCost + extraMatCost + packagingCost
       + consumablesCost;
@@ -216,12 +234,12 @@
    *
    * Mirrors partGramsConsumed() in inventory.js — same shape, same reason.
    */
-  function partTotalCost(part, ctx) {
+  function partTotalCost(part, ctx, opts) {
     const qty = Math.max(1, +(part && part.qty) || 1);
-    return computePartBaseCost(part, ctx) * qty;
+    return computePartBaseCost(part, ctx, opts) * qty;
   }
 
-  const api = { computePartBaseCost, partTotalCost, getActivePriceTier, computePartBreakdown, computeComponentsCost, partConsumablesCost, consumableUnitCost, consumableQty };
+  const api = { computePartBaseCost, partTotalCost, labourCostOf, getActivePriceTier, computePartBreakdown, computeComponentsCost, partConsumablesCost, consumableUnitCost, consumableQty };
 
   Object.assign(global, api);
   global.KhaytCalculatorCost = api;
