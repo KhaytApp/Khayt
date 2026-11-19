@@ -140,6 +140,12 @@ final class LanConnectorPairing {
     }
     nonisolated(unsafe) static var enabledForTests = false
 
+    /// "Show prices in OrcaSlicer" (Connected apps ▸ Slicers), this Mac's own
+    /// switch beside "Pair a slicer", OFF unless the owner turns it on. Even
+    /// on, a plugin sees nothing until the shop grants that device a price.
+    nonisolated static let pricesKey = "connectorPrices"
+    nonisolated static var pricesOn: Bool { UserDefaults.standard.bool(forKey: pricesKey) }
+
     func open() {
         guard enabledHere ?? Self.enabled else { return }
         deadline = clock() + Self.length

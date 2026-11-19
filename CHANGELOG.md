@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the route that lets the Khayt tab in OrcaSlicer show the shop's price for a sliced plate (off; not visible yet).** `POST /api/connectors/price` takes the plate's slice facts from a paired plugin (time, filaments by type, colour and grams, the printer preset, and a quantity). It prices them with the shared rule `lib/connector-price.js` (#2588), which runs the calculator's own code on one new hand part, and answers sealed. Nothing is stored or logged.
+  - **Off by default.** The shop must turn on "Show prices in OrcaSlicer" and grant each device: none (the default), price, or price and cost.
+  - **What each grant sees.** A device granted price never sees the cost or margin; the route passes only an allow-list of keys.
+  - **Off is a 200 `{"prices":"off"}`, not a 404**, so the tab never mistakes a shop's choice for an old Mac.
+  - **`/api/connectors/self`** lists `price:read` (and `cost:read`) only while both the switch and the grant hold.
+  - **Still to come.** The switch and the per-device grant come to Connected apps ▸ Slicers after their Figma frame is approved. Until then, prices are off on every Mac.
+  - **Tests.** The 15 shared vectors (`test/fixtures/connector-price-vectors.json`) run through the Mac's engine. One route test per grant, plus: unpriced, nothing stored, and refusals.
 - **Mac: prep once per line, finishing per piece, packaging by the box (the shared rule from #2586).**
   - **Product sheet.** A product with its own rates now separates "Prep, once per line" from "Finishing, per piece". It has a "Pieces per box" field (blank means a box each) and a "For N pieces" preview of what a line of N costs: parts, labour, packaging and how many boxes, the cost and per piece. Every figure comes from the shared rule (`productJobParts` with `units`, `jobCost`, `lineBoxes`), so the Mac does no sums of its own. Figma: Mac file, page 21.
   - **Online orders.** A web order's line of a product with its own rates is now ONE line of N pieces through the same rule as the desktop's store orders: prep once, finishing per piece, packaging by the box. Before, it was one piece's labour and packaging times the quantity. The line counts the pieces still to print, as the shared rule does. A product saved before this keeps its own sum.
