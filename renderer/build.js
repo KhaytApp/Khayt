@@ -385,6 +385,21 @@ function applyPartExtras(snap) {
   return snap;
 }
 
+/**
+ * The part in the form, when it came from Edit on a part whose labour and
+ * packaging are on the ORDER (`orderLevelCosts`, a product's once-costs, in
+ * its `onceGroup`): null otherwise. editPart writes it on the Add button
+ * beside the part's id and place; addPart puts both back on the part. Rebuilt
+ * from the form without them, an edited part was costed with labour and
+ * packaging again (91.36 for 11.61) while the order still carried them, and
+ * lost its group (money review of #2581, HIGH).
+ */
+function editingOnce() {
+  const btn = (typeof document !== 'undefined') ? document.getElementById('btnAddPart') : null;
+  if (!btn || !btn.dataset || !btn.dataset.editing || btn.dataset.editingOnce !== '1') return null;
+  return { orderLevelCosts: true, onceGroup: btn.dataset.editingOnceGroup || undefined };
+}
+
 function calculateLivePartCost() {
   // Snapshot the DOM into a part-shaped object and reuse the pure helper.
   // qty and filamentId MUST be included or the live preview disagrees with the cart:
@@ -407,6 +422,7 @@ function calculateLivePartCost() {
     laborRate:     $('#laborRate').value,
     failureRate:   $('#failureRate').value,
     extraMaterials: currentExtraMaterials.filter(m => m.material && m.weight > 0),
+    orderLevelCosts: editingOnce() ? true : undefined,
   }));
 }
 
@@ -965,6 +981,9 @@ function addPart() {
     return;
   }
   const part = snapshotPartFromForm();
+  // Its once-costs mark and group, as it had them (editingOnce).
+  const once = editingOnce();
+  if (once) { part.orderLevelCosts = true; if (once.onceGroup) part.onceGroup = once.onceGroup; }
   // A part coming back from the form after Edit is the SAME part: it keeps
   // its id and its place in the cart. It was given a new id at the end,
   // so nothing that pointed at it (lib/part-ids.js, a part sheet, a file
@@ -1016,6 +1035,8 @@ function addPart() {
     delete addBtn.dataset.editing;
     delete addBtn.dataset.editingId;
     delete addBtn.dataset.editingAt;
+    delete addBtn.dataset.editingOnce;
+    delete addBtn.dataset.editingOnceGroup;
   }
   renderBuild();
   saveBuildDraft();
@@ -1095,6 +1116,12 @@ function editPart(index) {
   currentPriceTiers = (part.priceTiers || []).map(ti => ({ ...ti }));
   renderPriceTiers();
 
+  // Marked as being edited BEFORE the cart renders: its pending total costs
+  // the form through calculateLivePartCost, which reads editingOnce().
+  { const b = $('#btnAddPart');
+    if (b) { b.dataset.editing = '1';
+      if (part.orderLevelCosts === true) b.dataset.editingOnce = '1'; else delete b.dataset.editingOnce;
+      if (part.onceGroup) b.dataset.editingOnceGroup = String(part.onceGroup); else delete b.dataset.editingOnceGroup; } }
   currentBuild.splice(index, 1);
   renderBuild();
   calculateLivePartCost();
@@ -1108,6 +1135,9 @@ function editPart(index) {
     // The part's id and place, so Update puts back the same part (addPart).
     if (part.id) addBtn.dataset.editingId = String(part.id); else delete addBtn.dataset.editingId;
     addBtn.dataset.editingAt = String(index);
+    // Its once-costs mark and group (editingOnce): Update gives them back.
+    if (part.orderLevelCosts === true) addBtn.dataset.editingOnce = '1'; else delete addBtn.dataset.editingOnce;
+    if (part.onceGroup) addBtn.dataset.editingOnceGroup = String(part.onceGroup); else delete addBtn.dataset.editingOnceGroup;
     addBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
