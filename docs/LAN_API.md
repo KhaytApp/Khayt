@@ -301,6 +301,7 @@ verify. Per connector: 600 requests, 30 announces and 30 files an hour (429 with
 | `PUT /api/connectors/slices/{sliceId}/file` | the raw file, exact `Content-Length`, `x-khayt-content-sha256` | 201 `{sliceId, state:"in-inbox"}`; 422 `hash-mismatch` (`retry` once) |
 | `GET /api/connectors/slices/{sliceId}` | none | `{sliceId, state}`: `awaiting-file`, `in-inbox`, `left-inbox`, `expired` |
 | `GET /api/connectors/queue` | none | 200 sealed `{v, at, shop:{name}, jobs:[{id, number, stage, machine, file}], machines:[{id, name, state}], inbox:{waiting}, more?}` with `ETag`; 304 on a matching `If-None-Match`; 1 per 10 s |
+| `POST /api/connectors/price` | sealed slice facts, ≤ 8 KB opened: `{v, qty, timeSec, filaments:[{type, colour, grams}], printer:{preset}}` | 200 sealed `{prices:"off"}` when the shop's "Show prices in OrcaSlicer" is off or this device has no grant; `{prices:"on", currency, qty, unit, total, rounded, basis}` for the `price` grant, plus `cost:{unit, total}` and `margin:{pct}` for `cost`; `{prices:"on", unpriced:"no-material"\|"no-currency"\|"bad-facts"}`; 120 an hour |
 
 **Sealed capture.** `{"v":1,"alg":"A256GCM","nonce":b64(12 bytes),"ct":b64(ciphertext ‖ 16-byte tag)}`
 under `HKDF-SHA256(K, salt "khayt-connector-seal-v1", info connectorId)`, AAD
@@ -331,6 +332,15 @@ its number, stage, machine name and `file` (only the name of a file THIS
 connector sent for that job; null otherwise). Never a title (a title can hold a
 client's name), a client, a price or a note. Sealed as the capture is, with AAD
 `"GET /api/connectors/queue"`; the ETag covers everything but `at`. It is keyed, because it travels in the clear while the queue is sealed: `HMAC-SHA256(HKDF-SHA256(K, salt "khayt-connector-etag-v1", info connectorId), content)`, first 32 hex digits, quoted. A plugin only echoes it in `If-None-Match`.
+**The price** is `lib/connector-price.js priceSlice`: the facts as one new hand
+part, priced by the calculator's own code (shop spool by type and colour, the
+preset named like the slicer's printer preset, the default margin, overhead by
+the print hour). Sealed with AAD `"POST /api/connectors/price"` both ways.
+Nothing is stored or logged. The shop's switch is this Mac's own (default off);
+the grant is per device (none, `price`, `cost`), and the route passes only an
+allow-list of keys for it: the rule always works out the cost and margin, and a
+`price` device never sees them. `GET /api/connectors/self` lists `price:read`
+(and `cost:read`) only while both hold.
 Vectors: `docs/connector-routes.vectors.json`. The desktop (`lib/lan-server.js`) has none of this yet.
 
 ### `GET /api/library`, its thumbnails, and `POST /api/library/{id}/estimate` — pricing a model from the phone

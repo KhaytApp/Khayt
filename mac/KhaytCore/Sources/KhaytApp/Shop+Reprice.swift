@@ -75,9 +75,16 @@ extension Shop {
     func previewReprice(_ id: Order.ID, marginPct: Double?) async -> RepriceAnswer? {
         guard let engine, let row = orderRow(id) else { return nil }
         return await Self.repriced(row, marginPct: marginPct, priceSeenOk: true, milestonesOk: true,
-                                   clients: clientRows, settings: settingsDict, overheadPerHour: overheadPerHour,
+                                   clients: clientRows, settings: settingsDict, overheadPerHour: Self.repriceOverhead,
                                    engine: engine, refusals: Self.repriceRefusalWords(words))
     }
+
+    /// The overhead a reprice charges: nil, the JOB's own rate (`order-edit.js`
+    /// reads it off the job), never the shop's rate today. Passing the shop's
+    /// gave an online or shelf job priced without overhead a share of it on
+    /// Recalculate (release data review). If a shop ever opts in to
+    /// re-charging overhead, this is where it is decided.
+    nonisolated static let repriceOverhead: Double? = nil
 
     /// Reprice the job, inside the write, on the book as it is on disk.
     /// Returns the rule's answer: `.ready` when it was written, `.ask` when the
@@ -87,7 +94,7 @@ extension Shop {
                  milestonesOk: Bool) async -> RepriceAnswer? {
         guard permitted("orders", "edit") else { return nil }
         let refusals = Self.repriceRefusalWords(words)
-        let overhead = overheadPerHour
+        let overhead = Self.repriceOverhead
         var answer: RepriceAnswer?
         let wrote = await writeToOneOrder(id, named: words.callIt("mac.rc_title"), as: .person("orders", "edit")) { order, engine, root in
             let a = await Self.repriced(order, marginPct: marginPct, priceSeenOk: priceSeenOk,

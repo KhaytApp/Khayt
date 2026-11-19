@@ -185,11 +185,14 @@ extension Shop {
                 // costed: marked afterwards, it would be stored as sharing them
                 // while still carrying its own labour.
                 let mark = await handPartMark(orderId)
+                // A new part, on the new quantity rule (`newPartMark`).
+                var marks = Self.newPartMark
+                if mark { marks["orderLevelCosts"] = .bool(true) }
                 let costed = await costedPart(spoolId: d.spoolId, grams: TypedNumber.parse(d.grams) ?? 0,
                                               hours: TypedNumber.parse(d.hours) ?? 0, qty: d.qty,
-                                              extra: mark ? ["orderLevelCosts": .bool(true)] : [:])
+                                              extra: marks)
                 var fresh = NewJobSheet.Draft()
-                if mark { fresh.raw["orderLevelCosts"] = .bool(true) }
+                for (key, value) in marks { fresh.raw[key] = value }
                 fresh.name = d.name; fresh.spoolId = d.spoolId
                 fresh.grams = d.grams; fresh.hours = d.hours; fresh.qty = d.qty
                 fresh.cost = costed?.cost ?? 0

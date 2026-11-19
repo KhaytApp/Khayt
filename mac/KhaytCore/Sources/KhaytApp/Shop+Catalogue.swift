@@ -697,6 +697,41 @@ extension Shop {
                                               consumables: consumableRows)
     }
 
+    /// The shop's packaging, one box's worth (Settings ▸ Pricing), which a
+    /// line of a product is charged per box (#2586).
+    var packagingPerBox: Double { Self.plainNumber(settingsDict["defaultPackagingCost"]) ?? 0 }
+
+    /// A product as ONE line of `units` pieces (Figma 180:223): its parts, its
+    /// labour (prep once, finishing per piece) and packaging (per box), and
+    /// the cost — each the shared rule's (`productJobParts` with `units`,
+    /// `jobCost`, `lineBoxes`). Per piece is that cost shared over the line.
+    struct ProductLine: Equatable, Sendable {
+        var units: Int
+        var parts: Double
+        var labour: Double
+        var packaging: Double
+        var boxes: Double
+        var cost: Double
+        var perPiece: Double
+    }
+
+    func productLine(_ record: JSONValue, units: Int) async -> ProductLine? {
+        guard let engine else { return nil }
+        let n = max(1, units)
+        guard let built = try? await engine.productJobParts(record, inventory: inventoryRows, settings: settingsDict,
+                                                            consumables: consumableRows, units: n) else { return nil }
+        let job: JSONValue = .object(["parts": .array(built.parts),
+                                      "labourCost": .number(built.labourCost),
+                                      "packagingCost": .number(built.packagingCost)])
+        guard let parts = try? await engine.jobCost(job, components: false, overhead: false, labour: false, packaging: false),
+              let cost = try? await engine.jobCost(job, components: false, overhead: false) else { return nil }
+        // The product's own count (`perBoxOf`: a box each unless it says),
+        // the count its packaging above was charged at.
+        let boxes = (try? await engine.productBoxes(record, units: n)) ?? 1
+        return ProductLine(units: n, parts: parts, labour: built.labourCost, packaging: built.packagingCost,
+                           boxes: boxes, cost: cost, perPiece: cost / Double(n))
+    }
+
     /// A recommended margin, with the reason for it.
     struct PriceAdvice: Sendable {
         /// The margin on PRICE advised — what the sentence says.
