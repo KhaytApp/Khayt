@@ -63,3 +63,11 @@ test('FIX: a printer that is preparing, homing or otherwise working is busy, nev
     assert.equal(A.machineState(m, { state: w, progress: 0 }), 'printing', w);
   }
 });
+
+test('FIX: a printer that needs a person (a failed print, ATTENTION, halted) reads error, never free (was idle)', () => {
+  const m = { printerApi: { type: 'prusalink' } };
+  for (const w of ['ATTENTION', 'Failed', 'halted']) {
+    assert.equal(PA.machineStatus(m, { state: w }).activity, 'error', w);
+    for (const progress of [0, 40]) assert.equal(A.machineState(m, { state: w, progress }), 'error', w);
+  }
+});
