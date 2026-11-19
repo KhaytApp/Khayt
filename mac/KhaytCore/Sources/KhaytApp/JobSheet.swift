@@ -112,7 +112,7 @@ struct JobSheet: View {
         }
         .onAppear(perform: open)
         .task(id: Signature(form: form, parts: parts)) { await preview() }
-        .sheet(isPresented: $recalculating) {
+        .shopSheet(isPresented: $recalculating) {
             RecalculateSheet(shop: shop, jobId: subject.id, currency: currency) { saved in
                 recalculating = false
                 // Saved: the price, markup and lines moved on disk. Read the
