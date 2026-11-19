@@ -207,3 +207,18 @@ struct PairASlicer: View {
         }
     }
 }
+
+extension Shop {
+    /// What `lib/connector-price.js` prices a sliced plate with: the shop's
+    /// settings (currency, margin, packaging, quote-sheet material), its
+    /// shelf, its printer presets (matched by the slicer's printer preset
+    /// name) and its overhead by the print hour, as the public quote passes it.
+    var slicePriceContext: JSONValue {
+        .object([
+            "settings": .object(settingsDict),
+            "inventory": .array(inventoryRows),
+            "printers": .array(presetRows),
+            "overheadPerHour": .number(overheadPerHour),
+        ])
+    }
+}

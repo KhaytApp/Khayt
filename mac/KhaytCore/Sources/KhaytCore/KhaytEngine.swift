@@ -920,6 +920,12 @@ public actor KhaytEngine {
         // allowlist). Both read `order-status` / `machine-status` at call time.
         "connector-slice",
         "connector-queue",
+        // The shop's price for a plate sliced in OrcaSlicer (the Khayt tab,
+        // `POST /api/connectors/price`): the slice facts as ONE new hand part,
+        // priced by the existing calculator, rates and pricing code. Reads
+        // `print-rates`, `calculator-cost`, `pricing`, `loaded-colours`,
+        // `spool-match`, `spool-edit` and `tax` at call time.
+        "connector-price",
         "carriers",
         // A job handed to a carrier: who, which service, under what tracking
         // number, and a parcel's status moved by hand without going backwards.
@@ -8081,6 +8087,14 @@ public actor KhaytEngine {
                                  "shopName": .string(shopName), "inboxWaiting": .number(Double(inboxWaiting))])],
             as: [String].self)
     }
+    /// The shop's price for a sliced plate (`lib/connector-price.js
+    /// priceSlice`): `{currency, qty, unit, total, rounded, basis, cost,
+    /// margin}` or `{unpriced}`. The route decides what a device may see.
+    public func connectorPrice(facts: JSONValue, context: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytConnectorPrice.priceSlice(ARG0, ARG1)", [facts, context],
+                          as: JSONValue.self)
+    }
+
     /// `YYYY-MM-DD` in the shop's own calendar, as the rule compares it.
     public func lanQuoteExpired(order: JSONValue, today: String) throws -> Bool {
         try runtime.call2("globalThis.KhaytLanQuotePage.isQuoteExpired(ARG0, ARG1)",
@@ -13581,16 +13595,24 @@ public actor KhaytEngine {
         /// The one place a job's cost is summed on the Mac (`JobCostTests`).
         /// Nil when not worked out.
         public let cost: Double?
+        /// The same cost WITHOUT the job's overhead (`jobCost(o, {overhead:
+        /// false})`): what the ledger and the desktop's Orders Log measure a
+        /// job's margin against. Nil from an older caller; read through
+        /// `costForLedger`.
+        public let costWithoutOverhead: Double?
+        public var costForLedger: Double? { costWithoutOverhead ?? cost }
         /// Shop currency per unit of the job's: its frozen `fxRate`, 1 for a
         /// job in the shop's currency. Every figure above but `cost` is in the
         /// job's currency; times this, the shop's.
         public let fx: Double
         public init(billed: Double, net: Double, tax: Double, owed: Double, due: Double? = nil,
-                    earned: Double? = nil, cost: Double? = nil, fx: Double = 1) {
+                    earned: Double? = nil, cost: Double? = nil, fx: Double = 1,
+                    costWithoutOverhead: Double? = nil) {
             self.billed = billed; self.net = net; self.tax = tax; self.owed = owed; self.due = due ?? billed
             self.earned = earned; self.cost = cost; self.fx = fx
+            self.costWithoutOverhead = costWithoutOverhead
         }
-        private enum CodingKeys: String, CodingKey { case billed, net, tax, owed, due, earned, cost, fx }
+        private enum CodingKeys: String, CodingKey { case billed, net, tax, owed, due, earned, cost, fx, costWithoutOverhead }
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             billed = try c.decode(Double.self, forKey: .billed); net = try c.decode(Double.self, forKey: .net)
@@ -13599,6 +13621,7 @@ public actor KhaytEngine {
             earned = try c.decodeIfPresent(Double.self, forKey: .earned)
             cost = try c.decodeIfPresent(Double.self, forKey: .cost)
             fx = try c.decodeIfPresent(Double.self, forKey: .fx) ?? 1
+            costWithoutOverhead = try c.decodeIfPresent(Double.self, forKey: .costWithoutOverhead)
         }
     }
 
@@ -13632,6 +13655,9 @@ public actor KhaytEngine {
                   cost: M.jobCost ? M.jobCost(o) : (Array.isArray(o.parts) ? o.parts : [])
                           .reduce(function (s, p) { return s + Math.max(0, +(p && p.baseCost) || 0); }, 0)
                         + Math.max(0, +o.componentsCost || 0) + Math.max(0, +o.overheadCost || 0),
+                  // What the ledger measures the margin against: the same cost
+                  // without the job's overhead, as the desktop's Orders Log.
+                  costWithoutOverhead: M.jobCost ? M.jobCost(o, { overhead: false }) : null,
                   // The price is the JOB's currency: its frozen rate to the shop's.
                   fx: (+o.fxRate > 0) ? +o.fxRate : 1,
                 };
@@ -15888,15 +15914,40 @@ public actor KhaytEngine {
         public let packagingCost: Double
     }
 
+    /// `units`: how many of the product the line is (#2586). The rule scales
+    /// each part's qty by it, charges prep once and post per unit, and boxes
+    /// the line by the product's `perBox`; nothing of that is done in Swift.
     public func productJobParts(_ product: JSONValue, inventory: [JSONValue],
                                 settings: [String: JSONValue],
-                                consumables: [JSONValue]) throws -> ProductJobParts {
+                                consumables: [JSONValue], units: Int = 1) throws -> ProductJobParts {
         try runtime.call2("""
             KhaytProductPricing.productJobParts(ARG0,
-              { inventory: ARG1, settings: ARG2, consumables: ARG3 })
+              { inventory: ARG1, settings: ARG2, consumables: ARG3, units: ARG4 })
             """,
-            [product, .array(inventory), .object(settings), .array(consumables)],
+            [product, .array(inventory), .object(settings), .array(consumables), .number(Double(max(1, units)))],
             as: ProductJobParts.self)
+    }
+
+    /// The boxes a line of `units` of this PRODUCT ships in: `lineBoxes` with
+    /// the product's own `perBoxOf` (a box each unless it says), which is the
+    /// count its packaging is charged at (`productPackagingCost`).
+    public func productBoxes(_ product: JSONValue, units: Int) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.lineBoxes(ARG0, KhaytProductPricing.perBoxOf(ARG1))",
+                          [.number(Double(max(1, units))), product], as: Double.self)
+    }
+
+    /// A line's labour (`lib/order-money.js lineLabour`, #2586): prep once
+    /// and post per piece for a `labourPerLine` line, the old sum otherwise.
+    public func lineLabour(_ line: JSONValue) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.lineLabour(ARG0)", [line], as: Double.self)
+    }
+
+    /// How many boxes a line of `qty` ships in, `perBox` to a box
+    /// (`lib/order-money.js lineBoxes`, #2586): ceil(qty / perBox), 1 a box each.
+    public func lineBoxes(qty: Int, perBox: Double?) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.lineBoxes(ARG0, ARG1)",
+                          [.number(Double(max(1, qty))), perBox.map(JSONValue.number) ?? .null],
+                          as: Double.self)
     }
 
     /// A job's cost (`lib/order-money.js jobCost`): its parts' `baseCost` plus

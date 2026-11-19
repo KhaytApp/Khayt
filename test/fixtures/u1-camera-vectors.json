@@ -1,0 +1,85 @@
+{
+  "why": "Shared by test/u1-camera.test.js and the Mac's U1CameraTests: keeping a Snapmaker U1 camera awake (camera.start_monitor over WebSocket only) and its chamber light (SET_LED cavity_led). Sample hosts only.",
+  "keepAwake": [
+    { "why": "U1 with its monitor still: socket on the API port",
+      "machine": { "printerApi": { "type": "moonraker", "host": "192.168.1.20" },
+                   "webcam": { "enabled": true, "snapshotUrl": "http://192.168.1.20:7125/server/files/camera/monitor.jpg" } },
+      "want": "ws://192.168.1.20:7125/websocket" },
+    { "why": "explicit port is kept",
+      "machine": { "printerApi": { "type": "moonraker", "host": "192.168.1.20", "port": 7130 },
+                   "webcam": { "enabled": true, "snapshotUrl": "http://192.168.1.20:7130/server/files/camera/monitor.jpg" } },
+      "want": "ws://192.168.1.20:7130/websocket" },
+    { "why": "https API gives wss",
+      "machine": { "printerApi": { "type": "moonraker", "host": "https://printer.local:443" },
+                   "webcam": { "enabled": true, "snapshotUrl": "https://printer.local/server/files/camera/monitor.jpg" } },
+      "want": "wss://printer.local:443/websocket" },
+    { "why": "camera switched off: nothing to keep awake",
+      "machine": { "printerApi": { "type": "moonraker", "host": "192.168.1.20" },
+                   "webcam": { "enabled": false, "snapshotUrl": "http://192.168.1.20:7125/server/files/camera/monitor.jpg" } },
+      "want": null },
+    { "why": "a crowsnest camera on a Klipper printer refreshes by itself",
+      "machine": { "printerApi": { "type": "moonraker", "host": "192.168.1.21" },
+                   "webcam": { "enabled": true, "snapshotUrl": "http://192.168.1.21/webcam/?action=snapshot" } },
+      "want": null },
+    { "why": "a file merely named monitor.jpg somewhere else is not the camera service",
+      "machine": { "printerApi": { "type": "moonraker", "host": "192.168.1.20" },
+                   "webcam": { "enabled": true, "snapshotUrl": "http://192.168.1.20:7125/server/files/gcodes/monitor.jpg" } },
+      "want": null },
+    { "why": "not Moonraker",
+      "machine": { "printerApi": { "type": "prusalink", "host": "192.168.1.30" },
+                   "webcam": { "enabled": true, "snapshotUrl": "http://192.168.1.30/server/files/camera/monitor.jpg" } },
+      "want": null },
+    { "why": "no machine",
+      "machine": null,
+      "want": null }
+  ],
+  "request": [
+    { "id": 1, "want": "{\"jsonrpc\":\"2.0\",\"method\":\"camera.start_monitor\",\"params\":{\"domain\":\"lan\",\"interval\":0},\"id\":1}" },
+    { "id": 0, "want": null },
+    { "id": -3, "want": null },
+    { "id": 1.5, "want": null },
+    { "id": "7", "want": "{\"jsonrpc\":\"2.0\",\"method\":\"camera.start_monitor\",\"params\":{\"domain\":\"lan\",\"interval\":0},\"id\":7}" }
+  ],
+  "reply": [
+    { "text": "{\"jsonrpc\":\"2.0\",\"result\":\"ok\",\"id\":4}", "id": 4, "want": "ok" },
+    { "text": "{\"jsonrpc\":\"2.0\",\"result\":null,\"id\":4}", "id": 4, "want": "ok" },
+    { "text": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"Method not found\"},\"id\":4}", "id": 4, "want": "error" },
+    { "text": "{\"jsonrpc\":\"2.0\",\"result\":\"ok\",\"id\":5}", "id": 4, "want": "other" },
+    { "text": "{\"jsonrpc\":\"2.0\",\"method\":\"notify_status_update\",\"params\":[{}]}", "id": 4, "want": "other" },
+    { "text": "not json", "id": 4, "want": "other" }
+  ],
+  "wsMethods": [
+    { "method": "camera.start_monitor", "want": true },
+    { "method": "camera.stop_monitor", "want": false },
+    { "method": "machine.system_upgrade", "want": false },
+    { "method": "printer.gcode.script", "want": false },
+    { "method": "", "want": false }
+  ],
+  "lightScript": [
+    { "on": true, "want": "SET_LED LED=cavity_led WHITE=1 SYNC=0" },
+    { "on": false, "want": "SET_LED LED=cavity_led WHITE=0 SYNC=0" },
+    { "on": null, "want": null }
+  ],
+  "scriptAllowed": [
+    { "script": "SET_LED LED=cavity_led WHITE=1 SYNC=0", "want": true },
+    { "script": "SET_LED LED=cavity_led WHITE=0 SYNC=0", "want": true },
+    { "script": "SET_LED LED=cavity_led WHITE=1 SYNC=0\nG28", "want": false },
+    { "script": "SET_LED LED=cavity_led WHITE=0.5 SYNC=0", "want": false },
+    { "script": "M104 S200", "want": false }
+  ],
+  "lightFor": [
+    { "machine": { "printerApi": { "type": "moonraker", "host": "192.168.1.20" } },
+      "want": { "queryUrl": "http://192.168.1.20:7125/printer/objects/query?led%20cavity_led",
+                "scriptUrl": "http://192.168.1.20:7125/printer/gcode/script" } },
+    { "machine": { "printerApi": { "type": "bambu", "host": "192.168.1.40" } }, "want": null },
+    { "machine": { "printerApi": { "type": "moonraker", "host": "" } }, "want": null }
+  ],
+  "lightState": [
+    { "why": "on (white channel)", "body": { "result": { "status": { "led cavity_led": { "color_data": [[0, 0, 0, 1]] } } } }, "want": true },
+    { "why": "off", "body": { "result": { "status": { "led cavity_led": { "color_data": [[0, 0, 0, 0]] } } } }, "want": false },
+    { "why": "dimmed is still on", "body": { "result": { "status": { "led cavity_led": { "color_data": [[0, 0, 0, 0.3]] } } } }, "want": true },
+    { "why": "no such light on this printer", "body": { "result": { "status": {} } }, "want": null },
+    { "why": "unreadable", "body": { "result": { "status": { "led cavity_led": { "color_data": "on" } } } }, "want": null },
+    { "why": "empty body", "body": null, "want": null }
+  ]
+}
