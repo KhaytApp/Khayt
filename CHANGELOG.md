@@ -6995,6 +6995,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [4.10.3] - 2026-11-19
+
+### Before you update
+
+- **If you are updating from 4.9 or earlier, Settings, the job page, Simple mode and the stage colours have changed: read this before you update.** Settings is one window with 14 panes in a sidebar, named as on the Mac app, in place of the strip of tabs; each setting is under the pane its name says, and File ▸ Settings… (Ctrl+,) opens it. In Jobs, a job's ⋯ menu has **Open page**, and the page's **Edit** opens one sheet for the whole job (Job, Parts, Price) with a **Markup** field and the new total shown before you save; **New job** opens the same sheet empty. "Target profit margin" is now called **Markup**: the same number and the same arithmetic. In Simple mode the board has four columns (Quote, Queued, Printing, Ready) and the screens that belong to Professional are left out; switch to Professional to have them back. Printing is amber in every theme and a job on hold is purple; in Arabic, Pending reads «بانتظار» and On hold «متوقف مؤقتاً». Once, in the background, Khayt reads your library's 3MF files again, so some cards show fewer colour dots: the colours the print uses, not every spool the printer had loaded. If you already run 4.10.0, nothing here is new to you; accept to continue.
+
+### Privacy
+
+- **Privacy: crash reporting no longer contacts Sentry at all unless you opted in.** Crash reports are opt-in, and a report was never sent without consent, but the crash reporter itself was started on every launch, and its session heartbeat (the app version, and that a session started and ended) went to sentry.io regardless. The crash reporter now starts only for a shop that has turned crash reports on, and never sends session heartbeats even then. Turning crash reports on takes effect the next time Khayt starts.
+
 ## [4.10.2] - 2026-11-17
 
 ### Before you update

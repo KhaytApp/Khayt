@@ -19,16 +19,31 @@ if (isBedReady && !hasExplicitUserDataDir) {
   }
 }
 
+// Optional portable / multi-instance data dir override. Set KHAYT_USER_DATA to
+// run an isolated second instance (e.g. to test cloud sync between "devices").
+// Must run before any app.getPath('userData') call.
+if (process.env.KHAYT_USER_DATA) {
+  try { app.setPath('userData', process.env.KHAYT_USER_DATA); } catch (e) { console.error('KHAYT_USER_DATA:', e && e.message); }
+}
+
 // Crash/error reporting (Sentry). The DSN is publishable, so it's baked in for
-// official builds. Active in PACKAGED installs by default; in dev only when
-// SENTRY_DSN is set (so day-to-day development doesn't flood the project).
-// PII is off and the E2E store is never sent. Init early to catch startup errors.
+// official builds. Considered in PACKAGED installs; in dev only when SENTRY_DSN
+// is set (so day-to-day development doesn't flood the project). And STARTED
+// only when the shop has opted in to crash reports, read from the store on disk
+// here (lib/main/sentry-consent.js). Initialised on every launch, the SDK's
+// release-health sessions reached sentry.io from desktops that never opted in,
+// because sessions bypass beforeSend (Mac outbound audit, Nov 19). Opting in
+// takes effect at the next launch. This runs AFTER the user-data path is final,
+// so it reads the store this launch will use. PII is off and the E2E store is
+// never sent.
 // Bed Ready is a separate product and does NOT report to Khayt's Sentry project;
 // the SDK is also excluded from its build (see electron-builder.bedready.js).
 const SENTRY_DSN = process.env.SENTRY_DSN
   || 'https://7b05dbab160d7a1825f5b2fceab06122@o4511599597977600.ingest.de.sentry.io/4511599624126544';
 let sentry = null;
-if (!isBedReady && SENTRY_DSN && (app.isPackaged || process.env.SENTRY_DSN)) {
+const SentryConsent = require('./lib/main/sentry-consent.js');
+if (!isBedReady && SENTRY_DSN && (app.isPackaged || process.env.SENTRY_DSN)
+    && SentryConsent.crashConsentAtStartup(require('fs'), require('path').join(app.getPath('userData'), 'khayt-store.json'))) {
   try {
     sentry = require('@sentry/electron/main');
     sentry.init({
@@ -37,6 +52,10 @@ if (!isBedReady && SENTRY_DSN && (app.isPackaged || process.env.SENTRY_DSN)) {
       environment: app.isPackaged ? 'production' : 'development',
       sendDefaultPii: false,
       tracesSampleRate: 0,
+      // No release-health sessions, even with consent: their envelopes do not
+      // pass through beforeSend, so a consent turned OFF mid-session could not
+      // stop them.
+      integrations: (defaults) => SentryConsent.withoutSessions(defaults),
       // Crash reporting is OPT-IN. Settings offers it as a checkbox that
       // defaults to off, and the app tells the user "Khayt sends nothing by
       // default" — but Sentry was initialised purely on app.isPackaged and
@@ -66,12 +85,6 @@ if (!isBedReady && SENTRY_DSN && (app.isPackaged || process.env.SENTRY_DSN)) {
   } catch (e) { console.error('Sentry init:', e && e.message); sentry = null; }
 }
 
-// Optional portable / multi-instance data dir override. Set KHAYT_USER_DATA to
-// run an isolated second instance (e.g. to test cloud sync between "devices").
-// Must run before any app.getPath('userData') call.
-if (process.env.KHAYT_USER_DATA) {
-  try { app.setPath('userData', process.env.KHAYT_USER_DATA); } catch (e) { console.error('KHAYT_USER_DATA:', e && e.message); }
-}
 const crypto = require('crypto');
 const QRCode = require('qrcode');
 const { safeJsonParse } = require('./lib/safe-json');
