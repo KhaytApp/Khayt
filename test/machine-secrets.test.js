@@ -19,7 +19,7 @@ const disk = [
 
 test('a masked key is put back from the same machine on disk', () => {
   const m = fillMachineSecrets({ id: 'M1', printerApi: { type: 'octoprint', host: 'h', port: 5000, apiKey: MASK },
-    smartPlug: { type: 'homeassistant', host: 'http://ha.local:8123', token: MASK } }, disk, isMasked);
+    smartPlug: { type: 'homeassistant', host: 'http://ha.local:8123', entity: 'switch.p1', token: MASK } }, disk, isMasked);
   assert.equal(m.printerApi.apiKey, 'REAL-KEY');
   assert.equal(m.printerApi.host, 'h', 'the window\'s other fields are kept');
   assert.equal(m.smartPlug.token, 'HA-TOKEN');
@@ -57,6 +57,41 @@ test('a smart plug gets its token only at its own address and type', () => {
   const both = fillMachineSecrets({ ...octo({}), smartPlug: plug({ host: 'evil.lan' }).smartPlug }, disk, isMasked);
   assert.equal(both.printerApi.apiKey, 'REAL-KEY');
   assert.equal(both.smartPlug.token, MASK);
+});
+
+test('a Home Assistant token reads or switches only the entity it was saved for', () => {
+  assert.equal(fillMachineSecrets(plug({ entity: 'switch.p1' }), disk, isMasked).smartPlug.token, 'HA-TOKEN', 'full match');
+  assert.equal(fillMachineSecrets(plug({ entity: ' switch.p1 ' }), disk, isMasked).smartPlug.token, 'HA-TOKEN', 'trimmed, as the request trims it');
+  for (const entity of ['switch.front_door', 'lock.front_door', 'switch.P1', '', undefined]) {
+    assert.equal(fillMachineSecrets(plug({ entity }), disk, isMasked).smartPlug.token, MASK, String(entity));
+  }
+});
+
+test('a plug at another scheme, port or path gets no secret', () => {
+  for (const host of ['https://ha.local:8123', 'http://ha.local:8124', 'http://ha.local', 'ha.local', 'http://ha.local:8123/proxy',
+    'http://user:pw@ha.local:8123']) {
+    assert.equal(fillMachineSecrets(plug({ host }), disk, isMasked).smartPlug.token, MASK, host);
+  }
+  // a host written without its scheme is the http one, as the request reads it
+  const bare = [{ id: 'P', smartPlug: { type: 'homeassistant', host: 'ha.local:8123', entity: 'switch.p1', token: 'T' } }];
+  assert.equal(fillMachineSecrets({ id: 'P', smartPlug: { type: 'homeassistant', host: 'http://ha.local:8123', entity: 'switch.p1', token: MASK } }, bare, isMasked).smartPlug.token, 'T');
+  assert.equal(fillMachineSecrets({ id: 'P', smartPlug: { type: 'homeassistant', host: 'https://ha.local:8123', entity: 'switch.p1', token: MASK } }, bare, isMasked).smartPlug.token, MASK);
+});
+
+test('a Tasmota password goes only with the user it was saved beside', () => {
+  const book = [{ id: 'T', smartPlug: { type: 'tasmota', host: '192.168.1.9', user: 'admin', password: 'PW' } }];
+  const tas = (over) => ({ id: 'T', smartPlug: { type: 'tasmota', host: '192.168.1.9', user: 'admin', password: MASK, ...over } });
+  assert.equal(fillMachineSecrets(tas({}), book, isMasked).smartPlug.password, 'PW');
+  assert.equal(fillMachineSecrets(tas({ user: 'other' }), book, isMasked).smartPlug.password, MASK);
+  assert.equal(fillMachineSecrets(tas({ host: 'https://192.168.1.9' }), book, isMasked).smartPlug.password, MASK);
+  assert.equal(fillMachineSecrets(tas({ type: 'shelly' }), book, isMasked).smartPlug.password, MASK);
+});
+
+test('a printer has no scheme of its own: one written into the host is another host', () => {
+  assert.equal(fillMachineSecrets(octo({ host: 'https://h' }), disk, isMasked).printerApi.apiKey, MASK);
+  assert.equal(fillMachineSecrets(octo({ host: 'http://h' }), disk, isMasked).printerApi.apiKey, MASK);
+  assert.equal(fillMachineSecrets(bambu({ host: 'https://192.168.1.50' }), disk, isMasked).printerApi.accessCode, MASK);
+  assert.equal(fillMachineSecrets(octo({}), disk, isMasked).printerApi.apiKey, 'REAL-KEY', 'full match');
 });
 
 test('a missing or bad host fills nothing', () => {
