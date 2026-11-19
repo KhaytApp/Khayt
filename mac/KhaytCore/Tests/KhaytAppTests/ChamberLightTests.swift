@@ -33,4 +33,17 @@ import Testing
         camera.unwatch("m1")
         #expect(camera.watchers["m1"] == nil)
     }
+
+    /// A renewal that stops by itself (not a camera that needs keeping) leaves
+    /// no count behind, so a tile that appears later starts it again (#2589
+    /// review L4: the count stayed at 1 with no task, and never restarted).
+    @Test("a renewal that ends by itself forgets the machine")
+    func stoppedWakingClears() {
+        let camera = Camera()
+        camera.watchers["m1"] = 1
+        camera.waking["m1"] = Task {}
+        camera.stoppedWaking("m1")
+        #expect(camera.watchers["m1"] == nil)
+        #expect(camera.waking["m1"] == nil)
+    }
 }

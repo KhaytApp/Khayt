@@ -92,11 +92,10 @@ enum U1Camera {
         parts.scheme = parts.scheme == "https" ? "wss" : "ws"
         guard let url = parts.url else { return (renew, .refused) }
 
-        // The one frame, and the gate on its own method.
+        // The one frame, and the gate on it.
         let id = Int.random(in: 1...999_999)
         guard let frame = try? await engine.keepAwakeRequest(id: id),
-              let method = (try? JSONDecoder().decode(Frame.self, from: Data(frame.utf8)))?.method,
-              (try? await engine.wsMethodAllowed(method)) == true else {
+              await frameAllowed(frame, id: id, engine: engine) else {
             return (renew, .refused)
         }
         var request = URLRequest(url: url)
@@ -108,8 +107,22 @@ enum U1Camera {
 
     private struct Frame: Decodable { let method: String }
 
-    /// The real socket: open, send, read until our reply, hang up.
+    /// The gate every frame passes before it is written: it must be EXACTLY
+    /// the frame the lib builds for this id (not merely carry an allowed
+    /// method — extra params would ride along otherwise), and its method must
+    /// be on the lib's allow-list. The socket also carries Snapmaker's
+    /// firmware methods; nothing else is ever written to it.
+    static func frameAllowed(_ frame: String, id: Int, engine: KhaytEngine) async -> Bool {
+        guard let built = try? await engine.keepAwakeRequest(id: id), built == frame,
+              let method = (try? JSONDecoder().decode(Frame.self, from: Data(frame.utf8)))?.method,
+              (try? await engine.wsMethodAllowed(method)) == true else { return false }
+        return true
+    }
+
+    /// The real socket: open, send, read until our reply, hang up. Gated
+    /// again here, so no caller can hand it a frame the lib did not build.
     static let live: Exchange = { request, frame, id, deadline, engine in
+        guard await frameAllowed(frame, id: id, engine: engine) else { return .refused }
         let session = URLSession(configuration: .ephemeral, delegate: RefuseRedirects.shared,
                                  delegateQueue: nil)
         let task = session.webSocketTask(with: request)
@@ -166,6 +179,7 @@ enum U1Camera {
         for (name, value) in plan.headers { request.setValue(value, forHTTPHeaderField: name) }
         guard let (data, response) = try? await (get ?? httpGet)(request),
               (response as? HTTPURLResponse)?.statusCode == 200,
+              data.count <= lightReplyCap,
               let body = try? JSONDecoder().decode(JSONValue.self, from: data) else { return nil }
         return try? await engine.chamberLightState(body)
     }
@@ -192,8 +206,23 @@ enum U1Camera {
         return await readLight(machine, shop: shop, get: get, lookUp: lookUp)
     }
 
+    /// The light's reply is a few hundred bytes; anything past this is not
+    /// the printer's answer, and is not read into memory.
+    static let lightReplyCap = 64 * 1024
+
+    /// Thrown when a reply runs past its cap.
+    struct TooLarge: Error {}
+
+    /// A call to the printer that STREAMS its reply and stops at the cap,
+    /// rather than buffering whatever the other end sends and checking after.
     static let httpGet: Get = { request in
-        try await URLSession.shared.data(for: request, delegate: RefuseRedirects.shared)
+        let (bytes, response) = try await URLSession.shared.bytes(for: request, delegate: RefuseRedirects.shared)
+        var data = Data()
+        for try await byte in bytes {
+            data.append(byte)
+            if data.count > lightReplyCap { throw TooLarge() }
+        }
+        return (data, response)
     }
 }
 
@@ -216,15 +245,25 @@ extension Camera {
         watchers[machine.id, default: 0] += 1
         guard watchers[machine.id] == 1 else { return }
         let id = machine.id
-        waking[id] = Task { [weak self] in
+        waking[id] = Task { [weak self, weak shop] in
             while !Task.isCancelled {
-                guard let self,
+                guard let self, let shop,
                       let current = shop.machines.first(where: { $0.id == id }),
-                      let step = await U1Camera.keepAwake(current, shop: shop) else { return }
+                      let step = await U1Camera.keepAwake(current, shop: shop) else { break }
                 if step.outcome == .ok { self.askSoon(id) }
                 try? await Task.sleep(for: step.renew)
             }
+            // Stopped by itself (not a camera that needs keeping, or the
+            // machine went): forget this machine, so a tile that appears later
+            // starts afresh instead of finding a count with no renewal behind it.
+            if !Task.isCancelled { self?.stoppedWaking(id) }
         }
+    }
+
+    /// The renewal ended on its own: no count is left without a task.
+    func stoppedWaking(_ id: String) {
+        watchers[id] = nil
+        waking[id] = nil
     }
 
     /// The tile went away. The last one stops the renewals — and sends no
