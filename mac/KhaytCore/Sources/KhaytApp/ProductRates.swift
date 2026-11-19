@@ -68,7 +68,24 @@ enum ProductRates {
         var out: [String: JSONValue] = [:]
         if let r = rest["rates"], case .object = r { out["rates"] = r }
         if let l = rest["labourPerPart"] { out["labourPerPart"] = l }
+        // How many fit one box (#2586): the rule boxes a line of N by it.
+        if let b = rest["perBox"] { out["perBox"] = b }
         return out
+    }
+
+    /// Pieces per box as the field shows it; blank is the rule's default (1).
+    static func perBoxText(_ rest: [String: JSONValue]) -> String {
+        guard let n = Shop.plainNumber(rest["perBox"]), n >= 1 else { return "" }
+        return Money.fieldValue(n)
+    }
+
+    /// A typed pieces-per-box onto the product: a whole number of at least 1,
+    /// blank removes it (one box each).
+    static func setPerBox(_ rest: inout [String: JSONValue], _ typed: String) {
+        let t = typed.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { rest.removeValue(forKey: "perBox"); return }
+        guard let n = TypedNumber.parse(t), n.isFinite, n >= 1 else { return }
+        rest["perBox"] = .number(min(9999, n.rounded()))
     }
 }
 
@@ -76,19 +93,22 @@ enum ProductRates {
 struct ProductRatesSection: View {
     let shop: Shop
     @Binding var rest: [String: JSONValue]
+    /// The product as the rule prices it (parts and pricing fields), for the
+    /// "For N pieces" preview.
+    var record: JSONValue
     var reprice: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             GroupBox {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(shop.words.callIt("mac.prod_labour_note"))
+                    Text(shop.words.callIt("mac.prod_labour_line_note"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
                         row("calc.labor.rate", "laborRate", unit: shop.currency)
-                        row("calc.labor.prep", "prepTime", unit: shop.words.callIt("common.hours"))
-                        row("calc.labor.post", "postTime", unit: shop.words.callIt("common.hours"))
+                        row("mac.prod_prep_line", "prepTime", unit: shop.words.callIt("common.hours"))
+                        row("mac.prod_post_piece", "postTime", unit: shop.words.callIt("common.hours"))
                     }
                     Toggle(shop.words.callIt("mac.prod_labour_per_part"), isOn: Binding(
                         get: { ProductRates.labourPerPart(rest) },
@@ -97,7 +117,7 @@ struct ProductRatesSection: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             } label: {
-                Text(shop.words.callIt("mac.prod_labour_once")).font(.subheadline.weight(.semibold))
+                Text(shop.words.callIt("mac.prod_labour_line_title")).font(.subheadline.weight(.semibold))
             }
             GroupBox {
                 VStack(alignment: .leading, spacing: 6) {
@@ -114,6 +134,37 @@ struct ProductRatesSection: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             } label: {
                 Text(shop.words.callIt("mac.prod_machine")).font(.subheadline.weight(.semibold))
+            }
+            // Packaging by the box (Figma 180:223). The packaging per box is
+            // the shop's (Settings); what a product says is how many fit one.
+            GroupBox {
+                VStack(alignment: .leading, spacing: 6) {
+                    Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                        GridRow {
+                            Text(shop.words.callIt("mac.prod_per_box")).gridColumnAlignment(.trailing)
+                                .font(.caption).foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
+                                TextField("1", text: Binding(
+                                    get: { ProductRates.perBoxText(rest) },
+                                    set: { ProductRates.setPerBox(&rest, $0); reprice() }))
+                                    .textFieldStyle(.roundedBorder).frame(width: 70).monospacedDigit()
+                                    .accessibilityLabel(shop.words.callIt("mac.prod_per_box"))
+                                Text(shop.words.callIt("mac.prod_pieces")).font(.caption2).foregroundStyle(Khayt.faint)
+                                Spacer()
+                            }
+                        }
+                    }
+                    Text(shop.words.callIt("mac.prod_per_box_note", [
+                        "amount": .string(Money.text(shop.packagingPerBox, shop.currency))]))
+                        .font(.caption2).foregroundStyle(Khayt.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } label: {
+                Text(shop.words.callIt("mac.prod_packaging_box")).font(.subheadline.weight(.semibold))
+            }
+            if !ProductRates.labourPerPart(rest) {
+                ProductLinePreview(shop: shop, record: record)
             }
         }
     }
@@ -171,5 +222,64 @@ struct ProductRatesNotice: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Khayt.attention.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// "What it costs to make, for N pieces" (Figma 180:223): the product as one
+/// line of N through the shared rule (`productJobParts` with `units`), prep
+/// once, finishing per piece, packaging by the box. Every figure is the lib's.
+struct ProductLinePreview: View {
+    let shop: Shop
+    let record: JSONValue
+    @State private var units = 10
+    @State private var line: Shop.ProductLine?
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text(shop.words.callIt("mac.prod_for_n")).font(.caption).foregroundStyle(.secondary)
+                    TextField("", value: $units, format: .number.locale(Money.digits))
+                        .textFieldStyle(.roundedBorder).frame(width: 60).monospacedDigit()
+                        .accessibilityLabel(shop.words.callIt("mac.prod_for_n"))
+                    Stepper("", value: $units, in: 1...9999).labelsHidden()
+                    Text(shop.words.callIt("mac.prod_pieces")).font(.caption2).foregroundStyle(Khayt.faint)
+                }
+                if let line {
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+                        figure(shop.words.callIt("mac.prod_line_parts"), line.parts)
+                        figure(shop.words.callIt("mac.prod_line_labour", ["n": .number(Double(line.units))]), line.labour)
+                        figure(shop.words.callIt("mac.prod_line_packaging", ["boxes": .number(line.boxes)]), line.packaging)
+                        figure(shop.words.callIt("mac.prod_line_cost"), line.cost, bold: true)
+                        figure(shop.words.callIt("mac.prod_line_per_piece"), line.perPiece)
+                    }
+                    .font(.caption)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(shop.words.callIt("mac.prod_line_title")).font(.subheadline.weight(.semibold))
+        }
+        .task(id: Key(record: record, units: units)) {
+            // A quarter second after the last keystroke, as Recalculate's
+            // preview: four engine calls per digit typed was the cost before,
+            // and a superseded answer must not land over a newer one.
+            try? await Task.sleep(for: .milliseconds(250))
+            if Task.isCancelled { return }
+            let next = await shop.productLine(record, units: max(1, min(9999, units)))
+            if Task.isCancelled { return }
+            line = next
+        }
+    }
+
+    private struct Key: Equatable { let record: JSONValue; let units: Int }
+
+    private func figure(_ label: String, _ amount: Double, bold: Bool = false) -> some View {
+        GridRow {
+            Text(label).fontWeight(bold ? .semibold : .regular)
+            Text(Money.text(amount, shop.currency)).monospacedDigit()
+                .fontWeight(bold ? .semibold : .regular)
+                .gridColumnAlignment(.trailing)
+        }
     }
 }
