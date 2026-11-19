@@ -68,18 +68,20 @@ test('delivered counts — it is completed work that moved on', () => {
   assert.equal(rollup([job({ status: 'delivered' })]).jobs, 1);
 });
 
-test('two currencies refuse to add rather than producing a number', () => {
-  // 12 SAR + 3 EUR = 15 of nothing. A shop mid-migration is the realistic case.
+test('jobs in two currencies still add up: costBasis is the SHOP\'s figure in every job', () => {
+  // costBasis is the parts' baseCost, always the shop's currency (newOrder
+  // converts the price, never the cost), so a SAR job and a EUR job's costs
+  // are both riyals and add up (money review, Nov 19). It used to refuse.
   const r = rollup([job({ currency: 'SAR', costBasis: 12 }), job({ currency: 'EUR', costBasis: 3 })]);
-  assert.equal(r.mixedCurrency, true);
-  assert.equal(r.cost, null, 'a mixed-currency total was invented');
-  assert.equal(r.currency, null);
+  assert.equal(r.mixedCurrency, false);
+  assert.equal(r.cost, 15);
+  assert.equal(r.currency, null, 'the shop\'s currency: the caller names it');
 });
 
-test('one currency totals normally and is named', () => {
+test('one currency totals normally', () => {
   const r = rollup([job({ costBasis: 12 }), job({ costBasis: 3 })]);
   assert.equal(r.cost, 15);
-  assert.equal(r.currency, 'SAR');
+  assert.equal(r.currency, null, 'the shop\'s currency: the caller names it');
   assert.equal(r.mixedCurrency, false);
   assert.equal(r.costed, 2);
 });
@@ -126,7 +128,7 @@ test('the delta matches the four real jobs this was built from', () => {
   assert.equal(r.actualHours, 69.2);
   assert.equal(r.actualGrams, 1273.03);
   assert.equal(r.cost, 95.5);
-  assert.equal(r.currency, 'SAR');
+  assert.equal(r.currency, null);
   const a = accuracy(r);
   // Every one of these four ran under its estimate, so the kit must too.
   assert.ok(a.time < 0, `expected the kit to run under estimate, got ${a.time}%`);

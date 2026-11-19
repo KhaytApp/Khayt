@@ -97,6 +97,7 @@ try {
       base('JS-PCT', { status: 'quote', quoteShareStamped: true, statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }],
         extraLines: [{ id: 'EL-P', label: 'Design fee', pct: 10, amount: 34 }] }),
       base('JS-LOYAL', { clientId: 'C-LOYAL' }),
+      base('JS-REP', { price: 999, priceSource: 'override', priceOverride: 999, computedPrice: 999, marginPct: 30 }),
       base('JS-COL', { dueDate: '2099-01-10' }),
       base('JS-COLDONE', { status: 'completed', materialDeducted: true, costBasis: 100, dueDate: '2099-01-10' }),
     );
@@ -390,6 +391,18 @@ try {
   ok(colDone2.parts[0].colour === 'Gold' && colDone2.price === colDone.price, 'a finished job may still correct a colour');
   const cleared = await editColour('JS-COL', '');
   ok(/colour: not set/.test(cleared) && (await job('JS-COL')).parts[0].colour === '', 'a cleared colour is saved as cleared and reads "not set"');
+
+  // ── Recalculate from parts (lib/order-edit.js repriceFromParts) ─────────
+  await openSheet('JS-REP');
+  await window.click('#modalMount [data-js="reprice"]');
+  await window.waitForSelector('.confirm-modal-overlay [data-act="ok"]', { state: 'visible', timeout: 5_000 });
+  ok(/999/.test(await window.textContent('.confirm-modal-overlay')), 'Recalculate shows the typed 999 and the price from the parts before anything changes');
+  await window.click('.confirm-modal-overlay [data-act="ok"]');
+  await closed(); await window.click('#jobPage [data-jp="back"]');
+  const rep = await job('JS-REP');
+  const expect = await window.evaluate(() => { const o = printLog.find((x) => x.id === 'JS-REP');
+    return KhaytOrderNew.previewTotal({ parts: o.parts, margin: 30, discountPct: 0, overheadPerHour: typeof shopOverheadPerHour === 'function' ? shopOverheadPerHour() : 0 }, { settings, clients }).total; });
+  ok(rep.price === expect && rep.priceSource !== 'override' && !('priceOverride' in rep), `the job is priced from its parts as a new job would be (${rep.price}), the typed price gone`);
 
   const before = await window.evaluate(() => printLog.length);
   await switchTab(window, 'logs-tab');

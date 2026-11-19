@@ -69,6 +69,18 @@ enum L10n {
     /// sends English, as the Mac does.
     static var contentLanguage: String { usesArabicLayout ? "ar" : "en" }
 
+    /// The app's language as the shared engine names its catalogues
+    /// (`KhaytEngine.translations`, KhaytCore's `locale-*.js`): `zh`, not
+    /// `zh-Hans`. For a rule's own words — a refusal shown as the Mac and the
+    /// desktop show it — in the language the phone is set to.
+    static var engineLanguage: String {
+        let code = currentLanguage.bundleCode ?? Bundle.main.preferredLocalizations.first ?? "en"
+        if code.hasPrefix("zh") { return "zh" }
+        if code.hasPrefix("pt") { return "pt-BR" }
+        let base = String(code.prefix(2))
+        return ["en", "ar", "de", "es", "fr", "ja", "tr"].contains(base) ? base : "en"
+    }
+
     static func setLanguage(_ language: AppLanguage) {
         currentLanguage = language
         bundle = language.bundleCode.flatMap(bundleFor) ?? .main
