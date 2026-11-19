@@ -4,7 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Fixed (desktop, privacy): Khayt contacted the crash-reporting service on every launch, even with crash reports off.** Crash reports are opt-in, and a report was never sent without consent, but the crash reporter itself was started on every launch, and its session heartbeat (the app version, and that a session started and ended) went to sentry.io regardless. The crash reporter now starts only for a shop that has turned crash reports on, and never sends session heartbeats even then. Turning crash reports on takes effect the next time Khayt starts.
 - **All apps: a product's labour and packaging are carried once on the job, and a job's cost comes from one place.** A job taken from a product with its own rates keeps the product's labour and packaging as two job-level costs, not inside every part, so its cost equals the catalogue's. Editing a part, recalculating from parts, duplicating, reprinting and every report (profit by product, break-even, the dashboard's cost of goods, the job's profitability) count them once. When some parts have an agreed price, the labour and packaging are priced only on the parts that are not agreed. A part added by hand to such a job keeps its own labour. Jobs taken before this are unchanged.
 - **Mac: the slicer plugin's queue ETag no longer gives the queue away (off until "Pair a slicer" is switched on).** The queue a plugin reads is encrypted, but its ETag was a plain hash of the same content, sent in the clear, so someone on the shop's network could check a guess about the queue against it. It is now keyed to that plugin's own key, so it only says "unchanged" and is never the same for two plugins.
 - **All apps: a job's price can be recalculated from its parts.** "Recalculate from parts…" on the desktop job sheet (and the shared rule the Mac and iPhone use) prices a job again exactly as a new job would be priced today: its parts, discount, rush, shipping, extra charges (a percentage charge worked out again), overhead and rounding, at the markup shown, and at the exchange rate the job was taken at. A price that was typed is replaced. It shows the old and new price first, and is held by the same locks as typing a price: not on a job whose invoice has left the shop, never below what has been paid, and asked first when the customer has seen the price.
@@ -7035,6 +7034,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [4.10.3] - 2026-11-19
+
+### Before you update
+
+- **If you are updating from 4.9 or earlier, Settings, the job page, Simple mode and the stage colours have changed: read this before you update.** Settings is one window with 14 panes in a sidebar, named as on the Mac app, in place of the strip of tabs; each setting is under the pane its name says, and File ▸ Settings… (Ctrl+,) opens it. In Jobs, a job's ⋯ menu has **Open page**, and the page's **Edit** opens one sheet for the whole job (Job, Parts, Price) with a **Markup** field and the new total shown before you save; **New job** opens the same sheet empty. "Target profit margin" is now called **Markup**: the same number and the same arithmetic. In Simple mode the board has four columns (Quote, Queued, Printing, Ready) and the screens that belong to Professional are left out; switch to Professional to have them back. Printing is amber in every theme and a job on hold is purple; in Arabic, Pending reads «بانتظار» and On hold «متوقف مؤقتاً». Once, in the background, Khayt reads your library's 3MF files again, so some cards show fewer colour dots: the colours the print uses, not every spool the printer had loaded. If you already run 4.10.0, nothing here is new to you; accept to continue.
+
+### Privacy
+
+- **Privacy: crash reporting no longer contacts Sentry at all unless you opted in.** Crash reports are opt-in, and a report was never sent without consent, but the crash reporter itself was started on every launch, and its session heartbeat (the app version, and that a session started and ended) went to sentry.io regardless. The crash reporter now starts only for a shop that has turned crash reports on, and never sends session heartbeats even then. Turning crash reports on takes effect the next time Khayt starts.
 
 ## [4.10.2] - 2026-11-17
 
