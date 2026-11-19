@@ -3123,7 +3123,11 @@ function appendProductParts(p) {
     // seven on every part it saves, so the job records what it was charged.
     const PRt = (typeof window !== 'undefined' && window.KhaytPrintRates) || null;
     const rated = PRt ? PRt.withRates(part, { settings: typeof settings !== 'undefined' ? settings : {} }) : part;
-    const partCopy = { ...rated, id: uid('PRT') };
+    // A product costed the old way keeps its labour per piece, prep included
+    // (labourEachPiece, KhaytOrderMoney.lineLabour), so the job costs what
+    // the catalogue says until the shop chooses "Use the new cost" (Turki,
+    // Nov 19).
+    const partCopy = { ...rated, id: uid('PRT'), labourEachPiece: true };
     if (!partCopy.material && partCopy.filamentId) {
       const inv = inventory.find(i => i.id === partCopy.filamentId);
       if (inv) partCopy.material = inv.material;

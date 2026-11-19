@@ -94,14 +94,29 @@
    * (lib/product-pricing.js productLabourCost). For qty 1 it is what it was:
    * (prep + post) × rate.
    */
-  function labourCostOf(part) {
-    const p = part || {};
+  /**
+   * One piece's share of the line's packaging: the shop's packaging × the
+   * boxes the line ships in (KhaytOrderMoney.lineBoxes: ceil(qty / perBox)
+   * with the part's own `perBox`; one box for the line when unsaid, as it
+   * always was) ÷ qty.
+   */
+  function packagingShare(part, settings) {
+    const Mo = moneyRules();
+    const qty = Math.max(1, +part.qty || 1);
+    return Math.max(0, +(settings && settings.defaultPackagingCost) || 0) * Mo.lineBoxes(qty, part.perBox) / qty;
+  }
+
+  function moneyRules() {
     const Mo = global.KhaytOrderMoney
       || (typeof require === 'function' ? (() => { try { return require('./order-money.js'); } catch (_) { return null; } })() : null);
-    // Never priced silently without labour: every page and the Mac load
-    // order-money before this file.
+    // Never priced silently: every page and the Mac load order-money first.
     if (!Mo || typeof Mo.lineLabour !== 'function') throw new Error('KhaytOrderMoney.lineLabour is not loaded');
-    return Mo.lineLabour(p) / Math.max(1, +p.qty || 1);
+    return Mo;
+  }
+
+  function labourCostOf(part) {
+    const p = part || {};
+    return moneyRules().lineLabour(p) / Math.max(1, +p.qty || 1);
   }
 
   /**
@@ -175,7 +190,7 @@
       }
     }
     const packagingCost = withPackaging
-      ? Math.max(0, +settings.defaultPackagingCost || 0) / Math.max(1, +part.qty || 1) : 0;
+      ? packagingShare(part, settings) : 0;
     const consumablesCost = partConsumablesCost(part, ctx);
     const baseCost = materialCost + wearCost + powerCost + laborCost + extraMatCost + packagingCost
       + consumablesCost;
@@ -227,7 +242,7 @@
       }
     }
     const packagingCost = withPackaging
-      ? Math.max(0, +settings.defaultPackagingCost || 0) / Math.max(1, +part.qty || 1) : 0;
+      ? packagingShare(part, settings) : 0;
     // Fold extra materials, packaging and the part's consumables into the
     // material bucket (no separate chip);
     // this keeps the {material, machine, labor, buffer} sum == committed base cost.

@@ -1,17 +1,193 @@
 {
-  "about": "Labour on a line of work (Turki, Nov 19): PREP once per line, POST-processing / assembly PER PIECE. KhaytOrderMoney.lineLabour(line) = (prepTime + postTime x qty) x laborRate, before any failure buffer. A part is a line (its own qty); a product is a line (qty = how many of the product; its parts' qty do not multiply post); a store order's line of N products is a line. Every case below runs through the shared lib the Mac and the phone load. Before this rule, prep was charged per piece: +24.75 a piece at the defaults (0.25 h x 90 x 1.1).",
-  "rates": { "laborRate": 90, "prepTime": 0.25, "postTime": 0.5, "wearRate": 0, "powerDraw": 0, "elecRate": 0, "failureRate": 10 },
-  "settings": { "currency": "SAR", "defaultMargin": 30, "defaultPackagingCost": 5 },
+  "about": "Labour on a line of work (Turki, Nov 19): PREP once per line, POST-processing / assembly PER PIECE. KhaytOrderMoney.lineLabour(line) = (prepTime + postTime x qty) x laborRate, before any failure buffer. A part is a line (its own qty); a product is a line (qty = how many of the product; its parts' qty do not multiply post); a store order's line of N products is a line. Every case below runs through the shared lib the Mac and the phone load. Before this rule, prep was charged per piece: +24.75 a piece at the defaults (0.25 h x 90 x 1.1). Packaging (Turki, Nov 19, \"depends on size\"): a line of N ships in KhaytOrderMoney.lineBoxes(N, perBox) = ceil(N / perBox) boxes; a product's perBox defaults to 1 (a box each, as before); a hand part without perBox is one box for the line, as before. Existing products (no rates, or labourPerPart) keep the OLD labour, prep and post on every piece, through the part mark labourEachPiece, until the shop chooses \"Use the new cost\" (option ii).",
+  "rates": {
+    "laborRate": 90,
+    "prepTime": 0.25,
+    "postTime": 0.5,
+    "wearRate": 0,
+    "powerDraw": 0,
+    "elecRate": 0,
+    "failureRate": 10
+  },
+  "settings": {
+    "currency": "SAR",
+    "defaultMargin": 30,
+    "defaultPackagingCost": 5
+  },
   "cases": [
-    { "why": "lineLabour, qty 1: (0.25 + 0.5) x 90 = 67.50 (unchanged)", "kind": "lineLabour", "qty": 1, "want": 67.5 },
-    { "why": "lineLabour, qty 10: (0.25 + 0.5 x 10) x 90 = 472.50 (was 675.00: prep charged ten times)", "kind": "lineLabour", "qty": 10, "want": 472.5 },
-    { "why": "a hand part, qty 1, labour only: 67.50 x 1.1 = 74.25 (unchanged)", "kind": "part", "qty": 1, "want": 74.25 },
-    { "why": "a hand part, qty 10, labour only: 472.50 x 1.1 = 519.75 (was 742.50, 222.75 more)", "kind": "part", "qty": 10, "want": 519.75 },
-    { "why": "a hand part, qty 10, with 100 g at 90/kg: (9.00 x 10 + 472.50 + packaging 5 once) x 1.1 = 624.25", "kind": "part", "qty": 10, "printWeight": 100, "spoolCost": 90, "spoolWeight": 1000, "packaging": true, "want": 624.25 },
-    { "why": "a product (own rates) x 1: labour once 74.25, packaging 5.50", "kind": "product", "units": 1, "want": { "labourCost": 74.25, "packagingCost": 5.5, "partQty": [1, 2] } },
-    { "why": "a product x 10: prep once + post x 10: (0.25 + 5) x 90 x 1.1 = 519.75; a box each: 55.00; the parts x 10", "kind": "product", "units": 10, "want": { "labourCost": 519.75, "packagingCost": 55, "partQty": [10, 20] } },
-    { "why": "a once-job product with a multi-qty part (b, qty 2): the parts carry no labour of their own, the product's post is NOT multiplied by b's qty", "kind": "product", "units": 1, "want": { "labourCost": 74.25, "packagingCost": 5.5, "partQty": [1, 2], "partsWithoutLabour": true } },
-    { "why": "an agreed-price line: 5 at 20 agreed is priced 100 whatever its labour; its cost carries prep once: (0.25 + 0.5 x 5) x 90 x 1.1 = 272.25", "kind": "agreed", "qty": 5, "agreedPrice": 20, "want": { "price": 100, "baseCost": 272.25 } },
-    { "why": "a store order's line of 3 of the product: prep once + post x 3 = (0.25 + 1.5) x 90 x 1.1 = 173.25 on the job; 3 boxes 16.50", "kind": "store", "units": 3, "want": { "labourCost": 173.25, "packagingCost": 16.5, "partQty": [3, 6] } }
+    {
+      "why": "lineLabour, qty 1: (0.25 + 0.5) x 90 = 67.50 (unchanged)",
+      "kind": "lineLabour",
+      "qty": 1,
+      "want": 67.5
+    },
+    {
+      "why": "lineLabour, qty 10: (0.25 + 0.5 x 10) x 90 = 472.50 (was 675.00: prep charged ten times)",
+      "kind": "lineLabour",
+      "qty": 10,
+      "want": 472.5
+    },
+    {
+      "why": "a hand part, qty 1, labour only: 67.50 x 1.1 = 74.25 (unchanged)",
+      "kind": "part",
+      "qty": 1,
+      "want": 74.25
+    },
+    {
+      "why": "a hand part, qty 10, labour only: 472.50 x 1.1 = 519.75 (was 742.50, 222.75 more)",
+      "kind": "part",
+      "qty": 10,
+      "want": 519.75
+    },
+    {
+      "why": "a hand part, qty 10, with 100 g at 90/kg: (9.00 x 10 + 472.50 + packaging 5 once) x 1.1 = 624.25",
+      "kind": "part",
+      "qty": 10,
+      "printWeight": 100,
+      "spoolCost": 90,
+      "spoolWeight": 1000,
+      "packaging": true,
+      "want": 624.25
+    },
+    {
+      "why": "a product (own rates) x 1: labour once 74.25, packaging 5.50",
+      "kind": "product",
+      "units": 1,
+      "want": {
+        "labourCost": 74.25,
+        "packagingCost": 5.5,
+        "partQty": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "why": "a product x 10: prep once + post x 10: (0.25 + 5) x 90 x 1.1 = 519.75; a box each: 55.00; the parts x 10",
+      "kind": "product",
+      "units": 10,
+      "want": {
+        "labourCost": 519.75,
+        "packagingCost": 55,
+        "partQty": [
+          10,
+          20
+        ]
+      }
+    },
+    {
+      "why": "a once-job product with a multi-qty part (b, qty 2): the parts carry no labour of their own, the product's post is NOT multiplied by b's qty",
+      "kind": "product",
+      "units": 1,
+      "want": {
+        "labourCost": 74.25,
+        "packagingCost": 5.5,
+        "partQty": [
+          1,
+          2
+        ],
+        "partsWithoutLabour": true
+      }
+    },
+    {
+      "why": "an agreed-price line: 5 at 20 agreed is priced 100 whatever its labour; its cost carries prep once: (0.25 + 0.5 x 5) x 90 x 1.1 = 272.25",
+      "kind": "agreed",
+      "qty": 5,
+      "agreedPrice": 20,
+      "want": {
+        "price": 100,
+        "baseCost": 272.25
+      }
+    },
+    {
+      "why": "a store order's line of 3 of the product: prep once + post x 3 = (0.25 + 1.5) x 90 x 1.1 = 173.25 on the job; 3 boxes 16.50",
+      "kind": "store",
+      "units": 3,
+      "want": {
+        "labourCost": 173.25,
+        "packagingCost": 16.5,
+        "partQty": [
+          3,
+          6
+        ]
+      }
+    },
+    {
+      "why": "lineLabour, qty 10, labourEachPiece (a product saved before this): (0.25 + 0.5) x 10 x 90 = 675.00, the old sum",
+      "kind": "lineLabour",
+      "qty": 10,
+      "labourEachPiece": true,
+      "want": 675
+    },
+    {
+      "why": "a product x 10, perBox 1 (the default): 10 boxes, 10 x 5 x 1.1 = 55.00",
+      "kind": "product",
+      "units": 10,
+      "perBox": 1,
+      "want": {
+        "labourCost": 519.75,
+        "packagingCost": 55,
+        "partQty": [
+          10,
+          20
+        ]
+      }
+    },
+    {
+      "why": "a product x 10, perBox 4: ceil(10 / 4) = 3 boxes, 16.50",
+      "kind": "product",
+      "units": 10,
+      "perBox": 4,
+      "want": {
+        "labourCost": 519.75,
+        "packagingCost": 16.5,
+        "partQty": [
+          10,
+          20
+        ]
+      }
+    },
+    {
+      "why": "a product x 10, perBox 12: one box, 5.50",
+      "kind": "product",
+      "units": 10,
+      "perBox": 12,
+      "want": {
+        "labourCost": 519.75,
+        "packagingCost": 5.5,
+        "partQty": [
+          10,
+          20
+        ]
+      }
+    },
+    {
+      "why": "a hand part qty 10, perBox 4, 100 g at 90/kg: (90 + 472.50 + 3 boxes x 5) x 1.1 = 635.25",
+      "kind": "part",
+      "qty": 10,
+      "perBox": 4,
+      "printWeight": 100,
+      "spoolCost": 90,
+      "spoolWeight": 1000,
+      "packaging": true,
+      "want": 635.25
+    },
+    {
+      "why": "an EXISTING product (no rates), a part of qty 10: catalogue keeps the old labour, (0.25 + 0.5) x 90 x 10 + packaging 5 once, x 1.1 = 748.00; a job and a store order from it carry the same, marked labourEachPiece",
+      "kind": "legacyProduct",
+      "qty": 10,
+      "want": {
+        "cost": 748
+      }
+    },
+    {
+      "why": "the same product after \"Use the new cost\" (rates given, labour once): parts carry no labour; the product's labour once 74.25 + one box 5.50 = 79.75",
+      "kind": "legacyProduct",
+      "qty": 10,
+      "newCost": true,
+      "want": {
+        "cost": 79.75
+      }
+    }
   ]
 }

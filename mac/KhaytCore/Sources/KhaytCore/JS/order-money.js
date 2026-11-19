@@ -356,10 +356,29 @@
    * call it, and so do the Mac and the phone. It used to be (prep + post) ×
    * rate per PIECE, so prep was charged qty times: +24.75 a piece by default.
    */
+  /**
+   * How many boxes a line of `qty` pieces ships in (Turki, Nov 19: "depends
+   * on size"): `perBox` is how many fit one box. A whole number >= 1 gives
+   * ceil(qty / perBox); unsaid (or not a usable number) is ONE box for the
+   * line, a hand part's packaging as it always was. A product passes its own
+   * perBox, 1 by default (a box each, as before).
+   */
+  function lineBoxes(qty, perBox) {
+    const q = Math.max(1, Math.floor(+qty || 1));
+    const b = Math.floor(+perBox);
+    if (!(perBox !== undefined && perBox !== null && perBox !== '' && b >= 1)) return 1;
+    return Math.ceil(q / b);
+  }
+
   function lineLabour(line) {
     const l = line || {};
     const pos = (v) => Math.max(0, +v || 0);
     const qty = Math.max(1, +l.qty || 1);
+    // `labourEachPiece: true`: the OLD sum, prep and post on every piece. A
+    // part of a product saved before this (no rates, or labour per part) is
+    // marked so, and keeps its catalogue figure until the shop chooses "Use
+    // the new cost" (Turki, Nov 19, option ii): nothing re-prices silently.
+    if (l.labourEachPiece === true) return (pos(l.prepTime) + pos(l.postTime)) * qty * pos(l.laborRate);
     return (pos(l.prepTime) + pos(l.postTime) * qty) * pos(l.laborRate);
   }
 
@@ -401,6 +420,7 @@
 
   const api = {
     lineLabour,
+    lineBoxes,
     HAND_PARTS_SHARE_ONCE: false,   // Turki, Nov 19 (see addedPartMark)
     addedPartMark,
     jobCost, jobFixedCost,

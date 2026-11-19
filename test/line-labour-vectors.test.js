@@ -18,17 +18,18 @@ const product = { id: 'PR', rates: V.rates, parts: [
   { name: 'a', printWeight: 0, printTime: 0, qty: 1 },
   { name: 'b', printWeight: 0, printTime: 0, qty: 2 },
 ] };
-const part = (c) => Object.assign({ name: 'p', printWeight: c.printWeight || 0, printTime: 0, spoolCost: c.spoolCost || 0, spoolWeight: c.spoolWeight || 1000, qty: c.qty }, V.rates);
+const part = (c) => Object.assign({ name: 'p', printWeight: c.printWeight || 0, printTime: 0, spoolCost: c.spoolCost || 0, spoolWeight: c.spoolWeight || 1000, qty: c.qty }, c.perBox ? { perBox: c.perBox } : {}, V.rates);
 
 for (const c of V.cases) {
   test(c.why, () => {
     if (c.kind === 'lineLabour') {
-      assert.equal(r2(Mo.lineLabour(Object.assign({ qty: c.qty }, V.rates))), c.want);
+      assert.equal(r2(Mo.lineLabour(Object.assign({ qty: c.qty, labourEachPiece: c.labourEachPiece }, V.rates))), c.want);
     } else if (c.kind === 'part') {
       const s = c.packaging ? settings : Object.assign({}, settings, { defaultPackagingCost: 0 });
       assert.equal(r2(CC.partTotalCost(part(c), { inventory: [], settings: s })), c.want);
     } else if (c.kind === 'product') {
-      const jp = PP.productJobParts(product, { inventory: [], settings, units: c.units });
+      const prod = c.perBox ? Object.assign({}, product, { perBox: c.perBox }) : product;
+      const jp = PP.productJobParts(prod, { inventory: [], settings, units: c.units });
       assert.equal(r2(jp.labourCost), c.want.labourCost);
       assert.equal(r2(jp.packagingCost), c.want.packagingCost);
       assert.deepEqual(jp.parts.map((p) => p.qty), c.want.partQty);
@@ -48,6 +49,17 @@ for (const c of V.cases) {
       assert.deepEqual(out.parts.map((p) => p.qty), c.want.partQty);
       const job = SJ.apply({ id: 'S1', parts: [] }, out);
       assert.equal(r2(Mo.jobFixedCost(job, { components: false, overhead: false })), r2(c.want.labourCost + c.want.packagingCost), 'on the job, once');
+    } else if (c.kind === 'legacyProduct') {
+      // A product saved before this: no rates, its part carries the shop's.
+      const prod = { id: 'OLD', defaultMargin: 30, parts: [Object.assign({ name: 'p', printWeight: 0, printTime: 0, qty: c.qty }, V.rates)] };
+      if (c.newCost) prod.rates = V.rates;
+      const book = { inventory: [], settings, consumables: [] };
+      assert.equal(PP.priceProduct(prod, book).cost, c.want.cost, 'catalogue');
+      const jp = PP.productJobParts(prod, book);
+      assert.equal(r2(jp.parts.reduce((s, p) => s + p.baseCost, 0) + jp.labourCost + jp.packagingCost), c.want.cost, 'a job from it');
+      for (const p of jp.parts) assert.equal(p.labourEachPiece === true, !c.newCost);
+      const out = SJ.build({ lines: [{ name: 'OLD', productId: 'OLD', qty: 1, toPrint: 1 }] }, { products: [prod], settings, inventory: [], consumables: [] }, 'S2');
+      assert.equal(r2(out.parts.reduce((s, p) => s + p.baseCost, 0) + (out.labourCost || 0) + (out.packagingCost || 0)), c.want.cost, 'a store order from it');
     } else {
       throw new Error('unknown kind ' + c.kind);
     }
