@@ -150,7 +150,14 @@ extension Shop {
             // on the old sum. Now the part's own record is the base, and only
             // the keys written below (and `id`, which a copied job must not
             // carry over) are taken from what the sheet says.
-            var row: [String: JSONValue] = p.raw.filter { !Self.ownedPartKeys.contains($0.key) }
+            // A part's RATES are only taken off when the sheet has its own to
+            // write: a costing that failed (`rates` nil) keeps the rates the
+            // part was costed at, rather than saving it with none (release
+            // data review).
+            let rateKeys = Set(ProductSheet.PartRow.rateKeys)
+            var row: [String: JSONValue] = p.raw.filter {
+                !Self.ownedPartKeys.contains($0.key) || (p.rates == nil && rateKeys.contains($0.key))
+            }
             let owned: [String: JSONValue] = [
                 "name": .string(p.name.isEmpty ? unnamed : p.name),
                 // `TypedNumber.parse`, as the sheet's own costing and totals

@@ -4099,5 +4099,7 @@
  "mac.prod_line_labour": "人件費：準備1回、仕上げ × {n}",
  "mac.prod_line_packaging": "梱包、箱数：{boxes}",
  "mac.prod_line_cost": "コスト",
- "mac.prod_line_per_piece": "1個あたり"
+ "mac.prod_line_per_piece": "1個あたり",
+ "mac.rc_markup_bad": "そのマークアップは数値ではありません。30 のように数値を入力してください。",
+ "mac.rc_not_saved": "新しい価格は保存されませんでした。もう一度お試しください。"
 }

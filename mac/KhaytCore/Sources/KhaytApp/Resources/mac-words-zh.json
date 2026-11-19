@@ -4099,5 +4099,7 @@
  "mac.prod_line_labour": "人工：准备一次，后处理 × {n}",
  "mac.prod_line_packaging": "包装，箱数：{boxes}",
  "mac.prod_line_cost": "成本",
- "mac.prod_line_per_piece": "每件"
+ "mac.prod_line_per_piece": "每件",
+ "mac.rc_markup_bad": "该加价不是数字。请输入数值，例如 30。",
+ "mac.rc_not_saved": "新价格未保存。请重试。"
 }

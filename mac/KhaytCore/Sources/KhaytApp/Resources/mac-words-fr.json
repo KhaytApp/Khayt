@@ -4099,5 +4099,7 @@
  "mac.prod_line_labour": "Main-d’œuvre : préparation une fois, finition × {n}",
  "mac.prod_line_packaging": "Emballage, boîtes : {boxes}",
  "mac.prod_line_cost": "Coût",
- "mac.prod_line_per_piece": "Par pièce"
+ "mac.prod_line_per_piece": "Par pièce",
+ "mac.rc_markup_bad": "Cette marge n’est pas un nombre. Saisissez un chiffre, par exemple 30.",
+ "mac.rc_not_saved": "Le nouveau prix n’a pas été enregistré. Réessayez."
 }

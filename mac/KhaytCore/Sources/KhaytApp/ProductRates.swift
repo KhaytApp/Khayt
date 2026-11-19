@@ -261,7 +261,14 @@ struct ProductLinePreview: View {
             Text(shop.words.callIt("mac.prod_line_title")).font(.subheadline.weight(.semibold))
         }
         .task(id: Key(record: record, units: units)) {
-            line = await shop.productLine(record, units: max(1, min(9999, units)))
+            // A quarter second after the last keystroke, as Recalculate's
+            // preview: four engine calls per digit typed was the cost before,
+            // and a superseded answer must not land over a newer one.
+            try? await Task.sleep(for: .milliseconds(250))
+            if Task.isCancelled { return }
+            let next = await shop.productLine(record, units: max(1, min(9999, units)))
+            if Task.isCancelled { return }
+            line = next
         }
     }
 

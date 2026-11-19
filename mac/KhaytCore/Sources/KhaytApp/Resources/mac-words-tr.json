@@ -4099,5 +4099,7 @@
  "mac.prod_line_labour": "İşçilik: hazırlık bir kez, son işlem × {n}",
  "mac.prod_line_packaging": "Ambalaj, kutu: {boxes}",
  "mac.prod_line_cost": "Maliyet",
- "mac.prod_line_per_piece": "Parça başına"
+ "mac.prod_line_per_piece": "Parça başına",
+ "mac.rc_markup_bad": "Bu kâr payı bir sayı değil. Bir sayı yazın, örneğin 30.",
+ "mac.rc_not_saved": "Yeni fiyat kaydedilmedi. Yeniden deneyin."
 }

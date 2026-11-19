@@ -67,6 +67,25 @@ import KhaytCore
         #expect(Shop.ledgerMoney(c).marginMoney == money.marginMoney)
     }
 
+    /// The ledger measures a job's margin without its overhead, as the
+    /// desktop's Orders Log does (`jobCost(o, {overhead: false})`; release
+    /// money review M3). `OrderFigures.cost` keeps it for every other reader.
+    @MainActor @Test("the ledger's cost leaves the overhead out, as the desktop's Orders Log")
+    func ledgerWithoutOverhead() async throws {
+        let engine = try KhaytEngine()
+        let job: JSONValue = .object(["id": .string("A"), "price": .number(300), "costBasis": .number(100),
+                                      "parts": .array([.object(["baseCost": .number(100)])]),
+                                      "overheadCost": .number(20)])
+        let figures = try #require(try await engine.orderFigures([job], settings: ["currency": .string("SAR")], clients: [])["A"])
+        #expect(figures.cost == 120, "OrderFigures.cost keeps the overhead")
+        #expect(figures.costWithoutOverhead == (try await engine.jobCost(job, overhead: false)))
+        #expect(figures.costWithoutOverhead == 100)
+        var order = try JSONDecoder().decode(Order.self, from: JSONEncoder().encode(job))
+        order.figures = figures
+        let money = Shop.ledgerMoney(order)
+        #expect(money.marginMoney.map { abs($0 - 200) < 1e-9 } == true, "300 − 100: the overhead is not in the ledger's cost")
+    }
+
     /// A part of a product that charges its labour once carries
     /// `orderLevelCosts` (#2581). Re-costed, it is costed without labour and
     /// packaging; an unmarked part on the same job (one added by hand) keeps

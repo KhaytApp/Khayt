@@ -4099,5 +4099,7 @@
  "mac.prod_line_labour": "Arbeit: Vorbereitung einmal, Nachbearbeitung × {n}",
  "mac.prod_line_packaging": "Verpackung, Kartons: {boxes}",
  "mac.prod_line_cost": "Kosten",
- "mac.prod_line_per_piece": "Pro Stück"
+ "mac.prod_line_per_piece": "Pro Stück",
+ "mac.rc_markup_bad": "Dieser Aufschlag ist keine Zahl. Gib eine Zahl ein, zum Beispiel 30.",
+ "mac.rc_not_saved": "Der neue Preis wurde nicht gespeichert. Versuche es erneut."
 }
