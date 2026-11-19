@@ -47,3 +47,11 @@ test('every word in the tables is in the fixture, so none is untested', () => {
   const missing = Object.keys(PA.WORDS).filter((w) => !seen.has(w) && !['pause', 'printing from sd', 'completed', 'canceled', 'canceling', 'connected', 'finish', 'running', 'changing tool'].includes(w));
   assert.deepEqual(missing, []);
 });
+
+test('FIX: a paused printer is busy, never offered as free (was idle)', () => {
+  const m = { printerApi: { type: 'moonraker' } };
+  for (const w of ['paused', 'Paused', 'PAUSED', 'pausing', 'Pausing']) {
+    assert.equal(PA.machineStatus(m, { state: w }).activity, 'paused', w);
+    assert.equal(A.machineState(m, { state: w, progress: 0 }), 'printing', w);
+  }
+});
