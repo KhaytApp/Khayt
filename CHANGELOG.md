@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
+  - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.
+  - **Recalculate.**
+    - It used the shop's overhead rate today, so an online or shelf job priced without overhead gained a share of it. It now keeps the job's own.
+    - The second confirm button no longer saves twice on a double-click.
+    - A markup typed while the sheet opens is no longer replaced.
+    - A markup that is not a number is said, not priced at the default.
+    - A save that gets no answer says the price was not saved.
+  - **Edit Job.** The "kept as typed" hint is read again after Recalculate saves.
+  - **"For N pieces".** The product sheet's preview waits a quarter second after typing and never shows an older answer over a newer one.
+  - **Saving parts.** A part whose costing failed keeps the rates it was costed at.
 - **Mac: the route that lets the Khayt tab in OrcaSlicer show the shop's price for a sliced plate (off; not visible yet).** `POST /api/connectors/price` takes the plate's slice facts from a paired plugin (time, filaments by type, colour and grams, the printer preset, and a quantity). It prices them with the shared rule `lib/connector-price.js` (#2588), which runs the calculator's own code on one new hand part, and answers sealed. Nothing is stored or logged.
   - **Off by default.** The shop must turn on "Show prices in OrcaSlicer" and grant each device: none (the default), price, or price and cost.
   - **What each grant sees.** A device granted price never sees the cost or margin; the route passes only an allow-list of keys.

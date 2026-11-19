@@ -80,6 +80,9 @@ struct RecalculateSheet: View {
                         Button(shop.words.callIt("mac.rc_keep", ["price": .string(Money.text(was, currency))])) { done(false) }
                         Button(shop.words.callIt("mac.js_markup_change")) { Task { await save(saidYes: asking) } }
                             .buttonStyle(.borderedProminent)
+                            // Held while a save is on its way: a double-click
+                            // saved twice (release stability review).
+                            .disabled(saving || !shop.permitted("orders", "edit"))
                     }
                 }
                 .padding(10)
@@ -106,7 +109,10 @@ struct RecalculateSheet: View {
     private func open() async {
         // The markup the rule would use (the job's, else the shop's default),
         // shown so the shop sees what it is pricing at and may change it.
-        if case .ready(_, _, _, let used)? = await shop.previewReprice(jobId, marginPct: nil), let used {
+        if case .ready(_, _, _, let used)? = await shop.previewReprice(jobId, marginPct: nil), let used,
+           // Only into an empty field: a markup typed while this was being
+           // worked out is the shop's, and is not replaced.
+           markup.trimmingCharacters(in: .whitespaces).isEmpty {
             markup = Money.fieldValue(used)
         }
     }
@@ -116,6 +122,13 @@ struct RecalculateSheet: View {
         if Task.isCancelled { return }
         asking = nil
         answered = []
+        // A markup that is not a number is said, not previewed at the default
+        // as if the field were empty.
+        if Self.markupUnreadable(markup) {
+            preview = .refused(shop.words.callIt("mac.rc_markup_bad"))
+            cost = nil
+            return
+        }
         preview = await shop.previewReprice(jobId, marginPct: typedMarkup)
         if case .ready(let out, _, _, _)? = preview, let engine = shop.engine {
             cost = await Shop.repriceCost(out, engine: engine)
@@ -126,6 +139,7 @@ struct RecalculateSheet: View {
 
     /// Save; a question the rule asks is asked here, and answered once.
     private func save(saidYes: String?) async {
+        guard !saving, !Self.markupUnreadable(markup) else { return }
         saving = true
         defer { saving = false }
         if let saidYes { answered.insert(saidYes) }
@@ -136,7 +150,15 @@ struct RecalculateSheet: View {
         case .ready?: done(true)
         case .ask(let code)?: asking = code
         case .refused(let why)?: preview = .refused(why)
-        case nil: break
+        // No answer at all (no engine, or the write could not run): said, so
+        // the sheet never sits there as if it had saved.
+        case nil: preview = .refused(shop.words.callIt("mac.rc_not_saved"))
         }
+    }
+
+    /// Typed, and not a number the field can read.
+    static func markupUnreadable(_ text: String) -> Bool {
+        let t = text.trimmingCharacters(in: .whitespaces)
+        return !t.isEmpty && TypedNumber.parse(t) == nil
     }
 }
