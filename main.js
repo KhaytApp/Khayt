@@ -5536,7 +5536,7 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
         if (completionIsNew(before, printerStatusCache[machine.id])) captured = true;
       } catch(e) {
         printerStatusCache[machine.id] = mergePollFailure(
-          printerStatusCache[machine.id], e.message, Date.now(),
+          printerStatusCache[machine.id], e.message, Date.now(), e && e.status,
         );
       }
     }
@@ -5575,7 +5575,7 @@ ipcMain.handle('hub:probe-printer', async (_e, machine) => {
   try {
     return mergePollSuccess(before, await fetchPrinterStatus(m), Date.now());
   } catch (e) {
-    return mergePollFailure(before, e.message, Date.now());
+    return mergePollFailure(before, e.message, Date.now(), e && e.status);
   }
 });
 

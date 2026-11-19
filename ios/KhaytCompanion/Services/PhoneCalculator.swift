@@ -165,8 +165,15 @@ extension BookReader {
         let shelf = await self.shelf(store)
         let settings = Self.settings(store)
         let pieces = CalculatorPart.consumableRows(q.pieces, shelf: shelf.consumables)
+        // A part the calculator makes is new, so it is costed on Turki's rule
+        // (#2586, Nov 19): prep ONCE for the line, post-processing per piece.
+        // `labourPerLine: true` is lib's mark for that (`KhaytOrderMoney.
+        // lineLabour`); without it lib keeps the old sum (prep on every piece),
+        // which is right only for a part stored before the rule.
+        var extra: [String: JSONValue] = q.rates.mapValues { .number($0) }
+        extra["labourPerLine"] = .bool(true)
         let part = CalculatorPart.input(lines: q.lines, purge: q.purge, hours: q.hours, qty: q.qty,
-                                        pieces: pieces, extra: q.rates.mapValues { .number($0) })
+                                        pieces: pieces, extra: extra)
         func list(_ key: String) -> [JSONValue] {
             if case .array(let r)? = store[key] { return r }
             return []

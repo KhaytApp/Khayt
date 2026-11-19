@@ -177,6 +177,8 @@ public actor KhaytEngine {
         // Pure, zero requires, and already assigning onto globalThis — so the
         // screen a shop opens on is the same arithmetic the Electron app shows,
         // not a Swift opinion about which orders are late.
+        // printer-activity first: attention's machineState projects it (C2).
+        "printer-activity",
         "attention",
         "dashboard-facts",
         // Two more things the shop is meant to chase, each with its own

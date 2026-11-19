@@ -54,6 +54,18 @@ final class Camera {
     private(set) var frames: [String: Frame] = [:]
     private var task: Task<Void, Never>?
 
+    /// How many tiles are showing each machine, and the renewal keeping a
+    /// Snapmaker camera awake while any is (`U1Camera.swift`).
+    var watchers: [String: Int] = [:]
+    var waking: [String: Task<Void, Never>] = [:]
+    /// The chamber light as last read, per machine. Absent: no light, or not
+    /// known — no switch is drawn.
+    var lights: [String: Light] = [:]
+
+    /// Ask this machine's camera on the next sweep, not after the paused
+    /// minute: it has just been told to wake up.
+    func askSoon(_ id: String) { nextAsk[id] = nil }
+
     /// When a paused camera is next asked. A still that has not changed for
     /// minutes will not change in the next five seconds, so it is asked once a
     /// minute instead — enough to notice it waking up.

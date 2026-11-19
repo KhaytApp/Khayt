@@ -22,6 +22,7 @@ const ALLOWED = {
   // and costs one edit to move).
   'lib/ai-quote.js': 1,
   'lib/break-even.js': 1, // + jobFixedCost (once labour and packaging)
+  'lib/connector-price.js': 2, // a sliced plate's price (the Orca tab): one new part, no job
   'lib/depreciation.js': 1,
   'lib/kpi-rows.js': 3, // orderCost: + the once packaging
   'lib/lan-library.js': 1, // a library quote: one part, no job
