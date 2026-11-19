@@ -49,6 +49,7 @@ enum U1Camera {
 
     /// The machine as the shared rules want it: the printer's own record and
     /// the camera on it. The key travels sealed and is opened only here.
+    @MainActor
     static func record(_ machine: Machine, shop: Shop) async -> (row: JSONValue, api: JSONValue)? {
         guard let api = await shop.printerApiRow(machine) else { return nil }
         var cam: [String: JSONValue] = ["enabled": .bool(machine.hasCamera)]
@@ -71,6 +72,7 @@ enum U1Camera {
     /// Returns how long until the next renewal, or nil when this machine's
     /// camera needs no keeping (so the caller stops asking). A renewal that
     /// failed still returns the interval: the printer may be back next time.
+    @MainActor
     static func keepAwake(_ machine: Machine, shop: Shop,
                           exchange: Exchange? = nil,
                           lookUp: @escaping @Sendable (String) async -> [String] = { await WebhookClient.addresses(of: $0) })
@@ -150,6 +152,7 @@ enum U1Camera {
 
     /// Read the light: true on, false off, nil when this printer has none (or
     /// could not be asked — the row then says nothing rather than guessing).
+    @MainActor
     static func readLight(_ machine: Machine, shop: Shop, get: Get? = nil,
                           lookUp: @escaping @Sendable (String) async -> [String] = { await WebhookClient.addresses(of: $0) })
     async -> Bool? {
@@ -169,6 +172,7 @@ enum U1Camera {
 
     /// Switch the light, then read it back. Returns what the printer says now
     /// (nil if it could not be asked). The script is the lib's, gated by it.
+    @MainActor
     static func setLight(_ machine: Machine, on: Bool, shop: Shop, get: Get? = nil,
                          lookUp: @escaping @Sendable (String) async -> [String] = { await WebhookClient.addresses(of: $0) })
     async -> Bool? {
