@@ -626,6 +626,10 @@ async function startLanServer() {
   ensureLanNetworkAccess();
   const lan = settings.lanApi || {};
   const bindLan = lan.bindLan || settings.onlineEnabled;
+  // Main reads the book from disk and will not start on one without settings
+  // (#2592: it used to write an empty book over one it could not read). A save
+  // still waiting out saveAll's 300 ms would not be there yet, so write it now.
+  if (typeof flushSave === 'function') { try { await flushSave(); } catch (_) { /* main says why */ } }
   const res = await window.hubAPI?.startLanServer?.({
     port: lan.port || 3219,
     pin: lan.pin || '',

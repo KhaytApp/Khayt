@@ -10,6 +10,8 @@
  * Run: npm run test:e2e:phones   (PHONES_SMOKE_SHOTS=<dir> saves screenshots)
  */
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 import { launchApp, dismissWizard, makeUserDataDir, switchTab, E2E_LAN_PORT, E2E_LAN_PIN } from './e2e/helpers.mjs';
 
@@ -47,15 +49,27 @@ async function openLanSettings(window) {
   await window.waitForTimeout(150);
 }
 
-const { electronApp, window } = await launchApp(makeUserDataDir());
+const userDataDir = makeUserDataDir();
+const { electronApp, window } = await launchApp(userDataDir);
 let failed = false;
 try {
   await dismissWizard(window);
+  // A brand-new install whose FIRST act is starting the LAN server, through the
+  // app's own startLanServer(): no book on disk yet (#2592 refuses to start on
+  // a book main cannot read, and must not mistake "not written yet" for that).
+  const bookFile = path.join(userDataDir, 'khayt-store.json');
+  fs.rmSync(bookFile, { force: true });
   await window.evaluate(async ({ port, pin }) => {
     settings.lanApi = { ...(settings.lanApi || {}), enabled: true, port, pin, bindLan: false };
-    saveAll();
-    await window.hubAPI.startLanServer({ port, pin, bindLan: 'loopback' });
+    // startLanServer() reads the Online panel's fields when they are built.
+    const portEl = document.querySelector('#lanApiSection #lan_port');
+    if (portEl) portEl.value = String(port);
+    const bindEl = document.querySelector('#lanApiSection #lan_bind_lan');
+    if (bindEl) bindEl.checked = false;
+    await startLanServer();
   }, { port: E2E_LAN_PORT, pin: PIN });
+  ok(fs.existsSync(bookFile), 'a fresh install starting the LAN server first writes its book');
+  // The enrolments below reach the server, so it started (not store_unreadable).
 
   const kept = await enrol('Workshop iPhone');
   const lost = await enrol('Lost iPhone');
