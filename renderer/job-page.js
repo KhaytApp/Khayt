@@ -288,8 +288,9 @@
     // editor (S1, Nov 18).
     const dialog = { hold: global.holdOrder, fail_check: global.qcFailOrder, ship: global.openShipModal }[code];
     if (typeof dialog === 'function') { dialog(o.id); return; }
-    // Anything else that asks a question the page does not ask yet: the job editor.
-    if (!s.to || s.asks === 'hold' || s.asks === 'qc_fail') { openOrderEditor(o.id); return; }
+    // Every step that asks has its own dialog above; one that does not move the
+    // job anywhere and has none is not offered (old-editor retirement step 7).
+    if (!s.to) return;
     updateStatus(o.id, s.to);
     render();
   }
@@ -301,7 +302,7 @@
     const b = e.target.closest('#jobPage [data-jp], #jobPage [data-jp-step]');
     if (!b) return;
     if (b.dataset.jp === 'back') { closeJobPage(); return; }
-    if (b.dataset.jp === 'edit') { (typeof openJobSheet === 'function' ? openJobSheet : openOrderEditor)(openId); return; }
+    if (b.dataset.jp === 'edit') { openJobSheet(openId); return; }
     if (b.dataset.jp === 'ms-refresh') { refreshMilestones(); return; }
     if (b.dataset.jp === 'plan') { openPaymentPlanDialog(openId); return; }
     if (b.dataset.jp === 'status-save' || b.dataset.jp === 'status-open') {

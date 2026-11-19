@@ -193,6 +193,7 @@
       priceTiers: [],
       colours,
       fileRef: rec.name || rec.originalName || '',
+      labourPerLine: true,   // a new part: prep once, post per piece
     };
     part.unitCost = (typeof computePartBaseCost === 'function') ? computePartBaseCost(part) : totalCost;
     part.baseCost = part.unitCost * part.qty;

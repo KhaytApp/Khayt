@@ -724,8 +724,9 @@
       const settings = book.settings || {};
       const costCtx = { inventory: book.inventory || [], settings };
       const qty = Math.max(1, Math.min(100000, +part.qty || 1));
-      const unitCost = Cost.computePartBaseCost(Object.assign({}, part, { qty }), costCtx);
-      const breakdown = Cost.computePartBreakdown(Object.assign({}, part, { qty }), costCtx);
+      // A part being quoted is new: prep once, post per piece (labourPerLine).
+      const unitCost = Cost.computePartBaseCost(Object.assign({}, part, { qty, labourPerLine: true }), costCtx);
+      const breakdown = Cost.computePartBreakdown(Object.assign({}, part, { qty, labourPerLine: true }), costCtx);
       const tier = Pricing.activePriceTier(part.priceTiers, qty);
       let overheadPerHour = 0;
       if (!tier) {

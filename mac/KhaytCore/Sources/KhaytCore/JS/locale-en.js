@@ -1258,6 +1258,8 @@
   "pe.description": "Description",
   "pe.description_ph": "Short notes about this product (optional)",
   "pe.default_margin": "Default markup",
+  "pe.per_box": "Pieces per box",
+  "pe.per_box_hint": "How many of this product ship in one box. Packaging is charged per box.",
   "pe.cost": "Cost",
   "pe.default_price": "Default price",
   "bom.components": "Components (non-printed)",

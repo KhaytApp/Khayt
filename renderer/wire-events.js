@@ -1262,7 +1262,7 @@ function wireEvents() {
     if (tracking) shareTrackingWhatsApp(tracking.dataset.id);
     if (pay)     openPaymentModal(pay.dataset.id);
     if (unp)     clearPayment(unp.dataset.id);
-    if (edit)    openOrderEditor(edit.dataset.id);
+    if (edit && typeof openJobSheet === 'function') openJobSheet(edit.dataset.id);
     if (dup)     duplicateOrder(dup.dataset.id);
     if (reprint) reprintOrder(reprint.dataset.id);
     if (rma)     openRmaModal(rma.dataset.id);
@@ -1372,7 +1372,7 @@ function wireEvents() {
   $('#portfolioSearch')?.addEventListener('input', (e) => { portfolioSearchTerm = e.target.value; renderPortfolio(); });
   $('#portfolioGrid')?.addEventListener('click', (e) => {
     const cell = e.target.closest('.portfolio-cell');
-    if (cell) openOrderEditor(cell.dataset.oid);
+    if (cell && typeof openJobPage === 'function') openJobPage(cell.dataset.oid);
   });
   $('#btnRevealOrderPhotos')?.addEventListener('click', () => {
     if (window.hubAPI?.revealOrderPhotosFolder) window.hubAPI.revealOrderPhotosFolder();
@@ -1892,7 +1892,7 @@ function wireEvents() {
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
     if (btn.dataset.act === 'cl-quote')   quoteForClient(btn.dataset.id);
-    if (btn.dataset.act === 'edit-log')   openOrderEditor(btn.dataset.id);
+    if (btn.dataset.act === 'edit-log' && typeof openJobPage === 'function') openJobPage(btn.dataset.id);
     if (btn.dataset.act === 'pay-remind') sendPaymentReminder(btn.dataset.id);
     if (btn.dataset.act === 'quote-followup') sendQuoteFollowUp(btn.dataset.id);
     if (btn.dataset.act === 'log-service') logMachineService(btn.dataset.id);

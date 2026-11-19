@@ -344,6 +344,48 @@
    * of goods leaves components out). The ONE place these fields are read
    * (test/job-cost-ratchet.test.js).
    */
+  /**
+   * The labour of ONE LINE of work, before any failure buffer: prep ONCE for
+   * the line, post-processing / assembly PER PIECE (Turki, Nov 19):
+   *   (prepTime + postTime × qty) × laborRate.
+   * A line is a part (its own qty), or a product (qty = how many of it, the
+   * product's own hours; its parts' qty do not multiply post: assembly is per
+   * finished product), or a store order's line of N products. The ONE rule:
+   * the calculator's part cost (lib/calculator-cost.js), a product's labour
+   * (lib/product-pricing.js) and store orders (lib/store-order-job.js) all
+   * call it, and so do the Mac and the phone. It used to be (prep + post) ×
+   * rate per PIECE, so prep was charged qty times: +24.75 a piece by default.
+   */
+  /**
+   * How many boxes a line of `qty` pieces ships in (Turki, Nov 19: "depends
+   * on size"): `perBox` is how many fit one box. A whole number >= 1 gives
+   * ceil(qty / perBox); unsaid (or not a usable number) is ONE box for the
+   * line, a hand part's packaging as it always was. A product passes its own
+   * perBox, 1 by default (a box each, as before).
+   */
+  function lineBoxes(qty, perBox) {
+    const q = Math.max(1, Math.floor(+qty || 1));
+    const b = Math.floor(+perBox);
+    if (!(perBox !== undefined && perBox !== null && perBox !== '' && b >= 1)) return 1;
+    return Math.ceil(q / b);
+  }
+
+  function lineLabour(line) {
+    const l = line || {};
+    const pos = (v) => Math.max(0, +v || 0);
+    const qty = Math.max(1, +l.qty || 1);
+    // ONLY a line marked `labourPerLine: true` is costed the new way. An
+    // unmarked line is the OLD sum, prep and post on every piece, so every
+    // record written before this (a stored job's parts, a product without
+    // rates) and every path that does not know the mark costs exactly what
+    // it did (money review of #2586, HIGH 1 and 2): stored jobs stay frozen
+    // and a product keeps its catalogue figure until "Use the new cost"
+    // (Turki, Nov 19, option ii). New parts are marked where they are made:
+    // the calculator, the job sheet, a quote, a product with its own rates.
+    if (l.labourPerLine !== true) return (pos(l.prepTime) + pos(l.postTime)) * qty * pos(l.laborRate);
+    return (pos(l.prepTime) + pos(l.postTime) * qty) * pos(l.laborRate);
+  }
+
   function jobFixedCost(order, opts) {
     const o = order || {};
     const x = opts || {};
@@ -381,6 +423,8 @@
   }
 
   const api = {
+    lineLabour,
+    lineBoxes,
     HAND_PARTS_SHARE_ONCE: false,   // Turki, Nov 19 (see addedPartMark)
     addedPartMark,
     jobCost, jobFixedCost,

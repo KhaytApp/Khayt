@@ -101,7 +101,9 @@ test('a part is costed with the desktop\'s own maths', async () => {
   // hardcoded number would still pass if both sides drifted together.
   const cost = require('../lib/calculator-cost.js');
   const ctx = { inventory: store.inventory, settings: store.settings };
-  const expected = cost.computePartBaseCost({ ...FULL_PART, qty: 2 }, ctx);
+  // A part being quoted is NEW, as one typed into the desktop calculator:
+  // prep once for its line, post per piece (labourPerLine, #2586).
+  const expected = cost.computePartBaseCost({ ...FULL_PART, qty: 2, labourPerLine: true }, ctx);
 
   assert.ok(Math.abs(body.unitCost - expected) < 0.0001,
     `endpoint said ${body.unitCost}, the desktop's calculator says ${expected}`);
