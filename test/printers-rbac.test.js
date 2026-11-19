@@ -545,3 +545,34 @@ test('nobody signed in under the lock: the PIN pad, no owner controls; and main 
   assert.doesNotMatch(pad.slice(0, pad.indexOf('\nfunction ', 10)), /sha256Hex\(enteredPin\)/, 'no renderer-only PIN check');
   assert.match(pad, /const verified = await window\.hubAPI\?\.verifyOperatorPin\?\.\(/);
 });
+
+test('the owner migration runs only on a book from before roleKey, and once (security review LOW)', () => {
+  // Any operator with a roleKey: the roles were set by someone; "مدير" may be a real manager.
+  const set = { settings: { operatorLockEnabled: true }, operators: [{ id: 'A', role: 'مدير' }, { id: 'B', roleKey: 'operator' }] };
+  assert.equal(P.migrateLegacyOwner(set).changed, false);
+  const old = { settings: { operatorLockEnabled: true }, operators: [{ id: 'A', role: 'مدير' }, { id: 'B', role: 'فني' }] };
+  const m = P.migrateLegacyOwner(old);
+  assert.equal(m.changed, true);
+  assert.ok(typeof m.store.settings.ownerMigratedAt === 'string', 'stamped');
+  // Stamped: never again, even if the roleKey were later removed.
+  const again = { ...m.store, operators: m.store.operators.map((o) => { const c = { ...o }; delete c.roleKey; return c; }) };
+  assert.equal(P.migrateLegacyOwner(again).changed, false);
+});
+
+test('a refusal reloads the book at most once at a time, so it can never loop (security review LOW)', async () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app-state.js'), 'utf8');
+  const at = src.indexOf('let _reloadingAfterRefusal');
+  const code = src.slice(at, src.indexOf('\nfunction _doSave(', at));
+  let loads = 0, toasts = 0;
+  const box = {
+    t: (k) => k, toast: () => { toasts++; }, console, Promise, setTimeout: () => {}, Set, String,
+    window: { hubAPI: { loadStore: async () => { loads++; return { settings: {} }; } } },
+    replaceStoreFromSnapshot: () => true, initialRender: () => {}, applyOperatorPermissions: () => {},
+  };
+  vm.createContext(box);
+  vm.runInContext(code + '\nthis.f = _saveRefused;', box);
+  box.f(['activeOperatorId']); box.f(['operators']); box.f(['settings.roleLimits']);
+  await new Promise((r) => setImmediate(r));
+  assert.equal(loads, 1, 'one reload');
+  assert.equal(toasts, 3, 'every refusal is still said');
+});

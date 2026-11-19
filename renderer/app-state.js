@@ -768,6 +768,7 @@ function explainRefusal(code) {
 }
 
 /** Saved, but main put some of it back (the role on disk may not change it). */
+let _reloadingAfterRefusal = false;
 function _saveRefused(refused) {
   const parts = new Set();
   for (const r of refused) {
@@ -779,12 +780,18 @@ function _saveRefused(refused) {
   }
   toast('⚠ ' + t('err.refused', { what: [...parts].join(' · ') || t('err.refused_lock') }), 'error', 12000);
   // The window shows what is really saved: the book main kept, not the edit.
+  // ONE reload: a refusal that arrives while it runs (or straight after, from
+  // the save the reload itself triggers) is said, never reloaded again, so a
+  // refusal can never turn into a loop (security review LOW).
+  if (_reloadingAfterRefusal) return;
+  _reloadingAfterRefusal = true;
   Promise.resolve(window.hubAPI && window.hubAPI.loadStore ? window.hubAPI.loadStore() : null).then((data) => {
     if (data && !data.__corrupt && typeof replaceStoreFromSnapshot === 'function' && replaceStoreFromSnapshot(data)) {
       if (typeof initialRender === 'function') initialRender();
       if (typeof applyOperatorPermissions === 'function') applyOperatorPermissions();
     }
-  }).catch((e) => console.error('reload after a refused save failed:', e));
+  }).catch((e) => console.error('reload after a refused save failed:', e))
+    .finally(() => { setTimeout(() => { _reloadingAfterRefusal = false; }, 5000); });
 }
 
 function _doSave(snapshot) {
