@@ -71,3 +71,11 @@ test('FIX: a printer that needs a person (a failed print, ATTENTION, halted) rea
     for (const progress of [0, 40]) assert.equal(A.machineState(m, { state: w, progress }), 'error', w);
   }
 });
+
+test('FIX: a printer whose own state says it is not linked reads reconnecting, never free (was idle)', () => {
+  const m = { printerApi: { type: 'octoprint' } };
+  for (const w of ['Offline', 'Opening serial port', 'Detecting serial port', 'Detecting baudrate', 'Connecting', 'off']) {
+    assert.equal(PA.machineStatus(m, { state: w }).link, 'reconnecting', w);
+    for (const progress of [0, 40]) assert.equal(A.machineState(m, { state: w, progress }), 'reconnecting', w);
+  }
+});
