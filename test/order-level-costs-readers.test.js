@@ -135,3 +135,55 @@ test('the sheet: a product part edited there keeps the mark (no labour of its ow
   assert.equal(edited.orderLevelCosts, true);
   assert.equal(edited.baseCost, 23.22);
 });
+
+/* ── Release money review (Nov 19): a hand part on a once-job ─────────────── */
+
+{
+  for (const f of ['pnl-report', 'kpi-rows', 'reprint']) require('../lib/' + f + '.js');
+  const P = globalThis.KhaytPnl, K = require('../lib/kpi-rows.js'), R = globalThis.KhaytReprint;
+  // Two product parts with rates (11.61 each, labour 74.25 and packaging 5.50
+  // once) plus a part added BY HAND, qty 3, its own labour (addedPartMark false).
+  const two = PP.productJobParts({ id: 'P2', parts: [0, 1].map((i) => Object.assign({ name: 'q' + i }, part)), rates }, ctx);
+  const hand = PRt.withRates(Object.assign({ name: 'hand', labourPerLine: true }, part, { qty: 3, prepTime: 0.5, postTime: 0.25, laborRate: 90, failureRate: 10 }), { settings });
+  const hu = CC.computePartBaseCost(hand, ctx);
+  hand.unitCost = +hu.toFixed(4); hand.baseCost = +(hu * 3).toFixed(4);
+  const tok = { tracking: new Uint8Array(16), quoteApproval: new Uint8Array(16), id: new Uint8Array(4) };
+  const job = N.newOrder({ parts: clone(two.parts).concat([hand]), labourCost: two.labourCost, packagingCost: two.packagingCost, project: 'J', margin: 30, productId: 'P2' },
+    { settings, orders: [], clients: [], now: new Date('2026-11-19T08:00:00Z'), tokens: tok });
+  job.status = 'completed'; job.costBasis = job.parts.reduce((s, p) => s + p.baseCost, 0);
+
+  test('H1: the hand part keeps its own labour in the P&L stock share and the dashboard cost of goods (55.50, not 150.70 / 50.50)', () => {
+    assert.equal(hand.baseCost, 164.0782);
+    assert.equal(job.price, 347.16);
+    const share = P.stockShare(job, ctx);
+    assert.ok(Math.abs(share - 0.26696) < 0.0001, 'stock share ' + share + ' (0.775 when the hand part was split without its labour)');
+    const cogs = job.costBasis * share + Mo.jobFixedCost(job, { components: false, overhead: false, labour: false });
+    assert.equal(+cogs.toFixed(2), 55.5, 'P&L cost of goods');
+    assert.equal(K.orderCost(job, ctx), 55.5, 'dashboard cost of goods');
+  });
+
+  test('M1: a reprint of the job keeps the hand part\'s labour, and the product\'s at the order level', () => {
+    const rp = R.input(job, { settings, inventory: [] }, 'RP');
+    assert.deepEqual(rp.parts.map((p) => +p.baseCost.toFixed(4)), [11.6094, 11.6094, 164.0782]);
+    assert.equal(rp.labourCost, 74.25);
+    assert.equal(rp.packagingCost, 5.5);
+  });
+}
+
+test('M2: Recalculate and a new markup on a FINISHED job ask first, as on a job whose price the customer has seen', () => {
+  const tok = { tracking: new Uint8Array(16), quoteApproval: new Uint8Array(16), id: new Uint8Array(4) };
+  const base = N.newOrder({ parts: clone(jp.parts), labourCost: jp.labourCost, packagingCost: jp.packagingCost, project: 'J', margin: 30, productId: 'P' },
+    { settings, orders: [], clients: [], now: new Date('2026-11-19T08:00:00Z'), tokens: tok });
+  const done = Object.assign(clone(base), { status: 'completed', materialDeducted: true, price: 500, priceSource: 'override', priceOverride: 500 });
+  const c = { settings, now: new Date('2026-11-19T09:00:00Z') };
+  const asked = E.applyJobEdit(clone(done), { reprice: {} }, c);
+  assert.equal(asked.ok, false); assert.equal(asked.reason, 'ask_price', 'Recalculate on a finished job: asked, never silent');
+  const target = clone(done);
+  const yes = E.applyJobEdit(target, { reprice: {} }, Object.assign({ priceSeenOk: true }, c));
+  assert.equal(yes.ok, true, 'once the shop said yes');
+  assert.notEqual(target.price, 500, 'repriced in place');
+  // Before the fix a finished job did not ask at all: the lock was 'deducted' with askPrice false.
+  assert.equal(E.partsLock(clone(done), c).code, 'deducted');
+  const mk = E.applyJobEdit(clone(Object.assign({}, done, { priceSource: undefined, priceOverride: undefined })), { marginPct: 10 }, c);
+  assert.equal(mk.reason === 'ask_price' || mk.reason === 'deducted' || mk.reason === 'price_fixed', true, 'a markup on a finished job is never applied silently: ' + mk.reason);
+});

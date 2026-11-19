@@ -1335,7 +1335,7 @@ function renderMachineQueues() {
       // send, or the shop sends it a second time.
       try { recordPrintRun(order.id, machine.id, !!r.started, file.originalName || file.filename); }
       catch (e) { console.warn('[kanban] could not record the print run', e); }
-    } catch (e) { toast(`${t('slicer.fail')} ${e.message}`, 'error'); }
+    } catch (e) { toast(`${t('slicer.fail')} ${explainRefusal(e.message)}`, 'error'); }
   }
 
   // The job records the machine it was sent to (lib/print-runs.js), the same
