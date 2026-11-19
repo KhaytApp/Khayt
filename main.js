@@ -1632,6 +1632,15 @@ function printerGate(verb) {
   if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
   return PrinterPermission.printerAllowed(lanServerStore, verb);
 }
+// Operators whose PIN main itself checked, and when: a save may sign in only
+// one of these (or one with no PIN). Two minutes covers the PIN pad's own save.
+const verifiedOperatorAt = new Map();
+const VERIFIED_FOR_MS = 2 * 60 * 1000;
+function operatorVerified(id) {
+  const at = verifiedOperatorAt.get(id);
+  return typeof at === 'number' && Date.now() - at < VERIFIED_FOR_MS;
+}
+function noteVerified(id) { if (id) verifiedOperatorAt.set(String(id), Date.now()); }
 
 ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startPrint } = {}) => {
   const gate = printerGate('send');
@@ -1660,6 +1669,8 @@ ipcMain.handle('hub:slice-and-print', async (_e, { modelPath, slicerPath, args, 
 // the order-files folder (confined), slice it if it's a model or upload directly
 // if it's already G-code, then start the print.
 ipcMain.handle('hub:print-order-file', async (_e, { orderFile, machine, slicerPath, args, startPrint } = {}) => {
+  const gate = printerGate('send');
+  if (!gate.ok) return gate;
   let outDir;
   try {
     const full = path.join(orderFilesDir(), path.basename(String(orderFile || '')));
@@ -2081,6 +2092,8 @@ const machineSecrets = require('./lib/main/machine-secrets.js').createMachineSec
 // auto-off after a cooled print. Same LAN pinning and secret fill as printers.
 require('./lib/main/smart-plug.js').registerSmartPlug({
   ipcMain,
+  // Switching a printer's power is controlling it (P5); reading it is not.
+  gate: (verb) => printerGate(verb),
   fill: (m) => machineSecrets.fill(m),
   resolveTarget: (host) => resolvePrinterTarget(host),
   statusCache: () => printerStatusCache,
@@ -2333,6 +2346,18 @@ ipcMain.handle('hub:save-store', async (event, data) => {
       if (guarded !== merged) console.warn('hub:save-store: API token change refused for this role');
       merged = guarded;
     } catch (e) { console.error('hub:save-store: token guard failed:', e && e.message); }
+    // The lock, roles, sign-in and printer connections: what the role ON DISK
+    // may not change is put back as it is there (lib/main/printer-permission.js,
+    // #2592 security review M2/L1). A failure here refuses the save rather
+    // than writing an unguarded book.
+    try {
+      const g = PrinterPermission.guardSave(merged, readStoreDecryptedFromDisk(), { verified: operatorVerified });
+      if (g.refused.length) console.warn('hub:save-store: refused for this role:', g.refused.join(', '));
+      merged = g.store;
+    } catch (e) {
+      console.error('hub:save-store: role guard failed:', e && e.message);
+      return { ok: false, error: 'role_guard_failed' };
+    }
     // First real keychain write. Explain once, before encryptForDisk triggers
     // the OS permission prompt — but only when there is actually a plaintext
     // secret to encrypt, so a shop that never configures a credential is never
@@ -4806,12 +4831,13 @@ ipcMain.handle('hub:verify-operator-pin', async (_event, { operatorId, pin } = {
   if (!lanServerStore?.operators?.length) syncLanServerStoreFromDisk();
   const op = (lanServerStore?.operators || []).find(o => o.id === operatorId);
   if (!op) return { ok: false, error: 'operator_not_found' };
-  if (!op.pinHash) return { ok: true, noPin: true };
+  if (!op.pinHash) { noteVerified(op.id); return { ok: true, noPin: true }; }
   // Verify against either the salted PBKDF2 format or a legacy SHA-256 hash.
   // Unrecognized formats (the very old base64 scheme) report legacy_pin so the
   // renderer re-prompts to set a fresh PIN.
   if (!isManagedHash(op.pinHash)) return { ok: false, error: 'legacy_pin' };
   const ok = verifyPin(String(pin || ''), op.pinHash);
+  if (ok) noteVerified(op.id);
   // A correct PIN against a LEGACY hash is the moment to replace it — the only
   // moment, because it is the only time the plaintext is in hand. See the note
   // on `hub:verify-pin`. The caller writes it; this cannot, because the store's
@@ -4842,6 +4868,19 @@ ipcMain.handle('hub:hash-pin', async (_e, pin) => hashPinSalted(String(pin ?? ''
 // worse than handing it back to the one place that does know.
 ipcMain.handle('hub:verify-pin', async (_e, plain, stored) => {
   const ok = verifyPin(String(plain ?? ''), stored);
+  // Whose PIN was it? An operator's own, or the owner's admin PIN / recovery
+  // code: main notes it, so the save that signs them in is allowed (P5).
+  if (ok && stored) {
+    try {
+      const disk = readStoreDecryptedFromDisk() || {};
+      const ops = Array.isArray(disk.operators) ? disk.operators : [];
+      for (const o of ops) if (o && o.pinHash === stored) noteVerified(o.id);
+      const st = disk.settings || {};
+      if (stored === st.recoveryCodeHash || stored === st.adminPinHash) {
+        for (const o of ops) if (o && (o.roleKey || require('./lib/rbac.js').roleFromLegacy(o.role, { hasLock: true })) === 'owner') noteVerified(o.id);
+      }
+    } catch (_) { /* nothing noted: a later sign-in save is refused, not allowed */ }
+  }
   return { ok, upgraded: ok && needsUpgrade(stored) ? hashPinSalted(String(plain ?? '')) : null };
 });
 
