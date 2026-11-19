@@ -69,6 +69,9 @@ extension KhaytEngine {
         public let changed: Bool
         /// The job after the edit; the job as handed in on a refusal.
         public let order: JSONValue
+        /// The markup a reprice from the parts used (`{ reprice }`): the one
+        /// asked for, else the job's own, else the shop's default.
+        public var marginPct: Double? = nil
     }
 
     /// `applyJobEdit`: customer, name, parts, details and a typed price, ALL
@@ -83,20 +86,24 @@ extension KhaytEngine {
                              clients: [JSONValue] = [], settings: [String: JSONValue] = [:],
                              keepPrice: Bool = false, marginPct: Double? = nil,
                              priceSeenOk: Bool = false,
+                             milestonesOk: Bool = false,
+                             overheadPerHour: Double? = nil,
                              newPartIds: [String] = [], now: Date,
                              editId: String, priceId: String) throws -> JobEditResult {
         try runtime.call2("""
             (function (order, fields, ctx) {
               var o = order;
               var r = globalThis.KhaytOrderEdit.applyJobEdit(o, fields, ctx);
-              return { ok: r.ok, reason: r.reason || null, step: r.step || null, changed: !!r.changed, order: o };
+              return { ok: r.ok, reason: r.reason || null, step: r.step || null, changed: !!r.changed, order: o,
+                       marginPct: typeof r.marginPct === 'number' ? r.marginPct : null };
             })(ARG0, ARG1, { clients: ARG2, settings: ARG3, keepPrice: ARG4, marginPct: ARG5,
-                             ids: ARG6, now: ARG7, id: ARG8, priceId: ARG9, priceSeenOk: ARG10 })
+                             ids: ARG6, now: ARG7, id: ARG8, priceId: ARG9, priceSeenOk: ARG10,
+                             milestonesOk: ARG11, overheadPerHour: ARG12 === null ? undefined : ARG12 })
             """,
             [order, .object(fields), .array(clients), .object(ruleSettings(settings)), .bool(keepPrice),
              marginPct.map(JSONValue.number) ?? .null, .array(newPartIds.map(JSONValue.string)),
              .number(now.timeIntervalSince1970 * 1000), .string(editId), .string(priceId),
-             .bool(priceSeenOk)],
+             .bool(priceSeenOk), .bool(milestonesOk), overheadPerHour.map(JSONValue.number) ?? .null],
             as: JobEditResult.self)
     }
 }

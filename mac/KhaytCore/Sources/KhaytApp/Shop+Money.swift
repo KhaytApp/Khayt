@@ -1234,6 +1234,7 @@ extension Shop {
          "price_fixed": words.callIt("mac.js_markup_fixed"),
          "bad_markup": words.callIt("mac.js_markup_bad"),
          "ask_price": words.callIt("mac.js_markup_q"),
+         "milestones_issued": words.callIt("mac.reprice_milestones_issued"),
          "no_parts": words.callIt("mac.parts_last"),
          "missing": words.callIt("mac.move_gone"),
          "unknown": words.callIt("mac.move_refused")]
