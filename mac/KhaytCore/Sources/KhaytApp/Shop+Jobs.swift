@@ -850,6 +850,20 @@ extension Shop {
         return rule
     }
 
+    /// What a cart costs (shop currency), through the shared `jobCost`:
+    /// its parts, its components and the once-costs it carries. Overhead is
+    /// left out, as the margin advice has always measured it.
+    func cartCost(parts: [NewJobSheet.Draft], componentsCost: Double, once: ProductOnceCosts) async -> Double {
+        var order: [String: JSONValue] = [
+            "parts": .array(parts.map { .object(["baseCost": .number($0.cost * Double(max(1, $0.qty)))]) }),
+            "componentsCost": .number(componentsCost),
+        ]
+        if once.labour > 0 { order["labourCost"] = .number(once.labour) }
+        if once.packaging > 0 { order["packagingCost"] = .number(once.packaging) }
+        guard let engine else { return 0 }
+        return (try? await engine.jobCost(.object(order), overhead: false)) ?? 0
+    }
+
     /// Whether a part added by hand shares a job's once-costs (labour and
     /// packaging charged once for its product): `lib/order-money.js
     /// addedPartMark`, so one switch flips every app. False when unsure.
