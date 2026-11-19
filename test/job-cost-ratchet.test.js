@@ -20,7 +20,7 @@ const ALLOWED = {
   'lib/order-new.js': 2,        // writes them
   'lib/store-order-job.js': 5,  // writes the web store job's componentsCost
   'lib/reprint.js': 6,          // copies a once-labour job's figures to its reprint
-  'lib/order-edit.js': 2,       // applyParts rescales overheadCost with the hours
+  'lib/order-edit.js': 13,      // applyParts rescales overheadCost with the hours; repriceFromParts (#2576) rebuilds newOrder's INPUT from the stored components, overhead, labour and packaging
   'lib/kpi-rows.js': 1,         // a comment saying why it does NOT add componentsCost
   'lib/quote-sheet.js': 1,      // q.packagingCost: a quote sheet's own input, not a job's
   'renderer/build.js': 4,       // the calculator's currentFixedCosts state

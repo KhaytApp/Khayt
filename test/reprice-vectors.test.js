@@ -40,5 +40,6 @@ for (const c of V.cases) {
     if (c.want.typedGone) { assert.notEqual(order.priceSource, 'override'); assert.equal('priceOverride' in order, false); }
     if (c.want.logged) assert.ok(order.editHistory.some((h) => h.fields && h.fields.price && h.fields.price.to === c.want.price), 'the price change is logged');
     if (c.want.lineAmounts) assert.deepEqual(order.extraLines.map((l) => l.amount), c.want.lineAmounts);
+    if (c.want.keepsOnce) for (const [k, v] of Object.entries(c.want.keepsOnce)) assert.equal(+order[k], v, k + ' stays on the job');
   });
 }

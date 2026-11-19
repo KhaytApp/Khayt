@@ -817,6 +817,11 @@
       components: frozenComp.length ? [] : order.components,
       assemblyQty: order.assemblyQty,
       productId: order.productId,
+      // A product's labour and packaging, carried once at the order level in the
+      // shop's currency: priced again as newOrder priced them (costedShare), so
+      // a reprice keeps them instead of dropping them from the price.
+      labourCost: +order.labourCost > 0 ? +order.labourCost : 0,
+      packagingCost: +order.packagingCost > 0 ? +order.packagingCost : 0,
     };
     const q = N.previewTotal(input, { settings: st, clients: c.clients, consumables: c.consumables }).quote;
     const was = +order.price || 0;
