@@ -790,12 +790,25 @@ extension Shop {
     /// figures for `newOrder`'s job-level `labourCost` / `packagingCost`, so
     /// no part walker (assembly, reprint, deduction) ever sees labour.
     func jobFrom(_ product: Product) async -> (parts: [NewJobSheet.Draft], once: ProductOnceCosts) {
-        guard case .array(let rows)? = product.rest["parts"] else { return ([], .none) }
+        let line = await jobLine(product, units: 1)
+        return (line.parts, line.once)
+    }
+
+    /// A product as ONE line of `units` pieces (#2586). A product with its
+    /// own rates goes through the shared rule with `units`: each part's qty is
+    /// scaled, labour is prep once for the line and finishing per piece, and
+    /// packaging is boxed by its `perBox` (`scaled` is true, nothing is to be
+    /// multiplied here). Any other product comes back as ONE piece's parts on
+    /// its own sum, as before (`scaled` false): the caller multiplies, as the
+    /// shared store-order rule does for such a product.
+    func jobLine(_ product: Product, units: Int) async -> (parts: [NewJobSheet.Draft], once: ProductOnceCosts, scaled: Bool) {
+        guard case .array(let rows)? = product.rest["parts"] else { return ([], .none, false) }
         if ProductRates.usesOwn(product.rest), !ProductRates.labourPerPart(product.rest), let engine {
             var record: [String: JSONValue] = ["parts": .array(rows)]
             for (k, v) in ProductRates.pricingFields(product.rest) { record[k] = v }
             if let built = try? await engine.productJobParts(.object(record), inventory: inventoryRows,
-                                                            settings: settingsDict, consumables: consumableRows) {
+                                                            settings: settingsDict, consumables: consumableRows,
+                                                            units: max(1, units)) {
                 let parts: [NewJobSheet.Draft] = built.parts.compactMap { row in
                     guard var draft = NewJobSheet.Draft.from(row), case .object(let o) = row else { return nil }
                     draft.cost = Shop.plainNumber(o["unitCost"]) ?? 0
@@ -804,10 +817,10 @@ extension Shop {
                     }
                     return draft
                 }
-                return (parts, ProductOnceCosts(labour: built.labourCost, packaging: built.packagingCost))
+                return (parts, ProductOnceCosts(labour: built.labourCost, packaging: built.packagingCost), true)
             }
         }
-        return (await jobParts(fromRows: rows), .none)
+        return (await jobParts(fromRows: rows), .none, false)
     }
 
     /// Part records — a product's, or a copied job's — costed the same way.
