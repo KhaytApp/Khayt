@@ -641,7 +641,7 @@ struct ProductSheet: View {
     /// new cost. Figma Mac file p.18.
     @ViewBuilder private var costRates: some View {
         if ProductRates.usesOwn(draft.rest) {
-            ProductRatesSection(shop: shop, rest: $draft.rest) { Task { await reprice() } }
+            ProductRatesSection(shop: shop, rest: $draft.rest, record: rateRecord) { Task { await reprice() } }
         } else if let now = pricing, let new = proposedPricing, !effectiveParts.isEmpty {
             ProductRatesNotice(
                 shop: shop, partCount: effectiveParts.count, oldCost: now.cost, newCost: new.cost,
@@ -1157,6 +1157,15 @@ struct ProductSheet: View {
         case .string(let s)?: return Double(s)
         default: return nil
         }
+    }
+
+    /// The product as the shared rule prices a line of it: the parts in the
+    /// list and the pricing fields (rates, labour switch, pieces per box).
+    private var rateRecord: JSONValue {
+        var record: [String: JSONValue] = [
+            "parts": .array(effectiveParts.map { $0.record(spools: shop.spools, reclaimsTax: shop.reclaimsTax) })]
+        for (key, value) in ProductRates.pricingFields(draft.rest) { record[key] = value }
+        return .object(record)
     }
 
     /// Price what is in the list, through the shared rule.

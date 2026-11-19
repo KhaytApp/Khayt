@@ -784,8 +784,12 @@ extension Shop {
                         if case .string(let p)? = iq["presetId"], !p.isEmpty { sheetPreset = p }
                     }
                     unpriced.spoolId = sheetSpool
+                    // A new part, as the desktop's intake makes it
+                    // (`intakeQuotePart`): on the new quantity rule.
+                    for (key, value) in Shop.newPartMark { unpriced.raw[key] = value }
                     if let costed = await costedPart(spoolId: sheetSpool, grams: shown.grams, hours: shown.hours,
-                                                     qty: unpriced.qty, presetId: sheetPreset) {
+                                                     qty: unpriced.qty, presetId: sheetPreset,
+                                                     extra: Shop.newPartMark) {
                         unpriced.cost = costed.cost
                         unpriced.parts = costed.parts
                         unpriced.rates = costed.rates
@@ -798,17 +802,36 @@ extension Shop {
             products += 1
             onlyProduct = products == 1 ? product : nil
             if products == 1 { margin = product.margin ?? defaultMargin }
-            let built = await jobFrom(product)
-            // Labour and packaging per piece, as the parts are, until the
-            // qty decision (Dev Hub #3).
-            onceCosts = onceCosts + built.once.times(line.qty)
+            // ── ONE LINE OF N, AS THE STORE-ORDER RULE BUILDS IT ─────────
+            //
+            // A product with its own rates is the shared rule's line of
+            // `line.qty` (#2586, `lib/store-order-job.js productLine`):
+            // parts scaled, prep once for the line, finishing per piece,
+            // packaging by the box, all from `productJobParts` with `units`.
+            // It used to be one piece's labour and packaging times the qty.
+            // A product saved before keeps its own sum, part by part.
+            //
+            // The line is the pieces still to PRINT, as the rule builds it
+            // (`all ? qty : toPrint`): labour and packaging are not charged
+            // for pieces handed over from the shelf. `printOnly` sizes the
+            // parts the same way inside the write.
+            let units = Self.lineUnits(order, line)
+            if units == 0 { continue }
+            let built = await jobLine(product, units: units)
+            onceCosts = onceCosts + built.once
             for var part in built.parts {
+                if built.scaled {
+                    // Already the line's count; per piece is that over units.
+                    drafts.append(part)
+                    origin.append((index, max(1, part.qty / units)))
+                    continue
+                }
                 // The product's part count is PER ONE. Six hoods is six times
                 // each of a hood's parts.
                 let perPiece = max(1, part.qty)
                 // Overflow-safe: both counts are clamped, but a product's own
                 // part count is the shop's and is not.
-                let (total, overflow) = perPiece.multipliedReportingOverflow(by: max(1, line.qty))
+                let (total, overflow) = perPiece.multipliedReportingOverflow(by: units)
                 part.qty = overflow ? Int.max : total
                 drafts.append(part)
                 origin.append((index, perPiece))
@@ -902,6 +925,14 @@ extension Shop {
             input["parts"] = .array(rows)
         }
         return input
+    }
+
+    /// How many pieces of a product line the job makes: all of them when
+    /// the shelf covers the whole order (that job is recorded from stock),
+    /// else those still to print. `lib/store-order-job.js` build's count.
+    static func lineUnits(_ order: OnlineOrder, _ line: OnlineOrder.Line) -> Int {
+        let ordered = max(1, line.qty)
+        return order.allFromShelf ? ordered : max(0, min(ordered, line.toPrint))
     }
 
     static let lineKey = "_onlineLine"
