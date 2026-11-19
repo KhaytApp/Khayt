@@ -774,8 +774,40 @@ extension Shop {
     /// left the costing out. A part with nothing to cost stays at nothing and
     /// the sheet says so.
     func jobParts(from product: Product) async -> [NewJobSheet.Draft] {
-        guard case .array(let rows)? = product.rest["parts"] else { return [] }
-        return await jobParts(fromRows: rows)
+        await jobFrom(product).parts
+    }
+
+    /// A job's parts from a product, and the labour and packaging it charges
+    /// once at the job level.
+    ///
+    /// ── LABOUR ONCE, AS THE CATALOGUE COSTS IT ───────────────────────────
+    ///
+    /// A product with its own rates charges labour and packaging once
+    /// (`ProductRates`). Costing each part on its own here put them back on
+    /// every part: a 15-part product the catalogue costs at 248.39 opened a
+    /// job at about 1,287.89 (#2575 money review). The shared rule
+    /// (`productJobParts`, #2581) hands the parts without them and the two
+    /// figures for `newOrder`'s job-level `labourCost` / `packagingCost`, so
+    /// no part walker (assembly, reprint, deduction) ever sees labour.
+    func jobFrom(_ product: Product) async -> (parts: [NewJobSheet.Draft], once: ProductOnceCosts) {
+        guard case .array(let rows)? = product.rest["parts"] else { return ([], .none) }
+        if ProductRates.usesOwn(product.rest), !ProductRates.labourPerPart(product.rest), let engine {
+            var record: [String: JSONValue] = ["parts": .array(rows)]
+            for (k, v) in ProductRates.pricingFields(product.rest) { record[k] = v }
+            if let built = try? await engine.productJobParts(.object(record), inventory: inventoryRows,
+                                                            settings: settingsDict, consumables: consumableRows) {
+                let parts: [NewJobSheet.Draft] = built.parts.compactMap { row in
+                    guard var draft = NewJobSheet.Draft.from(row), case .object(let o) = row else { return nil }
+                    draft.cost = Shop.plainNumber(o["unitCost"]) ?? 0
+                    if let rates = try? JSONDecoder().decode(KhaytEngine.Rates.self, from: JSONEncoder().encode(row)) {
+                        draft.rates = rates
+                    }
+                    return draft
+                }
+                return (parts, ProductOnceCosts(labour: built.labourCost, packaging: built.packagingCost))
+            }
+        }
+        return (await jobParts(fromRows: rows), .none)
     }
 
     /// Part records — a product's, or a copied job's — costed the same way.
@@ -816,6 +848,33 @@ extension Shop {
             rule.mode = plainString(r["mode"]) ?? "nearest"
         }
         return rule
+    }
+
+    /// What a cart costs (shop currency), through the shared `jobCost`:
+    /// its parts, its components and the once-costs it carries. Overhead is
+    /// left out, as the margin advice has always measured it.
+    func cartCost(parts: [NewJobSheet.Draft], componentsCost: Double, once: ProductOnceCosts) async -> Double {
+        var order: [String: JSONValue] = [
+            "parts": .array(parts.map { .object(["baseCost": .number($0.cost * Double(max(1, $0.qty)))]) }),
+            "componentsCost": .number(componentsCost),
+        ]
+        if once.labour > 0 { order["labourCost"] = .number(once.labour) }
+        if once.packaging > 0 { order["packagingCost"] = .number(once.packaging) }
+        guard let engine else { return 0 }
+        return (try? await engine.jobCost(.object(order), overhead: false)) ?? 0
+    }
+
+    /// Whether a part added by hand shares a job's once-costs (labour and
+    /// packaging charged once for its product): `lib/order-money.js
+    /// addedPartMark`, so one switch flips every app. False when unsure.
+    func handPartMark(_ order: JSONValue) async -> Bool {
+        guard let engine else { return false }
+        return (try? await engine.addedPartMark(order)) ?? false
+    }
+
+    func handPartMark(_ orderId: Order.ID) async -> Bool {
+        guard let row = orderRow(orderId) else { return false }
+        return await handPartMark(row)
     }
 
     func costedPart(spoolId: String?, grams: Double, hours: Double, qty: Int,
