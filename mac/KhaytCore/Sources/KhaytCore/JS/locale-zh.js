@@ -1258,6 +1258,8 @@
   "pe.description": "描述",
   "pe.description_ph": "关于此产品的简短备注（可选）",
   "pe.default_margin": "默认加价率",
+  "pe.per_box": "每箱件数",
+  "pe.per_box_hint": "一个箱子能装多少件此产品。包装费按箱计算。",
   "pe.cost": "成本",
   "pe.default_price": "默认价格",
   "bom.components": "组件（非打印）",

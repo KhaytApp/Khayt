@@ -24,7 +24,7 @@ const ALLOWED = {
   'lib/kpi-rows.js': 1,         // a comment saying why it does NOT add componentsCost
   'lib/quote-sheet.js': 1,      // q.packagingCost: a quote sheet's own input, not a job's
   'renderer/build.js': 6,       // the calculator's currentFixedCosts state, and its per-product groups (syncFixedCosts)
-  'renderer/inventory.js': 8,   // catalogue → calculator: productJobParts' figures, kept as a group
+  'renderer/inventory.js': 10,  // catalogue → calculator: productJobParts' figures, kept as a group; +2 for mergeProductAgain (one line of N, Nov 19)
   'renderer/order-flows.js': 14, // newOrder's input, and duplicate / reprint copies (one group)
   'renderer/logs.js': 1,         // jobCostForMargin's fallback where order-money is not loaded (the old formula)
 };

@@ -1258,6 +1258,8 @@
   "pe.description": "Beschreibung",
   "pe.description_ph": "Kurze Notizen zu diesem Produkt (optional)",
   "pe.default_margin": "Standardaufschlag",
+  "pe.per_box": "Stück pro Karton",
+  "pe.per_box_hint": "Wie viele Stück dieses Produkts in einen Karton passen. Die Verpackung wird pro Karton berechnet.",
   "pe.cost": "Kosten",
   "pe.default_price": "Standardpreis",
   "bom.components": "Komponenten (nicht gedruckt)",
