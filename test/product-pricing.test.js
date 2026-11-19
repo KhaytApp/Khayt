@@ -130,8 +130,8 @@ function jobFrom(product, ctx) {
   // At the part's own rates and the shop's default for any it never carried
   // (`withRates`), as `appendProductParts` and the Mac's `costPart` take it.
   const parts = (product.parts || []).map((p) => {
-    // A product without rates: labour per piece, prep included (labourEachPiece).
-    const rated = Object.assign(PR.withRates(p, { settings: ctx.settings }), { labourEachPiece: true });
+    // A product without rates: unmarked, the old labour sum.
+    const rated = PR.withRates(p, { settings: ctx.settings });
     return Object.assign({}, rated, { baseCost: CC.partTotalCost(rated, ctx) });
   });
   return N.newOrder({
@@ -188,8 +188,8 @@ test('a part with no labour or wear is costed at the shop defaults, as the job p
   assert.equal(out.cost, 160.33);
   // The very merge the Mac's `costPart` makes for a job's part.
   const merged = Object.assign({}, PR.ratesFor({ settings }), RATELESS);
-  // Costed the old way (labourEachPiece) until the shop uses the new cost.
-  assert.equal(out.cost, +CC.partTotalCost(Object.assign({}, merged, { labourEachPiece: true }), { inventory: [], settings }).toFixed(2));
+  // Unmarked: the old sum, until the shop uses the new cost.
+  assert.equal(out.cost, +CC.partTotalCost(merged, { inventory: [], settings }).toFixed(2));
   assert.deepEqual(PR.withRates(RATELESS, { settings }), merged);
 });
 

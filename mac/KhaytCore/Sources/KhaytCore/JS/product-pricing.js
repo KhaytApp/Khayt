@@ -91,17 +91,6 @@ function perBoxOf(product) {
   return b >= 1 ? b : 1;
 }
 
-/**
- * A part of a product costed the OLD way (no rates, or labourPerPart) carries
- * its labour per piece, prep included, as the catalogue has always costed it:
- * it keeps that figure until the shop chooses "Use the new cost" (Turki,
- * Nov 19, option ii). The mark travels with the part into a job, so the job
- * costs what the catalogue says.
- */
-function legacyLabour(part) {
-  return Object.assign({}, part, { labourEachPiece: true });
-}
-
 function moneyRules() {
   const g = (typeof global !== 'undefined' && global.KhaytOrderMoney) || null;
   const Mo = g || (typeof require === 'function' ? (() => { try { return require('./order-money.js'); } catch (_) { return null; } })() : null);
@@ -118,7 +107,7 @@ function productLabourCost(product, opts) {
   // (`opts.units`, how many of it; 1 by default). The parts' own qty do not
   // multiply post (Turki, Nov 19). KhaytOrderMoney.lineLabour is the rule.
   const Mo = moneyRules();
-  const line = Mo.lineLabour({ prepTime: r.prepTime, postTime: r.postTime, laborRate: r.laborRate, qty: unitsOf(opts) });
+  const line = Mo.lineLabour({ prepTime: r.prepTime, postTime: r.postTime, laborRate: r.laborRate, qty: unitsOf(opts), labourPerLine: true });
   return line * (1 + Math.max(0, +r.failureRate || 0) / 100);
 }
 
@@ -175,8 +164,10 @@ function productJobParts(product, opts) {
   const once = usesProductRates(d) && d.labourPerPart !== true;
   const o = once ? { labour: false, packaging: false } : undefined;
   const parts = (Array.isArray(d.parts) ? d.parts : []).filter(Boolean).map((raw) => {
-    let p = Object.assign({}, ratedPart(d, raw, ctx.settings));   // never the product's own part
-    if (!once) p = legacyLabour(p);
+    // A product with its own rates is costed the new way (labourPerLine);
+    // one without (or with labourPerPart) stays unmarked, the old sum, as
+    // the catalogue costs it, until the shop uses the new cost.
+    const p = Object.assign({}, ratedPart(d, raw, ctx.settings), once ? { labourPerLine: true } : {});   // never the product's own part
     // Costed at the line's real qty: a per-piece share (packaging, and under
     // labourPerPart its labour) depends on it.
     p.qty = Math.max(1, +p.qty || 1) * units;
@@ -270,7 +261,7 @@ function priceProduct(product, opts) {
   const onceOpts = once ? { labour: false, packaging: false } : undefined;
   const partsCost = list.reduce((sum, raw) => {
     const rated = ratedPart(d, raw, ctx.settings);
-    const p = once ? rated : legacyLabour(rated);
+    const p = once ? Object.assign({}, rated, { labourPerLine: true }) : rated;
     if (CC && typeof CC.partTotalCost === 'function') {
       return sum + (+CC.partTotalCost(p, ctx, onceOpts) || 0);
     }

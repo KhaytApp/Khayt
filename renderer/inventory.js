@@ -3130,11 +3130,9 @@ function appendProductParts(p) {
     // seven on every part it saves, so the job records what it was charged.
     const PRt = (typeof window !== 'undefined' && window.KhaytPrintRates) || null;
     const rated = PRt ? PRt.withRates(part, { settings: typeof settings !== 'undefined' ? settings : {} }) : part;
-    // A product costed the old way keeps its labour per piece, prep included
-    // (labourEachPiece, KhaytOrderMoney.lineLabour), so the job costs what
-    // the catalogue says until the shop chooses "Use the new cost" (Turki,
-    // Nov 19).
-    const partCopy = { ...rated, id: uid('PRT'), labourEachPiece: true };
+    // Unmarked (no labourPerLine): a product without rates keeps the old
+    // labour sum, as the catalogue costs it, until "Use the new cost".
+    const partCopy = { ...rated, id: uid('PRT') };
     if (!partCopy.material && partCopy.filamentId) {
       const inv = inventory.find(i => i.id === partCopy.filamentId);
       if (inv) partCopy.material = inv.material;
@@ -3164,9 +3162,23 @@ function mergeProductAgain(p, PPr, book) {
   const at = [];
   currentBuild.forEach((q, i) => { if (q && q.onceGroup === key) at.push(i); });
   const was = PPr.productJobParts(p, Object.assign({}, book, { units })).parts;
+  // UNTOUCHED means every key: an agreed price, a colour, a note, a file, a
+  // rate typed on the part, anything the shop changed in the cart makes it
+  // the shop's line, and it is not rebuilt (money review of #2586, MED 4).
+  // Only what the cart itself adds is set aside: its id and group, and the
+  // material it fills in from the spool when the product's part has none.
+  const canon = (v) => (Array.isArray(v) ? v.map(canon)
+    : (v && typeof v === 'object' ? Object.keys(v).sort().reduce((o, k) => { if (v[k] !== undefined) o[k] = canon(v[k]); return o; }, {}) : v));
+  const bare = (q, w) => {
+    const o = Object.assign({}, q);
+    delete o.id; delete o.onceGroup;
+    if (!w.material) delete o.material;
+    return JSON.stringify(canon(o));
+  };
   const same = at.length === was.length && at.every((i, n) => {
-    const q = currentBuild[i], w = was[n];
-    return q.orderLevelCosts === true && +q.qty === +w.qty && Math.abs((+q.baseCost || 0) - (+w.baseCost || 0)) < 0.00005;
+    const w = Object.assign({}, was[n]);
+    if (!w.material) delete w.material;
+    return bare(currentBuild[i], was[n]) === JSON.stringify(canon(w));
   });
   if (!same) return false;
   const jp = PPr.productJobParts(p, Object.assign({}, book, { units: units + 1 }));

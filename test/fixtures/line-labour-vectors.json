@@ -1,5 +1,5 @@
 {
-  "about": "Labour on a line of work (Turki, Nov 19): PREP once per line, POST-processing / assembly PER PIECE. KhaytOrderMoney.lineLabour(line) = (prepTime + postTime x qty) x laborRate, before any failure buffer. A part is a line (its own qty); a product is a line (qty = how many of the product; its parts' qty do not multiply post); a store order's line of N products is a line. Every case below runs through the shared lib the Mac and the phone load. Before this rule, prep was charged per piece: +24.75 a piece at the defaults (0.25 h x 90 x 1.1). Packaging (Turki, Nov 19, \"depends on size\"): a line of N ships in KhaytOrderMoney.lineBoxes(N, perBox) = ceil(N / perBox) boxes; a product's perBox defaults to 1 (a box each, as before); a hand part without perBox is one box for the line, as before. Existing products (no rates, or labourPerPart) keep the OLD labour, prep and post on every piece, through the part mark labourEachPiece, until the shop chooses \"Use the new cost\" (option ii).",
+  "about": "Labour on a line of work (Turki, Nov 19): PREP once per line, POST-processing / assembly PER PIECE. KhaytOrderMoney.lineLabour(line) = (prepTime + postTime x qty) x laborRate, before any failure buffer. A part is a line (its own qty); a product is a line (qty = how many of the product; its parts' qty do not multiply post); a store order's line of N products is a line. Every case below runs through the shared lib the Mac and the phone load. Before this rule, prep was charged per piece: +24.75 a piece at the defaults (0.25 h x 90 x 1.1). Packaging (Turki, Nov 19, \"depends on size\"): a line of N ships in KhaytOrderMoney.lineBoxes(N, perBox) = ceil(N / perBox) boxes; a product's perBox defaults to 1 (a box each, as before); a hand part without perBox is one box for the line, as before. ONLY a line marked labourPerLine: true is costed this way. An UNMARKED line is the old sum, prep and post on every piece: every record written before this (a stored job, a product without rates or with labourPerPart) costs exactly what it did, and so does every path that does not know the mark (money review of #2586). New parts are marked where they are made (the calculator, the job sheet, quotes, a product with its own rates).",
   "rates": {
     "laborRate": 90,
     "prepTime": 0.25,
@@ -113,11 +113,11 @@
       }
     },
     {
-      "why": "lineLabour, qty 10, labourEachPiece (a product saved before this): (0.25 + 0.5) x 10 x 90 = 675.00, the old sum",
+      "why": "lineLabour, qty 10, UNMARKED (a stored part, a product saved before this): (0.25 + 0.5) x 10 x 90 = 675.00, the old sum",
       "kind": "lineLabour",
       "qty": 10,
-      "labourEachPiece": true,
-      "want": 675
+      "want": 675,
+      "unmarked": true
     },
     {
       "why": "a product x 10, perBox 1 (the default): 10 boxes, 10 x 5 x 1.1 = 55.00",
@@ -173,7 +173,7 @@
       "want": 635.25
     },
     {
-      "why": "an EXISTING product (no rates), a part of qty 10: catalogue keeps the old labour, (0.25 + 0.5) x 90 x 10 + packaging 5 once, x 1.1 = 748.00; a job and a store order from it carry the same, marked labourEachPiece",
+      "why": "an EXISTING product (no rates), a part of qty 10: catalogue keeps the old labour, (0.25 + 0.5) x 90 x 10 + packaging 5 once, x 1.1 = 748.00; a job and a store order from it carry the same, unmarked",
       "kind": "legacyProduct",
       "qty": 10,
       "want": {
@@ -188,6 +188,17 @@
       "want": {
         "cost": 79.75
       }
+    },
+    {
+      "why": "a stored part (unmarked), qty 10, 100 g at 90/kg: (90 + 675 + packaging 5 once) x 1.1 = 847.00, as before this",
+      "kind": "part",
+      "qty": 10,
+      "unmarked": true,
+      "printWeight": 100,
+      "spoolCost": 90,
+      "spoolWeight": 1000,
+      "packaging": true,
+      "want": 847
     }
   ]
 }

@@ -77,3 +77,14 @@ test('two different products stay two groups', () => {
   box.api.add(product()); box.api.add(product({ id: 'Q' }));
   assert.equal(Object.keys(box.currentFixedCosts.groups).length, 2);
 });
+
+for (const [what, change] of [['an agreed price', { agreedPrice: 40 }], ['a colour', { colour: 'Red' }], ['a note', { note: 'gift wrap' }]]) {
+  test(`a group with ${what} on a part is not rebuilt: the product goes in as its own group (money review of #2586, MED 4)`, () => {
+    const box = cart();
+    box.api.add(product());
+    box.currentBuild[0] = Object.assign({}, box.currentBuild[0], change);
+    box.api.add(product());
+    assert.equal(Object.keys(box.currentFixedCosts.groups).length, 2);
+    for (const [k, v] of Object.entries(change)) assert.equal(box.currentBuild[0][k], v, 'kept');
+  });
+}

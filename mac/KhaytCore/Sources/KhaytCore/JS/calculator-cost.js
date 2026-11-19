@@ -97,13 +97,16 @@
   /**
    * One piece's share of the line's packaging: the shop's packaging × the
    * boxes the line ships in (KhaytOrderMoney.lineBoxes: ceil(qty / perBox)
-   * with the part's own `perBox`; one box for the line when unsaid, as it
-   * always was) ÷ qty.
+   * with the part's own `perBox`, read only on a labourPerLine part; one box
+   * for the line otherwise, as it always was) ÷ qty.
    */
   function packagingShare(part, settings) {
     const Mo = moneyRules();
     const qty = Math.max(1, +part.qty || 1);
-    return Math.max(0, +(settings && settings.defaultPackagingCost) || 0) * Mo.lineBoxes(qty, part.perBox) / qty;
+    // Only a part on the new rule (labourPerLine) reads perBox: an unmarked
+    // (stored) part costs exactly what it did, one box for its line.
+    const perBox = part.labourPerLine === true ? part.perBox : undefined;
+    return Math.max(0, +(settings && settings.defaultPackagingCost) || 0) * Mo.lineBoxes(qty, perBox) / qty;
   }
 
   function moneyRules() {
