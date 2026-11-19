@@ -115,19 +115,27 @@ extension Shop {
     }
 
     static func ledgerMoney(_ order: Order) -> LedgerMoney {
-        let costKnown = order.costBasis > 0
-        // The job's own cost: its parts (`costBasis`) and the components it
-        // was priced with. The price includes the components, so a margin
-        // against the parts alone read high by exactly their cost.
-        let cost = order.costBasis + order.componentsCost
-        let net = order.figures?.net ?? order.price
-        let tax = order.figures?.tax ?? 0
+        let costKnown = order.costBasis > 0 && order.figures?.cost != nil
+        // ── ALL IN THE SHOP'S CURRENCY ────────────────────────────────────
+        //
+        // The ledger shows its figures in the shop's currency and sums them.
+        // A job's price and its invoice split are in the JOB's currency; its
+        // cost is the shop's. So the job's figures go across at the job's own
+        // frozen rate, and the cost is the shared rule's (`OrderFigures.cost`
+        // = `KhaytOrderMoney.jobCost`): parts, components, overhead, and a
+        // product's labour and packaging. Summed here as `costBasis +
+        // componentsCost`, it missed the overhead and set a SAR cost against a
+        // USD price, so a USD job read "sold below cost" (#2581/#2582 review).
+        let fx = order.figures?.fx ?? 1
+        let cost = order.figures?.cost ?? 0
+        let net = (order.figures?.net ?? order.price) * fx
+        let tax = (order.figures?.tax ?? 0) * fx
         // The margin is on what the shop KEPT: the price less its credit
         // notes, net of tax — the figure Reports' margin is on. `net` above is
         // the invoice's split, which a credit note does not change.
-        let earned = order.figures?.earnedOrNet ?? order.price
+        let earned = (order.figures?.earnedOrNet ?? order.price) * fx
         return LedgerMoney(
-            charged: order.figures?.billed ?? order.price,
+            charged: (order.figures?.billed ?? order.price) * fx,
             // Only for a shop that charges tax: an unregistered shop has no
             // split, and a zero tax line would claim one.
             net: tax > 0 ? net : nil,
