@@ -3807,6 +3807,8 @@ final class Words {
         "mac.rc_markup_note": ["en": "% on the parts’ cost", "ar": "% على تكلفة القطع"],
         "mac.rc_cost": ["en": "Cost", "ar": "التكلفة"],
         "mac.rc_kept_hint": ["en": "Kept as typed at {kept}. The parts now come to {price} at a {pct}% markup.", "ar": "أُبقي السعر كما أُدخل: {kept}. القطع الآن تساوي {price} بهامش {pct}%."],
+        "mac.rc_markup_bad": ["en": "That markup is not a number. Type a figure, for example 30.", "ar": "هذا الهامش ليس رقمًا. اكتب رقمًا، مثل 30."],
+        "mac.rc_not_saved": ["en": "The new price was not saved. Try again.", "ar": "لم يُحفظ السعر الجديد. حاول مرة أخرى."],
         "mac.rc_price_now": ["en": "Price now", "ar": "السعر الحالي"],
         "mac.rc_new_price": ["en": "New price", "ar": "السعر الجديد"],
         "mac.rc_terms": ["en": "Discount, rush, shipping and extra charges stay as they are.", "ar": "الخصم والاستعجال والشحن والرسوم الإضافية تبقى كما هي."],

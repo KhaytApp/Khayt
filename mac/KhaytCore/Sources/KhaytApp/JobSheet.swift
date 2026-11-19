@@ -81,6 +81,9 @@ struct JobSheet: View {
     @State private var margin: Double??
     /// "Kept as typed at …; the parts now come to …" for a typed price.
     @State private var keptHint: String?
+    /// Moves when the price moves under the sheet (a Recalculate saved), so
+    /// the hint is read again rather than left describing the old price.
+    @State private var hintRevision = 0
     /// The rule's answer to the sheet as it stands.
     @State private var newTotal: String?
     @State private var refusal: String?
@@ -119,7 +122,7 @@ struct JobSheet: View {
                 recalculating = false
                 // Saved: the price, markup and lines moved on disk. Read the
                 // job again so this sheet does not save the old price back.
-                if saved { started = false; open() }
+                if saved { started = false; open(); hintRevision += 1 }
             }
         }
         .confirmationDialog(shop.words.callIt("mac.parts_price_q"), isPresented: $askingPrice) {
@@ -324,7 +327,7 @@ struct JobSheet: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    .task(id: subject.id) { await readKeptHint() }
+                    .task(id: "\(subject.id)#\(hintRevision)") { await readKeptHint() }
                 case .none:
                     Text(verbatim: " ")
                 }

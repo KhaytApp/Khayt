@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
+  - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.
+  - **Recalculate.**
+    - It used the shop's overhead rate today, so an online or shelf job priced without overhead gained a share of it. It now keeps the job's own.
+    - The second confirm button no longer saves twice on a double-click.
+    - A markup typed while the sheet opens is no longer replaced.
+    - A markup that is not a number is said, not priced at the default.
+    - A save that gets no answer says the price was not saved.
+  - **Edit Job.** The "kept as typed" hint is read again after Recalculate saves.
+  - **"For N pieces".** The product sheet's preview waits a quarter second after typing and never shows an older answer over a newer one.
+  - **Saving parts.** A part whose costing failed keeps the rates it was costed at.
 - **Mac: prep once per line, finishing per piece, packaging by the box (the shared rule from #2586).**
   - **Product sheet.** A product with its own rates now separates "Prep, once per line" from "Finishing, per piece". It has a "Pieces per box" field (blank means a box each) and a "For N pieces" preview of what a line of N costs: parts, labour, packaging and how many boxes, the cost and per piece. Every figure comes from the shared rule (`productJobParts` with `units`, `jobCost`, `lineBoxes`), so the Mac does no sums of its own. Figma: Mac file, page 21.
   - **Online orders.** A web order's line of a product with its own rates is now ONE line of N pieces through the same rule as the desktop's store orders: prep once, finishing per piece, packaging by the box. Before, it was one piece's labour and packaging times the quantity. The line counts the pieces still to print, as the shared rule does. A product saved before this keeps its own sum.

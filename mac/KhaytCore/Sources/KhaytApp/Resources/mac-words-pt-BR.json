@@ -4099,5 +4099,7 @@
  "mac.prod_line_labour": "Mão de obra: preparo uma vez, acabamento × {n}",
  "mac.prod_line_packaging": "Embalagem, caixas: {boxes}",
  "mac.prod_line_cost": "Custo",
- "mac.prod_line_per_piece": "Por peça"
+ "mac.prod_line_per_piece": "Por peça",
+ "mac.rc_markup_bad": "Essa margem não é um número. Digite um valor, por exemplo 30.",
+ "mac.rc_not_saved": "O novo preço não foi salvo. Tente de novo."
 }

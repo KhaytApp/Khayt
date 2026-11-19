@@ -13581,16 +13581,24 @@ public actor KhaytEngine {
         /// The one place a job's cost is summed on the Mac (`JobCostTests`).
         /// Nil when not worked out.
         public let cost: Double?
+        /// The same cost WITHOUT the job's overhead (`jobCost(o, {overhead:
+        /// false})`): what the ledger and the desktop's Orders Log measure a
+        /// job's margin against. Nil from an older caller; read through
+        /// `costForLedger`.
+        public let costWithoutOverhead: Double?
+        public var costForLedger: Double? { costWithoutOverhead ?? cost }
         /// Shop currency per unit of the job's: its frozen `fxRate`, 1 for a
         /// job in the shop's currency. Every figure above but `cost` is in the
         /// job's currency; times this, the shop's.
         public let fx: Double
         public init(billed: Double, net: Double, tax: Double, owed: Double, due: Double? = nil,
-                    earned: Double? = nil, cost: Double? = nil, fx: Double = 1) {
+                    earned: Double? = nil, cost: Double? = nil, fx: Double = 1,
+                    costWithoutOverhead: Double? = nil) {
             self.billed = billed; self.net = net; self.tax = tax; self.owed = owed; self.due = due ?? billed
             self.earned = earned; self.cost = cost; self.fx = fx
+            self.costWithoutOverhead = costWithoutOverhead
         }
-        private enum CodingKeys: String, CodingKey { case billed, net, tax, owed, due, earned, cost, fx }
+        private enum CodingKeys: String, CodingKey { case billed, net, tax, owed, due, earned, cost, fx, costWithoutOverhead }
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             billed = try c.decode(Double.self, forKey: .billed); net = try c.decode(Double.self, forKey: .net)
@@ -13599,6 +13607,7 @@ public actor KhaytEngine {
             earned = try c.decodeIfPresent(Double.self, forKey: .earned)
             cost = try c.decodeIfPresent(Double.self, forKey: .cost)
             fx = try c.decodeIfPresent(Double.self, forKey: .fx) ?? 1
+            costWithoutOverhead = try c.decodeIfPresent(Double.self, forKey: .costWithoutOverhead)
         }
     }
 
@@ -13632,6 +13641,9 @@ public actor KhaytEngine {
                   cost: M.jobCost ? M.jobCost(o) : (Array.isArray(o.parts) ? o.parts : [])
                           .reduce(function (s, p) { return s + Math.max(0, +(p && p.baseCost) || 0); }, 0)
                         + Math.max(0, +o.componentsCost || 0) + Math.max(0, +o.overheadCost || 0),
+                  // What the ledger measures the margin against: the same cost
+                  // without the job's overhead, as the desktop's Orders Log.
+                  costWithoutOverhead: M.jobCost ? M.jobCost(o, { overhead: false }) : null,
                   // The price is the JOB's currency: its frozen rate to the shop's.
                   fx: (+o.fxRate > 0) ? +o.fxRate : 1,
                 };
