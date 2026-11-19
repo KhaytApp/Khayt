@@ -66,39 +66,14 @@ function parseDay(s) {
  * @returns {'offline'|'error'|'reconnecting'|'printing'|'idle'|'unknown'}
  */
 function machineState(machine, entry, opts) {
-  const offlineAfter = (opts && +opts.offlineAfter > 0)
-    ? +opts.offlineAfter
-    : OFFLINE_AFTER_MISSED_POLLS;
-
-  // The operator ticked "offline" by hand. Nothing the poller says overrides that.
-  if (machine && machine.isOffline) return 'offline';
-  if (!entry) {
-    /* No reading. That means two different things and they must not share a word.
-     *
-     * A machine with NO printer API configured is genuinely idle as far as the
-     * app can know — the shop tracks it by orders and there is nothing to poll.
-     *
-     * A machine that HAS one and no reading is a machine nobody has heard from:
-     * polling has not run yet, or stopped. Calling that 'idle' is the app
-     * asserting a fact it does not have, and it reads identically to a printer
-     * that is genuinely free — which is the answer an owner acts on when
-     * deciding whether a bed is available.
-     */
-    const api = machine && machine.printerApi;
-    const polled = !!(api && api.type && api.type !== 'none');
-    return polled ? 'unknown' : 'idle';
-  }
-
-  if (entry.error) {
-    return (entry.consecutiveFailures || 0) >= offlineAfter ? 'offline' : 'reconnecting';
-  }
-
-  const st = String(entry.state || '').toLowerCase();
-  if (st.includes('error')) return 'error';
-  if (st.includes('print')) return 'printing';
-  // Progress without a recognisable state string still means work in flight.
-  if (Math.round(+entry.progress || 0) > 0) return 'printing';
-  return 'idle';
+  // The closed sets and the per-protocol words live in lib/printer-activity.js
+  // (C2, Nov 19); this is their projection onto the six values every screen,
+  // the idle panel and lead-time-publish read. A word no table knows reads by
+  // the old substring rule, exactly as before.
+  const MS = (typeof globalThis !== 'undefined' && globalThis.KhaytPrinterActivity)
+    || (typeof require === 'function' ? require('./printer-activity.js') : null);
+  if (!MS) throw new Error('KhaytPrinterActivity is not loaded (lib/printer-activity.js before lib/attention.js)');
+  return MS.legacy(MS.machineStatus(machine, entry, opts), entry, opts);
 }
 
 /**

@@ -251,11 +251,20 @@
     return s;
   }
 
-  /** A poll that threw. Keep the telemetry, count the miss. */
-  function mergePollFailure(prev, message, now) {
+  /**
+   * A poll that threw. Keep the telemetry, count the miss. `status` is the
+   * HTTP status when the printer answered one (the poller's `e.status`), so
+   * a refused key reads as unauthorized from the code, not from the words
+   * (lib/printer-activity.js); absent otherwise, and dropped from an earlier
+   * failure. A good poll builds a fresh entry, so it never outlives one.
+   */
+  function mergePollFailure(prev, message, now, status) {
     const p = prev || {};
+    const code = Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
+    const { httpStatus: _old, ...rest } = p;
     return {
-      ...p,
+      ...rest,
+      ...(code ? { httpStatus: code } : {}),
       error: message,
       consecutiveFailures: (p.consecutiveFailures || 0) + 1,
       // Only stamp lastOkAt from lastUpdated on the FIRST failure — after that
