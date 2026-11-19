@@ -464,6 +464,13 @@ extension Shop {
         // one, filed as having come from online. `lib/webstore-order.js`
         // decides, as the desktop's Order requests screen always has.
         var input = printOnly(input, reading: fresh)
+        // The labour and packaging of the rated product lines, for the pieces
+        // the FRESH reading says to make — the count `printOnly` just sized
+        // the parts to. The queue-time figures could be for a different count.
+        if let once = try await Self.onceCosts(fresh, root: root, engine: engine) {
+            if once.labour > 0 { input["labourCost"] = .number(once.labour) } else { input.removeValue(forKey: "labourCost") }
+            if once.packaging > 0 { input["packagingCost"] = .number(once.packaging) } else { input.removeValue(forKey: "packagingCost") }
+        }
         if allFromShelf { input["fromStock"] = .bool(true) } else { input.removeValue(forKey: "fromStock") }
         var clients = rows(root, "clients")
         var clientId: String?
@@ -784,8 +791,12 @@ extension Shop {
                         if case .string(let p)? = iq["presetId"], !p.isEmpty { sheetPreset = p }
                     }
                     unpriced.spoolId = sheetSpool
+                    // A new part, as the desktop's intake makes it
+                    // (`intakeQuotePart`): on the new quantity rule.
+                    for (key, value) in Shop.newPartMark { unpriced.raw[key] = value }
                     if let costed = await costedPart(spoolId: sheetSpool, grams: shown.grams, hours: shown.hours,
-                                                     qty: unpriced.qty, presetId: sheetPreset) {
+                                                     qty: unpriced.qty, presetId: sheetPreset,
+                                                     extra: Shop.newPartMark) {
                         unpriced.cost = costed.cost
                         unpriced.parts = costed.parts
                         unpriced.rates = costed.rates
@@ -798,17 +809,35 @@ extension Shop {
             products += 1
             onlyProduct = products == 1 ? product : nil
             if products == 1 { margin = product.margin ?? defaultMargin }
-            let built = await jobFrom(product)
-            // Labour and packaging per piece, as the parts are, until the
-            // qty decision (Dev Hub #3).
-            onceCosts = onceCosts + built.once.times(line.qty)
+            // ── ONE LINE OF N, AS THE STORE-ORDER RULE BUILDS IT ─────────
+            //
+            // A product with its own rates is the shared rule's line of
+            // `line.qty` (#2586, `lib/store-order-job.js productLine`):
+            // parts scaled, prep once for the line, finishing per piece,
+            // packaging by the box, all from `productJobParts` with `units`.
+            // It used to be one piece's labour and packaging times the qty.
+            // A product saved before keeps its own sum, part by part.
+            //
+            // Built at the ORDERED count, every line, as before: this reading
+            // is from queue time. Inside the write, `printOnly` cuts the parts
+            // to what the shelf cannot cover NOW, and `onceCosts(fresh:)`
+            // prices the labour and packaging for those same pieces.
+            let units = max(1, line.qty)
+            let built = await jobLine(product, units: units)
+            onceCosts = onceCosts + built.once
             for var part in built.parts {
+                if built.scaled {
+                    // Already the line's count; per piece is that over units.
+                    drafts.append(part)
+                    origin.append((index, max(1, part.qty / units)))
+                    continue
+                }
                 // The product's part count is PER ONE. Six hoods is six times
                 // each of a hood's parts.
                 let perPiece = max(1, part.qty)
                 // Overflow-safe: both counts are clamped, but a product's own
                 // part count is the shop's and is not.
-                let (total, overflow) = perPiece.multipliedReportingOverflow(by: max(1, line.qty))
+                let (total, overflow) = perPiece.multipliedReportingOverflow(by: units)
                 part.qty = overflow ? Int.max : total
                 drafts.append(part)
                 origin.append((index, perPiece))
@@ -902,6 +931,42 @@ extension Shop {
             input["parts"] = .array(rows)
         }
         return input
+    }
+
+    /// How many pieces of a product line the job makes: all of them when
+    /// the shelf covers the whole order (that job is recorded from stock),
+    /// else those still to print. `lib/store-order-job.js` build's count.
+    static func lineUnits(_ order: OnlineOrder, _ line: OnlineOrder.Line) -> Int {
+        let ordered = max(1, line.qty)
+        return order.allFromShelf ? ordered : max(0, min(ordered, line.toPrint))
+    }
+
+    /// The labour and packaging, once per line (#2581, #2586), of every product
+    /// line with its own rates, at the pieces `reading` says to make
+    /// (`lineUnits`), through `productJobParts` with `units` — the store-order
+    /// rule's `build`. Nil when the order has no such line, so nothing is
+    /// touched. Run inside the write, on the reading taken there.
+    static func onceCosts(_ reading: OnlineOrder, root: [String: JSONValue],
+                          engine: KhaytEngine) async throws -> ProductOnceCosts? {
+        let products = rows(root, "products")
+        var total = ProductOnceCosts.none
+        var any = false
+        for line in reading.lines {
+            guard let id = line.productId,
+                  case .object(let product)? = products.first(where: { recordId($0) == id }),
+                  ProductRates.usesOwn(product), !ProductRates.labourPerPart(product),
+                  case .array(let parts)? = product["parts"] else { continue }
+            any = true
+            let units = lineUnits(reading, line)
+            if units == 0 { continue }
+            var record: [String: JSONValue] = ["parts": .array(parts)]
+            for (k, v) in ProductRates.pricingFields(product) { record[k] = v }
+            let built = try await engine.productJobParts(.object(record), inventory: rows(root, "inventory"),
+                                                         settings: settings(root),
+                                                         consumables: rows(root, "consumables"), units: units)
+            total = total + ProductOnceCosts(labour: built.labourCost, packaging: built.packagingCost)
+        }
+        return any ? total : nil
     }
 
     static let lineKey = "_onlineLine"
