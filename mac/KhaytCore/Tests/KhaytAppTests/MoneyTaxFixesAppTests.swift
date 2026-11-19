@@ -120,7 +120,7 @@ struct MoneyTaxFixesAppTests {
     @Test("the ledger's margin is on the price net of VAT")
     func ledgerMarginIsNetOfVat() throws {
         var job = try Self.order(price: 115, cost: 80)
-        job.figures = .init(billed: 115, net: 100, tax: 15, owed: 0)
+        job.figures = .init(billed: 115, net: 100, tax: 15, owed: 0, cost: 80)
         let money = Shop.ledgerMoney(job)
         #expect(money.margin.map { abs($0 - 0.2) < 1e-9 } == true,
                 "30.4% is the VAT read as margin; the P&L says 20%")
@@ -135,7 +135,7 @@ struct MoneyTaxFixesAppTests {
         // 115 charged, 57.50 credited back: the shop kept 50 net of VAT, and a
         // job that cost 40 made 10 — not the 60 the invoice's split implies.
         var job = try Self.order(price: 115, cost: 40)
-        job.figures = .init(billed: 115, net: 100, tax: 15, owed: 0, earned: 50)
+        job.figures = .init(billed: 115, net: 100, tax: 15, owed: 0, earned: 50, cost: 40)
         let money = Shop.ledgerMoney(job)
         #expect(money.marginMoney == 10)
         #expect(money.margin.map { abs($0 - 0.2) < 1e-9 } == true)
@@ -145,7 +145,7 @@ struct MoneyTaxFixesAppTests {
     @Test("an exclusive shop's ledger charges price + tax and keeps the price")
     func ledgerExclusive() throws {
         var job = try Self.order(price: 100, cost: 80)
-        job.figures = .init(billed: 108.25, net: 100, tax: 8.25, owed: 8.25)
+        job.figures = .init(billed: 108.25, net: 100, tax: 8.25, owed: 8.25, cost: 80)
         let money = Shop.ledgerMoney(job)
         #expect(money.charged == 108.25)
         #expect(money.marginMoney == 20)
@@ -154,7 +154,7 @@ struct MoneyTaxFixesAppTests {
     @Test("an unregistered shop has no tax line on the ledger")
     func ledgerUnregistered() throws {
         var job = try Self.order(price: 115, cost: 80)
-        job.figures = .init(billed: 115, net: 115, tax: 0, owed: 0)
+        job.figures = .init(billed: 115, net: 115, tax: 0, owed: 0, cost: 80)
         let money = Shop.ledgerMoney(job)
         #expect(money.vat == nil)
         #expect(money.net == nil)
@@ -167,7 +167,7 @@ struct MoneyTaxFixesAppTests {
     func owedInOwnCurrency() throws {
         var job = try Self.order(price: 100, cost: 10)
         job.owedResolved = 375          // the shop's riyals
-        job.figures = .init(billed: 100, net: 100, tax: 0, owed: 100)
+        job.figures = .init(billed: 100, net: 100, tax: 0, owed: 100, cost: 10)
         #expect(job.owedInOwnCurrency == 100, "printed beside USD, this read 375.00 USD")
         #expect(job.owed == 375, "and the shop-currency figure stays for totals")
     }
