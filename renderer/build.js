@@ -34,6 +34,29 @@ let currentFixedCosts = { labourCost: 0, packagingCost: 0 };
 function onceFixedCost() {
   return Math.max(0, +currentFixedCosts.labourCost || 0) + Math.max(0, +currentFixedCosts.packagingCost || 0);
 }
+/**
+ * The once-costs follow the parts they came with. Each product added (and a
+ * duplicated or reprinted once-job) is a GROUP: its parts carry the group's
+ * key (`onceGroup`, stripped before newOrder) and `currentFixedCosts.groups`
+ * holds its labour and packaging. A group whose last part leaves the cart
+ * takes its costs with it: removing a product's parts and logging a manual
+ * part sent the product's 79.75 anyway (money review of #2581, HIGH).
+ */
+function syncFixedCosts() {
+  const f = currentFixedCosts || {};
+  const groups = f.groups && typeof f.groups === 'object' ? f.groups : null;
+  if (groups) {
+    const live = new Set((currentBuild || []).map((p) => p && p.onceGroup).filter(Boolean));
+    const kept = {}; let lab = 0, pkg = 0;
+    for (const key of Object.keys(groups)) {
+      if (!live.has(key)) continue;
+      kept[key] = groups[key]; lab += +groups[key].labourCost || 0; pkg += +groups[key].packagingCost || 0;
+    }
+    currentFixedCosts = { labourCost: +lab.toFixed(4), packagingCost: +pkg.toFixed(4), groups: kept };
+  } else if (!(currentBuild || []).some((p) => p && p.orderLevelCosts === true)) {
+    currentFixedCosts = { labourCost: 0, packagingCost: 0 };
+  }
+}
 let currentAssemblyQty = 1;
 
 // Feature 5: Price tiers for the current part being configured
@@ -193,7 +216,8 @@ if (typeof document !== 'undefined') {
     currentClientId = saved.clientId || null;
     currentExtraLines = saved.extraLines || [];
     currentFixedCosts = saved.fixedCosts && typeof saved.fixedCosts === 'object'
-      ? { labourCost: +saved.fixedCosts.labourCost || 0, packagingCost: +saved.fixedCosts.packagingCost || 0 }
+      ? Object.assign({ labourCost: +saved.fixedCosts.labourCost || 0, packagingCost: +saved.fixedCosts.packagingCost || 0 },
+        saved.fixedCosts.groups && typeof saved.fixedCosts.groups === 'object' ? { groups: saved.fixedCosts.groups } : {})
       : { labourCost: 0, packagingCost: 0 };
     // Show toast after DOM ready
     document.addEventListener('DOMContentLoaded', () => {
@@ -617,8 +641,11 @@ function updateGrandTotal() {
     totalBase += componentsBase;
     totalCost += componentsBase;
   }
+  // Priced only on the costed share of the parts, as newOrder prices it
+  // (KhaytOrderNew.costedShare); the cost counts it whole.
   const onceFixed = typeof onceFixedCost === 'function' ? onceFixedCost() : 0;
-  totalBase += onceFixed; totalCost += onceFixed;
+  totalBase += onceFixed * (onceFixed > 0 && typeof KhaytOrderNew !== 'undefined' && KhaytOrderNew.costedShare ? KhaytOrderNew.costedShare(currentBuild) : 1);
+  totalCost += onceFixed;
   const compLine = $('#calcComponentsLine');
   if (compLine) {
     compLine.style.display = componentsBase > 0 ? 'inline' : 'none';
@@ -996,6 +1023,7 @@ function addPart() {
 
 function removePart(index) {
   currentBuild.splice(index, 1);
+  syncFixedCosts();
   renderBuild();
   saveBuildDraft();
 }

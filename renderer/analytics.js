@@ -3132,7 +3132,10 @@ function pnlInputsForRange() {
       // Not shipping: it is charged inside the price, and the courier is an
       // expense — as pnlByPeriod and the dashboard (kpi-rows orderCost) read it.
       const cogs = (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0)
-          * KhaytPnl.stockShare(o, { inventory, settings });
+          * KhaytPnl.stockShare(o, { inventory, settings })
+          // + a product's packaging carried once on the order (inventoried; its
+          // labour is not, 2026-09-28), as pnlByPeriod and kpi-rows count it.
+          + KhaytOrderMoney.jobFixedCost(o, { components: false, overhead: false, labour: false });
       // `revenue` here is gross — see lib/tax.js. Its VAT counts when the
       // INVOICE's day is in range (KhaytPnl.taxPointDate: an accepted quote's
       // acceptance), which for a plain job is the same day as its revenue.

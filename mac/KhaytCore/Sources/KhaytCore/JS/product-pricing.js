@@ -140,7 +140,9 @@ function productJobParts(product, opts) {
     const qty = Math.max(1, +p.qty || 1);
     // To 4 places, not 2: newOrder sums the lines, and 15 lines each rounded
     // to the halala came to 0.01 more than the catalogue's one rounding.
-    return Object.assign({}, p, { unitCost: +unit.toFixed(4), baseCost: +(unit * qty).toFixed(4) });
+    // `orderLevelCosts`: this part's labour and packaging are on the order, so
+    // anything that costs it again leaves them out (lib/calculator-cost.js).
+    return Object.assign({}, p, { unitCost: +unit.toFixed(4), baseCost: +(unit * qty).toFixed(4) }, once ? { orderLevelCosts: true } : {});
   });
   return {
     parts,

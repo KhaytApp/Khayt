@@ -59,6 +59,12 @@
   function costed(part, order) {
     const machine = list('machines').find((m) => m.id === (part.machineId || order.machineId));
     const rated = PR() ? PR().withRates(part, { settings, machine }) : Object.assign({}, part);
+    // A job carrying a product's labour and packaging ONCE (on the order): a
+    // part added or edited here is costed without them too, as the product's
+    // parts were, or the sheet charged them per part again on top of the
+    // order's (money review of #2581, HIGH: a qty 1→2 took 164.04 to 379.33).
+    const Mo = global.KhaytOrderMoney;
+    if (Mo && Mo.jobFixedCost && Mo.jobFixedCost(order, { components: false, overhead: false }) > 0) rated.orderLevelCosts = true;
     const unit = CC() ? CC().computePartBaseCost(rated, { inventory: list('inventory'), settings }) : 0;
     rated.unitCost = +unit.toFixed(4);
     rated.baseCost = +(unit * Math.max(1, Math.round(+rated.qty || 1))).toFixed(2);

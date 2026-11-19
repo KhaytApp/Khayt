@@ -105,7 +105,8 @@ function logPrint(asQuote = false) {
   const bytes = (n) => { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; };
   const N = NewOrderRules();
   const entry = N.newOrder({
-    parts: currentBuild,
+    // `onceGroup` is the cart's own bookkeeping (build.js syncFixedCosts), not the job's.
+    parts: currentBuild.map((p) => { if (!p || !p.onceGroup) return p; const { onceGroup, ...rest } = p; return rest; }),
     project: $('#clientInput').value.trim(),
     clientId: currentClientId || null,
     clientRef: ($('#calcClientRef')?.value || '').trim() || null,
@@ -2686,13 +2687,17 @@ function duplicateOrder(orderId) {
   // otherwise come back in every part.
   const srcJob = order;
   const onceJob = +srcJob.labourCost > 0 || +srcJob.packagingCost > 0;
-  if (typeof currentFixedCosts !== 'undefined') currentFixedCosts = { labourCost: +srcJob.labourCost || 0, packagingCost: +srcJob.packagingCost || 0 };
+  if (typeof currentFixedCosts !== 'undefined') currentFixedCosts = onceJob
+    ? { labourCost: +srcJob.labourCost || 0, packagingCost: +srcJob.packagingCost || 0, groups: { JOB: { labourCost: +srcJob.labourCost || 0, packagingCost: +srcJob.packagingCost || 0 } } }
+    : { labourCost: 0, packagingCost: 0 };
   currentBuild = (shop.parts || []).map(p => {
     const copy = { ...p, id: uid('PRT') };
     // baseCost is a LINE total (unit cost x qty), matching what the calculator stores
     // when the part is first added. Using the per-unit cost here re-quoted a duplicated
     // or reprinted order at 1/qty of its real cost while still printing every unit.
     copy.baseCost = onceJob ? partTotalCost(copy, undefined, { labour: false, packaging: false }) : partTotalCost(copy);
+    // The source job's once-costs leave with its parts (build.js syncFixedCosts).
+    if (onceJob) { copy.orderLevelCosts = true; copy.onceGroup = 'JOB'; }
     return copy;
   });
   currentBuildFromProductId = order.productId || null;
@@ -2726,13 +2731,17 @@ function createLinkedReprint(original, reason, costMode) {
   // otherwise come back in every part.
   const srcJob = original;
   const onceJob = +srcJob.labourCost > 0 || +srcJob.packagingCost > 0;
-  if (typeof currentFixedCosts !== 'undefined') currentFixedCosts = { labourCost: +srcJob.labourCost || 0, packagingCost: +srcJob.packagingCost || 0 };
+  if (typeof currentFixedCosts !== 'undefined') currentFixedCosts = onceJob
+    ? { labourCost: +srcJob.labourCost || 0, packagingCost: +srcJob.packagingCost || 0, groups: { JOB: { labourCost: +srcJob.labourCost || 0, packagingCost: +srcJob.packagingCost || 0 } } }
+    : { labourCost: 0, packagingCost: 0 };
   currentBuild = (shop.parts || []).map(p => {
     const copy = { ...p, id: uid('PRT') };
     // baseCost is a LINE total (unit cost x qty), matching what the calculator stores
     // when the part is first added. Using the per-unit cost here re-quoted a duplicated
     // or reprinted order at 1/qty of its real cost while still printing every unit.
     copy.baseCost = onceJob ? partTotalCost(copy, undefined, { labour: false, packaging: false }) : partTotalCost(copy);
+    // The source job's once-costs leave with its parts (build.js syncFixedCosts).
+    if (onceJob) { copy.orderLevelCosts = true; copy.onceGroup = 'JOB'; }
     return copy;
   });
   currentBuildFromProductId = original.productId || null;

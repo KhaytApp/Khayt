@@ -23,9 +23,9 @@ const ALLOWED = {
   'lib/order-edit.js': 13,      // applyParts rescales overheadCost with the hours; repriceFromParts (#2576) rebuilds newOrder's INPUT from the stored components, overhead, labour and packaging
   'lib/kpi-rows.js': 1,         // a comment saying why it does NOT add componentsCost
   'lib/quote-sheet.js': 1,      // q.packagingCost: a quote sheet's own input, not a job's
-  'renderer/build.js': 4,       // the calculator's currentFixedCosts state
-  'renderer/inventory.js': 4,   // catalogue → calculator: productJobParts' figures
-  'renderer/order-flows.js': 10, // newOrder's input, and duplicate / reprint copies
+  'renderer/build.js': 6,       // the calculator's currentFixedCosts state, and its per-product groups (syncFixedCosts)
+  'renderer/inventory.js': 8,   // catalogue → calculator: productJobParts' figures, kept as a group
+  'renderer/order-flows.js': 14, // newOrder's input, and duplicate / reprint copies (one group)
   'renderer/logs.js': 1,         // jobCostForMargin's fallback where order-money is not loaded (the old formula)
 };
 const RE = /\.(componentsCost|overheadCost|labourCost|packagingCost)\b(?!\s*\()/g;

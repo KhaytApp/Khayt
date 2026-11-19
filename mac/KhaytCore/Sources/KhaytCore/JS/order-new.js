@@ -399,10 +399,17 @@
     // A frozen components line (lib/order-edit.js repriceFromParts) is not a
     // part: newOrder's share was over the parts alone.
     const list = arrayOf(parts).filter((p) => p && typeof p === 'object' && p.kind !== 'components');
+    // No parts: nothing is agreed, so all of it is priced (money review: a
+    // product with labour and no parts lost both). Shares by cost; where the
+    // costed parts cost nothing on record but exist beside agreed ones, by
+    // count, so a 0-cost part does not drop the labour to 0.
+    if (list.length === 0) return 1;
+    const open = list.filter((p) => !isAgreed(p));
+    if (open.length === 0) return 0;
     const all = list.reduce((s, p) => s + Math.max(0, num(p.baseCost, 0)), 0);
-    const costed = list.reduce((s, p) => s + (isAgreed(p) ? 0 : Math.max(0, num(p.baseCost, 0))), 0);
-    if (all > 0) return costed / all;
-    return list.some((p) => !isAgreed(p)) ? 1 : 0;
+    const costed = open.reduce((s, p) => s + Math.max(0, num(p.baseCost, 0)), 0);
+    if (all > 0 && costed > 0) return costed / all;
+    return open.length / list.length;
   }
 
   /** A part the customer has agreed a price for. Zero is a price; absent is not. */
