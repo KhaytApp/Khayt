@@ -849,6 +849,17 @@
     return { ok: true, reason: null, changes, marginPct: +margin.toFixed(2) };
   }
 
+  /**
+   * Whether a price worked out again (Recalculate, a new markup) must be
+   * confirmed first: the customer has seen the price (partsLock.askPrice), or
+   * the job is finished and its invoice issued. A completed job's lock is
+   * 'deducted', whose askPrice is false, so Recalculate took a finished job
+   * from 500 to 133.86 without a word (release money review M2).
+   */
+  function mustAskPrice(order, lock) {
+    return !!(lock && lock.askPrice) || (!!lock && lock.code === 'deducted' && invoiceIssued(order));
+  }
+
   function partsLock(order, ctx) {
     const none = (code) => ({ code, edit: false, addRemove: false, nameOnly: false, askPrice: false });
     if (!isObj(order)) return none('missing');
@@ -1057,7 +1068,7 @@
     if (!lock.edit || lock.nameOnly) return { ok: false, reason: lock.code || 'locked', changes: {} };
     const from = pricedFrom(order);
     if (from.typed || !(from.costed > 0)) return { ok: false, reason: 'price_fixed', changes: {} };
-    if (lock.askPrice && c.priceSeenOk !== true) return { ok: false, reason: 'ask_price', changes: {} };
+    if (mustAskPrice(order, lock) && c.priceSeenOk !== true) return { ok: false, reason: 'ask_price', changes: {} };
     // A job taken in another currency carries the rate it was taken at
     // (`fxRate`: shop currency per one unit of the job's, `order-new.js`
     // jobCurrency), and the parts' costs are in the shop's. So the cost is
@@ -1451,7 +1462,7 @@
       const wasPrice = +work.price || 0;
       const r = repriceFromParts(work, n.reprice || {}, c);
       if (!r.ok) return stop(r.reason, 'reprice');
-      if (r.changes.price && partsLock(order, c).askPrice && c.priceSeenOk !== true) return stop('ask_price', 'reprice');
+      if (r.changes.price && mustAskPrice(order, partsLock(order, c)) && c.priceSeenOk !== true) return stop('ask_price', 'reprice');
       // An issued milestone proforma asks for more than the new price: the
       // shop is asked, never refused silently (milestonesOk once it said yes).
       const issued = (Array.isArray(work.milestoneInvoices) ? work.milestoneInvoices : [])
