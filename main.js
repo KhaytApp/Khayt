@@ -1794,6 +1794,22 @@ async function maybeShowKeychainExplanation(win) {
   }
 }
 
+/**
+ * The one-time owner migration (PrinterPermission.migrateLegacyOwner), main's
+ * own write: under the lock, when no operator resolves to the owner, the
+ * admin the lock made gets roleKey 'owner'. Never runs on a book that has an
+ * owner, so it changes nothing twice.
+ */
+async function migrateLegacyOwnerOnDisk() {
+  const disk = readStoreDecryptedFromDisk();
+  if (!disk || !disk.settings) return false;
+  const m = PrinterPermission.migrateLegacyOwner(disk);
+  if (!m.changed) return false;
+  await writeStoreToDisk(m.store);
+  console.warn('owner migration: operator', m.operatorId, 'is the owner by roleKey now (a lock older than #2264)');
+  return true;
+}
+
 ipcMain.handle('hub:load-store', async (event) => {
   // No keychain explanation here. This handler reads raw JSON, validates it and
   // MASKS secrets for the renderer — it never decrypts, so it never touches the
@@ -1830,7 +1846,11 @@ ipcMain.handle('hub:load-store', async (event) => {
     try { writeAppVersionBackup(rec.data); }
     catch (e) { console.error('hub:load-store: app-version backup failed:', e && e.message || e); }
     syncLanServerStoreFromDisk();
-    const { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
+    // A lock older than roleKey: its translated admin becomes the owner, once,
+    // on disk and in what the window gets (#2592 data review, MED-3).
+    try { await migrateLegacyOwnerOnDisk(); } catch (e) { console.error('hub:load-store: owner migration failed:', e && e.message); }
+    let { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
+    if (normalized) normalized = PrinterPermission.migrateLegacyOwner(normalized).store;
     if (!normalized) {
       console.error('hub:load-store: unrecoverable store shape:', errors.join('; '));
       return { __corrupt: true, error: errors[0] || 'Invalid store' };
@@ -2355,6 +2375,7 @@ let _diskStoreVersion = null;
  */
 function guardWindowStore(normalized) {
   let merged = mergeStoreSecretsFromDisk(normalized);
+  const refused = [];
   let guardDisk = null;
   try { guardDisk = readStoreDecryptedFromDisk(); } catch (_) { guardDisk = null; }
   if (!guardDisk || !guardDisk.settings) guardDisk = (lanServerStore && lanServerStore.settings) ? lanServerStore : guardDisk;
@@ -2366,7 +2387,7 @@ function guardWindowStore(normalized) {
     const ApiTokens = require('./lib/api-tokens.js');
     const guarded = ApiTokens.guardTokenSave(merged, guardDisk);
     if (!guarded) return { error: 'settings_missing' };
-    if (guarded !== merged) console.warn('store guard: API token change refused for this role');
+    if (guarded !== merged) { console.warn('store guard: API token change refused for this role'); refused.push('settings.lanApi.apiTokens'); }
     merged = guarded;
   } catch (e) {
     console.error('store guard: token guard failed:', e && e.message);
@@ -2375,13 +2396,15 @@ function guardWindowStore(normalized) {
   try {
     const g = PrinterPermission.guardSave(merged, guardDisk, { verified: operatorVerified, consume: consumeVerified });
     if (!g.store) return { error: 'settings_missing' };
-    if (g.refused.length) console.warn('store guard: refused for this role:', g.refused.join(', '));
+    if (g.refused.length) { console.warn('store guard: refused for this role:', g.refused.join(', ')); refused.push(...g.refused); }
     merged = g.store;
   } catch (e) {
     console.error('store guard: role guard failed:', e && e.message);
     return { error: 'role_guard_failed' };
   }
-  return { store: merged };
+  // What was put back as it is on disk: the window reloads and says so
+  // (#2592 review), instead of showing an edit that was never kept.
+  return { store: merged, refused };
 }
 
 ipcMain.handle('hub:save-store', async (event, data) => {
@@ -2438,7 +2461,7 @@ ipcMain.handle('hub:save-store', async (event, data) => {
     // Atomic + durable: fsync'd temp swap, with a one-generation .prev rollback.
     await atomicWriteStore(serialized);
     lanServerStore = merged;  // keep LAN server in sync (plaintext in-memory)
-    return { ok: true };
+    return guarded.refused && guarded.refused.length ? { ok: true, refused: guarded.refused } : { ok: true };
   } catch (e) {
     console.error('hub:save-store error:', e);
     return { ok: false, error: String(e) };

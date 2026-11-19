@@ -3966,6 +3966,8 @@ function renderOperatorLockSettings() {
     renderOperatorLockSettings();
     applyOperatorPermissions();
     toast(t('op.lock') || 'Locked', 'info', 1800);
+    // Locked means nobody is signed in: the PIN pad, not owner controls.
+    if (typeof openPinPadModal === 'function') openPinPadModal();
   });
 
   el.querySelectorAll('.op-save-pin').forEach(btn => {

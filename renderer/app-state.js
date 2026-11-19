@@ -752,6 +752,41 @@ function applyStoreFromSnapshot(store) {
 }
 
 /** Write the store snapshot to disk; serializes concurrent saves (last snapshot wins). */
+/**
+ * A refusal from main, said in the shop's language. Main answers with codes
+ * (P5 and the store guards, #2592): 'not_permitted', 'settings_missing',
+ * 'store_unreadable', '<x>_guard_failed'. Anything else (a printer's own
+ * words, a disk error) is shown as it came.
+ */
+function explainRefusal(code) {
+  const c = String(code == null ? '' : code).trim();
+  if (c === 'not_permitted') return t('err.not_permitted');
+  if (c === 'settings_missing') return t('err.settings_missing');
+  if (c === 'store_unreadable') return t('err.store_unreadable');
+  if (/_guard_failed$/.test(c)) return t('err.guard_failed');
+  return c;
+}
+
+/** Saved, but main put some of it back (the role on disk may not change it). */
+function _saveRefused(refused) {
+  const parts = new Set();
+  for (const r of refused) {
+    const s = String(r);
+    if (s === 'activeOperatorId') parts.add(t('err.refused_signin'));
+    else if (s.startsWith('settings.') || s === 'settings') parts.add(t('err.refused_lock'));
+    else if (s.startsWith('operators')) parts.add(t('err.refused_people'));
+    else if (s.startsWith('machines.')) parts.add(t('err.refused_printer'));
+  }
+  toast('⚠ ' + t('err.refused', { what: [...parts].join(' · ') || t('err.refused_lock') }), 'error', 12000);
+  // The window shows what is really saved: the book main kept, not the edit.
+  Promise.resolve(window.hubAPI && window.hubAPI.loadStore ? window.hubAPI.loadStore() : null).then((data) => {
+    if (data && !data.__corrupt && typeof replaceStoreFromSnapshot === 'function' && replaceStoreFromSnapshot(data)) {
+      if (typeof initialRender === 'function') initialRender();
+      if (typeof applyOperatorPermissions === 'function') applyOperatorPermissions();
+    }
+  }).catch((e) => console.error('reload after a refused save failed:', e));
+}
+
 function _doSave(snapshot) {
   if (!window.hubAPI?.saveStore) return Promise.resolve();
   // Phase 0 sync foundation: stamp rev/updatedAt on changed records + tombstone
@@ -765,10 +800,11 @@ function _doSave(snapshot) {
       // inspecting rejection meant every one of those failed silently: the UI showed the
       // order saved and the shop lost the work at next launch.
       if (res && res.ok === false) throw new Error(res.error || 'save failed');
+      if (res && Array.isArray(res.refused) && res.refused.length) _saveRefused(res.refused);
     })
     .catch((e) => {
       console.error('Save failed:', e);
-      const detail = e && e.message ? ` — ${e.message}` : '';
+      const detail = e && e.message ? ` — ${explainRefusal(e.message)}` : '';
       toast('⚠ ' + (t('common.save_failed') || 'Save failed — check disk space') + detail, 'error', 10000);
     });
   // Stage C: when Khayt Cloud is connected + unlocked, push changes in the
@@ -1057,6 +1093,8 @@ function pruneExpiredNotifs() {
     // Reported exactly that way: "trying to log onto the cloud and stuck at
     // connecting". test/cross-file-wiring.test.js now checks bare calls too.
     syncScopeToShop,
+    // Called bare from machines.js and kanban.js: a refusal said in the shop's language.
+    explainRefusal,
     applyStoreFromSnapshot,
     replaceStoreFromSnapshot,
     ensureOrderTrackingTokens,

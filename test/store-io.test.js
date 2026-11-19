@@ -1063,3 +1063,23 @@ test('the window says store_unreadable in the shop\'s language, not as a code', 
     assert.match(loc, /"lan\.store_unreadable": "[^"]{20,}"/, l);
   }
 });
+
+test('updateStoreOnDisk reads the disk when main\'s copy is still the boot {} (#2592 LOW1)', async () => {
+  const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-store-io-boot-'));
+  let mem = { settings: { lanApi: {} }, printLog: [{ id: 'ON-DISK' }] };
+  const io = createStoreIo({
+    app: { getPath: () => tmp2 }, fs,
+    safeStorage: { isEncryptionAvailable: () => false },
+    safeJsonParse, crypto,
+    onStoreUpdated: (d) => { mem = d; },
+    getStore: () => mem,
+  });
+  try {
+    await io.persistLanStoreUpdate(mem);
+    mem = {};   // main restarted: its copy is empty until the book loads
+    await io.updateStoreOnDisk((cur) => ({ ...cur, expenses: [{ id: 'E1' }] }));
+    const d = io.recoverStoreRaw().data;
+    assert.deepEqual(d.printLog, [{ id: 'ON-DISK' }], 'written on top of the book on disk, not over it');
+    assert.deepEqual(d.expenses, [{ id: 'E1' }]);
+  } finally { fs.rmSync(tmp2, { recursive: true, force: true }); }
+});

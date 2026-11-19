@@ -8,6 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const R = require('../lib/rbac.js');
 const P = require('../lib/main/printer-permission.js');
 
@@ -56,7 +57,8 @@ test('main reads the active role from the same fields as the renderer, and fails
   assert.deepEqual(P.activeRole({ settings: { operatorLockEnabled: true, activeOperatorId: 'O2' }, operators: ops }), { lock: true, role: 'operator' });
   // The renderer's own function, read out of its source, agrees on each.
   const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'ops-locations.js'), 'utf8');
-  assert.match(src, /function currentOperatorRoleKey\(\) \{\n  if \(!settings\.operatorLockEnabled\) return 'owner';\n  const activeOp = settings\.activeOperatorId \? operators\.find\(o => o\.id === settings\.activeOperatorId\) : null;\n  if \(!activeOp\) return 'owner';/);
+  // The window reads nobody signed in under the lock as the least privilege, as main does (#2592 review).
+  assert.match(src, /function currentOperatorRoleKey\(\) \{\n  if \(!settings\.operatorLockEnabled\) return 'owner';\n  const activeOp = settings\.activeOperatorId \? operators\.find\(o => o\.id === settings\.activeOperatorId\) : null;[\s\S]{0,400}?if \(!activeOp\) return 'viewer';/);
 });
 
 test('a viewer with the lock on is refused send and control; an operator is not', () => {
@@ -381,7 +383,7 @@ test('every writer of the whole book is guarded or main\'s own (ratchet; the lis
     'main.js': {
       'atomicWriteStore(': ["ipcMain.handle('hub:save-store'"],                 // after guardWindowStore
       'restoreSnapshotToDisk(': ['function restoreSnapshotForWindow('],          // after restoreAllowed + guardSave
-      'writeStoreToDisk(': [],
+      'writeStoreToDisk(': ['async function migrateLegacyOwnerOnDisk('],   // main's own, one-time owner migration
     },
     'lib/updater.js': { 'writeStoreToDisk(': ["ipcMain.handle('hub:install-update'"] },   // after guardStore
     // MAIN-originated: the LAN server's own generated tokens and PIN.
@@ -459,4 +461,87 @@ test('MED-1: even the owner cannot deactivate, demote or remove the last owner',
   // Ordinary owner edits still pass untouched.
   const fine = edit(disk, (c) => { c.operators[2].active = false; c.operators[1].roleKey = 'operator'; });
   assert.equal(P.guardSave(fine, disk).store, fine);
+});
+
+/* ── #2592 data review MED-3: a lock older than roleKey keeps its owner ──── */
+
+test('MED-3: the admin of a pre-#2264 lock, titled in any language, becomes the owner by roleKey, once', () => {
+  for (const title of ['مدير', 'Yönetici', '管理者', '管理员', 'Administrador', 'Admin']) {
+    const store = { settings: { operatorLockEnabled: true }, operators: [{ id: 'A', role: title }, { id: 'B', role: 'Technician' }] };
+    const m = P.migrateLegacyOwner(store);
+    assert.equal(m.changed, !/admin/i.test(title), title + (/admin/i.test(title) ? ': rbac already reads it as owner' : ''));
+    const after = m.store.operators.find((o) => o.id === 'A');
+    assert.equal(R.roleFromLegacy(after.role) === 'owner' || after.roleKey === 'owner', true, title);
+    assert.equal(m.store.operators.find((o) => o.id === 'B').roleKey, undefined, 'nobody else');
+    assert.equal(P.migrateLegacyOwner(m.store).changed, false, 'once');
+  }
+  // The only operator, whatever the title.
+  assert.equal(P.migrateLegacyOwner({ settings: { operatorLockEnabled: true }, operators: [{ id: 'X', role: 'Boss' }] }).store.operators[0].roleKey, 'owner');
+  // Never: no lock, an owner already, two candidates, or someone else's roleKey.
+  assert.equal(P.migrateLegacyOwner({ settings: {}, operators: [{ id: 'A', role: 'مدير' }] }).changed, false);
+  assert.equal(P.migrateLegacyOwner({ settings: { operatorLockEnabled: true }, operators: [{ id: 'A', role: 'مدير' }, { id: 'O', roleKey: 'owner' }] }).changed, false);
+  assert.equal(P.migrateLegacyOwner({ settings: { operatorLockEnabled: true }, operators: [{ id: 'A', role: 'مدير' }, { id: 'B', role: '管理者' }] }).changed, false);
+  assert.equal(P.migrateLegacyOwner({ settings: { operatorLockEnabled: true }, operators: [{ id: 'A', roleKey: 'viewer', role: 'مدير' }] }).changed, false);
+});
+
+test('MED-3: ADMIN_TITLES is every locale\'s op.role_admin, and load-store runs the migration', () => {
+  const titles = new Set();
+  for (const l of ['en', 'ar', 'de', 'es', 'fr', 'ja', 'pt-BR', 'tr', 'zh']) {
+    const m = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'locales', l + '.js'), 'utf8').match(/"op\.role_admin": "([^"]+)"/);
+    assert.ok(m, l); titles.add(m[1]);
+  }
+  assert.deepEqual([...titles].sort(), [...new Set(P.ADMIN_TITLES)].sort());
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const body = handlerBody(main, main.indexOf("ipcMain.handle('hub:load-store'"));
+  assert.ok(body.indexOf('await migrateLegacyOwnerOnDisk()') !== -1 && body.indexOf('PrinterPermission.migrateLegacyOwner(normalized)') !== -1);
+});
+
+/* ── #2592 stability/data review: the window and main agree ─────────────── */
+
+test('refusals are said in the shop\'s language, never as codes (MED1)', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app-state.js'), 'utf8');
+  const at = src.indexOf('function explainRefusal(');
+  const box = { t: (k) => '«' + k + '»', String };
+  vm.createContext(box);
+  vm.runInContext(src.slice(at, src.indexOf('\n}\n', at) + 3) + '\nthis.f = explainRefusal;', box);
+  assert.equal(box.f('not_permitted'), '«err.not_permitted»');
+  assert.equal(box.f('settings_missing'), '«err.settings_missing»');
+  assert.equal(box.f('store_unreadable'), '«err.store_unreadable»');
+  assert.equal(box.f('role_guard_failed'), '«err.guard_failed»');
+  assert.equal(box.f('token_guard_failed'), '«err.guard_failed»');
+  assert.equal(box.f('Printer answered HTTP 409'), 'Printer answered HTTP 409', 'anything else as it came');
+  for (const [file, re] of [['machines.js', /mach\.printer_failed', \{ error: explainRefusal\(/g], ['machines.js', /slicer\.fail'\)\} \$\{explainRefusal\(e\.message\)\}/], ['kanban.js', /slicer\.fail'\)\} \$\{explainRefusal\(e\.message\)\}/]]) {
+    assert.match(fs.readFileSync(path.join(__dirname, '..', 'renderer', file), 'utf8'), re, file);
+  }
+  assert.equal((fs.readFileSync(path.join(__dirname, '..', 'renderer', 'machines.js'), 'utf8').match(/mach\.printer_failed', \{ error: explainRefusal\(/g) || []).length, 2);
+  for (const l of ['en', 'ar', 'de', 'es', 'fr', 'ja', 'pt-BR', 'tr', 'zh']) {
+    const loc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'locales', l + '.js'), 'utf8');
+    for (const k of ['err.not_permitted', 'err.settings_missing', 'err.store_unreadable', 'err.guard_failed', 'err.refused', 'err.refused_signin', 'err.refused_lock', 'err.refused_people', 'err.refused_printer']) {
+      assert.match(loc, new RegExp('"' + k.replace('.', '\\.') + '": "[^"]{4,}"'), l + ' ' + k);
+    }
+    assert.match(loc, /"err\.refused": "[^"]*\{what\}[^"]*"/, l + ' keeps {what}');
+  }
+});
+
+test('a save main put back says so, and the window reloads what was kept (MED2)', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const g = fnBody(main, 'guardWindowStore');
+  assert.match(g, /return \{ store: merged, refused \};/);
+  const body = handlerBody(main, main.indexOf("ipcMain.handle('hub:save-store'"));
+  assert.match(body, /return guarded\.refused && guarded\.refused\.length \? \{ ok: true, refused: guarded\.refused \} : \{ ok: true \};/);
+  const st = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app-state.js'), 'utf8');
+  assert.match(st, /if \(res && Array\.isArray\(res\.refused\) && res\.refused\.length\) _saveRefused\(res\.refused\);/);
+  const sr = st.slice(st.indexOf('function _saveRefused('), st.indexOf('function _doSave('));
+  assert.match(sr, /window\.hubAPI\.loadStore\(\)/);
+  assert.match(sr, /replaceStoreFromSnapshot\(data\)/);
+});
+
+test('nobody signed in under the lock: the PIN pad, no owner controls; and main alone verifies a PIN (MED2)', () => {
+  const settingsJs = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'settings.js'), 'utf8');
+  const lock = settingsJs.slice(settingsJs.indexOf("#btnLockNow')?.addEventListener"), settingsJs.indexOf("#btnLockNow')?.addEventListener") + 500);
+  assert.match(lock, /openPinPadModal\(\)/);
+  const ops = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'ops-locations.js'), 'utf8');
+  const pad = ops.slice(ops.indexOf('function openPinPadModal('));
+  assert.doesNotMatch(pad.slice(0, pad.indexOf('\nfunction ', 10)), /sha256Hex\(enteredPin\)/, 'no renderer-only PIN check');
+  assert.match(pad, /const verified = await window\.hubAPI\?\.verifyOperatorPin\?\.\(/);
 });
