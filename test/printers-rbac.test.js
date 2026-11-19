@@ -429,3 +429,34 @@ test('every field writer (updateStoreOnDisk / persistLanStoreUpdate) that touche
   const io = fs.readFileSync(path.join(root, 'lib', 'store-io.js'), 'utf8');
   assert.match(io, /const changed = lockFieldsChanged\(current, next\);\s*if \(changed\) throw new Error\('mutator may not change ' \+ changed\);/);
 });
+
+/* ── #2592 release review MED-1: the shop always keeps an owner ─────────── */
+
+test('MED-1: a non-owner cannot deactivate anyone (the owner least of all)', () => {
+  const disk = book('VIEW');
+  const g = P.guardSave(edit(disk, (c) => { c.operators[0].active = false; c.operators[2].active = false; }), disk);
+  assert.equal(g.store.operators.find((o) => o.id === 'OWN').active, undefined, 'the owner stays active');
+  assert.equal(g.store.operators.find((o) => o.id === 'OPR').active, undefined, 'nor anyone else');
+  assert.ok(g.refused.includes('operators.OWN') && g.refused.includes('operators.OPR'));
+  // Nor re-activate someone the owner deactivated.
+  const off = edit(book('VIEW'), (c) => { c.operators[2].active = false; });
+  assert.equal(P.guardSave(edit(off, (c) => { c.operators[2].active = true; }), off).store.operators[2].active, false);
+});
+
+test('MED-1: even the owner cannot deactivate, demote or remove the last owner', () => {
+  const disk = book('OWN');
+  const deact = P.guardSave(edit(disk, (c) => { c.operators[0].active = false; }), disk);
+  assert.equal(deact.store.operators[0].active, true);
+  const demote = P.guardSave(edit(disk, (c) => { c.operators[0].roleKey = 'viewer'; }), disk);
+  assert.equal(demote.store.operators.find((o) => o.id === 'OWN').roleKey, 'owner');
+  assert.ok(demote.refused.includes('operators:last-owner'));
+  const removed = P.guardSave(edit(disk, (c) => { c.operators = c.operators.filter((o) => o.id !== 'OWN'); }), disk);
+  assert.ok(removed.store.operators.some((o) => o.id === 'OWN'));
+  // With a second owner added in the same save, demoting the first is fine.
+  const handover = P.guardSave(edit(disk, (c) => { c.operators[0].roleKey = 'manager'; c.operators.push({ id: 'OWN2', roleKey: 'owner' }); }), disk);
+  assert.equal(handover.store.operators.find((o) => o.id === 'OWN').roleKey, 'manager');
+  assert.ok(handover.store.operators.some((o) => o.id === 'OWN2'));
+  // Ordinary owner edits still pass untouched.
+  const fine = edit(disk, (c) => { c.operators[2].active = false; c.operators[1].roleKey = 'operator'; });
+  assert.equal(P.guardSave(fine, disk).store, fine);
+});
