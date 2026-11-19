@@ -47,7 +47,7 @@ function cart() {
     currentExtraMaterials: [], currentPriceTiers: [], currentColourLines: [], currentPurgeGrams: 0, currentConsumableLines: [],
   };
   vm.createContext(box);
-  vm.runInContext(['editingOnce', 'formPartMarked', 'calculateLivePartCost', 'snapshotPartFromForm', 'snapshotPartFromFormRaw', 'addPart', 'removePart', 'editPart', 'syncFixedCosts', 'onceFixedCost']
+  vm.runInContext(['editingOnce', 'formPartMarked', 'formPerLine', 'calculateLivePartCost', 'snapshotPartFromForm', 'snapshotPartFromFormRaw', 'addPart', 'removePart', 'editPart', 'syncFixedCosts', 'onceFixedCost']
     .map(fn).join('\n') + '\nthis.api = { editPart, addPart, removePart, calculateLivePartCost, onceFixedCost, syncFixedCosts };', box);
   // The product added as appendProductParts does: its parts marked, one group.
   const jp = PP.productJobParts(product, { inventory: [], settings });
@@ -122,4 +122,45 @@ test('Edit, then the form cleared and Log: the part is gone, and so are its once
   box.$('#printWeight').value = ''; box.$('#printTime').value = '';   // abandoned
   api.syncFixedCosts();                               // what Log does first (order-flows.js)
   assert.equal(api.onceFixedCost(), 0);
+});
+
+/* ── labourPerLine through the form (money review of #2586, MED 3) ──────── */
+
+const FORM = { printWeight: 100, printTime: 0, spoolCost: 90, spoolWeight: 1000, laborRate: 90, prepTime: 0.25, postTime: 0.5, wearRate: 0, powerDraw: 0, elecRate: 0, failureRate: 10, partQty: 10 };
+const fillForm = (box) => { box.$('#partName').value = 'hand'; for (const [k, v] of Object.entries(FORM)) box.$('#' + k).value = String(v); };
+
+test('a NEW part from the calculator is marked labourPerLine and costed prep once: (90 + 472.50 + 5) x 1.1 = 624.25', () => {
+  const { box, api } = cart();
+  box.currentBuild = []; box.currentFixedCosts = { labourCost: 0, packagingCost: 0 };
+  fillForm(box);
+  api.addPart();
+  const p = box.currentBuild[0];
+  assert.equal(p.labourPerLine, true);
+  assert.equal(Math.round(p.baseCost * 100) / 100, 624.25);
+});
+
+test('an OLD part (unmarked) keeps the old sum through Edit → Update: 847.00, and stays unmarked', () => {
+  const { box, api } = cart();
+  const CC = globalThis.KhaytCalculatorCost;
+  const old = { id: 'OLD1', name: 'old', printWeight: 100, printTime: 0, spoolCost: 90, spoolWeight: 1000, laborRate: 90, prepTime: 0.25, postTime: 0.5,
+    wearRate: 0, powerDraw: 0, elecRate: 0, failureRate: 10, qty: 10 };
+  old.baseCost = CC.partTotalCost(old, { inventory: [], settings });
+  assert.equal(Math.round(old.baseCost * 100) / 100, 847);
+  box.currentBuild = [old]; box.currentFixedCosts = { labourCost: 0, packagingCost: 0 };
+  api.editPart(0);
+  fillForm(box); box.$('#partName').value = 'renamed';
+  api.addPart();
+  const p = box.currentBuild[0];
+  assert.equal(p.id, 'OLD1');
+  assert.equal(p.labourPerLine, undefined, 'not moved to the new rule by an edit');
+  assert.equal(Math.round(p.baseCost * 100) / 100, 847);
+});
+
+test('a marked part stays marked through Edit → Update', () => {
+  const { box, api } = cart();
+  box.currentBuild = []; box.currentFixedCosts = { labourCost: 0, packagingCost: 0 };
+  fillForm(box); api.addPart();
+  api.editPart(0); fillForm(box); api.addPart();
+  assert.equal(box.currentBuild[0].labourPerLine, true);
+  assert.equal(Math.round(box.currentBuild[0].baseCost * 100) / 100, 624.25);
 });

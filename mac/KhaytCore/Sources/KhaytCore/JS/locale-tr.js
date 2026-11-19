@@ -1258,6 +1258,8 @@
   "pe.description": "Açıklama",
   "pe.description_ph": "Bu ürün hakkında kısa notlar (isteğe bağlı)",
   "pe.default_margin": "Varsayılan maliyet üzeri kâr",
+  "pe.per_box": "Kutu başına adet",
+  "pe.per_box_hint": "Bu üründen bir kutuya kaç adet sığar. Ambalaj kutu başına hesaplanır.",
   "pe.cost": "Maliyet",
   "pe.default_price": "Varsayılan fiyat",
   "bom.components": "Bileşenler (baskısız)",

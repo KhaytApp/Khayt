@@ -1258,6 +1258,8 @@
   "pe.description": "Descripción",
   "pe.description_ph": "Notas breves sobre este producto (opcional)",
   "pe.default_margin": "Recargo predeterminado",
+  "pe.per_box": "Piezas por caja",
+  "pe.per_box_hint": "Cuántas unidades de este producto caben en una caja. El embalaje se cobra por caja.",
   "pe.cost": "Coste",
   "pe.default_price": "Precio predeterminado",
   "bom.components": "Componentes (no impresos)",

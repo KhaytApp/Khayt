@@ -1258,6 +1258,8 @@
   "pe.description": "Description",
   "pe.description_ph": "Brèves notes sur ce produit (optionnel)",
   "pe.default_margin": "Majoration par défaut",
+  "pe.per_box": "Pièces par carton",
+  "pe.per_box_hint": "Combien d’exemplaires de ce produit tiennent dans un carton. L’emballage est compté par carton.",
   "pe.cost": "Coût",
   "pe.default_price": "Prix par défaut",
   "bom.components": "Composants (non imprimés)",

@@ -174,3 +174,22 @@ test('an unverified or unmeasured quote adds no part', async () => {
     assert.equal(global.printLog[0].printTime, 0);
   }
 });
+
+test('a verified quote becomes a job part on the new rule (labourPerLine), and re-costs to what it was opened at (#2586)', async () => {
+  stubApp(() => ({ ok: true, gone: false, attached: { filename: 'f.stl', originalName: 'bracket.stl', size: BYTES.length } }));
+  require('../lib/order-money.js'); require('../lib/print-rates.js'); require('../lib/calculator-cost.js'); require('../lib/pricing.js');
+  Object.assign(global, {
+    inventory: [{ id: 'SP1', material: 'PETG', cost: 100, spoolWeight: 1000 }],
+    printers: [{ id: 'PR1', wearRate: 0, powerDraw: 0, elecRate: 0, prepTime: 0.25, postTime: 0.5, laborRate: 90, failureRate: 0 }],
+    settings: { lanApi: { intakeQuote: { filamentId: 'SP1', presetId: 'PR1' } } },
+  });
+  const { importIntakeAsQuote } = require('../renderer/integrations.js');
+  const quote = { price: 1, currency: 'SAR', qty: 3, grams: 20, hours: 1.5, verified: true };
+  assert.equal(await importIntakeAsQuote({ ...REQ, payload: { ...REQ.payload, qty: '3', quote } }, CLOUD), true);
+  const part = global.printLog[0].parts[0];
+  assert.equal(part.labourPerLine, true, 'stored marked, as the quote was costed');
+  // 3 × 2.00 material + (0.25 + 0.5 × 3) × 90 = 6 + 157.50 = 163.50 (prep once; the old sum was 6 + 202.50)
+  assert.ok(Math.abs(part.baseCost - 163.5) < 1e-9, String(part.baseCost));
+  const CC = global.KhaytCalculatorCost;
+  assert.ok(Math.abs(CC.partTotalCost(part, { inventory: global.inventory, settings: global.settings }) - part.baseCost) < 1e-9, 'a later re-cost agrees');
+});

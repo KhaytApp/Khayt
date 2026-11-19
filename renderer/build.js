@@ -413,6 +413,18 @@ function formPartMarked() {
   return !!(Mo && Mo.addedPartMark && Mo.addedPartMark(currentFixedCosts));
 }
 
+/**
+ * Whether the part in the form is costed the new way, prep once for its line
+ * and post per piece (`labourPerLine`, KhaytOrderMoney.lineLabour): a NEW
+ * part always; a part being edited only if it already was. An older part
+ * keeps the old sum through Edit → Update (money review of #2586, MED 3).
+ */
+function formPerLine() {
+  const btn = (typeof document !== 'undefined') ? document.getElementById('btnAddPart') : null;
+  if (btn && btn.dataset && btn.dataset.editing) return btn.dataset.editingPerLine === '1';
+  return true;
+}
+
 function calculateLivePartCost() {
   // Snapshot the DOM into a part-shaped object and reuse the pure helper.
   // qty and filamentId MUST be included or the live preview disagrees with the cart:
@@ -436,6 +448,7 @@ function calculateLivePartCost() {
     failureRate:   $('#failureRate').value,
     extraMaterials: currentExtraMaterials.filter(m => m.material && m.weight > 0),
     orderLevelCosts: formPartMarked() ? true : undefined,
+    labourPerLine: formPerLine() ? true : undefined,
   }));
 }
 
@@ -998,6 +1011,7 @@ function addPart() {
   // Marked as it was costed (formPartMarked); an edited part keeps its group.
   const once = editingOnce();
   if (formPartMarked()) part.orderLevelCosts = true;
+  if (formPerLine()) part.labourPerLine = true; else delete part.labourPerLine;
   if (once && once.onceGroup) part.onceGroup = once.onceGroup;
   // A part coming back from the form after Edit is the SAME part: it keeps
   // its id and its place in the cart. It was given a new id at the end,
@@ -1052,6 +1066,7 @@ function addPart() {
     delete addBtn.dataset.editingAt;
     delete addBtn.dataset.editingOnce;
     delete addBtn.dataset.editingOnceGroup;
+    delete addBtn.dataset.editingPerLine;
   }
   renderBuild();
   saveBuildDraft();
@@ -1136,7 +1151,8 @@ function editPart(index) {
   { const b = $('#btnAddPart');
     if (b) { b.dataset.editing = '1';
       if (part.orderLevelCosts === true) b.dataset.editingOnce = '1'; else delete b.dataset.editingOnce;
-      if (part.onceGroup) b.dataset.editingOnceGroup = String(part.onceGroup); else delete b.dataset.editingOnceGroup; } }
+      if (part.onceGroup) b.dataset.editingOnceGroup = String(part.onceGroup); else delete b.dataset.editingOnceGroup;
+      if (part.labourPerLine === true) b.dataset.editingPerLine = '1'; else delete b.dataset.editingPerLine; } }
   currentBuild.splice(index, 1);
   renderBuild();
   calculateLivePartCost();
@@ -1153,6 +1169,7 @@ function editPart(index) {
     // Its once-costs mark and group (editingOnce): Update gives them back.
     if (part.orderLevelCosts === true) addBtn.dataset.editingOnce = '1'; else delete addBtn.dataset.editingOnce;
     if (part.onceGroup) addBtn.dataset.editingOnceGroup = String(part.onceGroup); else delete addBtn.dataset.editingOnceGroup;
+    if (part.labourPerLine === true) addBtn.dataset.editingPerLine = '1'; else delete addBtn.dataset.editingPerLine;
     addBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
