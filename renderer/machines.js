@@ -322,7 +322,7 @@ async function printerJobCommand(machineId, command, confirmed = false) {
   try {
     const r = await window.hubAPI.printerCommand(m, command).catch((e) => ({ ok: false, error: String(e && e.message || e) }));
     if (r && r.ok) toast(t('mach.printer_sent'), 'success');
-    else toast(t('mach.printer_failed', { error: (r && (r.error || r.unsupported)) || '' }), r && r.unconfirmed ? 'warning' : 'error');
+    else toast(t('mach.printer_failed', { error: explainRefusal((r && (r.error || r.unsupported)) || '') }), r && r.unconfirmed ? 'warning' : 'error');
   } finally {
     _printerBusy.delete(machineId);
   }
@@ -346,7 +346,7 @@ async function printerControl(machineId, control, value, confirmed = false) {
   try {
     const r = await window.hubAPI.printerControl(m, control, value).catch((e) => ({ ok: false, error: String(e && e.message || e) }));
     if (r && r.ok) toast(t('mach.printer_sent'), 'success');
-    else toast(t('mach.printer_failed', { error: (r && (r.error || r.unsupported)) || '' }), r && r.unconfirmed ? 'warning' : 'error');
+    else toast(t('mach.printer_failed', { error: explainRefusal((r && (r.error || r.unsupported)) || '') }), r && r.unconfirmed ? 'warning' : 'error');
   } finally {
     _printerBusy.delete(machineId);
   }
@@ -2125,7 +2125,7 @@ async function sliceAndPrintForMachine(machineId) {
     if (!r || !r.ok) throw new Error((r && r.error) || 'failed');
     toast(t('slicer.sent', { name: machine.name }), 'success');
   } catch (e) {
-    toast(`${t('slicer.fail')} ${e.message}`, 'error');
+    toast(`${t('slicer.fail')} ${explainRefusal(e.message)}`, 'error');
   }
 }
 
