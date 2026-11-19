@@ -131,7 +131,9 @@ test('main refuses the mint and guards the save; the window hides both controls 
   const mint = main.slice(main.indexOf("ipcMain.handle('hub:mint-api-token'"), main.indexOf("ipcMain.handle('hub:mint-api-token'") + 900);
   assert.match(mint, /if \(!ApiTokens\.mayManageTokens\(book\)\) return \{ ok: false, error: 'not_allowed' \}/);
   assert.ok(mint.indexOf('mayManageTokens') < mint.indexOf('generateToken'), 'checked before anything is minted');
-  assert.match(main, /ApiTokens\.guardTokenSave\(merged, readStoreDecryptedFromDisk\(\)\)/);
+  // Against the book on disk, or main's own copy when the disk cannot be read (#2592).
+  assert.match(main, /ApiTokens\.guardTokenSave\(merged, guardDisk\)/);
+  assert.match(main, /guardDisk = readStoreDecryptedFromDisk\(\)/);
   const settingsJs = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'settings.js'), 'utf8');
   assert.match(settingsJs, /operatorCan\('security', 'edit'\)/);
   assert.match(settingsJs, /\$\{mayManage \? `<button class="btn danger small" data-act="revoke-api-token"/);
