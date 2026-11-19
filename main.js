@@ -328,6 +328,9 @@ const { setupAutoUpdater } = registerUpdater({
   // generation, a temp name recovery treats as a candidate, and no place in the
   // write chain — at the one moment the app is about to be replaced.
   writeStoreToDisk,
+  // ...and through the same guards as a save: the snapshot is the window's
+  // (#2592: it went to disk unchecked, the lock and roles with it).
+  guardStore: (normalized) => guardWindowStore(normalized),
 });
 
 /* ---------- Shared helpers ---------- */
@@ -1075,6 +1078,15 @@ ipcMain.handle('hub:list-backups', async () => {
 // These handlers used to call a decryptStoreSecrets that main.js stopped
 // importing when store-io.js was extracted, so every restore threw a
 // ReferenceError and reported "could not read the backup".
+/** Whether the book may be restored now: no lock on disk, or the owner signed in on it. */
+function restoreAllowed() {
+  let disk = null;
+  try { disk = readStoreDecryptedFromDisk(); } catch (_) { disk = null; }
+  if (!disk || !disk.settings) disk = (lanServerStore && lanServerStore.settings) ? lanServerStore : disk;
+  if (!disk || !disk.settings || !disk.settings.operatorLockEnabled) return true;
+  return require('./lib/api-tokens.js').mayManageTokens(disk);
+}
+
 async function restoreSnapshotForWindow(parsed, event, label) {
   if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
     console.error(`${label}: the store on disk is from a newer ${FLAVOR_NAME}; not restoring over it`);
@@ -1085,6 +1097,20 @@ async function restoreSnapshotForWindow(parsed, event, label) {
     console.error(`${label}: the backup is from a newer ${FLAVOR_NAME} (v${parsed.version}); not restoring it with v${STORE_VERSION}`);
     return null;
   }
+  // Under the operator lock ON DISK, putting a whole book back is the
+  // owner's (rbac security/edit): a backup the window wrote (hub:write-backup)
+  // could otherwise carry the lock off and any role, past every later save
+  // and gate (#2592 security review). Then the same role guard as a save.
+  if (!restoreAllowed()) {
+    console.error(`${label}: refused, only the owner may restore while the operator lock is on`);
+    return null;
+  }
+  try {
+    const disk = (() => { try { return readStoreDecryptedFromDisk(); } catch (_) { return null; } })() || lanServerStore;
+    const g = PrinterPermission.guardSave(parsed, disk, { verified: operatorVerified, consume: consumeVerified });
+    if (!g.store) { console.error(`${label}: refused, the backup has no settings`); return null; }
+    parsed = g.store;
+  } catch (e) { console.error(`${label}: role guard failed:`, e && e.message); return null; }
   // Decrypting the backup and sealing it again are both keychain work. Explain once first.
   await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
   const r = await restoreSnapshotToDisk(parsed);
@@ -2315,6 +2341,49 @@ ipcMain.handle('hub:mint-api-token', async (_e, { label, scopes } = {}) => {
 // that version's data permanently, with only a console warning. Refuse instead.
 let _diskStoreVersion = null;
 
+/**
+ * Every guard a book that came from the WINDOW passes before it is written:
+ * the save (hub:save-store) and the pre-install flush (lib/updater.js). Its
+ * secrets are merged from disk; then, against the book on disk (or main's own
+ * copy when the disk cannot be read, #2592 M1):
+ *   - no settings object over a book that has one is REFUSED (#2592 H1: it
+ *     wiped every setting, and skipped both guards);
+ *   - API tokens: only the owner adds or revokes (ApiTokens.guardTokenSave);
+ *   - the lock, roles, PINs, sign-in and printer connections
+ *     (PrinterPermission.guardSave).
+ * Returns { store } or { error }. A guard that throws refuses.
+ */
+function guardWindowStore(normalized) {
+  let merged = mergeStoreSecretsFromDisk(normalized);
+  let guardDisk = null;
+  try { guardDisk = readStoreDecryptedFromDisk(); } catch (_) { guardDisk = null; }
+  if (!guardDisk || !guardDisk.settings) guardDisk = (lanServerStore && lanServerStore.settings) ? lanServerStore : guardDisk;
+  if (guardDisk && guardDisk.settings && !(normalized && normalized.settings && typeof normalized.settings === 'object' && !Array.isArray(normalized.settings))) {
+    console.error('store guard: refused a book with no settings');
+    return { error: 'settings_missing' };
+  }
+  try {
+    const ApiTokens = require('./lib/api-tokens.js');
+    const guarded = ApiTokens.guardTokenSave(merged, guardDisk);
+    if (!guarded) return { error: 'settings_missing' };
+    if (guarded !== merged) console.warn('store guard: API token change refused for this role');
+    merged = guarded;
+  } catch (e) {
+    console.error('store guard: token guard failed:', e && e.message);
+    return { error: 'token_guard_failed' };
+  }
+  try {
+    const g = PrinterPermission.guardSave(merged, guardDisk, { verified: operatorVerified, consume: consumeVerified });
+    if (!g.store) return { error: 'settings_missing' };
+    if (g.refused.length) console.warn('store guard: refused for this role:', g.refused.join(', '));
+    merged = g.store;
+  } catch (e) {
+    console.error('store guard: role guard failed:', e && e.message);
+    return { error: 'role_guard_failed' };
+  }
+  return { store: merged };
+}
+
 ipcMain.handle('hub:save-store', async (event, data) => {
   // A save is when a credential changes: the next printer call reads it fresh.
   machineSecrets.forget();
@@ -2342,43 +2411,10 @@ ipcMain.handle('hub:save-store', async (event, data) => {
     // Creating or revoking an API token is the owner's (rbac security/edit,
     // as on the Mac): a save from a role that may not changes the token list
     // back to what is on disk, whatever the window sent.
-    let merged = mergeStoreSecretsFromDisk(normalized);
-    // What the guards compare against: the book on disk, or main's own copy
-    // when the disk cannot be read. An unreadable file is not a reason to
-    // write whatever the window sent (#2592 security review, M1).
-    let guardDisk = null;
-    try { guardDisk = readStoreDecryptedFromDisk(); } catch (_) { guardDisk = null; }
-    if (!guardDisk || !guardDisk.settings) guardDisk = (lanServerStore && lanServerStore.settings) ? lanServerStore : guardDisk;
-    // A save with no settings object over a book that has them is REFUSED.
-    // It wiped every setting on disk (main had the same data loss for any
-    // window that sent no settings), and skipped both guards below.
-    if (guardDisk && guardDisk.settings && !(normalized.settings && typeof normalized.settings === 'object' && !Array.isArray(normalized.settings))) {
-      console.error('hub:save-store: refused a save with no settings');
-      return { ok: false, error: 'settings_missing' };
-    }
-    try {
-      const ApiTokens = require('./lib/api-tokens.js');
-      const guarded = ApiTokens.guardTokenSave(merged, guardDisk);
-      if (!guarded) return { ok: false, error: 'settings_missing' };
-      if (guarded !== merged) console.warn('hub:save-store: API token change refused for this role');
-      merged = guarded;
-    } catch (e) {
-      console.error('hub:save-store: token guard failed:', e && e.message);
-      return { ok: false, error: 'token_guard_failed' };
-    }
-    // The lock, roles, sign-in and printer connections: what the role ON DISK
-    // may not change is put back as it is there (lib/main/printer-permission.js,
-    // #2592 security review M2/L1). A failure here refuses the save rather
-    // than writing an unguarded book.
-    try {
-      const g = PrinterPermission.guardSave(merged, guardDisk, { verified: operatorVerified, consume: consumeVerified });
-      if (!g.store) return { ok: false, error: 'settings_missing' };
-      if (g.refused.length) console.warn('hub:save-store: refused for this role:', g.refused.join(', '));
-      merged = g.store;
-    } catch (e) {
-      console.error('hub:save-store: role guard failed:', e && e.message);
-      return { ok: false, error: 'role_guard_failed' };
-    }
+    // Every guard a book from the WINDOW goes through (guardWindowStore).
+    const guarded = guardWindowStore(normalized);
+    if (guarded.error) return { ok: false, error: guarded.error };
+    let merged = guarded.store;
     // First real keychain write. Explain once, before encryptForDisk triggers
     // the OS permission prompt — but only when there is actually a plaintext
     // secret to encrypt, so a shop that never configures a credential is never

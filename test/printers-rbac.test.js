@@ -259,13 +259,6 @@ test('hub:print-order-file is gated (#2592 security review, H1: kanban starts pr
   assert.ok(body.indexOf("printerGate('send')") !== -1 && body.indexOf("printerGate('send')") < body.indexOf('uploadGcodeToPrinter('));
 });
 
-test('every save goes through guardSave, and a guard failure refuses the save', () => {
-  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
-  const body = handlerBody(main, main.indexOf("ipcMain.handle('hub:save-store'"));
-  const g = body.indexOf('PrinterPermission.guardSave(');
-  assert.ok(g !== -1 && g < body.indexOf('atomicWriteStore('), 'guarded before the write');
-  assert.match(body, /role guard failed[\s\S]{0,120}return \{ ok: false, error: 'role_guard_failed' \}/);
-});
 
 /* ── #2592 re-check ─────────────────────────────────────────────────────── */
 
@@ -280,22 +273,9 @@ test('H1: a save with no settings object over a book that has one is refused, by
   // A fresh book (nothing on disk yet) may still be written without settings.
   assert.deepEqual(P.guardSave({ orders: [] }, null).refused, []);
   assert.deepEqual(require('../lib/api-tokens.js').guardTokenSave({ orders: [] }, null), { orders: [] });
-  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
-  const body = handlerBody(main, main.indexOf("ipcMain.handle('hub:save-store'"));
-  const refuse = body.indexOf("return { ok: false, error: 'settings_missing' }");
-  assert.ok(refuse !== -1 && refuse < body.indexOf('atomicWriteStore('), 'refused before anything is written');
-  assert.match(body, /if \(!guarded\) return \{ ok: false, error: 'settings_missing' \}/);
-  assert.match(body, /if \(!g\.store\) return \{ ok: false, error: 'settings_missing' \}/);
-  assert.match(body, /token guard failed[\s\S]{0,80}return \{ ok: false, error: 'token_guard_failed' \}/);
+  // save-store and the flush refuse it through guardWindowStore (tested below).
 });
 
-test('M1: an unreadable disk falls back to main\'s own copy of the book for the guards', () => {
-  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
-  const body = handlerBody(main, main.indexOf("ipcMain.handle('hub:save-store'"));
-  assert.match(body, /if \(!guardDisk \|\| !guardDisk\.settings\) guardDisk = \(lanServerStore && lanServerStore\.settings\) \? lanServerStore : guardDisk;/);
-  assert.ok(body.indexOf('guardTokenSave(merged, guardDisk)') !== -1);
-  assert.ok(body.indexOf('guardSave(merged, guardDisk,') !== -1);
-});
 
 test('L1: the save that signs someone in spends the verification', () => {
   const disk = book('VIEW');
@@ -341,4 +321,85 @@ test('L5: hub:verify-pin notes only the operator the screen named, never every h
   assert.match(pre, /verifyPin: \(plain, stored, forOperatorId\) => ipcRenderer\.invoke\('hub:verify-pin', plain, stored, forOperatorId\)/);
   const sec = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app-security.js'), 'utf8');
   assert.match(sec, /\}, admin\.id\);/);
+});
+
+/* ── Every book from the window is guarded; restores are the owner's (#2592) ── */
+
+const mainSrc = () => fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+const fnBody = (src, name) => { const at = src.search(new RegExp('\\n(?:async )?function ' + name + '\\(')); assert.ok(at !== -1, name); return functionBody(src, at); };
+
+test('guardWindowStore: settings-less books refused, both guards, main\'s copy when the disk is unreadable, failures refuse', () => {
+  const g = fnBody(mainSrc(), 'guardWindowStore');
+  assert.match(g, /if \(!guardDisk \|\| !guardDisk\.settings\) guardDisk = \(lanServerStore && lanServerStore\.settings\) \? lanServerStore : guardDisk;/);
+  assert.match(g, /return \{ error: 'settings_missing' \};/);
+  assert.ok(g.indexOf('guardTokenSave(merged, guardDisk)') !== -1 && g.indexOf('guardSave(merged, guardDisk, { verified: operatorVerified, consume: consumeVerified })') !== -1);
+  assert.match(g, /token guard failed[\s\S]{0,80}return \{ error: 'token_guard_failed' \}/);
+  assert.match(g, /role guard failed[\s\S]{0,80}return \{ error: 'role_guard_failed' \}/);
+  assert.ok(g.indexOf("'settings_missing'") < g.indexOf('guardTokenSave('), 'settings checked first');
+});
+
+test('hub:save-store writes only what guardWindowStore returns', () => {
+  const body = handlerBody(mainSrc(), mainSrc().indexOf("ipcMain.handle('hub:save-store'"));
+  const g = body.indexOf('guardWindowStore(normalized)');
+  assert.ok(g !== -1 && g < body.indexOf('atomicWriteStore('), 'guarded before the write');
+  assert.match(body, /if \(guarded\.error\) return \{ ok: false, error: guarded\.error \};\s*let merged = guarded\.store;/);
+});
+
+test('the pre-install flush goes through the same guard, and writes nothing without one', () => {
+  const up = fs.readFileSync(path.join(__dirname, '..', 'lib', 'updater.js'), 'utf8');
+  const at = up.indexOf("ipcMain.handle('hub:install-update'");
+  const body = up.slice(at, up.indexOf('quitAndInstall', at));
+  assert.match(body, /typeof guardStore !== 'function'[\s\S]{0,160}flush-save skipped: no store guard/);
+  assert.match(body, /const g = guardStore\(normalized\);\s*if \(g && g\.store\) await writeStoreToDisk\(g\.store\);/);
+  assert.doesNotMatch(body, /writeStoreToDisk\(normalized\)/);
+  assert.match(mainSrc(), /registerUpdater\(\{[\s\S]*guardStore: \(normalized\) => guardWindowStore\(normalized\),[\s\S]*?\}\);/);
+});
+
+test('a restore is the owner\'s while the lock is on (backup, restore point, off-site), then role-guarded', () => {
+  const main = mainSrc();
+  const r = fnBody(main, 'restoreSnapshotForWindow');
+  const allowed = r.indexOf('if (!restoreAllowed())');
+  assert.ok(allowed !== -1 && allowed < r.indexOf('restoreSnapshotToDisk('), 'checked before the restore');
+  const guard = r.indexOf('PrinterPermission.guardSave(parsed, disk');
+  assert.ok(guard !== -1 && guard < r.indexOf('restoreSnapshotToDisk('), 'guarded before the restore');
+  const ra = fnBody(main, 'restoreAllowed');
+  assert.match(ra, /if \(!disk \|\| !disk\.settings \|\| !disk\.settings\.operatorLockEnabled\) return true;/);
+  assert.match(ra, /mayManageTokens\(disk\)/);
+  // What mayManageTokens decides, on the shapes that matter.
+  const T = require('../lib/api-tokens.js');
+  assert.equal(T.mayManageTokens(book('OWN')), true);
+  for (const who of ['VIEW', 'OPR', null, 'GHOST']) assert.equal(T.mayManageTokens(book(who)), false, String(who));
+  // Every path that restores a whole book goes through restoreSnapshotForWindow.
+  for (const ch of ["'hub:restore-backup'", "'hub:read-restore-point'", "'hub:offsite-restore'"]) assert.ok(main.includes(ch) || /offsite/.test(ch), ch);
+});
+
+test('every writer of the whole book is guarded or main\'s own (ratchet; the list is in the PR body)', () => {
+  const root = path.join(__dirname, '..');
+  const files = ['main.js', 'lib/updater.js', 'lib/lan-server.js', ...fs.readdirSync(path.join(root, 'lib', 'main')).filter((x) => x.endsWith('.js')).map((x) => 'lib/main/' + x)];
+  // file → the functions or handlers allowed to call each writer, and why.
+  const ALLOWED = {
+    'main.js': {
+      'atomicWriteStore(': ["ipcMain.handle('hub:save-store'"],                 // after guardWindowStore
+      'restoreSnapshotToDisk(': ['function restoreSnapshotForWindow('],          // after restoreAllowed + guardSave
+      'writeStoreToDisk(': [],
+    },
+    'lib/updater.js': { 'writeStoreToDisk(': ["ipcMain.handle('hub:install-update'"] },   // after guardStore
+    // MAIN-originated: the LAN server's own generated tokens and PIN.
+    'lib/lan-server.js': { 'writeStoreToDisk(': ['ensureLanCalendarToken(STORE())'] },
+  };
+  for (const file of files) {
+    const src = fs.readFileSync(path.join(root, file), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    for (const w of ['atomicWriteStore(', 'restoreSnapshotToDisk(', 'writeStoreToDisk(']) {
+      let i = -1;
+      while ((i = src.indexOf(w, i + 1)) !== -1) {
+        const before = src.slice(Math.max(0, i - 40), i);
+        if (/function\s+$|async function\s+$|[.\w]$/.test(before) && !/await\s+$|\(\s*$|=\s*$|\s$/.test(before.slice(-1))) continue;
+        const allow = (ALLOWED[file] && ALLOWED[file][w]) || [];
+        // The enclosing registration or function: the nearest one above.
+        const head = src.slice(0, i);
+        const owner = allow.find((a) => head.lastIndexOf(a) !== -1 && head.lastIndexOf(a) > Math.max(head.lastIndexOf('ipcMain.handle('), head.lastIndexOf('\nfunction '), head.lastIndexOf('\nasync function ')) - 1);
+        assert.ok(owner, `${file}: ${w} at ${src.slice(0, i).split('\n').length} is not a guarded or main-originated writer`);
+      }
+    }
+  }
 });
