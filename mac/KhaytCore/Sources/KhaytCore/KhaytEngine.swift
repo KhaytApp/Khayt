@@ -15888,15 +15888,40 @@ public actor KhaytEngine {
         public let packagingCost: Double
     }
 
+    /// `units`: how many of the product the line is (#2586). The rule scales
+    /// each part's qty by it, charges prep once and post per unit, and boxes
+    /// the line by the product's `perBox`; nothing of that is done in Swift.
     public func productJobParts(_ product: JSONValue, inventory: [JSONValue],
                                 settings: [String: JSONValue],
-                                consumables: [JSONValue]) throws -> ProductJobParts {
+                                consumables: [JSONValue], units: Int = 1) throws -> ProductJobParts {
         try runtime.call2("""
             KhaytProductPricing.productJobParts(ARG0,
-              { inventory: ARG1, settings: ARG2, consumables: ARG3 })
+              { inventory: ARG1, settings: ARG2, consumables: ARG3, units: ARG4 })
             """,
-            [product, .array(inventory), .object(settings), .array(consumables)],
+            [product, .array(inventory), .object(settings), .array(consumables), .number(Double(max(1, units)))],
             as: ProductJobParts.self)
+    }
+
+    /// The boxes a line of `units` of this PRODUCT ships in: `lineBoxes` with
+    /// the product's own `perBoxOf` (a box each unless it says), which is the
+    /// count its packaging is charged at (`productPackagingCost`).
+    public func productBoxes(_ product: JSONValue, units: Int) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.lineBoxes(ARG0, KhaytProductPricing.perBoxOf(ARG1))",
+                          [.number(Double(max(1, units))), product], as: Double.self)
+    }
+
+    /// A line's labour (`lib/order-money.js lineLabour`, #2586): prep once
+    /// and post per piece for a `labourPerLine` line, the old sum otherwise.
+    public func lineLabour(_ line: JSONValue) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.lineLabour(ARG0)", [line], as: Double.self)
+    }
+
+    /// How many boxes a line of `qty` ships in, `perBox` to a box
+    /// (`lib/order-money.js lineBoxes`, #2586): ceil(qty / perBox), 1 a box each.
+    public func lineBoxes(qty: Int, perBox: Double?) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.lineBoxes(ARG0, ARG1)",
+                          [.number(Double(max(1, qty))), perBox.map(JSONValue.number) ?? .null],
+                          as: Double.self)
     }
 
     /// A job's cost (`lib/order-money.js jobCost`): its parts' `baseCost` plus

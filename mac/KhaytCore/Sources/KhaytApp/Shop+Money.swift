@@ -122,11 +122,36 @@ extension Shop {
     static let carriedPartKeys = ["printFileId", "plate", "fileRef", "setupId",
                                   "purgeGrams", "supportWeight"]
 
+    /// The mark a NEW part carries (#2586): its labour is prep once for its
+    /// line and finishing per piece (`KhaytOrderMoney.lineLabour`), and its
+    /// packaging is boxed by its `perBox`. Set where a part is made, as the
+    /// desktop does (job sheet, calculator, quote import); a part already on
+    /// a job keeps whatever it was costed with, so no stored job re-costs.
+    static let newPartMark: [String: JSONValue] = ["labourPerLine": .bool(true)]
+
+    /// The keys `partRows` decides itself. Taken off the part's record before
+    /// it is written again, so a value the sheet removed (an agreed price, a
+    /// spool) does not survive from the old record; every other key does.
+    static let ownedPartKeys: Set<String> = Set(
+        ["id", "name", "printWeight", "printTime", "qty", "unitCost", "baseCost", "agreedPrice",
+         "consumables", "orderLevelCosts", "filamentId", "material", "spoolCost", "spoolWeight", "colours"]
+        + ProductSheet.PartRow.rateKeys + carriedPartKeys)
+
     static func partRows(_ parts: [NewJobSheet.Draft], spools: [Spool],
                          reclaimsTax: Bool = false, unnamed: String) -> [JSONValue] {
         var rows: [JSONValue] = []
         for p in parts {
-            var row: [String: JSONValue] = [
+            // ── WHAT THIS DOES NOT OWN, IT KEEPS ─────────────────────────
+            //
+            // This used to write a fixed set of keys and drop the rest, so
+            // anything another app (or a later rule) put on a part was lost
+            // the first time the Mac saved it: a desktop part costed on the
+            // new quantity rule (`labourPerLine`, #2586) came back unmarked,
+            // on the old sum. Now the part's own record is the base, and only
+            // the keys written below (and `id`, which a copied job must not
+            // carry over) are taken from what the sheet says.
+            var row: [String: JSONValue] = p.raw.filter { !Self.ownedPartKeys.contains($0.key) }
+            let owned: [String: JSONValue] = [
                 "name": .string(p.name.isEmpty ? unnamed : p.name),
                 // `TypedNumber.parse`, as the sheet's own costing and totals
                 // use: `Double("١٥٠")` and `Double("1,5")` are nil, so a part
@@ -141,6 +166,7 @@ extension Shop {
                 "unitCost": .number(p.cost),
                 "baseCost": .number(p.cost * Double(max(1, p.qty))),
             ]
+            for (key, value) in owned { row[key] = value }
             // What the customer agreed for this part, per unit. The cost above
             // is still the cost: the shared rule charges the agreed figure
             // instead of cost plus margin, and measures the margin against
