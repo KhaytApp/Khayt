@@ -8990,6 +8990,11 @@ public actor KhaytEngine {
               var c = Number(globalThis.KhaytCalculatorCost.partTotalCost(parts[j], ctx));
               if (isFinite(c)) sum += c;
             }
+            // A product's labour and packaging carried ONCE on the job: its
+            // parts are costed without them (orderLevelCosts), so they are
+            // added here, as lib/break-even.js does (money review of #2581).
+            var once = Number(globalThis.KhaytOrderMoney.jobFixedCost(o, { components: false, overhead: false }));
+            if (isFinite(once)) sum += once;
             cost.push(sum);
           }
           return [revenue, cost];
@@ -15869,6 +15874,55 @@ public actor KhaytEngine {
     /// not exist here, and the resin branch is chosen by looking a part's
     /// filament up in the shelf. Without it a resin part is priced by the
     /// filament formula — a different answer, not a missing one.
+    /// A product's parts as a job taken from it holds them, and its labour
+    /// and packaging as job-level costs (`lib/product-pricing.js`
+    /// `productJobParts`, #2581). With the product's own rates each part is
+    /// costed WITHOUT labour and packaging and the two come back once, for
+    /// `newOrder`'s `labourCost` / `packagingCost`; without, the parts as
+    /// before and both 0. So a job from the product costs what the catalogue says.
+    public struct ProductJobParts: Decodable, Sendable {
+        public let parts: [JSONValue]
+        public let labourCost: Double
+        public let packagingCost: Double
+    }
+
+    public func productJobParts(_ product: JSONValue, inventory: [JSONValue],
+                                settings: [String: JSONValue],
+                                consumables: [JSONValue]) throws -> ProductJobParts {
+        try runtime.call2("""
+            KhaytProductPricing.productJobParts(ARG0,
+              { inventory: ARG1, settings: ARG2, consumables: ARG3 })
+            """,
+            [product, .array(inventory), .object(settings), .array(consumables)],
+            as: ProductJobParts.self)
+    }
+
+    /// A job's cost (`lib/order-money.js jobCost`): its parts' `baseCost` plus
+    /// the job-level costs, each counted unless its flag is false.
+    public func jobCost(_ order: JSONValue, components: Bool = true, overhead: Bool = true,
+                        labour: Bool = true, packaging: Bool = true) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.jobCost(ARG0, ARG1)",
+                          [order, .object(["components": .bool(components), "overhead": .bool(overhead),
+                                           "labour": .bool(labour), "packaging": .bool(packaging)])],
+                          as: Double.self)
+    }
+
+    /// Whether a part added BY HAND to this job is marked `orderLevelCosts`
+    /// (shares the job's once-costs, so it is costed without its own labour
+    /// and packaging). The shop's rule, in one place for every app:
+    /// `lib/order-money.js addedPartMark` (Turki, Nov 19: no, for now).
+    /// `flipped` asks it with the switch on, for the shared vectors only.
+    public func addedPartMark(_ order: JSONValue, flipped: Bool? = nil) throws -> Bool {
+        try runtime.call2("""
+            (function (order, flip) {
+              var M = KhaytOrderMoney, was = M.HAND_PARTS_SHARE_ONCE;
+              if (flip !== null) M.HAND_PARTS_SHARE_ONCE = flip;
+              try { return M.addedPartMark(order) === true; }
+              finally { M.HAND_PARTS_SHARE_ONCE = was; }
+            })(ARG0, ARG1)
+            """, [order, flipped.map { .bool($0) } ?? .null], as: Bool.self)
+    }
+
     public func priceProduct(_ product: JSONValue, inventory: [JSONValue],
                              settings: [String: JSONValue],
                              consumables: [JSONValue]) throws -> ProductPricing {

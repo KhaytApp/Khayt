@@ -5444,6 +5444,7 @@
   "jp.parts": "Pièces",
   "jp.money": "Argent",
   "jp.activity": "Activité",
+  "jp.labour_once": "Main-d’œuvre et emballage (une fois)",
   "jp.plan": "Échéancier",
   "ppd.title": "Échéancier",
   "ppd.due": "échéance {date}",

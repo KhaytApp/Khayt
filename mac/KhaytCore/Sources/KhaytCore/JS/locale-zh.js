@@ -5444,6 +5444,7 @@
   "jp.parts": "零件",
   "jp.money": "金额",
   "jp.activity": "动态",
+  "jp.labour_once": "人工和包装（一次）",
   "jp.plan": "付款计划",
   "ppd.title": "付款计划",
   "ppd.due": "到期 {date}",

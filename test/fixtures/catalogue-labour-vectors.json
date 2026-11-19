@@ -1,5 +1,5 @@
 {
-  "about": "lib/product-pricing.js priceProduct and labour ONCE per product (Turki, Nov 19; data model: Mac Figma p.18). A product with its own `rates` costs each part's material, wear and power by its own print time, and the labour, (prep + post) × rate × (1 + failure/100), once. `labourPerPart: true` puts labour back in every part. A product with NO `rates` (every product saved before this) costs exactly as before. One part here: 100 g of 90/1000 g filament (9.00), 2 h at wear 0.75 (1.50) and 150 W × 0.18 (0.054), +10% failure = 11.6094 without labour; labour 0.75 h × 90 × 1.1 = 74.25. The Mac and the phone run this file. Money review of #2575: the shop packaging is charged ONCE with the labour (per part only under labourPerPart); a part's own prep/post is not used under once-labour; productJobParts gives a job the parts costed without labour and packaging plus ONE labour line, so newOrder prices it exactly as the catalogue.",
+  "about": "lib/product-pricing.js priceProduct and labour ONCE per product (Turki, Nov 19; data model: Mac Figma p.18). A product with its own `rates` costs each part's material, wear and power by its own print time, and the labour, (prep + post) × rate × (1 + failure/100), once. `labourPerPart: true` puts labour back in every part. A product with NO `rates` (every product saved before this) costs exactly as before. One part here: 100 g of 90/1000 g filament (9.00), 2 h at wear 0.75 (1.50) and 150 W × 0.18 (0.054), +10% failure = 11.6094 without labour; labour 0.75 h × 90 × 1.1 = 74.25. The Mac and the phone run this file. Money review of #2575: the shop packaging is charged ONCE with the labour (per part only under labourPerPart); a part's own prep/post is not used under once-labour; productJobParts gives a job the parts costed without labour and packaging and the labour and packaging as ORDER-level costs (labourCost, packagingCost: never a part, Dev Hub Nov 19), so newOrder prices it exactly as the catalogue. Money review of #2581: the order-level labour and packaging go into the PRICE only in proportion to the parts that are costed (by cost), never on top of agreed prices; they are always stored whole as COST.",
   "settings": {
     "defaultMargin": 30
   },
@@ -104,7 +104,7 @@
       }
     },
     {
-      "why": "JOB == CATALOGUE: a job taken from a 15-part product with productJobParts is priced by newOrder at the catalogue's base price (330.06)",
+      "why": "JOB == CATALOGUE: a job taken from a 15-part product through productJobParts (15 parts, labour 74.25 and packaging 5.50 at the ORDER level) is priced by newOrder at the catalogue's base price (330.06)",
       "parts": 15,
       "productRates": true,
       "settings": {
@@ -114,7 +114,47 @@
       "want": {
         "cost": 253.89,
         "jobPrice": 330.06,
-        "jobLines": 16
+        "jobParts": 15,
+        "jobLabour": 74.25,
+        "jobPackaging": 5.5
+      }
+    },
+    {
+      "why": "ALL AGREED: 15 parts each agreed at 20 price at 300, not 300 + labour; labour and packaging are still stored as cost",
+      "parts": 15,
+      "productRates": true,
+      "settings": {
+        "defaultMargin": 30,
+        "defaultPackagingCost": 5
+      },
+      "agreedParts": 15,
+      "agreedPrice": 20,
+      "want": {
+        "cost": 253.89,
+        "jobPrice": 300,
+        "jobParts": 15,
+        "jobLabour": 74.25,
+        "jobPackaging": 5.5,
+        "noCatalogueMatch": true
+      }
+    },
+    {
+      "why": "MIXED: 5 of 15 agreed at 20; the labour and packaging are priced on the costed 10/15: 5 × 20 + (10 × 11.61 + 79.75 × 10/15) × 1.3 = 320.04",
+      "parts": 15,
+      "productRates": true,
+      "settings": {
+        "defaultMargin": 30,
+        "defaultPackagingCost": 5
+      },
+      "agreedParts": 5,
+      "agreedPrice": 20,
+      "want": {
+        "cost": 253.89,
+        "jobPrice": 320.04,
+        "jobParts": 15,
+        "jobLabour": 74.25,
+        "jobPackaging": 5.5,
+        "noCatalogueMatch": true
       }
     }
   ]
