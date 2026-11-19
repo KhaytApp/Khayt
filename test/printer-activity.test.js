@@ -55,3 +55,11 @@ test('FIX: a paused printer is busy, never offered as free (was idle)', () => {
     assert.equal(A.machineState(m, { state: w, progress: 0 }), 'printing', w);
   }
 });
+
+test('FIX: a printer that is preparing, homing or otherwise working is busy, never free (was idle)', () => {
+  const m = { printerApi: { type: 'bambu' } };
+  for (const w of ['Preparing', 'Slicing', 'BUSY', 'homing', 'exposing', 'lifting', 'transferring', 'self_testing', 'changingTool', 'processing', 'starting', 'resuming', 'Cancelling', 'Sending file to SD', 'Finishing']) {
+    assert.equal(PA.machineStatus(m, { state: w }).activity, 'printing', w);
+    assert.equal(A.machineState(m, { state: w, progress: 0 }), 'printing', w);
+  }
+});
