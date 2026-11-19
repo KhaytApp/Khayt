@@ -4060,5 +4060,16 @@
  "mac.apps_approve": "Os números conferem — aprovar",
  "mac.apps_deny": "Recusar",
  "mac.apps_timed_out": "Nenhum fatiador pareou a tempo. Clique em Parear um fatiador para tentar de novo.",
- "mac.apps_pin_unreadable": "Não foi possível ler o PIN da rede local nas Chaves, então nada foi pareado. Defina o PIN da rede local de novo acima e depois pareie o fatiador."
+ "mac.apps_pin_unreadable": "Não foi possível ler o PIN da rede local nas Chaves, então nada foi pareado. Defina o PIN da rede local de novo acima e depois pareie o fatiador.",
+ "mac.light_chamber": "Luz da câmara",
+ "mac.light_on": "Ligada",
+ "mac.light_off": "Desligada",
+ "mac.light_turning_on": "Ligando…",
+ "mac.light_turning_off": "Desligando…",
+ "mac.light_failed_on": "Não foi possível falar com a impressora. A luz continua como estava: ligada.",
+ "mac.light_failed_off": "Não foi possível falar com a impressora. A luz continua como estava: desligada.",
+ "mac.light_button_on": "Luz ligada",
+ "mac.light_button_off": "Luz desligada",
+ "mac.light_note": "Lida da impressora quando isto abriu. Mudar aqui altera só a luz dentro da impressora.",
+ "mac.cam_awake_note": "A câmera fica ligada enquanto você assiste. Ela volta a dormir sozinha cerca de um minuto depois que você fecha a visualização."
 }

@@ -4060,5 +4060,16 @@
  "mac.apps_approve": "Los números coinciden — aprobar",
  "mac.apps_deny": "Denegar",
  "mac.apps_timed_out": "Ningún laminador se emparejó a tiempo. Haz clic en Emparejar un laminador para volver a intentarlo.",
- "mac.apps_pin_unreadable": "No se pudo leer el PIN de la red local del llavero, así que no se emparejó nada. Vuelve a establecer el PIN arriba y empareja el laminador."
+ "mac.apps_pin_unreadable": "No se pudo leer el PIN de la red local del llavero, así que no se emparejó nada. Vuelve a establecer el PIN arriba y empareja el laminador.",
+ "mac.light_chamber": "Luz de la cámara",
+ "mac.light_on": "Encendida",
+ "mac.light_off": "Apagada",
+ "mac.light_turning_on": "Encendiendo…",
+ "mac.light_turning_off": "Apagando…",
+ "mac.light_failed_on": "No se pudo contactar con la impresora. La luz sigue como estaba: encendida.",
+ "mac.light_failed_off": "No se pudo contactar con la impresora. La luz sigue como estaba: apagada.",
+ "mac.light_button_on": "Luz encendida",
+ "mac.light_button_off": "Luz apagada",
+ "mac.light_note": "Leída de la impresora al abrir esto. Cambiarla aquí solo cambia la luz dentro de la impresora.",
+ "mac.cam_awake_note": "La cámara sigue encendida mientras miras. Vuelve a dormirse sola un minuto después de cerrar la vista."
 }

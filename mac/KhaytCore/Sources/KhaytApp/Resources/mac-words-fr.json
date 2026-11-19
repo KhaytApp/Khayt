@@ -4060,5 +4060,16 @@
  "mac.apps_approve": "Les nombres correspondent — approuver",
  "mac.apps_deny": "Refuser",
  "mac.apps_timed_out": "Aucun trancheur associé à temps. Cliquez sur Associer un trancheur pour réessayer.",
- "mac.apps_pin_unreadable": "Le code PIN du réseau local n’a pas pu être lu dans le trousseau : rien n’a été associé. Définissez de nouveau le code PIN ci-dessus, puis associez le trancheur."
+ "mac.apps_pin_unreadable": "Le code PIN du réseau local n’a pas pu être lu dans le trousseau : rien n’a été associé. Définissez de nouveau le code PIN ci-dessus, puis associez le trancheur.",
+ "mac.light_chamber": "Éclairage de l’enceinte",
+ "mac.light_on": "Allumé",
+ "mac.light_off": "Éteint",
+ "mac.light_turning_on": "Allumage…",
+ "mac.light_turning_off": "Extinction…",
+ "mac.light_failed_on": "Impossible de joindre l’imprimante. L’éclairage n’a pas changé : allumé.",
+ "mac.light_failed_off": "Impossible de joindre l’imprimante. L’éclairage n’a pas changé : éteint.",
+ "mac.light_button_on": "Lumière allumée",
+ "mac.light_button_off": "Lumière éteinte",
+ "mac.light_note": "Lu sur l’imprimante à l’ouverture. Le changer ici ne modifie que l’éclairage à l’intérieur de l’imprimante.",
+ "mac.cam_awake_note": "La caméra reste allumée pendant que vous regardez. Elle se rendort d’elle-même environ une minute après la fermeture de la vue."
 }

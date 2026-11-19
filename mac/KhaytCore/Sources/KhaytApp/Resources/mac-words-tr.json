@@ -4060,5 +4060,16 @@
  "mac.apps_approve": "Numaralar eşleşiyor — onayla",
  "mac.apps_deny": "Reddet",
  "mac.apps_timed_out": "Zamanında hiçbir dilimleyici eşleşmedi. Yeniden denemek için Dilimleyici eşleştir’e tıklayın.",
- "mac.apps_pin_unreadable": "Yerel ağ PIN’i Anahtar Zinciri’nden okunamadı, bu yüzden hiçbir şey eşleşmedi. Yukarıda yerel ağ PIN’ini yeniden ayarlayın, sonra dilimleyiciyi eşleştirin."
+ "mac.apps_pin_unreadable": "Yerel ağ PIN’i Anahtar Zinciri’nden okunamadı, bu yüzden hiçbir şey eşleşmedi. Yukarıda yerel ağ PIN’ini yeniden ayarlayın, sonra dilimleyiciyi eşleştirin.",
+ "mac.light_chamber": "Hazne ışığı",
+ "mac.light_on": "Açık",
+ "mac.light_off": "Kapalı",
+ "mac.light_turning_on": "Açılıyor…",
+ "mac.light_turning_off": "Kapanıyor…",
+ "mac.light_failed_on": "Yazıcıya ulaşılamadı. Işık olduğu gibi: açık.",
+ "mac.light_failed_off": "Yazıcıya ulaşılamadı. Işık olduğu gibi: kapalı.",
+ "mac.light_button_on": "Işık açık",
+ "mac.light_button_off": "Işık kapalı",
+ "mac.light_note": "Bu açıldığında yazıcıdan okundu. Buradan değiştirmek yalnızca yazıcının içindeki ışığı değiştirir.",
+ "mac.cam_awake_note": "İzlediğiniz sürece kamera açık kalır. Görünümü kapattıktan yaklaşık bir dakika sonra kendiliğinden uykuya döner."
 }
