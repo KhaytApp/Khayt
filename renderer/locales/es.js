@@ -604,6 +604,7 @@
   "lan.loopback_warn": "Escuchando solo en este equipo — activa «Escuchar en todas las interfaces de red» para otros dispositivos en el Wi‑Fi.",
   "lan.same_wifi_hint": "Otros dispositivos: mismo Wi‑Fi, abre esta URL. Formulario de cliente: /intake",
   "lan.start_failed": "Error al iniciar el servidor LAN — comprueba si el puerto está en uso",
+  "lan.store_unreadable": "Khayt no pudo leer tu archivo de datos, así que no se inició el servidor LAN y no se escribió nada. Reinicia Khayt; si sigue pasando, restaura una copia de seguridad.",
   "lan.port": "Port",
   "lan.pin": "PIN LAN del propietario (API de cola, kiosco, túnel)",
   "lan.pin_too_short": "El PIN de LAN es demasiado corto: los teléfonos y la página de la cola no se abrirán hasta que establezcas uno de al menos {n} caracteres en Ajustes → En línea.",

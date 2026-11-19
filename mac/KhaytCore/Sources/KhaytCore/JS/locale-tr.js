@@ -604,6 +604,7 @@
   "lan.loopback_warn": "Yalnızca bu bilgisayarda dinleniyor — Wi‑Fi'deki diğer cihazlar için \"Tüm ağ arayüzlerinde dinle\"yi açın.",
   "lan.same_wifi_hint": "Diğer cihazlar: aynı Wi‑Fi, bu URL'yi açın. Müşteri formu: /intake",
   "lan.start_failed": "LAN sunucusu başlatılamadı",
+  "lan.store_unreadable": "Khayt veri dosyanızı okuyamadı; bu yüzden LAN sunucusu başlatılmadı ve hiçbir şey yazılmadı. Khayt'ı yeniden başlatın; tekrar ederse bir yedeği geri yükleyin.",
   "lan.port": "Port",
   "lan.pin": "Sahip LAN PIN'i (kuyruk API, kiosk, tünel)",
   "lan.pin_too_short": "LAN PIN'i çok kısa: Ayarlar → Çevrimiçi bölümünden en az {n} karakterlik bir PIN belirleyene kadar telefonlar ve sıra sayfası açılmaz.",

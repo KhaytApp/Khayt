@@ -605,6 +605,7 @@
   "lan.loopback_warn": "Escutando somente neste computador — ative “Escutar em todas as interfaces de rede” para outros dispositivos no Wi‑Fi.",
   "lan.same_wifi_hint": "Outros dispositivos: mesmo Wi‑Fi, abra esta URL. Formulário do cliente: /intake",
   "lan.start_failed": "O servidor LAN não conseguiu iniciar",
+  "lan.store_unreadable": "O Khayt não conseguiu ler seu arquivo de dados, então o servidor LAN não foi iniciado e nada foi gravado. Reinicie o Khayt; se continuar acontecendo, restaure um backup.",
   "lan.port": "Porta",
   "lan.pin": "PIN do proprietário na LAN (API da fila, quiosque, túnel)",
   "lan.pin_too_short": "O PIN da LAN é curto demais: os celulares e a página da fila não abrem até você definir um com pelo menos {n} caracteres em Ajustes → Online.",

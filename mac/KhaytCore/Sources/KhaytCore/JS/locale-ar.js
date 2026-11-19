@@ -3974,6 +3974,7 @@
   "dash.forecast_tip": "الإيرادات المتوقعة نهاية الشهر",
   "dash.sparkline_30d": "آخر 30 يوم",
   "lan.start_failed": "فشل تشغيل خادم الشبكة — تحقق من المنفذ",
+  "lan.store_unreadable": "تعذّر على خيط قراءة ملف بياناتك، فلم يُشغَّل خادم الشبكة المحلية ولم يُكتب أي شيء. أعد تشغيل خيط، وإذا تكرر ذلك فاستعد نسخة احتياطية.",
   "lan.webhook_token": "رمز الويب هوك للطابعة",
   "lan.webhook_token_hint": "يُستخدم للتحقق من طلبات OctoPrint / Moonraker",
   "lan.printer_webhook": "رابط Webhook للطابعة",

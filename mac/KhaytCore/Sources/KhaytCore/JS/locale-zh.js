@@ -604,6 +604,7 @@
   "lan.loopback_warn": "仅在本机监听 — 为 Wi‑Fi 上的其他设备开启“在所有网络接口上监听”。",
   "lan.same_wifi_hint": "其他设备：同一 Wi‑Fi，打开此 URL。客户表单：/intake",
   "lan.start_failed": "局域网服务器启动失败 — 请检查端口是否被占用",
+  "lan.store_unreadable": "Khayt 无法读取你的数据文件，因此未启动局域网服务器，也没有写入任何内容。请重启 Khayt；如果反复出现，请恢复一个备份。",
   "lan.port": "Port",
   "lan.pin": "所有者局域网 PIN（队列 API、展示模式、隧道）",
   "lan.pin_too_short": "局域网 PIN 太短：在“设置 → 在线”中设置至少 {n} 个字符的 PIN 之前，手机和队列页面都无法打开。",

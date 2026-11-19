@@ -1054,3 +1054,12 @@ test('the LAN server never starts on a book it could not read, and writes nothin
   const refuse = body.indexOf("return { ok: false, error: 'store_unreadable' }");
   assert.ok(refuse !== -1 && refuse < body.indexOf('writeStoreToDisk('), 'refused before any write');
 });
+
+test('the window says store_unreadable in the shop\'s language, not as a code', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'integrations.js'), 'utf8');
+  assert.match(src, /res\?\.error === 'store_unreadable'\) \{[\s\S]{0,200}toast\(t\('lan\.store_unreadable'\)/);
+  for (const l of ['en', 'ar', 'de', 'es', 'fr', 'ja', 'pt-BR', 'tr', 'zh']) {
+    const loc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'locales', l + '.js'), 'utf8');
+    assert.match(loc, /"lan\.store_unreadable": "[^"]{20,}"/, l);
+  }
+});

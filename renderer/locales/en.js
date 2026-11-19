@@ -604,6 +604,7 @@
   "lan.loopback_warn": "Listening on this computer only — turn on “Listen on all network interfaces” for other devices on Wi‑Fi.",
   "lan.same_wifi_hint": "Other devices: same Wi‑Fi, open this URL. Customer form: /intake",
   "lan.start_failed": "LAN server failed to start",
+  "lan.store_unreadable": "Khayt could not read your data file, so the LAN server was not started and nothing was written. Restart Khayt; if this keeps happening, restore a backup.",
   "lan.port": "Port",
   "lan.pin": "Owner LAN PIN (queue API, kiosk, tunnel)",
   "lan.pin_too_short": "The LAN PIN is too short: phones and the queue page cannot open until you set one of at least {n} characters in Settings → Online.",

@@ -667,6 +667,10 @@ async function startLanServer() {
     renderOnlineCustomerLinks?.();
     renderWaitingOnlinePanel?.();
     renderOnlineSettings?.();
+  } else if (res?.error === 'store_unreadable') {
+    // Main refused to start on a book it could not read, and wrote nothing (#2592).
+    if (statusRow) statusRow.textContent = '❌ ' + t('lan.store_unreadable');
+    toast(t('lan.store_unreadable'), 'error', 12000);
   } else {
     if (statusRow) statusRow.textContent = `❌ Failed: ${res?.error || 'unknown error'}`;
     toast((t('lan.start_failed') || 'LAN server failed to start') + ': ' + (res?.error || 'unknown'), 'error', 8000);

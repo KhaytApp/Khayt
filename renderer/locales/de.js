@@ -604,6 +604,7 @@
   "lan.loopback_warn": "Lauscht nur auf diesem Computer — aktivieren Sie „Auf allen Netzwerkschnittstellen lauschen“ für andere Geräte im WLAN.",
   "lan.same_wifi_hint": "Andere Geräte: gleiches WLAN, diese URL öffnen. Kundenformular: /intake",
   "lan.start_failed": "LAN-Server konnte nicht gestartet werden — Port möglicherweise belegt",
+  "lan.store_unreadable": "Khayt konnte deine Datendatei nicht lesen. Der LAN-Server wurde daher nicht gestartet und nichts wurde geschrieben. Starte Khayt neu; passiert das weiter, stelle eine Sicherung wieder her.",
   "lan.port": "Port",
   "lan.pin": "LAN-PIN des Inhabers (Warteschlangen-API, Kiosk, Tunnel)",
   "lan.pin_too_short": "Die LAN-PIN ist zu kurz: Telefone und die Warteschlangen-Seite öffnen sich erst, wenn Sie unter Einstellungen → Online eine mit mindestens {n} Zeichen festlegen.",
