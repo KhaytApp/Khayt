@@ -464,6 +464,13 @@ extension Shop {
         // one, filed as having come from online. `lib/webstore-order.js`
         // decides, as the desktop's Order requests screen always has.
         var input = printOnly(input, reading: fresh)
+        // The labour and packaging of the rated product lines, for the pieces
+        // the FRESH reading says to make — the count `printOnly` just sized
+        // the parts to. The queue-time figures could be for a different count.
+        if let once = try await Self.onceCosts(fresh, root: root, engine: engine) {
+            if once.labour > 0 { input["labourCost"] = .number(once.labour) } else { input.removeValue(forKey: "labourCost") }
+            if once.packaging > 0 { input["packagingCost"] = .number(once.packaging) } else { input.removeValue(forKey: "packagingCost") }
+        }
         if allFromShelf { input["fromStock"] = .bool(true) } else { input.removeValue(forKey: "fromStock") }
         var clients = rows(root, "clients")
         var clientId: String?
@@ -811,12 +818,11 @@ extension Shop {
             // It used to be one piece's labour and packaging times the qty.
             // A product saved before keeps its own sum, part by part.
             //
-            // The line is the pieces still to PRINT, as the rule builds it
-            // (`all ? qty : toPrint`): labour and packaging are not charged
-            // for pieces handed over from the shelf. `printOnly` sizes the
-            // parts the same way inside the write.
-            let units = Self.lineUnits(order, line)
-            if units == 0 { continue }
+            // Built at the ORDERED count, every line, as before: this reading
+            // is from queue time. Inside the write, `printOnly` cuts the parts
+            // to what the shelf cannot cover NOW, and `onceCosts(fresh:)`
+            // prices the labour and packaging for those same pieces.
+            let units = max(1, line.qty)
             let built = await jobLine(product, units: units)
             onceCosts = onceCosts + built.once
             for var part in built.parts {
@@ -933,6 +939,34 @@ extension Shop {
     static func lineUnits(_ order: OnlineOrder, _ line: OnlineOrder.Line) -> Int {
         let ordered = max(1, line.qty)
         return order.allFromShelf ? ordered : max(0, min(ordered, line.toPrint))
+    }
+
+    /// The labour and packaging, once per line (#2581, #2586), of every product
+    /// line with its own rates, at the pieces `reading` says to make
+    /// (`lineUnits`), through `productJobParts` with `units` — the store-order
+    /// rule's `build`. Nil when the order has no such line, so nothing is
+    /// touched. Run inside the write, on the reading taken there.
+    static func onceCosts(_ reading: OnlineOrder, root: [String: JSONValue],
+                          engine: KhaytEngine) async throws -> ProductOnceCosts? {
+        let products = rows(root, "products")
+        var total = ProductOnceCosts.none
+        var any = false
+        for line in reading.lines {
+            guard let id = line.productId,
+                  case .object(let product)? = products.first(where: { recordId($0) == id }),
+                  ProductRates.usesOwn(product), !ProductRates.labourPerPart(product),
+                  case .array(let parts)? = product["parts"] else { continue }
+            any = true
+            let units = lineUnits(reading, line)
+            if units == 0 { continue }
+            var record: [String: JSONValue] = ["parts": .array(parts)]
+            for (k, v) in ProductRates.pricingFields(product) { record[k] = v }
+            let built = try await engine.productJobParts(.object(record), inventory: rows(root, "inventory"),
+                                                         settings: settings(root),
+                                                         consumables: rows(root, "consumables"), units: units)
+            total = total + ProductOnceCosts(labour: built.labourCost, packaging: built.packagingCost)
+        }
+        return any ? total : nil
     }
 
     static let lineKey = "_onlineLine"
