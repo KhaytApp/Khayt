@@ -272,16 +272,20 @@ try {
   const p2 = await plan();
   ok(p2.paidAmount === 1746.67 && p2.instalments.length === 3, 'Save keeps the plan and never moves the paid amount');
   ok(JSON.stringify(p2.instalments[0]) === JSON.stringify({ id: 'A', amount: 373.34, dueDate: '2026-12-18', note: '', paid: true, paidAt: '2026-11-01' }), 'the legacy row is exactly as it was');
+  // The payment floor (follow-up a): B was paid by its own recorded payment,
+  // so the total may not go below the base + B (1,000 + 373.33 = 1,373.33).
+  const below = await window.evaluate(() => { const o = printLog.find((x) => x.id === 'JP-PLAN'); const r = KhaytOrderPayment.recordPayment(o, { amount: 1300, method: 'cash', paidAt: '2026-11-18' }, { settings, today: '2026-11-18' }); return [r.refused || null, o.paidAmount]; });
+  ok(below[0] === 'plan_recorded' && below[1] === 1746.67, 'a payment total below what the plan recorded (1,300 < 1,373.33) is refused, and nothing moves');
   // Money review finding 1: the old editor's save rewrote paidAmount from the
-  // rows. A payment corrected DOWN (1,746.67 → 1,300) came back up on a
-  // notes-only save, with no payment behind it.
-  await window.evaluate(() => { const o = printLog.find((x) => x.id === 'JP-PLAN'); KhaytOrderPayment.recordPayment(o, { amount: 1300, method: 'cash', paidAt: '2026-11-18' }, { settings, today: '2026-11-18' }); saveAll(); });
+  // rows. A payment corrected DOWN (1,746.67 → 1,500, above the floor) came
+  // back up on a notes-only save, with no payment behind it.
+  await window.evaluate(() => { const o = printLog.find((x) => x.id === 'JP-PLAN'); KhaytOrderPayment.recordPayment(o, { amount: 1500, method: 'cash', paidAt: '2026-11-18' }, { settings, today: '2026-11-18' }); saveAll(); });
   await window.evaluate(() => openOrderEditor('JP-PLAN'));
   await window.waitForSelector('.modal [data-f="notes"]', { state: 'visible', timeout: 5_000 });
   await window.fill('.modal [data-f="notes"]', 'notes only');
   await window.click('.modal [data-act="save"]');
   await window.waitForFunction(() => printLog.find((o) => o.id === 'JP-PLAN').notes === 'notes only', null, { timeout: 5_000 });
-  ok((await plan()).paidAmount === 1300, 'a notes-only save in the old editor leaves a corrected payment (1,300) where it is');
+  ok((await plan()).paidAmount === 1500, 'a notes-only save in the old editor leaves a corrected payment (1,500) where it is');
 
   // Money recorded outside the plan (Dev Hub option 1): allocate, the one rule.
   await window.click('.modal [data-act="cancel"]').catch(() => {});

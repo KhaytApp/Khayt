@@ -761,6 +761,89 @@
     return invoiced < 0.005 ? null : 'invoice_issued';
   }
 
+  /**
+   * Price a job again FROM ITS PARTS, exactly as lib/order-new.js newOrder
+   * would price it today (Turki, Nov 19: "no way to recalculate a price").
+   * Runs newOrder's own previewTotal on the job as it stands: its parts, its
+   * discount, rush, shipping, extra lines (a % line re-resolved), overhead,
+   * rounding, components and the rate it was taken at (`fxRate`), at
+   * `req.marginPct`, else the job's stored markup, else the shop's default.
+   * A typed price is dropped (priceSource / priceOverride). Writes the fields
+   * newOrder writes and returns { changes }; applyJobEdit holds the guards.
+   *
+   * ctx: settings, clients, consumables, overheadPerHour (the shop's rate
+   * now; absent, the job's own: overheadCost over its overhead hours).
+   */
+  function repriceFromParts(order, req, ctx) {
+    const c = ctxOf(ctx);
+    const g = typeof globalThis !== 'undefined' ? globalThis : {};
+    const N = g.KhaytOrderNew || (typeof require === 'function' ? require('./order-new.js') : null);
+    const P = g.KhaytPricing;
+    if (!N || !N.previewTotal || !P) return { ok: false, reason: 'missing', changes: {} };
+    const settings = c.settings || {};
+    const fx = +order.fxRate > 0 && +order.fxRate !== 1 ? +order.fxRate : 1;
+    // newOrder converts the shop's figures at the job's rate: give it THAT
+    // rate for this job's currency, not today's.
+    const st = fx !== 1 && order.currency
+      ? Object.assign({}, settings, { exchangeRates: Object.assign({}, settings.exchangeRates || {}, { [order.currency]: fx }) })
+      : settings;
+    const back = (v) => +((+v || 0) * fx).toFixed(4);
+    const asked = optional(req && req.marginPct);
+    const stored = order.marginPct !== null && order.marginPct !== undefined && order.marginPct !== '' && Number.isFinite(+order.marginPct) ? +order.marginPct : null;
+    const dm = typeof settings.defaultMargin === 'number' && Number.isFinite(settings.defaultMargin) ? settings.defaultMargin : 30;
+    const margin = asked !== null ? asked : stored !== null ? stored : dm;
+    if (!(margin >= 0)) return { ok: false, reason: 'bad_markup', changes: {} };
+    const lines = Array.isArray(order.extraLines) ? order.extraLines : [];
+    const parts = partsOf(order).map((p) => (fx !== 1 && N.isAgreed && N.isAgreed(p) ? Object.assign({}, p, { agreedPrice: back(p.agreedPrice) }) : p));
+    const hours = N.overheadHours ? N.overheadHours(parts, { productId: order.productId }) : 0;
+    const ownRate = hours > 0 && +order.overheadCost > 0 ? +order.overheadCost / hours : 0;
+    // Components are costed from the shop's shelf. A host without it (the Mac
+    // and the phone pass none) keeps the cost the job froze when it was taken,
+    // as one costed line: priced at 0 they turned a 180 job into 60.
+    const shelf = Array.isArray(c.consumables) && c.consumables.length > 0;
+    const frozenComp = !shelf && +order.componentsCost > 0
+      ? [{ kind: 'components', name: 'components', qty: 1, printTime: 0, printWeight: 0, baseCost: +order.componentsCost }] : [];
+    const input = {
+      parts: parts.concat(frozenComp),
+      currency: fx !== 1 ? order.currency : undefined,
+      margin,
+      discountPct: +order.discountPct || 0,
+      rushEnabled: +order.rushFeeAmount > 0 || +order.rushFee > 0 || order.rushEnabled === true,
+      shippingCost: back(order.shippingCost),
+      extraLines: lines.map((l) => (P.isPercentLine(l) ? Object.assign({}, l) : Object.assign({}, l, { amount: back(l.amount) }))),
+      priceRound: order.priceRound || null,
+      priceOverride: null,
+      overheadPerHour: c.overheadPerHour !== undefined ? c.overheadPerHour : ownRate,
+      components: frozenComp.length ? [] : order.components,
+      assemblyQty: order.assemblyQty,
+      productId: order.productId,
+    };
+    const q = N.previewTotal(input, { settings: st, clients: c.clients, consumables: c.consumables }).quote;
+    const was = +order.price || 0;
+    const total = +q.total.toFixed(2);
+    order.price = total;
+    order.computedPrice = +q.computedTotal.toFixed(2);
+    if (q.priceSource && q.priceSource !== 'base') order.priceSource = q.priceSource; else delete order.priceSource;
+    delete order.priceOverride;
+    order.priceBeforeDiscount = (+order.discountPct || 0) > 0 ? +q.priceBeforeDiscount.toFixed(2) : null;
+    const rush = q.rushFee > 0 ? +q.rushFee.toFixed(2) : 0;
+    order.rushFeeAmount = rush;
+    if (rush > 0) order.rushFee = rush; else delete order.rushFee;
+    if (lines.length) {
+      // The job's own lines (fixed amounts already in its currency), each %
+      // line resolved at the new price, as newOrder stores them.
+      order.extraLines = P.resolveExtraLines(lines, q.extrasBase, q.feeBase)
+        .map((r, n) => Object.assign({}, lines[n], { label: r.label, amount: r.amount }));
+    }
+    const costed = parts.some((p) => !(N.isAgreed && N.isAgreed(p)) && +p.baseCost > 0) || +order.componentsCost > 0;
+    if (costed) order.marginPct = +margin.toFixed(2); else delete order.marginPct;
+    if (q.overhead > 0) order.overheadCost = +(q.overhead * fx).toFixed(2); else delete order.overheadCost;
+    const changes = {};
+    if (Math.abs(total - was) >= 0.005) changes.price = { from: was, to: total };
+    if (stored !== (costed ? +margin.toFixed(2) : null)) changes.marginPct = { from: stored, to: costed ? +margin.toFixed(2) : null };
+    return { ok: true, reason: null, changes, marginPct: +margin.toFixed(2) };
+  }
+
   function partsLock(order, ctx) {
     const none = (code) => ({ code, edit: false, addRemove: false, nameOnly: false, askPrice: false });
     if (!isObj(order)) return none('missing');
@@ -1320,6 +1403,7 @@
     const work = JSON.parse(JSON.stringify(order));
     const stop = (reason, step) => ({ ok: false, reason, step, changed: false });
     let changed = false;
+    let repriced = null;  // the markup a reprice used, returned to the caller
 
     if (has(n, 'clientId')) {
       const r = changeCustomer(work, n.clientId, c);
@@ -1349,8 +1433,35 @@
       }
       if (Object.keys(r.changes).length) changed = true;
     }
+    // Price again from the parts, as a new job would be (repriceFromParts),
+    // under exactly the locks a typed price has (Dev Hub, Nov 19): not on a
+    // job whose invoice has left the shop (reported, voided, credited,
+    // cancelled); a price the customer has seen asks first (priceSeenOk);
+    // held to what has been paid; the price change is logged. Booked jobs and
+    // quotes alike, wherever typing a new price works.
+    if (has(n, 'reprice')) {
+      const frozenCode = partsLock(work, c).code;
+      if (['zatca', 'voided', 'credited', 'cancelled'].indexOf(frozenCode) !== -1) return stop(frozenCode, 'reprice');
+      const paidBefore = (optional(work.paidAmount) || 0) + (optional(work.giftCardDiscount) || 0);
+      const wasPrice = +work.price || 0;
+      const r = repriceFromParts(work, n.reprice || {}, c);
+      if (!r.ok) return stop(r.reason, 'reprice');
+      if (r.changes.price && partsLock(order, c).askPrice && c.priceSeenOk !== true) return stop('ask_price', 'reprice');
+      // An issued milestone proforma asks for more than the new price: the
+      // shop is asked, never refused silently (milestonesOk once it said yes).
+      const issued = (Array.isArray(work.milestoneInvoices) ? work.milestoneInvoices : [])
+        .filter((m) => m && m.issuedAt).reduce((sum, m) => sum + (+m.amount || 0), 0);
+      if (issued > (+work.price || 0) + 0.005 && c.milestonesOk !== true) return stop('milestones_issued', 'reprice');
+      repriced = r.marginPct;
+      const billedAfter = billedOf(work, c);
+      if (paidBefore > billedAfter + 0.005) return stop('paid_exceeds_price', 'reprice');
+      if (Object.keys(r.changes).length) {
+        recordEdit(work, r.changes, { now: c.now, id: c.priceId || c.id });
+        changed = true;
+      } else if (+work.price !== wasPrice) changed = true;
+    }
     const details = Object.assign({}, n);
-    for (const k of ['clientId', 'project', 'parts', 'marginPct']) delete details[k];
+    for (const k of ['clientId', 'project', 'parts', 'marginPct', 'reprice']) delete details[k];
     if (STAMPS.some((k) => has(details, k))) {
       const why = actualTimes(work, details, c);
       if (why) return stop(why, 'times');
@@ -1393,10 +1504,11 @@
       }
       if (r.changed) changed = true;
     }
-    if (!changed) return { ok: true, reason: null, step: null, changed: false };
+    const extra = repriced !== null ? { marginPct: repriced } : {};
+    if (!changed) return Object.assign({ ok: true, reason: null, step: null, changed: false }, extra);
     for (const k of Object.keys(order)) if (!has(work, k)) delete order[k];
     Object.assign(order, work);
-    return { ok: true, reason: null, step: null, changed: true };
+    return Object.assign({ ok: true, reason: null, step: null, changed: true }, extra);
   }
 
   const api = {
@@ -1404,6 +1516,7 @@
     priorityFrom, priorityOf, changesBetween, recordEdit, applyEdit, adjustPrice,
     parseTags, repriceTerms, applyDetails, editLog, timeline,
     customerLocked, canChangeCustomer, changeCustomer,
+    repriceFromParts,
     partsLock, invoiceIssued, nonBusinessLock, actualTimes, quoteIsDraft, marginOf, applyMarkup, applyParts, applyJobEdit, unexplainedShare, moneyMoves,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
