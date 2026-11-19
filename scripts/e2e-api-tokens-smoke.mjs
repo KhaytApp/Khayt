@@ -50,7 +50,7 @@ try {
       apiTokens: records,
     };
     printLog.unshift({ id: 'API-1', status: 'pending', project: 'API test', date: '2026-07-20', price: 10, parts: [], statusHistory: [] });
-    saveAll();
+    await flushSave();
     await window.hubAPI.startLanServer({ port, pin, bindLan: false });
   }, { port: E2E_LAN_PORT, pin: E2E_LAN_PIN, records: [readTok.record, writeTok.record] });
   await new Promise(r => setTimeout(r, 1200));

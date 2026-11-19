@@ -485,14 +485,11 @@ function openPinPadModal(afterUnlock) {
         return;
       }
       if (typeof flushSave === 'function') await flushSave();
-      let verified = await window.hubAPI?.verifyOperatorPin?.({ operatorId: selectedOpId, pin: enteredPin });
-      // Renderer fallback only when the main bridge couldn't resolve the operator.
-      // The stored hash here is legacy 64-hex (main verifies PBKDF2 directly), so
-      // compare with a plain SHA-256 — NOT hashPin(), which now returns PBKDF2.
-      if (!verified?.ok && (verified?.error === 'operator_not_found' || verified == null) && /^[0-9a-f]{64}$/i.test(op.pinHash || '')) {
-        const entered = await sha256Hex(enteredPin);
-        if (timingSafeEqualHex(entered, op.pinHash)) verified = { ok: true };
-      }
+      // Main decides, always: it verifies a legacy SHA-256 hash itself, and a
+      // sign-in it did not verify is not kept (P5). The renderer used to check
+      // a legacy hash on its own when main could not find the operator, and
+      // the window then showed someone main never signed in (#2592 review).
+      const verified = await window.hubAPI?.verifyOperatorPin?.({ operatorId: selectedOpId, pin: enteredPin });
       if (verified?.error === 'legacy_pin') {
         op.pinHash = '';
         saveAll();
@@ -528,7 +525,10 @@ function openPinPadModal(afterUnlock) {
 function currentOperatorRoleKey() {
   if (!settings.operatorLockEnabled) return 'owner';
   const activeOp = settings.activeOperatorId ? operators.find(o => o.id === settings.activeOperatorId) : null;
-  if (!activeOp) return 'owner';
+  // Nobody signed in under the lock is NOBODY, as main reads it (P5): the
+  // least privilege, never the owner. Read as the owner, the window offered
+  // owner controls whose saves main then quietly put back (#2592 review).
+  if (!activeOp) return 'viewer';
   const rbac = (typeof KhaytRbac !== 'undefined') ? KhaytRbac : null;
   return activeOp.roleKey || (rbac ? rbac.roleFromLegacy(activeOp.role) : 'operator');
 }

@@ -58,11 +58,11 @@
    *   record the hash came from — and without one, a shop keeps a hash that a
    *   four-digit PIN can be read straight out of, for ever.
    */
-  async function verifyHash(plain, hash, onUpgraded) {
+  async function verifyHash(plain, hash, onUpgraded, forOperatorId) {
     if (typeof hash !== 'string' || !hash) return false;
     if (window.hubAPI?.verifyPin) {
       try {
-        const answer = await window.hubAPI.verifyPin(String(plain), hash);
+        const answer = await window.hubAPI.verifyPin(String(plain), hash, forOperatorId || undefined);
         // `{ ok, upgraded }` since the handler learned to re-hash. A plain
         // boolean is still accepted: this file also runs against an older main
         // process during a partial update, and refusing a correct PIN because
@@ -160,7 +160,7 @@
     return verifyHash(String(pin || ''), admin.pinHash, (upgraded) => {
       admin.pinHash = upgraded;
       if (typeof saveAll === 'function') saveAll();
-    });
+    }, admin.id);
   }
 
   function promptTypeConfirmModal(message, confirmPhrase, { title, danger = true, extraHtml = '' } = {}) {
