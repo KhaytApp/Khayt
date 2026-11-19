@@ -1641,6 +1641,9 @@ function operatorVerified(id) {
   return typeof at === 'number' && Date.now() - at < VERIFIED_FOR_MS;
 }
 function noteVerified(id) { if (id) verifiedOperatorAt.set(String(id), Date.now()); }
+// The save that signs them in USES the verification: it does not stay good
+// for another save inside the two minutes (#2592 re-check, L1).
+function consumeVerified(id) { verifiedOperatorAt.delete(String(id)); }
 
 ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startPrint } = {}) => {
   const gate = printerGate('send');
@@ -2340,18 +2343,36 @@ ipcMain.handle('hub:save-store', async (event, data) => {
     // as on the Mac): a save from a role that may not changes the token list
     // back to what is on disk, whatever the window sent.
     let merged = mergeStoreSecretsFromDisk(normalized);
+    // What the guards compare against: the book on disk, or main's own copy
+    // when the disk cannot be read. An unreadable file is not a reason to
+    // write whatever the window sent (#2592 security review, M1).
+    let guardDisk = null;
+    try { guardDisk = readStoreDecryptedFromDisk(); } catch (_) { guardDisk = null; }
+    if (!guardDisk || !guardDisk.settings) guardDisk = (lanServerStore && lanServerStore.settings) ? lanServerStore : guardDisk;
+    // A save with no settings object over a book that has them is REFUSED.
+    // It wiped every setting on disk (main had the same data loss for any
+    // window that sent no settings), and skipped both guards below.
+    if (guardDisk && guardDisk.settings && !(normalized.settings && typeof normalized.settings === 'object' && !Array.isArray(normalized.settings))) {
+      console.error('hub:save-store: refused a save with no settings');
+      return { ok: false, error: 'settings_missing' };
+    }
     try {
       const ApiTokens = require('./lib/api-tokens.js');
-      const guarded = ApiTokens.guardTokenSave(merged, readStoreDecryptedFromDisk());
+      const guarded = ApiTokens.guardTokenSave(merged, guardDisk);
+      if (!guarded) return { ok: false, error: 'settings_missing' };
       if (guarded !== merged) console.warn('hub:save-store: API token change refused for this role');
       merged = guarded;
-    } catch (e) { console.error('hub:save-store: token guard failed:', e && e.message); }
+    } catch (e) {
+      console.error('hub:save-store: token guard failed:', e && e.message);
+      return { ok: false, error: 'token_guard_failed' };
+    }
     // The lock, roles, sign-in and printer connections: what the role ON DISK
     // may not change is put back as it is there (lib/main/printer-permission.js,
     // #2592 security review M2/L1). A failure here refuses the save rather
     // than writing an unguarded book.
     try {
-      const g = PrinterPermission.guardSave(merged, readStoreDecryptedFromDisk(), { verified: operatorVerified });
+      const g = PrinterPermission.guardSave(merged, guardDisk, { verified: operatorVerified, consume: consumeVerified });
+      if (!g.store) return { ok: false, error: 'settings_missing' };
       if (g.refused.length) console.warn('hub:save-store: refused for this role:', g.refused.join(', '));
       merged = g.store;
     } catch (e) {
@@ -4831,6 +4852,8 @@ ipcMain.handle('hub:verify-operator-pin', async (_event, { operatorId, pin } = {
   if (!lanServerStore?.operators?.length) syncLanServerStoreFromDisk();
   const op = (lanServerStore?.operators || []).find(o => o.id === operatorId);
   if (!op) return { ok: false, error: 'operator_not_found' };
+  // A deactivated person is nobody to sign in (#2592 re-check, L4).
+  if (op.active === false) return { ok: false, error: 'operator_inactive' };
   if (!op.pinHash) { noteVerified(op.id); return { ok: true, noPin: true }; }
   // Verify against either the salted PBKDF2 format or a legacy SHA-256 hash.
   // Unrecognized formats (the very old base64 scheme) report legacy_pin so the
@@ -4866,15 +4889,20 @@ ipcMain.handle('hub:hash-pin', async (_e, pin) => hashPinSalted(String(pin ?? ''
 // written: this handler does not know which record the caller read it from —
 // an operator's `pinHash`, `settings.recoveryCodeHash` — and guessing would be
 // worse than handing it back to the one place that does know.
-ipcMain.handle('hub:verify-pin', async (_e, plain, stored) => {
+ipcMain.handle('hub:verify-pin', async (_e, plain, stored, forOperatorId) => {
   const ok = verifyPin(String(plain ?? ''), stored);
-  // Whose PIN was it? An operator's own, or the owner's admin PIN / recovery
-  // code: main notes it, so the save that signs them in is allowed (P5).
+  // Whose PIN was it? The operator the screen asked for when it says (an
+  // unsalted legacy hash can be shared by two people, so not every match:
+  // #2592 re-check, L5), else the owner's admin PIN / recovery code: main
+  // notes it, so the save that signs them in is allowed (P5).
   if (ok && stored) {
     try {
       const disk = readStoreDecryptedFromDisk() || {};
-      const ops = Array.isArray(disk.operators) ? disk.operators : [];
-      for (const o of ops) if (o && o.pinHash === stored) noteVerified(o.id);
+      const ops = (Array.isArray(disk.operators) ? disk.operators : []).filter((o) => o && o.active !== false);
+      if (forOperatorId) {
+        const o = ops.find((x) => x.id === forOperatorId);
+        if (o && o.pinHash === stored) noteVerified(o.id);
+      }
       const st = disk.settings || {};
       if (stored === st.recoveryCodeHash || stored === st.adminPinHash) {
         for (const o of ops) if (o && (o.roleKey || require('./lib/rbac.js').roleFromLegacy(o.role, { hasLock: true })) === 'owner') noteVerified(o.id);

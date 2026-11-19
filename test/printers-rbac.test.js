@@ -185,34 +185,61 @@ function functionBody(src, from) {
 test('every handler that can reach a printer calls printerGate before it does (main.js and lib/main, handle and on)', () => {
   const root = path.join(__dirname, '..');
   const files = ['main.js', ...fs.readdirSync(path.join(root, 'lib', 'main')).filter((f) => f.endsWith('.js')).map((f) => 'lib/main/' + f)];
-  // What reaches a printer, then every top-level function in main.js that calls one, to a fixed point.
-  const SINKS = ['uploadGcodeToPrinter', 'sendPrinterCommand', 'sendPrinterControl', 'bambuSendCommand'];
-  const main = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
-  const fns = {};
-  for (const m of main.matchAll(/^(?:async )?function ([A-Za-z0-9_$]+)\(/gm)) fns[m[1]] = functionBody(main, m.index);
-  const reach = new Set(SINKS);
+  const srcOf = Object.fromEntries(files.map((f) => [f, fs.readFileSync(path.join(root, f), 'utf8')]));
+  // What writes to a printer (#2592 re-check, M2): the senders, the
+  // exclude-object request (then a fetch), and a smart plug's request.
+  const SINKS = ['uploadGcodeToPrinter', 'sendPrinterCommand', 'sendPrinterControl', 'bambuSendCommand', 'excludeRequest', 'Plug\\.request'];
+  // Every named function in every file: declarations at any depth, and
+  // `const x = (…) =>` / `const x = async (…) =>` / `const x = function`.
+  const fns = [];
+  // Top-level only (main.js at column 0; a lib/main module at 0 or 2, inside
+  // its register function): a helper nested in a handler is in that
+  // handler's body already, and its local name (`send`) means nothing elsewhere.
+  for (const [file, src] of Object.entries(srcOf)) {
+    const indent = file === 'main.js' ? '' : '(?:  )?';
+    for (const m of src.matchAll(new RegExp('(?:^|\\n)' + indent + '(?:async )?function ([A-Za-z0-9_$]+)\\(', 'g'))) fns.push({ file, name: m[1], body: functionBody(src, m.index) });
+    for (const m of src.matchAll(new RegExp('(?:^|\\n)' + indent + '(?:const|let) ([A-Za-z0-9_$]+) = (?:async )?(?:\\([^)]*\\)|[A-Za-z0-9_$]+) =>', 'g'))) fns.push({ file, name: m[1], body: handlerBody(src, m.index) });
+  }
+  // A function reaches a printer if its body calls a sink, or a function
+  // that does, to a fixed point. Scoped by file, so a generic local name
+  // (the plug's own `send`) never matches `socket.send(` elsewhere:
+  //   - a sink: anywhere, in any form;
+  //   - a function of lib/main/X.js: bare in X.js, and as `Module.name(` in main.js;
+  //   - a function of main.js: bare in main.js.
+  const reached = [];   // { file, name }
+  // What a lib/main module hands main.js: only those names can be called there.
+  const exported = (file) => {
+    const src = srcOf[file] || '';
+    const m = src.match(/module\.exports\s*=\s*\{([^}]*)\}/);
+    const names = new Set(m ? m[1].split(',').map((x) => x.trim().split(':')[0].trim()).filter(Boolean) : []);
+    for (const e of src.matchAll(/module\.exports\.([A-Za-z0-9_$]+)\s*=/g)) names.add(e[1]);
+    return names;
+  };
+  const patternsFor = (file) => SINKS.map((r) => ({ r, re: new RegExp('\\b' + r + '\\(') }))
+    .concat(reached.filter((x) => x.file === file).map((x) => ({ r: x.name, re: new RegExp('(^|[^.\\w$])' + x.name + '\\(') })))
+    .concat(file === 'main.js' ? reached.filter((x) => x.file !== 'main.js' && exported(x.file).has(x.name)).map((x) => ({ r: x.name, re: new RegExp('\\.' + x.name + '\\(') })) : []);
   for (let grew = true; grew;) {
     grew = false;
-    for (const [name, body] of Object.entries(fns)) {
-      if (reach.has(name)) continue;
-      if ([...reach].some((r) => new RegExp('\\b' + r + '\\(').test(body))) { reach.add(name); grew = true; }
+    for (const fn of fns) {
+      if (reached.some((x) => x.file === fn.file && x.name === fn.name)) continue;
+      if (patternsFor(fn.file).some((p) => p.re.test(fn.body))) { reached.push({ file: fn.file, name: fn.name }); grew = true; }
     }
   }
   const touched = [];
-  for (const file of files) {
-    const src = fs.readFileSync(path.join(root, file), 'utf8');
+  for (const [file, src] of Object.entries(srcOf)) {
     for (const m of src.matchAll(/ipcMain\.(handle|on)\(\s*'([^']+)'/g)) {
       const body = handlerBody(src, m.index + m[0].length);
-      const hits = [...reach].map((r) => ({ r, at: body.search(new RegExp('\\b' + r + '\\(')) })).filter((h) => h.at !== -1);
+      const hits = patternsFor(file).map((p) => ({ r: p.r, at: body.search(p.re) })).filter((h) => h.at !== -1);
       if (!hits.length) continue;
       touched.push(m[2]);
-      const gate = body.search(/printerGate\('(send|control)'\)/);
+      const gate = body.search(/\b(printerGate|gate)\('(send|control)'\)/);
       const first = Math.min(...hits.map((h) => h.at));
-      assert.ok(gate !== -1 && gate < first, `${file} ${m[2]} reaches ${hits.map((h) => h.r).join(', ')} without printerGate first`);
+      assert.ok(gate !== -1 && gate < first, `${file} ${m[2]} reaches ${hits.map((h) => h.r).join(', ')} without a printer gate first`);
     }
   }
-  // The channels this finds today, so a scan that silently finds nothing fails too.
-  for (const ch of ['hub:printer-send-gcode', 'hub:slice-and-print', 'hub:print-order-file', 'hub:printer-command', 'hub:printer-control']) {
+  // The channels the scan must find today, so it can never pass by finding nothing.
+  for (const ch of ['hub:printer-send-gcode', 'hub:slice-and-print', 'hub:print-order-file', 'hub:printer-command',
+    'hub:printer-control', 'hub:printer-exclude-object', 'hub:smart-plug']) {
     assert.ok(touched.includes(ch), ch + ' found by the scan');
   }
 });
@@ -238,4 +265,80 @@ test('every save goes through guardSave, and a guard failure refuses the save', 
   const g = body.indexOf('PrinterPermission.guardSave(');
   assert.ok(g !== -1 && g < body.indexOf('atomicWriteStore('), 'guarded before the write');
   assert.match(body, /role guard failed[\s\S]{0,120}return \{ ok: false, error: 'role_guard_failed' \}/);
+});
+
+/* ── #2592 re-check ─────────────────────────────────────────────────────── */
+
+test('H1: a save with no settings object over a book that has one is refused, by both guards and by save-store', () => {
+  const disk = book('VIEW');
+  for (const bad of [undefined, null, [], 'x', 7]) {
+    const incoming = { orders: [], operators: [{ id: 'VIEW', roleKey: 'owner' }] };
+    if (bad !== undefined) incoming.settings = bad;
+    assert.deepEqual(P.guardSave(incoming, disk), { store: null, refused: ['settings'] }, String(bad));
+    assert.equal(require('../lib/api-tokens.js').guardTokenSave(incoming, disk), null, String(bad));
+  }
+  // A fresh book (nothing on disk yet) may still be written without settings.
+  assert.deepEqual(P.guardSave({ orders: [] }, null).refused, []);
+  assert.deepEqual(require('../lib/api-tokens.js').guardTokenSave({ orders: [] }, null), { orders: [] });
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const body = handlerBody(main, main.indexOf("ipcMain.handle('hub:save-store'"));
+  const refuse = body.indexOf("return { ok: false, error: 'settings_missing' }");
+  assert.ok(refuse !== -1 && refuse < body.indexOf('atomicWriteStore('), 'refused before anything is written');
+  assert.match(body, /if \(!guarded\) return \{ ok: false, error: 'settings_missing' \}/);
+  assert.match(body, /if \(!g\.store\) return \{ ok: false, error: 'settings_missing' \}/);
+  assert.match(body, /token guard failed[\s\S]{0,80}return \{ ok: false, error: 'token_guard_failed' \}/);
+});
+
+test('M1: an unreadable disk falls back to main\'s own copy of the book for the guards', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const body = handlerBody(main, main.indexOf("ipcMain.handle('hub:save-store'"));
+  assert.match(body, /if \(!guardDisk \|\| !guardDisk\.settings\) guardDisk = \(lanServerStore && lanServerStore\.settings\) \? lanServerStore : guardDisk;/);
+  assert.ok(body.indexOf('guardTokenSave(merged, guardDisk)') !== -1);
+  assert.ok(body.indexOf('guardSave(merged, guardDisk,') !== -1);
+});
+
+test('L1: the save that signs someone in spends the verification', () => {
+  const disk = book('VIEW');
+  const spent = [];
+  const g = P.guardSave(edit(disk, (c) => { c.settings.activeOperatorId = 'OWN'; }), disk, { verified: () => true, consume: (id) => spent.push(id) });
+  assert.equal(g.store.settings.activeOperatorId, 'OWN');
+  assert.deepEqual(spent, ['OWN']);
+  // Nothing spent for a free (no-PIN) switch or a refused one.
+  const none = [];
+  P.guardSave(edit(disk, (c) => { c.settings.activeOperatorId = 'FREE'; }), disk, { consume: (id) => none.push(id) });
+  P.guardSave(edit(disk, (c) => { c.settings.activeOperatorId = 'OWN'; }), disk, { verified: () => false, consume: (id) => none.push(id) });
+  assert.deepEqual(none, []);
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  assert.match(main, /guardSave\(merged, guardDisk, \{ verified: operatorVerified, consume: consumeVerified \}\)/);
+});
+
+test('L3: operators are compared as sets of ids: a duplicate, a missing id or a swap is a different list', () => {
+  const disk = book('VIEW');
+  const dup = edit(disk, (c) => { c.operators[2] = Object.assign({}, c.operators[0], { roleKey: 'owner' }); });
+  assert.ok(P.guardSave(dup, disk).refused.includes('operators'));
+  const noId = edit(disk, (c) => { delete c.operators[3].id; });
+  assert.ok(P.guardSave(noId, disk).refused.includes('operators'));
+  const pipe = edit(disk, (c) => { c.operators = [{ id: 'OWN|VIEW', roleKey: 'owner' }, { id: 'OPR', roleKey: 'operator' }, { id: 'FREE', roleKey: 'operator' }]; });
+  assert.ok(P.guardSave(pipe, disk).refused.includes('operators'), 'a "|" in an id cannot fake the list');
+  const reordered = edit(disk, (c) => { c.operators.reverse(); });
+  assert.deepEqual(P.guardSave(reordered, disk).refused, [], 'order does not matter');
+});
+
+test('L4: a deactivated operator cannot be signed in, verified or not', () => {
+  const disk = edit(book('VIEW'), (c) => { c.operators[0].active = false; c.operators[3].active = false; });
+  assert.equal(P.guardSave(edit(disk, (c) => { c.settings.activeOperatorId = 'OWN'; }), disk, { verified: () => true }).store.settings.activeOperatorId, 'VIEW');
+  assert.equal(P.guardSave(edit(disk, (c) => { c.settings.activeOperatorId = 'FREE'; }), disk).store.settings.activeOperatorId, 'VIEW');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  assert.match(handlerBody(main, main.indexOf("ipcMain.handle('hub:verify-operator-pin'")), /op\.active === false\) return \{ ok: false, error: 'operator_inactive' \}/);
+});
+
+test('L5: hub:verify-pin notes only the operator the screen named, never every holder of a matching hash', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const body = handlerBody(main, main.indexOf("ipcMain.handle('hub:verify-pin'"));
+  assert.doesNotMatch(body, /for \(const o of ops\) if \(o && o\.pinHash === stored\)/);
+  assert.match(body, /if \(forOperatorId\) \{\s*const o = ops\.find\(\(x\) => x\.id === forOperatorId\);\s*if \(o && o\.pinHash === stored\) noteVerified\(o\.id\);/);
+  const pre = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
+  assert.match(pre, /verifyPin: \(plain, stored, forOperatorId\) => ipcRenderer\.invoke\('hub:verify-pin', plain, stored, forOperatorId\)/);
+  const sec = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app-security.js'), 'utf8');
+  assert.match(sec, /\}, admin\.id\);/);
 });
