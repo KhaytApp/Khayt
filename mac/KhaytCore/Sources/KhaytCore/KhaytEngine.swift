@@ -13569,10 +13569,29 @@ public actor KhaytEngine {
         /// caller; read it through `earnedOrNet`.
         public let earned: Double?
         public var earnedOrNet: Double { earned ?? net }
+        /// What the job cost, in the SHOP's currency (`KhaytOrderMoney.jobCost`):
+        /// parts, components, overhead, and a product's labour and packaging.
+        /// The one place a job's cost is summed on the Mac (`JobCostTests`).
+        /// Nil when not worked out.
+        public let cost: Double?
+        /// Shop currency per unit of the job's: its frozen `fxRate`, 1 for a
+        /// job in the shop's currency. Every figure above but `cost` is in the
+        /// job's currency; times this, the shop's.
+        public let fx: Double
         public init(billed: Double, net: Double, tax: Double, owed: Double, due: Double? = nil,
-                    earned: Double? = nil) {
+                    earned: Double? = nil, cost: Double? = nil, fx: Double = 1) {
             self.billed = billed; self.net = net; self.tax = tax; self.owed = owed; self.due = due ?? billed
-            self.earned = earned
+            self.earned = earned; self.cost = cost; self.fx = fx
+        }
+        private enum CodingKeys: String, CodingKey { case billed, net, tax, owed, due, earned, cost, fx }
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            billed = try c.decode(Double.self, forKey: .billed); net = try c.decode(Double.self, forKey: .net)
+            tax = try c.decode(Double.self, forKey: .tax); owed = try c.decode(Double.self, forKey: .owed)
+            due = try c.decode(Double.self, forKey: .due)
+            earned = try c.decodeIfPresent(Double.self, forKey: .earned)
+            cost = try c.decodeIfPresent(Double.self, forKey: .cost)
+            fx = try c.decodeIfPresent(Double.self, forKey: .fx) ?? 1
         }
     }
 
@@ -13600,6 +13619,14 @@ public actor KhaytEngine {
                   billed: M.orderGrossRaw(o, ctx), net: split.subtotal,
                   tax: split.taxTotal, owed: M.orderOwedRaw(o, ctx), due: M.orderDueRaw(o, ctx),
                   earned: T.netOfTax(kept, profile),
+                  // The job's cost, SHOP currency: the shared jobCost once it
+                  // is in lib (#2581), else the same sum of what a job holds
+                  // today (parts' baseCost, components, overhead).
+                  cost: M.jobCost ? M.jobCost(o) : (Array.isArray(o.parts) ? o.parts : [])
+                          .reduce(function (s, p) { return s + Math.max(0, +(p && p.baseCost) || 0); }, 0)
+                        + Math.max(0, +o.componentsCost || 0) + Math.max(0, +o.overheadCost || 0),
+                  // The price is the JOB's currency: its frozen rate to the shop's.
+                  fx: (+o.fxRate > 0) ? +o.fxRate : 1,
                 };
               }
               return out;
