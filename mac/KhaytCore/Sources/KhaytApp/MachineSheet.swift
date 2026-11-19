@@ -507,6 +507,13 @@ struct MachineSheet: View {
                 rotate: $camRotate, flipH: $camFlipH, flipV: $camFlipV,
                 note: $camNote, looking: $camLooking, offer: $camOffer,
                 find: findCamera, accept: acceptCamera)
+            // The picture and the chamber light, for a printer already saved:
+            // both are read from the printer as it is on record, never from
+            // the unsaved fields above (Figma 181:223).
+            if let existing {
+                CameraAndLight(machine: shop.machines.first { $0.id == existing.id } ?? existing,
+                               shop: shop)
+            }
     }
 
     /// The smart plug: which kind, where, and whether to switch it off after a

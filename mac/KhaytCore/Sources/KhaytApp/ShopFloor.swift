@@ -370,6 +370,15 @@ struct MachineCard: View {
             if machine.hasCamera, machine.inService {
                 CameraTile(frame: camera.frames[machine.id] ?? .none, webcam: machine.webcam,
                            words: shop.words)
+                    // A Snapmaker camera stays awake while this is on screen
+                    // (U1Camera.swift); any other camera ignores it.
+                    .onAppear { camera.watch(machine, shop: shop) }
+                    .onDisappear { camera.unwatch(machine.id) }
+                    .task(id: machine.id) { await camera.readLight(machine, shop: shop) }
+                    .overlay(alignment: .bottomTrailing) {
+                        ChamberLightButton(machine: machine, camera: camera, shop: shop)
+                            .padding(6)
+                    }
             }
             HStack(spacing: 8) {
                 // The colour the shop gave this machine, which is how it is

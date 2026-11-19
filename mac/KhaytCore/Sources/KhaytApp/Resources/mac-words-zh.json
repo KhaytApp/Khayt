@@ -4060,5 +4060,16 @@
  "mac.apps_approve": "数字一致 — 批准",
  "mac.apps_deny": "拒绝",
  "mac.apps_timed_out": "没有切片软件按时配对。点击“配对切片软件”重试。",
- "mac.apps_pin_unreadable": "无法从钥匙串读取局域网 PIN，因此没有配对任何设备。请在上方重新设置局域网 PIN，然后再配对切片软件。"
+ "mac.apps_pin_unreadable": "无法从钥匙串读取局域网 PIN，因此没有配对任何设备。请在上方重新设置局域网 PIN，然后再配对切片软件。",
+ "mac.light_chamber": "腔体灯",
+ "mac.light_on": "开",
+ "mac.light_off": "关",
+ "mac.light_turning_on": "正在打开…",
+ "mac.light_turning_off": "正在关闭…",
+ "mac.light_failed_on": "无法连接打印机。灯保持原样：开。",
+ "mac.light_failed_off": "无法连接打印机。灯保持原样：关。",
+ "mac.light_button_on": "灯已开",
+ "mac.light_button_off": "灯已关",
+ "mac.light_note": "打开时从打印机读取。在此切换只会改变打印机内部的灯。",
+ "mac.cam_awake_note": "观看时摄像头保持开启。关闭视图约一分钟后会自动重新休眠。"
 }
