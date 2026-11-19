@@ -1625,7 +1625,17 @@ async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
 }
 
 // Send an already-sliced G-code file straight to a printer (no slicing).
+// P5: who may send to or control a printer is decided HERE, from the store,
+// not trusted from the renderer (lib/main/printer-permission.js).
+const PrinterPermission = require('./lib/main/printer-permission.js');
+function printerGate(verb) {
+  if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+  return PrinterPermission.printerAllowed(lanServerStore, verb);
+}
+
 ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startPrint } = {}) => {
+  const gate = printerGate('send');
+  if (!gate.ok) return gate;
   try {
     if (!gcodePath || !fs.existsSync(gcodePath)) return { ok: false, error: 'G-code file not found.' };
     return await uploadGcodeToPrinter(machine, gcodePath, startPrint);
@@ -1633,6 +1643,8 @@ ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startP
 });
 
 ipcMain.handle('hub:slice-and-print', async (_e, { modelPath, slicerPath, args, machine, startPrint } = {}) => {
+  const gate = printerGate('send');
+  if (!gate.ok) return gate;
   let outDir;
   try {
     const r = await runSlice({ modelPath, slicerPath, args });
@@ -5722,6 +5734,8 @@ ipcMain.handle('hub:printer-plate', async (_e, { machine } = {}) => {
 });
 
 ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) => {
+  const gate = printerGate('control');
+  if (!gate.ok) return gate;
   const read = await plateObjects(machine);
   if (!read.ok) return read;
   const req = excludeObject.excludeRequest(name, read.data);
@@ -5738,8 +5752,10 @@ ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) 
   }
 });
 
-ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) =>
-  sendPrinterCommand(machine, command));
+ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) => {
+  const gate = printerGate('control');
+  return gate.ok ? sendPrinterCommand(machine, command) : gate;
+});
 
 /**
  * A Bambu's speed preset and chamber light — the Mac's PrinterControl.swift
@@ -5762,8 +5778,10 @@ async function sendPrinterControl(machine, control, value) {
   const r = await bambu.bambuSendCommand({ host: target.urlHost, port: portNum, accessCode, serial: dev, mqtt: req.mqtt });
   return r.ok ? { ok: true, control } : r;
 }
-ipcMain.handle('hub:printer-control', async (_e, { machine, control, value } = {}) =>
-  sendPrinterControl(machine, control, value));
+ipcMain.handle('hub:printer-control', async (_e, { machine, control, value } = {}) => {
+  const gate = printerGate('control');
+  return gate.ok ? sendPrinterControl(machine, control, value) : gate;
+});
 // Read-only: safe to call while the printer is mid-job, which is when a shop is
 // most likely to reach for it.
 /**
