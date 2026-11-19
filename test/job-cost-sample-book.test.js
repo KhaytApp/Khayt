@@ -10,7 +10,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
 for (const f of ['tax', 'pricing', 'order-money', 'calculator-cost', 'print-rates', 'pnl-report']) require('../lib/' + f + '.js');
 const M = globalThis.KhaytOrderMoney;
 const { buildSampleData } = require('../lib/sample-data.js');
@@ -45,15 +44,14 @@ test('product profit and the edit pricer: jobFixedCost == the fixed costs they s
     assert.equal(M.jobFixedCost(o), Math.max(0, +o.componentsCost || 0) + Math.max(0, +o.overheadCost || 0), o.id);
   }
 });
-test('dashboard cost of goods (kpi-rows orderCost) == main\'s, job for job', () => {
-  const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'kpi-main-'));
-  const old = execFileSync('git', ['show', 'origin/main:lib/kpi-rows.js'], { cwd: path.join(__dirname, '..') });
-  fs.writeFileSync(path.join(dir, 'kpi-rows.js'), old);
+test('dashboard cost of goods (kpi-rows orderCost) == before #2581, job for job', () => {
+  // Frozen from main's kpi-rows.js before #2581: CI's shallow checkout has no
+  // origin/main to read the old file from (it failed the "Syntax check" job).
+  const before = require('./fixtures/kpi-ordercost-before-2581.json');
   const NEW = require('../lib/kpi-rows.js');
-  delete globalThis.KhaytKpiRows;
-  const OLD = require(path.join(dir, 'kpi-rows.js'));
   const ctx = { inventory: book.inventory || [], settings: book.settings || {} };
-  for (const o of jobs) assert.equal(NEW.orderCost(o, ctx), OLD.orderCost(o, ctx), o.id);
+  assert.equal(Object.keys(before.orderCost).length, jobs.length, 'the same jobs');
+  for (const o of jobs) assert.equal(NEW.orderCost(o, ctx), before.orderCost[o.id], o.id);
 });
 
 test('a once-labour job (from a 15-part product with rates): jobCost == the catalogue, the dashboard counts labour once, a reprint keeps it', () => {
