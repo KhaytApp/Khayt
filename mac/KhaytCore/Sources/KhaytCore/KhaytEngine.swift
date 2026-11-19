@@ -918,6 +918,12 @@ public actor KhaytEngine {
         // allowlist). Both read `order-status` / `machine-status` at call time.
         "connector-slice",
         "connector-queue",
+        // The shop's price for a plate sliced in OrcaSlicer (the Khayt tab,
+        // `POST /api/connectors/price`): the slice facts as ONE new hand part,
+        // priced by the existing calculator, rates and pricing code. Reads
+        // `print-rates`, `calculator-cost`, `pricing`, `loaded-colours`,
+        // `spool-match`, `spool-edit` and `tax` at call time.
+        "connector-price",
         "carriers",
         // A job handed to a carrier: who, which service, under what tracking
         // number, and a parcel's status moved by hand without going backwards.
@@ -8079,6 +8085,14 @@ public actor KhaytEngine {
                                  "shopName": .string(shopName), "inboxWaiting": .number(Double(inboxWaiting))])],
             as: [String].self)
     }
+    /// The shop's price for a sliced plate (`lib/connector-price.js
+    /// priceSlice`): `{currency, qty, unit, total, rounded, basis, cost,
+    /// margin}` or `{unpriced}`. The route decides what a device may see.
+    public func connectorPrice(facts: JSONValue, context: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytConnectorPrice.priceSlice(ARG0, ARG1)", [facts, context],
+                          as: JSONValue.self)
+    }
+
     /// `YYYY-MM-DD` in the shop's own calendar, as the rule compares it.
     public func lanQuoteExpired(order: JSONValue, today: String) throws -> Bool {
         try runtime.call2("globalThis.KhaytLanQuotePage.isQuoteExpired(ARG0, ARG1)",

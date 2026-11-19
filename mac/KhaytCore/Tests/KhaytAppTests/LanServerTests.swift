@@ -59,7 +59,8 @@ struct LanServerTests {
              identity: Curve25519.Signing.PrivateKey = .init(),
              port wanted: UInt16 = 0, libraryAsBeforeFilters: Bool = false,
              slicerRoot: URL? = nil, slicerMaxBytes: Int = LanServer.maxInflate,
-             connectorsEnabled: Bool = true) async throws {
+             connectorsEnabled: Bool = true,
+             connectorPrices: Bool = false, priceContext: JSONValue? = nil) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -79,6 +80,9 @@ struct LanServerTests {
                 icon: { LanServer.bundledIcon($0) })
             host.intakeToken = intakeToken
             host.calendarToken = calendarToken
+            // "Show prices in OrcaSlicer" and what a slice is priced with.
+            host.connectorPrices = { connectorPrices }
+            if let priceContext { host.slicePriceContext = { priceContext } }
             // The lockouts read the monotonic clock; the bench moves it with
             // the wall clock so `advance` lifts a lockout as before.
             host.lockoutClock = { box.now.timeIntervalSince1970 }

@@ -66,9 +66,14 @@ extension LanServer {
         "file": .init(limit: 30, window: 3600),
         // The tab polls every 15 s while visible, 60 s hidden, with an ETag.
         "queue": .init(limit: 1, window: 10),
+        // Once after each export, and again after a quantity change settles
+        // (600 ms): a person at a stepper, not a loop.
+        "price": .init(limit: 120, window: 3600),
     ]
 
     nonisolated static let connectorSealSalt = "khayt-connector-seal-v1"
+    /// A price request's facts, opened (plan: ≤ 8 KB).
+    nonisolated static let connectorPriceMaxBytes = 8 * 1024
     nonisolated static let connectorEtagSalt = "khayt-connector-etag-v1"
     nonisolated static let connectorReplyPrefix = "khayt-reply-v1"
     /// The header a file upload names its body's hash in; the signature
@@ -226,7 +231,7 @@ extension LanServer {
     // MARK: - Paths
 
     enum ConnectorPath: Equatable {
-        case pair, me, slices, slice(String), sliceFile(String), queue, unknown
+        case pair, me, slices, slice(String), sliceFile(String), queue, price, unknown
     }
 
     /// Exact shapes only, never a prefix match. Nil when not a connector path.
@@ -237,6 +242,7 @@ extension LanServer {
         if rest == "self" { return .me }
         if rest == "slices" { return .slices }
         if rest == "queue" { return .queue }
+        if rest == "price" { return .price }
         let parts = rest.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         if parts.count == 2, parts[0] == "slices", plausibleSliceId(parts[1]) { return .slice(parts[1]) }
         if parts.count == 3, parts[0] == "slices", plausibleSliceId(parts[1]), parts[2] == "file" {
@@ -412,6 +418,7 @@ extension LanServer {
         case .slice: allowed = ["GET"]
         case .sliceFile: allowed = ["PUT"]
         case .queue: allowed = ["GET"]
+        case .price: allowed = ["POST"]
         }
         guard allowed.contains(method) else {
             var r = Response.json(405, #"{"ok":false,"reason":"method"}"#)
@@ -449,6 +456,9 @@ extension LanServer {
         case (.queue, _):
             if let limited = connectorRate(caller.id, "queue") { return signedReply(limited, for: caller) }
             answer = await connectorQueue(request, path: path, caller: caller)
+        case (.price, _):
+            if let limited = connectorRate(caller.id, "price") { return signedReply(limited, for: caller) }
+            answer = await connectorPrice(request, path: path, caller: caller)
         default:
             answer = await connectorNotFound()
         }
@@ -465,9 +475,83 @@ extension LanServer {
                 "maxFileBytes": .number(Double(min(host.slicerMaxBytes, Self.maxInflate))),
                 "maxMetaBytes": .number(Double(Self.connectorMaxMetaBytes)),
             ]),
-            "scopes": .array([.string("slices:send"), .string("queue:read")]),
+            "scopes": .array(connectorScopes(caller.id).map(JSONValue.string)),
         ])
         return .json(200, Self.jsonText(body))
+    }
+
+    /// What this connector may do right now. `price:read` (and `cost:read`
+    /// with the second grant) only while the shop shows prices in OrcaSlicer
+    /// AND has granted this device: the tab draws a price block only then.
+    func connectorScopes(_ id: String) -> [String] {
+        var scopes = ["slices:send", "queue:read"]
+        if let grant = connectorPriceGrant(id) {
+            scopes.append("price:read")
+            if grant == "cost" { scopes.append("cost:read") }
+        }
+        return scopes
+    }
+
+    /// The grant that is in force: none while the shop's switch is off.
+    func connectorPriceGrant(_ id: String) -> String? {
+        guard host.connectorPrices(), host.slicePriceContext != nil else { return nil }
+        return host.devices.priceGrant(id)
+    }
+
+    /// The keys a device with the `price` grant sees; `cost` adds `cost` and
+    /// `margin`. An ALLOW-list: a key the rule adds later is not passed on
+    /// until somebody decides who may see it.
+    nonisolated static let priceKeys = ["currency", "qty", "unit", "total", "rounded", "basis"]
+    nonisolated static let costKeys = ["cost", "margin"]
+
+    /// `POST /api/connectors/price`: the shop's price for a sliced plate, from
+    /// the plugin's slice facts, priced by the shared rule
+    /// (`lib/connector-price.js`) and sealed. Nothing is stored: no job, no
+    /// quote, no inbox item, no log of the figures.
+    ///
+    /// Off (the shop's switch, or no grant for this device) is a 200
+    /// `{"prices":"off"}`, never a 404: a 404 already means "an older Mac, or
+    /// pairing switched off", and the tab must not say that when the shop
+    /// simply chose not to show prices. A device granted `price` never sees
+    /// the cost or margin, though the rule always works them out.
+    func connectorPrice(_ request: Request, path: String, caller: ConnectorCaller) async -> Response {
+        guard request.body.count <= Self.connectorMaxSealedBytes else {
+            return .json(413, #"{"ok":false,"reason":"too-large"}"#)
+        }
+        let key = Self.sealKey(caller.key, connectorId: caller.id)
+        let aad = Self.sealAad(method: "POST", path: path)
+        guard let plain = Self.unseal(request.body, key: key, aad: aad) else {
+            return .json(400, #"{"ok":false,"reason":"seal"}"#)
+        }
+        guard plain.count <= Self.connectorPriceMaxBytes else {
+            return .json(413, #"{"ok":false,"reason":"too-large"}"#)
+        }
+        guard let facts = try? JSONDecoder().decode(JSONValue.self, from: plain) else {
+            return .json(400, #"{"ok":false,"reason":"not-json"}"#)
+        }
+        var answer: [String: JSONValue] = ["prices": .string("off")]
+        if let grant = connectorPriceGrant(caller.id), let context = host.slicePriceContext?() {
+            guard case .object(let priced)? = try? await host.engine.connectorPrice(facts: facts, context: context) else {
+                return .json(500, #"{"ok":false,"reason":"price"}"#)
+            }
+            answer = Self.priceAnswer(priced, grant: grant)
+        }
+        guard let sealed = Self.seal(Data(Self.jsonText(.object(answer)).utf8), key: key, aad: aad) else {
+            return .json(500, #"{"ok":false,"reason":"seal"}"#)
+        }
+        return Response(status: 200, headers: ["Content-Type": "application/json"], body: sealed)
+    }
+
+    /// What one grant sees of the rule's answer: `{"prices":"on", ...}`.
+    nonisolated static func priceAnswer(_ priced: [String: JSONValue], grant: String) -> [String: JSONValue] {
+        var out: [String: JSONValue] = ["prices": .string("on")]
+        if let why = priced["unpriced"] {
+            out["unpriced"] = why
+            return out
+        }
+        for key in priceKeys { if let v = priced[key] { out[key] = v } }
+        if grant == "cost" { for key in costKeys { if let v = priced[key] { out[key] = v } } }
+        return out
     }
 
     func connectorSliceState(_ sliceId: String, caller: ConnectorCaller) -> Response {

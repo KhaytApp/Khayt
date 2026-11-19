@@ -42,7 +42,14 @@ final class LanDevices: @unchecked Sendable {
         /// What enrolled: nil is a phone (every device saved before kinds
         /// existed), `kindConnector` a slicer plugin. See `isRestricted`.
         var kind: String? = nil
+        /// What a CONNECTOR may see of the shop's prices in its tab:
+        /// nil (none, the default), `price`, or `cost` (price, cost and
+        /// margin). Only asked when the shop has turned prices on.
+        var priceGrant: String? = nil
     }
+
+    /// The grants a connector may hold, in order of what they show.
+    static let priceGrants = ["price", "cost"]
 
     // ── A CONNECTOR OPENS ITS OWN ROUTES AND NOTHING ELSE ──────────────────
     //
@@ -245,6 +252,24 @@ final class LanDevices: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         guard let d = saved.devices.first(where: { $0.id == id }), d.kind == Self.kindConnector else { return nil }
         return (d.key, d.name)
+    }
+
+    /// A connector's price grant: nil (none), `price` or `cost`.
+    func priceGrant(_ id: String) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        guard let d = saved.devices.first(where: { $0.id == id }), d.kind == Self.kindConnector,
+              let g = d.priceGrant, Self.priceGrants.contains(g) else { return nil }
+        return g
+    }
+
+    /// Set (or, with nil, take away) a connector's price grant. A phone, or an
+    /// id nobody enrolled, is left alone.
+    func setPriceGrant(_ id: String, _ grant: String?) {
+        lock.lock(); defer { lock.unlock() }
+        guard let i = saved.devices.firstIndex(where: { $0.id == id }),
+              saved.devices[i].kind == Self.kindConnector else { return }
+        saved.devices[i].priceGrant = grant.flatMap { Self.priceGrants.contains($0) ? $0 : nil }
+        save()
     }
 
     func removeAll() {
