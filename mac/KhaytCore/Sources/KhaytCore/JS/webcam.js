@@ -914,12 +914,49 @@
     };
   }
 
+  /**
+   * A time-lapse kept as the CUSTOMER'S PROOF (U1 idea 3, Mac plan Nov 19).
+   *
+   * The match and the link exist (matchTimelapse, timelapseRecord,
+   * timelapseLink): the job keeps a pointer to the video on the printer,
+   * which the printer deletes when its storage fills. A copy into the job's
+   * own files survives that. Turki (Nov 19): copy ONLY when the shop presses
+   * "Keep as proof"; otherwise the job keeps the link, as now.
+   *
+   * `budget` is the host's: { maxBytes } a video may be at most, and
+   * { freeBytes } the job's files may still take (either may be absent).
+   * Returns { attach: row } for the host to download and store (it sets the
+   * row's `filename` once the bytes are on disk), or { keepLink: reason }:
+   *   'not-kept'      the shop did not ask (opts.keep !== true)
+   *   'no-match'      no video to copy
+   *   'size-unknown'  the printer did not say how big it is: nothing is fetched blind
+   *   'over-budget'   bigger than maxBytes, or than what the job may still take
+   *   'already-kept'  this video is already in the job's files
+   */
+  function timelapseAttach(order, match, budget, opts) {
+    const keep = !!(opts && opts.keep === true);
+    if (!keep) return { keepLink: 'not-kept' };
+    if (!match || !safeCameraFile(match.video)) return { keepLink: 'no-match' };
+    const bytes = Number(match.bytes);
+    if (match.bytes == null || !Number.isFinite(bytes) || bytes <= 0) return { keepLink: 'size-unknown' };
+    const b = budget && typeof budget === 'object' ? budget : {};
+    const cap = (v) => (v != null && Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : Infinity);
+    if (bytes > cap(b.maxBytes) || bytes > cap(b.freeBytes)) return { keepLink: 'over-budget', bytes };
+    const files = Array.isArray(order && order.attachedFiles) ? order.attachedFiles : [];
+    if (files.some((x) => x && x.kind === 'timelapse' && x.video === match.video)) return { keepLink: 'already-kept' };
+    const name = String(match.video).split('/').pop();
+    const row = { originalName: name, size: bytes, kind: 'timelapse', video: match.video };
+    if (match.cover && safeCameraFile(match.cover)) row.cover = match.cover;
+    if (opts && opts.machineId) row.machineId = String(opts.machineId);
+    return { attach: row };
+  }
+
   const api = {
     STREAM_TYPES, TIMELAPSE_MODES, ROTATIONS, SNAPSHOT_TYPE,
     CAMERA_FILES_PATH, SNAPMAKER_MONITOR, PAUSED_AFTER_S,
     apiWithPort, discoverySteps, parseCameraFiles, candidateFromStep, stillAge, suggestionFor,
     safeCameraFile, cameraFileUrl, gcodeStem, splitTimelapseName, matchTimelapse,
-    timelapseRecord, timelapseLink,
+    timelapseRecord, timelapseLink, timelapseAttach,
     defaultWebcam, normalizeWebcamUrl, deriveWebcamUrls, webcamCandidates,
     parseOctoprintSettings, parseMoonrakerWebcams,
     detectPathFor, detectUrlFor, parseDetected,
