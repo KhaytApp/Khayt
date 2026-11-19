@@ -83,6 +83,10 @@ import KhaytCore
             if case .array(let amounts)? = want["lineAmounts"], case .array(let lines)? = after["extraLines"] {
                 #expect(lines.map { Self.obj($0)["amount"] } == amounts, "\(why): lines")
             }
+            // A product's labour and packaging stay on the job (shop currency).
+            for (k, x) in Self.obj(want["keepsOnce"]) {
+                #expect(Self.num(after[k]) == Self.num(x), "\(why): \(k) kept")
+            }
         }
     }
 
