@@ -98,9 +98,9 @@ test('costedShare: no parts prices all of it (1); a 0-cost costed part beside ag
 });
 
 // ── The job sheet: a part added BY HAND to a once-job (Dev Hub, Nov 19,
-// interim pending Turki): unmarked, its own labour; the order's once-costs
-// unchanged. A product part edited there keeps the mark. One rule decides:
-// KhaytCalculatorCost.keepsOrderLevelCosts.
+// Turki): unmarked, its own labour; the order's once-costs unchanged. A
+// product part edited there keeps the mark. One rule decides:
+// KhaytOrderMoney.addedPartMark.
 function sheetCosted() {
   const src = fs.readFileSync(require('path').join(__dirname, '..', 'renderer', 'job-sheet.js'), 'utf8');
   const at = src.indexOf('  function costed(part, order) {');
@@ -110,11 +110,9 @@ function sheetCosted() {
   return box.costed;
 }
 
-test('the rule lives in one place: a marked part keeps it; a hand part on a once-job does not (for now)', () => {
-  assert.equal(CC.HAND_PARTS_SHARE_ONCE, false);
-  assert.equal(CC.keepsOrderLevelCosts({ orderLevelCosts: true }, { onceJob: true }), true);
-  assert.equal(CC.keepsOrderLevelCosts({}, { onceJob: true }), false);
-  assert.equal(CC.keepsOrderLevelCosts({}, { onceJob: false }), false);
+test('the rule lives in one place: a hand part on a once-job is not marked (Turki, Nov 19)', () => {
+  assert.equal(Mo.HAND_PARTS_SHARE_ONCE, false);
+  assert.equal(Mo.addedPartMark({ labourCost: 74.25 }), false);
 });
 
 test('the sheet: a manual part added to a once-job gets its own labour; the once-costs are unchanged', () => {

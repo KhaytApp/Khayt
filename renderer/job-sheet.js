@@ -62,13 +62,11 @@
     // A product's part (and one edited from it) keeps `orderLevelCosts`, so it
     // is costed without the labour and packaging the ORDER carries (money
     // review of #2581, HIGH: a qty 1→2 took 164.04 to 379.33). A part added by
-    // hand follows the one shared rule (KhaytCalculatorCost.keepsOrderLevelCosts):
-    // for now it is unmarked and costed with its own labour (Dev Hub, Nov 19).
+    // hand follows the one shared rule (KhaytOrderMoney.addedPartMark): its
+    // OWN labour (Turki, Nov 19). Marked BEFORE it is costed.
     const Mo = global.KhaytOrderMoney;
-    const onceJob = !!(Mo && Mo.jobFixedCost && Mo.jobFixedCost(order, { components: false, overhead: false }) > 0);
-    if (CC() && CC().keepsOrderLevelCosts) {
-      if (CC().keepsOrderLevelCosts(part, { onceJob })) rated.orderLevelCosts = true; else delete rated.orderLevelCosts;
-    }
+    if (part.orderLevelCosts === true || (Mo && Mo.addedPartMark && Mo.addedPartMark(order))) rated.orderLevelCosts = true;
+    else delete rated.orderLevelCosts;
     const unit = CC() ? CC().computePartBaseCost(rated, { inventory: list('inventory'), settings }) : 0;
     rated.unitCost = +unit.toFixed(4);
     rated.baseCost = +(unit * Math.max(1, Math.round(+rated.qty || 1))).toFixed(2);

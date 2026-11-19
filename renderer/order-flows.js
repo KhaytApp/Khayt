@@ -102,6 +102,10 @@ function logPrint(asQuote = false) {
   // shop that still had to open Electron to take an order.
   //
   // The form is still this file's. The record is not.
+  // A product part taken out by Edit and never put back (the form cleared)
+  // must not leave its once-costs behind: drop every group with no part in
+  // the cart (build.js syncFixedCosts; money review of #2581).
+  if (typeof syncFixedCosts === 'function') syncFixedCosts();
   const bytes = (n) => { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; };
   const N = NewOrderRules();
   const entry = N.newOrder({

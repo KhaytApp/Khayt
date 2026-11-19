@@ -114,22 +114,6 @@
   }
 
   /**
-   * Whether a part on a job carries `orderLevelCosts` — THE rule, in one place,
-   * for the desktop (job sheet, calculator) and the Mac alike.
-   *  - A part that has the mark keeps it: a product's part (productJobParts),
-   *    and any part edited from one.
-   *  - A part added BY HAND to a job that carries a product's once-costs
-   *    (`ctx.onceJob`) is HAND_PARTS_SHARE_ONCE: false for now, so it is
-   *    costed with its own labour and packaging, and the order's once-costs
-   *    are unchanged (Dev Hub, Nov 19: interim, pending Turki). Flip it here.
-   */
-  const HAND_PARTS_SHARE_ONCE = false;
-  function keepsOrderLevelCosts(part, ctx) {
-    if (part && part.orderLevelCosts === true) return true;
-    return !!(ctx && ctx.onceJob) && HAND_PARTS_SHARE_ONCE;
-  }
-
-  /**
    * `opts.labour === false`: the part WITHOUT its labour, and
    * `opts.packaging === false` without the shop's packaging: a product with
    * its own rates charges both ONCE (lib/product-pricing.js productOnceCost).
@@ -278,7 +262,7 @@
     return computePartBaseCost(part, ctx, opts) * qty;
   }
 
-  const api = { keepsOrderLevelCosts, HAND_PARTS_SHARE_ONCE, computePartBaseCost, partTotalCost, labourCostOf, getActivePriceTier, computePartBreakdown, computeComponentsCost, partConsumablesCost, consumableUnitCost, consumableQty };
+  const api = { computePartBaseCost, partTotalCost, labourCostOf, getActivePriceTier, computePartBreakdown, computeComponentsCost, partConsumablesCost, consumableUnitCost, consumableQty };
 
   Object.assign(global, api);
   global.KhaytCalculatorCost = api;

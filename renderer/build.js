@@ -400,6 +400,19 @@ function editingOnce() {
   return { orderLevelCosts: true, onceGroup: btn.dataset.editingOnceGroup || undefined };
 }
 
+/**
+ * Whether the part in the form carries `orderLevelCosts`: one being edited
+ * from a marked part (editingOnce), or a hand part when the shared rule says
+ * so (KhaytOrderMoney.addedPartMark on the cart's once-costs; false since
+ * Turki, Nov 19). Read by calculateLivePartCost, so the part is COSTED as it
+ * is stored: marking it after costing kept its labour (money review, #2581).
+ */
+function formPartMarked() {
+  if (editingOnce()) return true;
+  const Mo = (typeof KhaytOrderMoney !== 'undefined') ? KhaytOrderMoney : null;
+  return !!(Mo && Mo.addedPartMark && Mo.addedPartMark(currentFixedCosts));
+}
+
 function calculateLivePartCost() {
   // Snapshot the DOM into a part-shaped object and reuse the pure helper.
   // qty and filamentId MUST be included or the live preview disagrees with the cart:
@@ -422,7 +435,7 @@ function calculateLivePartCost() {
     laborRate:     $('#laborRate').value,
     failureRate:   $('#failureRate').value,
     extraMaterials: currentExtraMaterials.filter(m => m.material && m.weight > 0),
-    orderLevelCosts: editingOnce() ? true : undefined,
+    orderLevelCosts: formPartMarked() ? true : undefined,
   }));
 }
 
@@ -982,12 +995,10 @@ function addPart() {
   }
   const part = snapshotPartFromForm();
   // Its once-costs mark and group, as it had them (editingOnce).
-  // A part added by hand follows the shared rule (keepsOrderLevelCosts):
-  // unmarked for now, with its own labour.
+  // Marked as it was costed (formPartMarked); an edited part keeps its group.
   const once = editingOnce();
-  if (once) { part.orderLevelCosts = true; if (once.onceGroup) part.onceGroup = once.onceGroup; }
-  else if (typeof KhaytCalculatorCost !== 'undefined' && KhaytCalculatorCost.keepsOrderLevelCosts
-    && KhaytCalculatorCost.keepsOrderLevelCosts(part, { onceJob: onceFixedCost() > 0 })) part.orderLevelCosts = true;
+  if (formPartMarked()) part.orderLevelCosts = true;
+  if (once && once.onceGroup) part.onceGroup = once.onceGroup;
   // A part coming back from the form after Edit is the SAME part: it keeps
   // its id and its place in the cart. It was given a new id at the end,
   // so nothing that pointed at it (lib/part-ids.js, a part sheet, a file
@@ -2059,6 +2070,7 @@ function updateResinFieldsVisibility() {
 
   const api = {
     formHasPendingPart,
+    syncFixedCosts,     // order-flows.js Log: drop once-cost groups with no part left (#2581)
     renderColourLines,
     renderConsumableLines,
     applyPartExtras,

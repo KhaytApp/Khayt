@@ -359,12 +359,30 @@
    * A job without labourCost / packagingCost (every job before Nov 19) costs
    * exactly what each reader summed before (test/job-cost-sample-book.test.js).
    */
+  /**
+   * Whether a part added BY HAND to an existing job carries `orderLevelCosts`
+   * (costed without labour and packaging, which the order carries once). THE
+   * rule, in one place, for the desktop's job sheet and calculator and the
+   * Mac's partsForSave. A product's parts (productJobParts), and parts edited
+   * from them, keep their mark whatever this says.
+   *
+   * Turki, Nov 19: a hand-added part gets its OWN labour, so false.
+   * `api.HAND_PARTS_SHARE_ONCE` is the switch: read at call time, so a test
+   * can flip it and see both settings price alike.
+   */
+  function addedPartMark(order) {
+    if (api.HAND_PARTS_SHARE_ONCE !== true) return false;
+    return jobFixedCost(order, { components: false, overhead: false }) > 0;
+  }
+
   function jobCost(order, opts) {
     const parts = (order && Array.isArray(order.parts) ? order.parts : []);
     return parts.reduce((s, p) => s + Math.max(0, +(p && p.baseCost) || 0), 0) + jobFixedCost(order, opts);
   }
 
   const api = {
+    HAND_PARTS_SHARE_ONCE: false,   // Turki, Nov 19 (see addedPartMark)
+    addedPartMark,
     jobCost, jobFixedCost,
     convertToBase, clientCurrency, orderCurrency, pinCurrenciesOf,
     orderRevenueBase, orderCreditedRaw, orderCreditedBase,
