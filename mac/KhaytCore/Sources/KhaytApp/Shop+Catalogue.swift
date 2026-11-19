@@ -725,11 +725,9 @@ extension Shop {
                                       "packagingCost": .number(built.packagingCost)])
         guard let parts = try? await engine.jobCost(job, components: false, overhead: false, labour: false, packaging: false),
               let cost = try? await engine.jobCost(job, components: false, overhead: false) else { return nil }
-        // A PRODUCT unsaid is a box each (`lib/product-pricing.js perBoxOf`,
-        // 1), which is what its packaging above was charged at; `lineBoxes`
-        // unsaid means one box for the whole line, a hand part's rule.
-        let perBox = Self.plainNumber(Self.asObject(record)?["perBox"]) ?? 1
-        let boxes = (try? await engine.lineBoxes(qty: n, perBox: perBox)) ?? 1
+        // The product's own count (`perBoxOf`: a box each unless it says),
+        // the count its packaging above was charged at.
+        let boxes = (try? await engine.productBoxes(record, units: n)) ?? 1
         return ProductLine(units: n, parts: parts, labour: built.labourCost, packaging: built.packagingCost,
                            boxes: boxes, cost: cost, perPiece: cost / Double(n))
     }

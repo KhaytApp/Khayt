@@ -15900,6 +15900,14 @@ public actor KhaytEngine {
             as: ProductJobParts.self)
     }
 
+    /// The boxes a line of `units` of this PRODUCT ships in: `lineBoxes` with
+    /// the product's own `perBoxOf` (a box each unless it says), which is the
+    /// count its packaging is charged at (`productPackagingCost`).
+    public func productBoxes(_ product: JSONValue, units: Int) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.lineBoxes(ARG0, KhaytProductPricing.perBoxOf(ARG1))",
+                          [.number(Double(max(1, units))), product], as: Double.self)
+    }
+
     /// A line's labour (`lib/order-money.js lineLabour`, #2586): prep once
     /// and post per piece for a `labourPerLine` line, the old sum otherwise.
     public func lineLabour(_ line: JSONValue) throws -> Double {
