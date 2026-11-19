@@ -20,6 +20,20 @@ function _kGlyph(name, emoji, size) {
 }
 function _kIco(name, emoji, size) { return _kGlyph(name, emoji, size); }
 function _kIcoL(name, emoji, size) { const g = _kGlyph(name, emoji, size); return g ? (/^<span/.test(g) ? g : g + ' ') : ''; }
+function _kStateClass(s) {
+  const PA = (typeof KhaytPrinterActivity !== 'undefined') ? KhaytPrinterActivity : null;
+  const st = PA ? PA.machineStatus({ printerApi: { type: 'polled' } }, { state: s.state, progress: s.progress }) : null;
+  if (st && st.cls) {
+    if (st.link !== 'online') return 'error';
+    if (st.activity === 'printing' || st.activity === 'paused') return 'printing';
+    if (st.activity === 'error') return 'error';
+    return 'idle';
+  }
+  // A word no table knows: the old rule, exactly.
+  const w = String(s.state || '').toLowerCase();
+  return w.includes('print') ? 'printing' : w.includes('error') ? 'error' : 'idle';
+}
+
 function updateKanbanLiveStatus() {
   if (typeof renderNextUp === 'function' && document.getElementById('queue-tab')?.classList.contains('active')) renderNextUp();
   const cards = document.querySelectorAll('.printer-live-status[data-machine-id]');
@@ -38,8 +52,10 @@ function updateKanbanLiveStatus() {
       return;
     }
     const pct = Math.min(100, Math.max(0, Math.round(+s.progress || 0)));
-    const stateClass = (s.state || '').toLowerCase().includes('print') ? 'printing'
-      : (s.state || '').toLowerCase().includes('error') ? 'error' : 'idle';
+    // The badge's colour from the one closed set (lib/printer-activity.js,
+    // C2): a paused, preparing or homing printer is busy, never "idle"; a
+    // failed one needs a person. The text stays the printer's own word.
+    const stateClass = _kStateClass(s);
     const etaStr = s.timeRemaining ? (() => {
       const mins = Math.round(s.timeRemaining / 60);
       return mins > 60 ? `${Math.floor(mins/60)}h ${mins%60}m` : `${mins}m`;
