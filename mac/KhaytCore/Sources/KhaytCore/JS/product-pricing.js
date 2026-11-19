@@ -95,12 +95,16 @@ function productLabourCost(product, opts) {
  * rates or with `labourPerPart` (both are in each part then).
  */
 function productOnceCost(product, opts) {
+  return productLabourCost(product, opts) + productPackagingCost(product, opts);
+}
+
+/** The shop's packaging, once for a product with its own rates, with its failure buffer; 0 otherwise. */
+function productPackagingCost(product, opts) {
   if (!usesProductRates(product) || product.labourPerPart === true) return 0;
   const PRt = printRates();
   const settings = (opts && opts.settings) || {};
   const r = PRt ? PRt.withRates(productRateDefaults(product), { settings }) : productRateDefaults(product);
-  const buffer = 1 + Math.max(0, +r.failureRate || 0) / 100;
-  return productLabourCost(product, opts) + Math.max(0, +settings.defaultPackagingCost || 0) * buffer;
+  return Math.max(0, +settings.defaultPackagingCost || 0) * (1 + Math.max(0, +r.failureRate || 0) / 100);
 }
 
 /** A product part with its rates merged as priceProduct costs it (part > product > shop). */
@@ -111,15 +115,18 @@ function ratedPart(product, raw, settings) {
 }
 
 /**
- * The parts a JOB taken from the product starts with, costed so that
- * lib/order-new.js newOrder prices the job exactly as the catalogue prices
- * the product (money review of #2575, finding 1: a job from a 15-part
- * product charged the labour 15 times while the catalogue charged it once).
- * A product with its own rates: each part costed WITHOUT labour and
- * packaging (`baseCost` for the line, `unitCost` a piece), plus ONE line
- * `{ kind: 'labour', name, qty: 1, printTime: 0, printWeight: 0, unitCost,
- * baseCost }` = productOnceCost. A product without rates, or with
- * labourPerPart: each part costed as it always was, no extra line.
+ * What a JOB taken from the product starts with, so that lib/order-new.js
+ * newOrder prices it exactly as the catalogue prices the product (money
+ * review of #2575). Returns { parts, labourCost, packagingCost }:
+ *   parts          each part rated (part > product > shop) and costed WITHOUT
+ *                  labour and packaging for a product with its own rates
+ *                  (`unitCost` a piece, `baseCost` the line, to 4 places);
+ *                  as it always was for one without (or with labourPerPart);
+ *   labourCost,    the product's labour and packaging, ONCE: ORDER-level
+ *   packagingCost  costs (Dev Hub, Nov 19), not a part. A "labour" part
+ *                  broke every part walker (assembly completion, reprints,
+ *                  file links). 0 for a product without rates.
+ * Pass all three to newOrder.
  */
 function productJobParts(product, opts) {
   const d = product || {};
@@ -133,13 +140,15 @@ function productJobParts(product, opts) {
     const qty = Math.max(1, +p.qty || 1);
     // To 4 places, not 2: newOrder sums the lines, and 15 lines each rounded
     // to the halala came to 0.01 more than the catalogue's one rounding.
-    return Object.assign({}, p, { unitCost: +unit.toFixed(4), baseCost: +(unit * qty).toFixed(4) });
+    // `orderLevelCosts`: this part's labour and packaging are on the order, so
+    // anything that costs it again leaves them out (lib/calculator-cost.js).
+    return Object.assign({}, p, { unitCost: +unit.toFixed(4), baseCost: +(unit * qty).toFixed(4) }, once ? { orderLevelCosts: true } : {});
   });
-  if (once) {
-    const cost = +productOnceCost(d, ctx).toFixed(4);
-    if (cost > 0) parts.push({ kind: 'labour', name: 'Labour and packaging', qty: 1, printTime: 0, printWeight: 0, unitCost: cost, baseCost: cost });
-  }
-  return parts;
+  return {
+    parts,
+    labourCost: once ? +productLabourCost(d, ctx).toFixed(4) : 0,
+    packagingCost: once ? +productPackagingCost(d, ctx).toFixed(4) : 0,
+  };
 }
 
 function priceProduct(product, opts) {
@@ -294,7 +303,7 @@ function pricingFields(product, opts) {
   return { baseCost: p.cost, basePrice: p.basePrice, price: p.price };
 }
 
-const api = { priceProduct, pricingFields, usesProductRates, productLabourCost, productOnceCost, productJobParts };
+const api = { priceProduct, pricingFields, usesProductRates, productLabourCost, productPackagingCost, productOnceCost, productJobParts };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 global.KhaytProductPricing = api;
 

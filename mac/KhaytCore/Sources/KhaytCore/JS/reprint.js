@@ -118,9 +118,12 @@
       ? N.inShopCurrency(o, settings)
       : { shippingCost: o.shippingCost, extraLines: arrayOf(o.extraLines), parts: arrayOf(o.parts) };
     const ctx = { inventory: arrayOf(b.inventory), settings, consumables: arrayOf(b.consumables) };
+    // A once-labour job (a product's labour and packaging at the ORDER level)
+    // keeps them there: its parts are re-costed without them.
+    const once = num(o.labourCost, 0) > 0 || num(o.packagingCost, 0) > 0;
     const parts = arrayOf(shop.parts).map((p, i) => {
       const copy = Object.assign({}, p, { id: `${idBase}-P${i + 1}`, partStatus: 'pending' });
-      copy.baseCost = CC && typeof CC.partTotalCost === 'function' ? +CC.partTotalCost(copy, ctx) || 0 : num(p.baseCost, 0);
+      copy.baseCost = CC && typeof CC.partTotalCost === 'function' ? +CC.partTotalCost(copy, ctx, once ? { labour: false, packaging: false } : undefined) || 0 : num(p.baseCost, 0);
       return copy;
     });
     const margin = typeof settings.defaultMargin === 'number' && Number.isFinite(settings.defaultMargin)
@@ -137,6 +140,7 @@
       extraLines: arrayOf(shop.extraLines),
       clientRef: o.clientRef || null,
     };
+    if (once) { out.labourCost = num(o.labourCost, 0); out.packagingCost = num(o.packagingCost, 0); }
     if (arrayOf(o.components).length) {
       out.components = arrayOf(o.components).map((c) => Object.assign({}, c));
       out.assemblyQty = num(o.assemblyQty, 1) > 0 ? num(o.assemblyQty, 1) : 1;

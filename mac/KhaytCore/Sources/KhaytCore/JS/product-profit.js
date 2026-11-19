@@ -29,6 +29,17 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+/**
+ * A job's costs that are not its parts, as this table counts them:
+ * components, and a product's labour and packaging carried once at the order
+ * level; overhead left out (lib/order-money.js jobFixedCost, the one reader).
+ */
+function fixedOf(order) {
+  const Mo = (typeof global !== 'undefined' && global.KhaytOrderMoney)
+    || (typeof require === 'function' ? require('./order-money.js') : null);
+  return Mo && typeof Mo.jobFixedCost === 'function' ? Mo.jobFixedCost(order, { overhead: false }) : 0;
+}
+
 const FINISHED = ['completed', 'delivered'];
 
 /**
@@ -114,7 +125,9 @@ function productProfit(input, deps) {
     // the dashboard's cost of goods does not add them.
     row.cost += (Array.isArray(order.parts) ? order.parts : [])
       .reduce((s, p) => s + num(partCostOf(p)), 0)
-      + Math.max(0, num(order.componentsCost))
+      // Components, and a product's labour and packaging carried once at the
+      // order level (lib/order-money.js jobFixedCost; overhead stays out here).
+      + fixedOf(order)
       + num(linked.get(String(order.id || '')));
     row.hours += num(hoursOf(order));
   }

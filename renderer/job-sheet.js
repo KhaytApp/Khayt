@@ -59,6 +59,14 @@
   function costed(part, order) {
     const machine = list('machines').find((m) => m.id === (part.machineId || order.machineId));
     const rated = PR() ? PR().withRates(part, { settings, machine }) : Object.assign({}, part);
+    // A product's part (and one edited from it) keeps `orderLevelCosts`, so it
+    // is costed without the labour and packaging the ORDER carries (money
+    // review of #2581, HIGH: a qty 1→2 took 164.04 to 379.33). A part added by
+    // hand follows the one shared rule (KhaytOrderMoney.addedPartMark): its
+    // OWN labour (Turki, Nov 19). Marked BEFORE it is costed.
+    const Mo = global.KhaytOrderMoney;
+    if (part.orderLevelCosts === true || (Mo && Mo.addedPartMark && Mo.addedPartMark(order))) rated.orderLevelCosts = true;
+    else delete rated.orderLevelCosts;
     const unit = CC() ? CC().computePartBaseCost(rated, { inventory: list('inventory'), settings }) : 0;
     rated.unitCost = +unit.toFixed(4);
     rated.baseCost = +(unit * Math.max(1, Math.round(+rated.qty || 1))).toFixed(2);

@@ -5444,6 +5444,7 @@
   "jp.parts": "Teile",
   "jp.money": "Geld",
   "jp.activity": "Verlauf",
+  "jp.labour_once": "Arbeit und Verpackung (einmal)",
   "jp.plan": "Zahlungsplan",
   "ppd.title": "Zahlungsplan",
   "ppd.due": "fällig {date}",

@@ -1,0 +1,15 @@
+{
+  "about": "lib/kpi-rows.js orderCost for every job of test/job-cost-sample-book.test.js, computed by main's kpi-rows.js BEFORE #2581 (the order-level labour change). #2581 must leave each figure byte-identical: an existing job (no labourCost / packagingCost) costs the dashboard exactly what it did. Frozen here because CI's shallow checkout has no origin/main to read the old file from.",
+  "sampleDate": "2026-11-19",
+  "orderCost": {
+    "DEMO-O1": 0,
+    "DEMO-O2": 0,
+    "DEMO-O3": 0,
+    "DEMO-O4": 0,
+    "DEMO-O5": 0,
+    "X1": 92.5,
+    "X2": 60,
+    "X3": 100,
+    "X4": 0
+  }
+}

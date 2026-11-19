@@ -555,7 +555,9 @@ function renderAttachedFiles(files) {
 
 function buildProfitabilityHtml(order) {
   if (!order.parts || order.parts.length === 0) return '';
-  const estCost = order.parts.reduce((s, p) => s + partTotalCost(p), 0);
+  // + a product's labour and packaging carried once on the order (0 otherwise).
+  const estCost = order.parts.reduce((s, p) => s + partTotalCost(p), 0)
+    + (typeof KhaytOrderMoney !== 'undefined' ? KhaytOrderMoney.jobFixedCost(order, { components: false, overhead: false }) : 0);
   if (estCost <= 0) return '';
   const revenue = +order.price || 0;
 
