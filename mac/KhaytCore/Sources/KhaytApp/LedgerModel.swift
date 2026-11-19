@@ -127,7 +127,10 @@ extension Shop {
         // componentsCost`, it missed the overhead and set a SAR cost against a
         // USD price, so a USD job read "sold below cost" (#2581/#2582 review).
         let fx = order.figures?.fx ?? 1
-        let cost = order.figures?.cost ?? 0
+        // WITHOUT the job's overhead, as the desktop's Orders Log measures it
+        // (`jobCost(o, {overhead: false})`, release money review M3): with it,
+        // every job carrying overhead read a lower margin here than there.
+        let cost = order.figures?.costForLedger ?? 0
         let net = (order.figures?.net ?? order.price) * fx
         let tax = (order.figures?.tax ?? 0) * fx
         // The margin is on what the shop KEPT: the price less its credit

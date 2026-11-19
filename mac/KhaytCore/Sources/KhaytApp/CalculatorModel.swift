@@ -306,7 +306,9 @@ final class CalculatorModel {
     func partInput(_ shop: Shop) -> JSONValue {
         // Only the figures actually typed travel with the part — see
         // `Calculator.ratesSection` for why sending all seven is wrong.
-        var extra: [String: JSONValue] = [:]
+        // A part priced here is new: prep once for its line, finishing per
+        // piece (`Shop.newPartMark`), as the desktop's calculator marks it.
+        var extra: [String: JSONValue] = Shop.newPartMark
         for key in Shop.Preset.rateKeys where !(rates[key] ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
             extra[key] = .number(typed(key))
         }
