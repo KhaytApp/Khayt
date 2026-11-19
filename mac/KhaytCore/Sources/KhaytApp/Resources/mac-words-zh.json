@@ -4071,5 +4071,20 @@
  "mac.light_button_on": "灯已开",
  "mac.light_button_off": "灯已关",
  "mac.light_note": "打开时从打印机读取。在此切换只会改变打印机内部的灯。",
- "mac.cam_awake_note": "观看时摄像头保持开启。关闭视图约一分钟后会自动重新休眠。"
+ "mac.cam_awake_note": "观看时摄像头保持开启。关闭视图约一分钟后会自动重新休眠。",
+ "mac.rc_link": "按零件重新计算…",
+ "mac.rc_title": "按零件重新计算",
+ "mac.rc_markup_note": "%（按零件成本）",
+ "mac.rc_price_now": "当前价格",
+ "mac.rc_new_price": "新价格",
+ "mac.rc_terms": "折扣、加急、运费和额外费用保持不变。",
+ "mac.rc_typed_dropped": "手动输入的价格将被移除，此次更改会记入该任务的历史。",
+ "mac.rc_use": "使用 {price}",
+ "mac.rc_keep": "保留 {price}",
+ "mac.rc_seen_title": "客户已看到 {price}。",
+ "mac.rc_seen_body": "改为 {new}？",
+ "mac.rc_milestones": "已发送的形式发票金额高于新价格。仍要更改价格吗？",
+ "mac.reprice_milestones_issued": "已发送的形式发票金额高于新价格。",
+ "mac.rc_kept_hint": "按输入保留：{kept}。按零件现在为 {price}（加价 {pct}%）。",
+ "mac.rc_cost": "成本"
 }

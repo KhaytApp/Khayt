@@ -4071,5 +4071,20 @@
  "mac.light_button_on": "Işık açık",
  "mac.light_button_off": "Işık kapalı",
  "mac.light_note": "Bu açıldığında yazıcıdan okundu. Buradan değiştirmek yalnızca yazıcının içindeki ışığı değiştirir.",
- "mac.cam_awake_note": "İzlediğiniz sürece kamera açık kalır. Görünümü kapattıktan yaklaşık bir dakika sonra kendiliğinden uykuya döner."
+ "mac.cam_awake_note": "İzlediğiniz sürece kamera açık kalır. Görünümü kapattıktan yaklaşık bir dakika sonra kendiliğinden uykuya döner.",
+ "mac.rc_link": "Parçalardan yeniden hesapla…",
+ "mac.rc_title": "Parçalardan yeniden hesapla",
+ "mac.rc_markup_note": "% (parçaların maliyetine)",
+ "mac.rc_price_now": "Şimdiki fiyat",
+ "mac.rc_new_price": "Yeni fiyat",
+ "mac.rc_terms": "İndirim, acil ücreti, kargo ve ek ücretler olduğu gibi kalır.",
+ "mac.rc_typed_dropped": "Elle girilen fiyat kaldırılır ve değişiklik işin geçmişine yazılır.",
+ "mac.rc_use": "{price} kullan",
+ "mac.rc_keep": "{price} kalsın",
+ "mac.rc_seen_title": "Müşteri {price} fiyatını gördü.",
+ "mac.rc_seen_body": "{new} olarak değiştirilsin mi?",
+ "mac.rc_milestones": "Gönderilmiş bir proforma yeni fiyattan fazlasını istiyor. Fiyat yine de değiştirilsin mi?",
+ "mac.reprice_milestones_issued": "Gönderilmiş bir proforma yeni fiyattan fazlasını istiyor.",
+ "mac.rc_kept_hint": "Girildiği gibi tutuldu: {kept}. Parçalar şimdi %{pct} kâr payıyla {price} ediyor.",
+ "mac.rc_cost": "Maliyet"
 }

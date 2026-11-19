@@ -872,6 +872,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only Recalculate from parts: Edit Job on a typed price, and the
+            // sheet's old → new — on the sample, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_RECALC"] == "1", let shop = subject {
+                await captureRecalculate(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             // Only Save to Khayt: the Saved from web folder, a saved page in
             // the inspector, and the Settings row — on the sample, in memory.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_WEBSAVE"] == "1", let shop = subject {
