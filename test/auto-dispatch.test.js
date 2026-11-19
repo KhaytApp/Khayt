@@ -284,3 +284,27 @@ test('a state word no table knows keeps dispatch\'s own lists, exactly as before
   assert.equal(ad.machineBlocked(m, { state: 'fault' }), 'ad.printer_error');
   assert.equal(ad.machineBlocked(m, { state: 'Kneading' }), 'ad.busy');
 });
+
+/* ── #2594 review ─────────────────────────────────────────────────────────── */
+
+test('MED 1: "Connected" (a Bambu report without gcode_state) is not idle, and work in flight is never free', () => {
+  const m = machine({ clearsOwnBed: true });
+  assert.equal(ad.machineBlocked(m, { state: 'Connected', progress: 40 }), 'ad.busy', 'a partial update mid-print');
+  assert.equal(ad.machineBlocked(m, { state: 'Connected' }), 'ad.busy', 'no progress: the old rule, busy as on main');
+  for (const w of ['idle', 'Operational', 'standby', 'Kneading']) assert.equal(ad.machineBlocked(m, { state: w, progress: 37 }), 'ad.busy', w + ' at 37%');
+  assert.equal(ad.machineBlocked(m, { state: 'complete', progress: 100 }), null, 'a finished print at 100% is left to the bed check');
+});
+
+test('MED 2: a print that ended (stopped, cancelled, complete…) is free only once the bed was cleared AFTER it ended', () => {
+  const ended = Date.parse('2026-09-11T12:00:00Z');
+  for (const w of ['STOPPED', 'stopped', 'cancelled', 'canceled', 'complete', 'Finished', 'FINISH']) {
+    const before = machine({ bedClearedAt: '2026-09-11T10:00:00Z' });
+    assert.equal(ad.machineBlocked(before, { state: w, lastActivityAt: ended }), 'ad.bed_not_clear', w + ': cleared before it ended');
+    const after = machine({ bedClearedAt: '2026-09-11T12:05:00Z' });
+    assert.equal(ad.machineBlocked(after, { state: w, lastActivityAt: ended }), null, w + ': cleared after');
+    const never = machine({ bedClearedAt: undefined });
+    assert.equal(ad.machineBlocked(never, { state: w, lastActivityAt: ended }), 'ad.bed_unknown', w + ': never cleared');
+  }
+  // An idle printer is not held by the new rule (the completedAt check still applies).
+  assert.equal(ad.machineBlocked(machine({ bedClearedAt: '2026-09-11T10:00:00Z' }), { state: 'idle', lastActivityAt: ended }), null);
+});

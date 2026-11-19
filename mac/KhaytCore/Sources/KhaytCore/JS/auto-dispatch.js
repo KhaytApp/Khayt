@@ -84,6 +84,11 @@
     // not know keeps this module's own lists, exactly as before.
     const PA = activity();
     const st = PA ? PA.machineStatus({ printerApi: api }, { state: status.state }) : null;
+    // Work in flight, whatever the word says: a partial report or a word that
+    // reads idle while the job is at 40% must never be given a second job
+    // (#2594 review). 100% is a finished print, left to the bed check below.
+    const progress = Math.round(+status.progress || 0);
+    if (progress > 0 && progress < 100) return 'ad.busy';
     if (st && st.word !== undefined && st.cls) {
       if (st.link !== 'online') return 'ad.no_reading';           // "Offline" in its own state text
       if (st.activity === 'error') return 'ad.printer_error';     // failed, attention, halted
@@ -107,6 +112,16 @@
     // not the shop saying it.
     if (machine && machine.clearsOwnBed === true) return null;
     const cleared = Date.parse(text(machine.bedClearedAt));
+    // A JOB THAT ENDED and wrote no completedAt (stopped, cancelled; and
+    // complete/finished seen before the job is recorded): the bed is clear
+    // only if the shop said so AFTER the printer last changed what it was
+    // doing (printer-poll-cache lastActivityAt). Main had this hole for
+    // complete, finished and cancelled already (#2594 review).
+    const endedWord = st && st.cls === 'finished';
+    const lastActivity = Number(status.lastActivityAt);
+    if (endedWord && Number.isFinite(lastActivity) && !(Number.isFinite(cleared) && cleared > lastActivity)) {
+      return Number.isFinite(cleared) ? 'ad.bed_not_clear' : 'ad.bed_unknown';
+    }
     // WHEN IT LAST FINISHED. Nothing in Khayt writes `lastFinishedAt` on a
     // machine, and few pollers report one — so on a real book "the bed is clear"
     // said once stayed true for ever, and a machine marked clear on Monday was
