@@ -65,6 +65,9 @@ struct ProductSheet: View {
     /// What the rule makes of the product AS OPENED — the figure an untouched
     /// save is compared with (`Shop.productPriceFields`). Nil for a new one.
     @State private var openedPricing: KhaytEngine.ProductPricing?
+    /// What the product would cost with labour once (`ProductRates`), for a
+    /// product still costed the old way; nil once it has its own rates.
+    @State private var proposedPricing: KhaytEngine.ProductPricing?
     /// Save was pressed at a price of zero; the question is up.
     @State private var askingZero = false
     /// The shop's own rounding and typed price for this product — the two
@@ -364,6 +367,7 @@ struct ProductSheet: View {
 
             Divider()
             partsSection
+            costRates
 
             Divider()
             ProductPictureStrip(shop: shop, productId: draft.id,
@@ -433,10 +437,17 @@ struct ProductSheet: View {
             overrideText = rule.override.map { Money.fieldValue($0) } ?? ""
             if let defaults = await shop.printRateDefaults() {
                 rateDefaults = defaults
-                // Only the part being composed. An existing part keeps what it
-                // has, blanks included: filling those in here would move the
-                // price of a product the shop only opened to look at.
-                if !newPart.hasRates { newPart.rates = defaults }
+                // A NEW product starts with its own rates, the shop's defaults:
+                // labour once. An existing one keeps what it has until the
+                // shop accepts the new cost (`ProductRatesNotice`).
+                if isNew, !ProductRates.usesOwn(draft.rest) {
+                    draft.rest["rates"] = .object(ProductRates.proposed(parts: [], defaults: defaults))
+                }
+                // Only the part being composed, and only on a product costed
+                // the old way: on one with its own rates a new part takes the
+                // product's, and its own fields stay blank. An existing part
+                // keeps what it has, blanks included.
+                if !ProductRates.usesOwn(draft.rest), !newPart.hasRates { newPart.rates = defaults }
             }
             tiers = opened.tiers
             docs = opened.docs
@@ -444,7 +455,8 @@ struct ProductSheet: View {
                 openedPricing = await shop.priceProduct(
                     parts: opened.parts.map { $0.record(spools: shop.spools, reclaimsTax: shop.reclaimsTax) },
                     margin: opened.draft.margin, components: opened.draft.rest["components"],
-                    assemblyQty: opened.draft.rest["assemblyQty"], rule: opened.rule)
+                    assemblyQty: opened.draft.rest["assemblyQty"], rule: opened.rule,
+                    productRates: ProductRates.pricingFields(opened.draft.rest))
             }
             await reprice()
         }
@@ -625,6 +637,28 @@ struct ProductSheet: View {
     ///
     /// The total is shown as it is built, because a margin typed above a cost
     /// nobody can see is a number chosen blind.
+    /// The product's own rates, or (costed the old way) the choice of the
+    /// new cost. Figma Mac file p.18.
+    @ViewBuilder private var costRates: some View {
+        if ProductRates.usesOwn(draft.rest) {
+            ProductRatesSection(shop: shop, rest: $draft.rest) { Task { await reprice() } }
+        } else if let now = pricing, let new = proposedPricing, !effectiveParts.isEmpty {
+            ProductRatesNotice(
+                shop: shop, partCount: effectiveParts.count, oldCost: now.cost, newCost: new.cost,
+                price: Self.storedPrice(draft),
+                useNew: {
+                    draft.rest["rates"] = .object(ProductRates.proposed(parts: effectiveParts, defaults: rateDefaults))
+                    draft.rest["labourPerPart"] = .bool(false)
+                    Task { await reprice() }
+                },
+                keepPerPart: {
+                    draft.rest["rates"] = .object(ProductRates.proposed(parts: effectiveParts, defaults: rateDefaults))
+                    draft.rest["labourPerPart"] = .bool(true)
+                    Task { await reprice() }
+                })
+        }
+    }
+
     private var partsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(shop.words.callIt("mac.parts")).font(.subheadline.weight(.semibold))
@@ -635,6 +669,14 @@ struct ProductSheet: View {
                     Text(part.name.isEmpty ? shop.words.callIt("mac.a_part") : part.name)
                         .lineLimit(1)
                     Text("×\(part.qty)").foregroundStyle(.secondary).monospacedDigit()
+                    // On a product with its own rates, a part that keeps its
+                    // own figures says so (Figma p.18, 3).
+                    if ProductRates.usesOwn(draft.rest), part.hasRates {
+                        Text(shop.words.callIt("mac.prod_own_rates_tag"))
+                            .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(.quaternary, in: Capsule())
+                    }
                     Spacer()
                     Text(partSummary(part)).font(.caption)
                         .foregroundStyle(.secondary).monospacedDigit()
@@ -707,7 +749,7 @@ struct ProductSheet: View {
                         editingAt = nil
                         editingOriginal = nil
                         var next = PartRow()
-                        next.rates = rateDefaults
+                        if !ProductRates.usesOwn(draft.rest) { next.rates = rateDefaults }
                         newPart = next
                     }
                 }
@@ -716,7 +758,7 @@ struct ProductSheet: View {
                     editingAt = nil
                     editingOriginal = nil
                     var next = PartRow()
-                    next.rates = rateDefaults
+                    if !ProductRates.usesOwn(draft.rest) { next.rates = rateDefaults }
                     newPart = next
                     pickNote = nil
                     Task { await reprice() }
@@ -754,13 +796,14 @@ struct ProductSheet: View {
                 }
                 .padding(.top, 4)
             } label: {
-                Text(shop.words.callIt("mac.part_rates")).font(.caption)
+                Text(shop.words.callIt(ProductRates.usesOwn(draft.rest) ? "mac.prod_part_rates" : "mac.part_rates"))
+                    .font(.caption)
             }
             // A part already in the list that carries none of them is costed
             // at the shop's default rates (`KhaytPrintRates.withRates`), and
             // says so: its fields here are blank, so nothing else on the sheet
             // shows what it is being charged at.
-            if parts.contains(where: { !$0.hasRates }) {
+            if !ProductRates.usesOwn(draft.rest), parts.contains(where: { !$0.hasRates }) {
                 Text(shop.words.callIt("mac.part_no_rates"))
                     .font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1118,11 +1161,23 @@ struct ProductSheet: View {
 
     /// Price what is in the list, through the shared rule.
     private func reprice() async {
-        pricing = await shop.priceProduct(parts: effectiveParts.map { $0.record(spools: shop.spools, reclaimsTax: shop.reclaimsTax) },
+        let records = effectiveParts.map { $0.record(spools: shop.spools, reclaimsTax: shop.reclaimsTax) }
+        pricing = await shop.priceProduct(parts: records,
                                           margin: draft.margin,
                                           components: draft.rest["components"],
                                           assemblyQty: draft.rest["assemblyQty"],
-                                          rule: rule)
+                                          rule: rule,
+                                          productRates: ProductRates.pricingFields(draft.rest))
+        // A product costed the old way: what labour once would make it cost,
+        // for the notice. Nothing is written until the shop chooses.
+        if !ProductRates.usesOwn(draft.rest), !effectiveParts.isEmpty {
+            proposedPricing = await shop.priceProduct(
+                parts: records, margin: draft.margin, components: draft.rest["components"],
+                assemblyQty: draft.rest["assemblyQty"], rule: rule,
+                productRates: ["rates": .object(ProductRates.proposed(parts: effectiveParts, defaults: rateDefaults))])
+        } else {
+            proposedPricing = nil
+        }
     }
 
     private func written(_ code: String) -> Bool {

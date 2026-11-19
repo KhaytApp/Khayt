@@ -65,6 +65,12 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// what the P&L's cost of goods is built from; a job's OWN margin adds it
     /// (`jobCost`). 0 on every job without components.
     let componentsCost: Double
+    /// A product's labour and packaging, charged ONCE at the job level when
+    /// the product carries its own rates (`lib/order-new.js`, #2581): frozen
+    /// beside the price like `componentsCost`, never in `costBasis`. 0 on
+    /// every job before Nov 19 and every job not from such a product.
+    let labourCost: Double
+    let packagingCost: Double
     let paymentStatus: String
     /// How the last payment arrived. Optional because an unpaid job has no
     /// answer, and "cash" is a claim rather than a default.
@@ -204,7 +210,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, jobNumber, date, timestamp, quoteAcceptedAt, clientApprovedAt, status, project, client, currency, price, paidAmount, costBasis, componentsCost
+        case id, jobNumber, date, timestamp, quoteAcceptedAt, clientApprovedAt, status, project, client, currency, price, paidAmount, costBasis, componentsCost, labourCost, packagingCost
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
         case machineId, operatorId, clientId, clientErasedAt, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
         case carrier, trackingNumber, shippingService, shippingStatus
@@ -319,6 +325,10 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         // nor make a margin read NaN.
         let components = (try? c.decodeIfPresent(Double.self, forKey: .componentsCost)) ?? nil
         componentsCost = components.map { $0.isFinite ? max(0, $0) : 0 } ?? 0
+        let labour = (try? c.decodeIfPresent(Double.self, forKey: .labourCost)) ?? nil
+        labourCost = labour.map { $0.isFinite ? max(0, $0) : 0 } ?? 0
+        let packaging = (try? c.decodeIfPresent(Double.self, forKey: .packagingCost)) ?? nil
+        packagingCost = packaging.map { $0.isFinite ? max(0, $0) : 0 } ?? 0
         paymentStatus = try c.decodeIfPresent(String.self, forKey: .paymentStatus) ?? ""
         paymentMethod = try c.decodeIfPresent(String.self, forKey: .paymentMethod)
         printTime = try c.decodeIfPresent(Double.self, forKey: .printTime) ?? 0

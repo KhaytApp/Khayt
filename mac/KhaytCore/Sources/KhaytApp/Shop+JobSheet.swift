@@ -180,9 +180,16 @@ extension Shop {
                     out.append(.object(first))
                 }
             } else {
+                // Whether a part added here shares the job's once-costs is the
+                // shop's rule in lib (`addedPartMark`), decided BEFORE it is
+                // costed: marked afterwards, it would be stored as sharing them
+                // while still carrying its own labour.
+                let mark = await handPartMark(orderId)
                 let costed = await costedPart(spoolId: d.spoolId, grams: TypedNumber.parse(d.grams) ?? 0,
-                                              hours: TypedNumber.parse(d.hours) ?? 0, qty: d.qty)
+                                              hours: TypedNumber.parse(d.hours) ?? 0, qty: d.qty,
+                                              extra: mark ? ["orderLevelCosts": .bool(true)] : [:])
                 var fresh = NewJobSheet.Draft()
+                if mark { fresh.raw["orderLevelCosts"] = .bool(true) }
                 fresh.name = d.name; fresh.spoolId = d.spoolId
                 fresh.grams = d.grams; fresh.hours = d.hours; fresh.qty = d.qty
                 fresh.cost = costed?.cost ?? 0

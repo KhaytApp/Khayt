@@ -167,6 +167,11 @@ extension Shop {
         /// to `newJobInput` beside what the sheet itself collects. Which fields
         /// those are is `lib/record-duplicate.js`'s to say, not this sheet's.
         var carried: [String: JSONValue] = [:]
+        /// A copied job's labour and packaging carried once (`labourCost` /
+        /// `packagingCost`, shop currency): its parts come marked
+        /// `orderLevelCosts` and are costed without them, so without these
+        /// the copy lost them (money review of #2577, HIGH).
+        var onceCosts: ProductOnceCosts = .none
     }
 
     /// Open the job sheet on `seed`.
