@@ -96,3 +96,44 @@ test('costedShare: no parts prices all of it (1); a 0-cost costed part beside ag
   assert.equal(N.costedShare([{ baseCost: 30 }, { baseCost: 10, agreedPrice: 20 }]), 0.75);
   assert.equal(N.costedShare([{ kind: 'components', baseCost: 50 }, { baseCost: 10 }]), 1);
 });
+
+// ── The job sheet: a part added BY HAND to a once-job (Dev Hub, Nov 19,
+// interim pending Turki): unmarked, its own labour; the order's once-costs
+// unchanged. A product part edited there keeps the mark. One rule decides:
+// KhaytCalculatorCost.keepsOrderLevelCosts.
+function sheetCosted() {
+  const src = fs.readFileSync(require('path').join(__dirname, '..', 'renderer', 'job-sheet.js'), 'utf8');
+  const at = src.indexOf('  function costed(part, order) {');
+  const body = src.slice(at, src.indexOf('\n  }\n', at) + 5);
+  const box = { global: globalThis, settings, list: () => [], PR: () => PRt, CC: () => CC, Math };
+  vm.runInNewContext(body + '\nthis.costed = costed;', box);
+  return box.costed;
+}
+
+test('the rule lives in one place: a marked part keeps it; a hand part on a once-job does not (for now)', () => {
+  assert.equal(CC.HAND_PARTS_SHARE_ONCE, false);
+  assert.equal(CC.keepsOrderLevelCosts({ orderLevelCosts: true }, { onceJob: true }), true);
+  assert.equal(CC.keepsOrderLevelCosts({}, { onceJob: true }), false);
+  assert.equal(CC.keepsOrderLevelCosts({}, { onceJob: false }), false);
+});
+
+test('the sheet: a manual part added to a once-job gets its own labour; the once-costs are unchanged', () => {
+  const costed = sheetCosted();
+  const job = make(jp.parts);
+  const manual = costed({ name: 'hand', qty: 1, printWeight: 100, printTime: 2, spoolCost: 90, spoolWeight: 1000, laborRate: 90, prepTime: 0.25, postTime: 0.5, failureRate: 10 }, job);
+  assert.equal(manual.orderLevelCosts, undefined, 'a hand part is not marked');
+  assert.ok(manual.baseCost > 70, 'it carries its own labour: ' + manual.baseCost);
+  const r = E.applyJobEdit(job, { parts: clone(job.parts).concat([manual]) }, { now: 1, id: 'e', priceId: 'e2', ids: ['N1'], settings, clients: [], priceSeenOk: true, keepPrice: false });
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(job.labourCost, jp.labourCost); assert.equal(job.packagingCost, jp.packagingCost);
+  const fresh = clone(jp.parts).concat([Object.assign({}, manual)]);
+  assert.ok(Math.abs(job.price - make(fresh).price) <= 0.0100001, `${job.price} vs ${make(fresh).price}`);
+});
+
+test('the sheet: a product part edited there keeps the mark (no labour of its own)', () => {
+  const costed = sheetCosted();
+  const job = make(jp.parts);
+  const edited = costed(Object.assign({}, job.parts[0], { qty: 2 }), job);
+  assert.equal(edited.orderLevelCosts, true);
+  assert.equal(edited.baseCost, 23.22);
+});

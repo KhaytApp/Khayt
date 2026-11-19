@@ -982,8 +982,12 @@ function addPart() {
   }
   const part = snapshotPartFromForm();
   // Its once-costs mark and group, as it had them (editingOnce).
+  // A part added by hand follows the shared rule (keepsOrderLevelCosts):
+  // unmarked for now, with its own labour.
   const once = editingOnce();
   if (once) { part.orderLevelCosts = true; if (once.onceGroup) part.onceGroup = once.onceGroup; }
+  else if (typeof KhaytCalculatorCost !== 'undefined' && KhaytCalculatorCost.keepsOrderLevelCosts
+    && KhaytCalculatorCost.keepsOrderLevelCosts(part, { onceJob: onceFixedCost() > 0 })) part.orderLevelCosts = true;
   // A part coming back from the form after Edit is the SAME part: it keeps
   // its id and its place in the cart. It was given a new id at the end,
   // so nothing that pointed at it (lib/part-ids.js, a part sheet, a file

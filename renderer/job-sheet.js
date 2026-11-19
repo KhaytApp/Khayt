@@ -59,12 +59,16 @@
   function costed(part, order) {
     const machine = list('machines').find((m) => m.id === (part.machineId || order.machineId));
     const rated = PR() ? PR().withRates(part, { settings, machine }) : Object.assign({}, part);
-    // A job carrying a product's labour and packaging ONCE (on the order): a
-    // part added or edited here is costed without them too, as the product's
-    // parts were, or the sheet charged them per part again on top of the
-    // order's (money review of #2581, HIGH: a qty 1→2 took 164.04 to 379.33).
+    // A product's part (and one edited from it) keeps `orderLevelCosts`, so it
+    // is costed without the labour and packaging the ORDER carries (money
+    // review of #2581, HIGH: a qty 1→2 took 164.04 to 379.33). A part added by
+    // hand follows the one shared rule (KhaytCalculatorCost.keepsOrderLevelCosts):
+    // for now it is unmarked and costed with its own labour (Dev Hub, Nov 19).
     const Mo = global.KhaytOrderMoney;
-    if (Mo && Mo.jobFixedCost && Mo.jobFixedCost(order, { components: false, overhead: false }) > 0) rated.orderLevelCosts = true;
+    const onceJob = !!(Mo && Mo.jobFixedCost && Mo.jobFixedCost(order, { components: false, overhead: false }) > 0);
+    if (CC() && CC().keepsOrderLevelCosts) {
+      if (CC().keepsOrderLevelCosts(part, { onceJob })) rated.orderLevelCosts = true; else delete rated.orderLevelCosts;
+    }
     const unit = CC() ? CC().computePartBaseCost(rated, { inventory: list('inventory'), settings }) : 0;
     rated.unitCost = +unit.toFixed(4);
     rated.baseCost = +(unit * Math.max(1, Math.round(+rated.qty || 1))).toFixed(2);
