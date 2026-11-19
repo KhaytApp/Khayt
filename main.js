@@ -328,6 +328,9 @@ const { setupAutoUpdater } = registerUpdater({
   // generation, a temp name recovery treats as a candidate, and no place in the
   // write chain — at the one moment the app is about to be replaced.
   writeStoreToDisk,
+  // ...and through the same guards as a save: the snapshot is the window's
+  // (#2592: it went to disk unchecked, the lock and roles with it).
+  guardStore: (normalized) => guardWindowStore(normalized),
 });
 
 /* ---------- Shared helpers ---------- */
@@ -1075,6 +1078,15 @@ ipcMain.handle('hub:list-backups', async () => {
 // These handlers used to call a decryptStoreSecrets that main.js stopped
 // importing when store-io.js was extracted, so every restore threw a
 // ReferenceError and reported "could not read the backup".
+/** Whether the book may be restored now: no lock on disk, or the owner signed in on it. */
+function restoreAllowed() {
+  let disk = null;
+  try { disk = readStoreDecryptedFromDisk(); } catch (_) { disk = null; }
+  if (!disk || !disk.settings) disk = (lanServerStore && lanServerStore.settings) ? lanServerStore : disk;
+  if (!disk || !disk.settings || !disk.settings.operatorLockEnabled) return true;
+  return require('./lib/api-tokens.js').mayManageTokens(disk);
+}
+
 async function restoreSnapshotForWindow(parsed, event, label) {
   if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
     console.error(`${label}: the store on disk is from a newer ${FLAVOR_NAME}; not restoring over it`);
@@ -1085,6 +1097,20 @@ async function restoreSnapshotForWindow(parsed, event, label) {
     console.error(`${label}: the backup is from a newer ${FLAVOR_NAME} (v${parsed.version}); not restoring it with v${STORE_VERSION}`);
     return null;
   }
+  // Under the operator lock ON DISK, putting a whole book back is the
+  // owner's (rbac security/edit): a backup the window wrote (hub:write-backup)
+  // could otherwise carry the lock off and any role, past every later save
+  // and gate (#2592 security review). Then the same role guard as a save.
+  if (!restoreAllowed()) {
+    console.error(`${label}: refused, only the owner may restore while the operator lock is on`);
+    return null;
+  }
+  try {
+    const disk = (() => { try { return readStoreDecryptedFromDisk(); } catch (_) { return null; } })() || lanServerStore;
+    const g = PrinterPermission.guardSave(parsed, disk, { verified: operatorVerified, consume: consumeVerified });
+    if (!g.store) { console.error(`${label}: refused, the backup has no settings`); return null; }
+    parsed = g.store;
+  } catch (e) { console.error(`${label}: role guard failed:`, e && e.message); return null; }
   // Decrypting the backup and sealing it again are both keychain work. Explain once first.
   await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
   const r = await restoreSnapshotToDisk(parsed);
@@ -1625,7 +1651,29 @@ async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
 }
 
 // Send an already-sliced G-code file straight to a printer (no slicing).
+// P5: who may send to or control a printer is decided HERE, from the store,
+// not trusted from the renderer (lib/main/printer-permission.js).
+const PrinterPermission = require('./lib/main/printer-permission.js');
+function printerGate(verb) {
+  if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+  return PrinterPermission.printerAllowed(lanServerStore, verb);
+}
+// Operators whose PIN main itself checked, and when: a save may sign in only
+// one of these (or one with no PIN). Two minutes covers the PIN pad's own save.
+const verifiedOperatorAt = new Map();
+const VERIFIED_FOR_MS = 2 * 60 * 1000;
+function operatorVerified(id) {
+  const at = verifiedOperatorAt.get(id);
+  return typeof at === 'number' && Date.now() - at < VERIFIED_FOR_MS;
+}
+function noteVerified(id) { if (id) verifiedOperatorAt.set(String(id), Date.now()); }
+// The save that signs them in USES the verification: it does not stay good
+// for another save inside the two minutes (#2592 re-check, L1).
+function consumeVerified(id) { verifiedOperatorAt.delete(String(id)); }
+
 ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startPrint } = {}) => {
+  const gate = printerGate('send');
+  if (!gate.ok) return gate;
   try {
     if (!gcodePath || !fs.existsSync(gcodePath)) return { ok: false, error: 'G-code file not found.' };
     return await uploadGcodeToPrinter(machine, gcodePath, startPrint);
@@ -1633,6 +1681,8 @@ ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startP
 });
 
 ipcMain.handle('hub:slice-and-print', async (_e, { modelPath, slicerPath, args, machine, startPrint } = {}) => {
+  const gate = printerGate('send');
+  if (!gate.ok) return gate;
   let outDir;
   try {
     const r = await runSlice({ modelPath, slicerPath, args });
@@ -1648,6 +1698,8 @@ ipcMain.handle('hub:slice-and-print', async (_e, { modelPath, slicerPath, args, 
 // the order-files folder (confined), slice it if it's a model or upload directly
 // if it's already G-code, then start the print.
 ipcMain.handle('hub:print-order-file', async (_e, { orderFile, machine, slicerPath, args, startPrint } = {}) => {
+  const gate = printerGate('send');
+  if (!gate.ok) return gate;
   let outDir;
   try {
     const full = path.join(orderFilesDir(), path.basename(String(orderFile || '')));
@@ -1742,6 +1794,22 @@ async function maybeShowKeychainExplanation(win) {
   }
 }
 
+/**
+ * The one-time owner migration (PrinterPermission.migrateLegacyOwner), main's
+ * own write: under the lock, when no operator resolves to the owner, the
+ * admin the lock made gets roleKey 'owner'. Never runs on a book that has an
+ * owner, so it changes nothing twice.
+ */
+async function migrateLegacyOwnerOnDisk() {
+  const disk = readStoreDecryptedFromDisk();
+  if (!disk || !disk.settings) return false;
+  const m = PrinterPermission.migrateLegacyOwner(disk);
+  if (!m.changed) return false;
+  await writeStoreToDisk(m.store);
+  console.warn('owner migration: operator', m.operatorId, 'is the owner by roleKey now (a lock older than #2264)');
+  return true;
+}
+
 ipcMain.handle('hub:load-store', async (event) => {
   // No keychain explanation here. This handler reads raw JSON, validates it and
   // MASKS secrets for the renderer — it never decrypts, so it never touches the
@@ -1778,7 +1846,11 @@ ipcMain.handle('hub:load-store', async (event) => {
     try { writeAppVersionBackup(rec.data); }
     catch (e) { console.error('hub:load-store: app-version backup failed:', e && e.message || e); }
     syncLanServerStoreFromDisk();
-    const { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
+    // A lock older than roleKey: its translated admin becomes the owner, once,
+    // on disk and in what the window gets (#2592 data review, MED-3).
+    try { await migrateLegacyOwnerOnDisk(); } catch (e) { console.error('hub:load-store: owner migration failed:', e && e.message); }
+    let { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
+    if (normalized) normalized = PrinterPermission.migrateLegacyOwner(normalized).store;
     if (!normalized) {
       console.error('hub:load-store: unrecoverable store shape:', errors.join('; '));
       return { __corrupt: true, error: errors[0] || 'Invalid store' };
@@ -2069,6 +2141,8 @@ const machineSecrets = require('./lib/main/machine-secrets.js').createMachineSec
 // auto-off after a cooled print. Same LAN pinning and secret fill as printers.
 require('./lib/main/smart-plug.js').registerSmartPlug({
   ipcMain,
+  // Switching a printer's power is controlling it (P5); reading it is not.
+  gate: (verb) => printerGate(verb),
   fill: (m) => machineSecrets.fill(m),
   resolveTarget: (host) => resolvePrinterTarget(host),
   statusCache: () => printerStatusCache,
@@ -2287,6 +2361,52 @@ ipcMain.handle('hub:mint-api-token', async (_e, { label, scopes } = {}) => {
 // that version's data permanently, with only a console warning. Refuse instead.
 let _diskStoreVersion = null;
 
+/**
+ * Every guard a book that came from the WINDOW passes before it is written:
+ * the save (hub:save-store) and the pre-install flush (lib/updater.js). Its
+ * secrets are merged from disk; then, against the book on disk (or main's own
+ * copy when the disk cannot be read, #2592 M1):
+ *   - no settings object over a book that has one is REFUSED (#2592 H1: it
+ *     wiped every setting, and skipped both guards);
+ *   - API tokens: only the owner adds or revokes (ApiTokens.guardTokenSave);
+ *   - the lock, roles, PINs, sign-in and printer connections
+ *     (PrinterPermission.guardSave).
+ * Returns { store } or { error }. A guard that throws refuses.
+ */
+function guardWindowStore(normalized) {
+  let merged = mergeStoreSecretsFromDisk(normalized);
+  const refused = [];
+  let guardDisk = null;
+  try { guardDisk = readStoreDecryptedFromDisk(); } catch (_) { guardDisk = null; }
+  if (!guardDisk || !guardDisk.settings) guardDisk = (lanServerStore && lanServerStore.settings) ? lanServerStore : guardDisk;
+  if (guardDisk && guardDisk.settings && !(normalized && normalized.settings && typeof normalized.settings === 'object' && !Array.isArray(normalized.settings))) {
+    console.error('store guard: refused a book with no settings');
+    return { error: 'settings_missing' };
+  }
+  try {
+    const ApiTokens = require('./lib/api-tokens.js');
+    const guarded = ApiTokens.guardTokenSave(merged, guardDisk);
+    if (!guarded) return { error: 'settings_missing' };
+    if (guarded !== merged) { console.warn('store guard: API token change refused for this role'); refused.push('settings.lanApi.apiTokens'); }
+    merged = guarded;
+  } catch (e) {
+    console.error('store guard: token guard failed:', e && e.message);
+    return { error: 'token_guard_failed' };
+  }
+  try {
+    const g = PrinterPermission.guardSave(merged, guardDisk, { verified: operatorVerified, consume: consumeVerified });
+    if (!g.store) return { error: 'settings_missing' };
+    if (g.refused.length) { console.warn('store guard: refused for this role:', g.refused.join(', ')); refused.push(...g.refused); }
+    merged = g.store;
+  } catch (e) {
+    console.error('store guard: role guard failed:', e && e.message);
+    return { error: 'role_guard_failed' };
+  }
+  // What was put back as it is on disk: the window reloads and says so
+  // (#2592 review), instead of showing an edit that was never kept.
+  return { store: merged, refused };
+}
+
 ipcMain.handle('hub:save-store', async (event, data) => {
   // A save is when a credential changes: the next printer call reads it fresh.
   machineSecrets.forget();
@@ -2314,13 +2434,10 @@ ipcMain.handle('hub:save-store', async (event, data) => {
     // Creating or revoking an API token is the owner's (rbac security/edit,
     // as on the Mac): a save from a role that may not changes the token list
     // back to what is on disk, whatever the window sent.
-    let merged = mergeStoreSecretsFromDisk(normalized);
-    try {
-      const ApiTokens = require('./lib/api-tokens.js');
-      const guarded = ApiTokens.guardTokenSave(merged, readStoreDecryptedFromDisk());
-      if (guarded !== merged) console.warn('hub:save-store: API token change refused for this role');
-      merged = guarded;
-    } catch (e) { console.error('hub:save-store: token guard failed:', e && e.message); }
+    // Every guard a book from the WINDOW goes through (guardWindowStore).
+    const guarded = guardWindowStore(normalized);
+    if (guarded.error) return { ok: false, error: guarded.error };
+    let merged = guarded.store;
     // First real keychain write. Explain once, before encryptForDisk triggers
     // the OS permission prompt — but only when there is actually a plaintext
     // secret to encrypt, so a shop that never configures a credential is never
@@ -2344,7 +2461,7 @@ ipcMain.handle('hub:save-store', async (event, data) => {
     // Atomic + durable: fsync'd temp swap, with a one-generation .prev rollback.
     await atomicWriteStore(serialized);
     lanServerStore = merged;  // keep LAN server in sync (plaintext in-memory)
-    return { ok: true };
+    return guarded.refused && guarded.refused.length ? { ok: true, refused: guarded.refused } : { ok: true };
   } catch (e) {
     console.error('hub:save-store error:', e);
     return { ok: false, error: String(e) };
@@ -4794,12 +4911,15 @@ ipcMain.handle('hub:verify-operator-pin', async (_event, { operatorId, pin } = {
   if (!lanServerStore?.operators?.length) syncLanServerStoreFromDisk();
   const op = (lanServerStore?.operators || []).find(o => o.id === operatorId);
   if (!op) return { ok: false, error: 'operator_not_found' };
-  if (!op.pinHash) return { ok: true, noPin: true };
+  // A deactivated person is nobody to sign in (#2592 re-check, L4).
+  if (op.active === false) return { ok: false, error: 'operator_inactive' };
+  if (!op.pinHash) { noteVerified(op.id); return { ok: true, noPin: true }; }
   // Verify against either the salted PBKDF2 format or a legacy SHA-256 hash.
   // Unrecognized formats (the very old base64 scheme) report legacy_pin so the
   // renderer re-prompts to set a fresh PIN.
   if (!isManagedHash(op.pinHash)) return { ok: false, error: 'legacy_pin' };
   const ok = verifyPin(String(pin || ''), op.pinHash);
+  if (ok) noteVerified(op.id);
   // A correct PIN against a LEGACY hash is the moment to replace it — the only
   // moment, because it is the only time the plaintext is in hand. See the note
   // on `hub:verify-pin`. The caller writes it; this cannot, because the store's
@@ -4828,8 +4948,26 @@ ipcMain.handle('hub:hash-pin', async (_e, pin) => hashPinSalted(String(pin ?? ''
 // written: this handler does not know which record the caller read it from —
 // an operator's `pinHash`, `settings.recoveryCodeHash` — and guessing would be
 // worse than handing it back to the one place that does know.
-ipcMain.handle('hub:verify-pin', async (_e, plain, stored) => {
+ipcMain.handle('hub:verify-pin', async (_e, plain, stored, forOperatorId) => {
   const ok = verifyPin(String(plain ?? ''), stored);
+  // Whose PIN was it? The operator the screen asked for when it says (an
+  // unsalted legacy hash can be shared by two people, so not every match:
+  // #2592 re-check, L5), else the owner's admin PIN / recovery code: main
+  // notes it, so the save that signs them in is allowed (P5).
+  if (ok && stored) {
+    try {
+      const disk = readStoreDecryptedFromDisk() || {};
+      const ops = (Array.isArray(disk.operators) ? disk.operators : []).filter((o) => o && o.active !== false);
+      if (forOperatorId) {
+        const o = ops.find((x) => x.id === forOperatorId);
+        if (o && o.pinHash === stored) noteVerified(o.id);
+      }
+      const st = disk.settings || {};
+      if (stored === st.recoveryCodeHash || stored === st.adminPinHash) {
+        for (const o of ops) if (o && (o.roleKey || require('./lib/rbac.js').roleFromLegacy(o.role, { hasLock: true })) === 'owner') noteVerified(o.id);
+      }
+    } catch (_) { /* nothing noted: a later sign-in save is refused, not allowed */ }
+  }
   return { ok, upgraded: ok && needsUpgrade(stored) ? hashPinSalted(String(plain ?? '')) : null };
 });
 
@@ -5722,6 +5860,8 @@ ipcMain.handle('hub:printer-plate', async (_e, { machine } = {}) => {
 });
 
 ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) => {
+  const gate = printerGate('control');
+  if (!gate.ok) return gate;
   const read = await plateObjects(machine);
   if (!read.ok) return read;
   const req = excludeObject.excludeRequest(name, read.data);
@@ -5738,8 +5878,10 @@ ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) 
   }
 });
 
-ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) =>
-  sendPrinterCommand(machine, command));
+ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) => {
+  const gate = printerGate('control');
+  return gate.ok ? sendPrinterCommand(machine, command) : gate;
+});
 
 /**
  * A Bambu's speed preset and chamber light — the Mac's PrinterControl.swift
@@ -5762,8 +5904,10 @@ async function sendPrinterControl(machine, control, value) {
   const r = await bambu.bambuSendCommand({ host: target.urlHost, port: portNum, accessCode, serial: dev, mqtt: req.mqtt });
   return r.ok ? { ok: true, control } : r;
 }
-ipcMain.handle('hub:printer-control', async (_e, { machine, control, value } = {}) =>
-  sendPrinterControl(machine, control, value));
+ipcMain.handle('hub:printer-control', async (_e, { machine, control, value } = {}) => {
+  const gate = printerGate('control');
+  return gate.ok ? sendPrinterControl(machine, control, value) : gate;
+});
 // Read-only: safe to call while the printer is mid-job, which is when a shop is
 // most likely to reach for it.
 /**

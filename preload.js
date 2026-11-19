@@ -222,7 +222,9 @@ contextBridge.exposeInMainWorld('hubAPI', {
   storeOwned:    ()       => ipcRenderer.invoke('hub:store-owned'),
   fetchExchangeRates: (base) => ipcRenderer.invoke('hub:fetch-exchange-rates', base),
   hashPin: (pin) => ipcRenderer.invoke('hub:hash-pin', pin),
-  verifyPin: (plain, stored) => ipcRenderer.invoke('hub:verify-pin', plain, stored),
+  // forOperatorId: whose PIN this is, when it is an operator's (main notes that
+  // person verified, for the sign-in save; P5).
+  verifyPin: (plain, stored, forOperatorId) => ipcRenderer.invoke('hub:verify-pin', plain, stored, forOperatorId),
   storeSize:     ()       => ipcRenderer.invoke('hub:store-size'),
   revealStoreFile: ()     => ipcRenderer.invoke('hub:reveal-store-file'),
   clipboardWrite: (text)  => ipcRenderer.invoke('hub:clipboard-write', text),
