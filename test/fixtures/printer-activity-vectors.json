@@ -1,0 +1,3341 @@
+{
+ "about": "lib/printer-activity.js: each protocol's state words (sources in the module header) → {link, activity}; `main` is lib/attention.js machineState on main before C2, `legacy` its value once every fix class is on. A class not yet fixed must read `main`. Synthetic entries.",
+ "cases": [
+  {
+   "why": "moonraker \"standby\"",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "standby",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "moonraker \"standby\", progress 40",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "standby",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "moonraker \"printing\"",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "printing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "moonraker \"printing\", progress 40",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "printing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "moonraker \"paused\"",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "paused",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "moonraker \"paused\", progress 40",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "paused",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "moonraker \"complete\"",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "complete",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "moonraker \"complete\", progress 40",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "complete",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "moonraker \"cancelled\"",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "cancelled",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "moonraker \"cancelled\", progress 40",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "cancelled",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "moonraker \"error\"",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "error",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "error"
+   },
+   "cls": "person",
+   "main": "error",
+   "legacy": "error"
+  },
+  {
+   "why": "moonraker \"error\", progress 40",
+   "protocol": "moonraker",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "error",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "error"
+   },
+   "cls": "person",
+   "main": "error",
+   "legacy": "error"
+  },
+  {
+   "why": "octoprint \"Operational\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Operational",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "octoprint \"Operational\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Operational",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Printing\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Printing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Printing\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Printing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Printing from SD\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Printing from SD",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Printing from SD\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Printing from SD",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Sending file to SD\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Sending file to SD",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Sending file to SD\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Sending file to SD",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Pausing\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Pausing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Pausing\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Pausing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Paused\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Paused",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Paused\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Paused",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Resuming\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Resuming",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Resuming\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Resuming",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Cancelling\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Cancelling",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Cancelling\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Cancelling",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Finishing\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Finishing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Finishing\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Finishing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "octoprint \"Error: Printer halted\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Error: Printer halted",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "error",
+   "legacy": "error"
+  },
+  {
+   "why": "octoprint \"Error: Printer halted\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Error: Printer halted",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "error",
+   "legacy": "error"
+  },
+  {
+   "why": "octoprint \"Offline\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Offline",
+    "progress": 0
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "idle",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "octoprint \"Offline\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Offline",
+    "progress": 40
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "printing",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "octoprint \"Opening serial port\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Opening serial port",
+    "progress": 0
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "idle",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "octoprint \"Opening serial port\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Opening serial port",
+    "progress": 40
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "printing",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "octoprint \"Detecting serial port\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Detecting serial port",
+    "progress": 0
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "idle",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "octoprint \"Detecting serial port\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Detecting serial port",
+    "progress": 40
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "printing",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "octoprint \"Detecting baudrate\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Detecting baudrate",
+    "progress": 0
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "idle",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "octoprint \"Detecting baudrate\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Detecting baudrate",
+    "progress": 40
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "printing",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "octoprint \"Connecting\"",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Connecting",
+    "progress": 0
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "idle",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "octoprint \"Connecting\", progress 40",
+   "protocol": "octoprint",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Connecting",
+    "progress": 40
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "printing",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "prusalink \"IDLE\"",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "IDLE",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "prusalink \"IDLE\", progress 40",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "IDLE",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "prusalink \"BUSY\"",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "BUSY",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "prusalink \"BUSY\", progress 40",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "BUSY",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "prusalink \"PRINTING\"",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "PRINTING",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "prusalink \"PRINTING\", progress 40",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "PRINTING",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "prusalink \"PAUSED\"",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "PAUSED",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "prusalink \"PAUSED\", progress 40",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "PAUSED",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "prusalink \"FINISHED\"",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "FINISHED",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "prusalink \"FINISHED\", progress 40",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "FINISHED",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "prusalink \"STOPPED\"",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "STOPPED",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "prusalink \"STOPPED\", progress 40",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "STOPPED",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "prusalink \"ERROR\"",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "ERROR",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "error"
+   },
+   "cls": "person",
+   "main": "error",
+   "legacy": "error"
+  },
+  {
+   "why": "prusalink \"ERROR\", progress 40",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "ERROR",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "error"
+   },
+   "cls": "person",
+   "main": "error",
+   "legacy": "error"
+  },
+  {
+   "why": "prusalink \"ATTENTION\"",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "ATTENTION",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "error"
+   },
+   "cls": "person",
+   "main": "idle",
+   "legacy": "error"
+  },
+  {
+   "why": "prusalink \"ATTENTION\", progress 40",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "ATTENTION",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "error"
+   },
+   "cls": "person",
+   "main": "printing",
+   "legacy": "error"
+  },
+  {
+   "why": "prusalink \"READY\"",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "READY",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "prusalink \"READY\", progress 40",
+   "protocol": "prusalink",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "READY",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "bambu \"Idle\"",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Idle",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "bambu \"Idle\", progress 40",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Idle",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "bambu \"Preparing\"",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Preparing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "bambu \"Preparing\", progress 40",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Preparing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "bambu \"Printing\"",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Printing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "bambu \"Printing\", progress 40",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Printing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "bambu \"Paused\"",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Paused",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "bambu \"Paused\", progress 40",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Paused",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "bambu \"Finished\"",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Finished",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "bambu \"Finished\", progress 40",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Finished",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "bambu \"Failed\"",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Failed",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "error"
+   },
+   "cls": "person",
+   "main": "idle",
+   "legacy": "error"
+  },
+  {
+   "why": "bambu \"Failed\", progress 40",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Failed",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "error"
+   },
+   "cls": "person",
+   "main": "printing",
+   "legacy": "error"
+  },
+  {
+   "why": "bambu \"Slicing\"",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Slicing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "bambu \"Slicing\", progress 40",
+   "protocol": "bambu",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Slicing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "repetier \"Offline\"",
+   "protocol": "repetier",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Offline",
+    "progress": 0
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "idle",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "repetier \"Offline\", progress 40",
+   "protocol": "repetier",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Offline",
+    "progress": 40
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "printing",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "repetier \"Paused\"",
+   "protocol": "repetier",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Paused",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "repetier \"Paused\", progress 40",
+   "protocol": "repetier",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Paused",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "repetier \"Preparing\"",
+   "protocol": "repetier",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Preparing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "repetier \"Preparing\", progress 40",
+   "protocol": "repetier",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Preparing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "repetier \"Printing\"",
+   "protocol": "repetier",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Printing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "repetier \"Printing\", progress 40",
+   "protocol": "repetier",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Printing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "repetier \"Idle\"",
+   "protocol": "repetier",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Idle",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "repetier \"Idle\", progress 40",
+   "protocol": "repetier",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Idle",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"idle\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "idle",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "duet \"idle\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "idle",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"busy\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "busy",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"busy\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "busy",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"printing\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "printing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"printing\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "printing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"pausing\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "pausing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"pausing\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "pausing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"paused\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "paused",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"paused\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "paused",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"resuming\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "resuming",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"resuming\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "resuming",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"cancelling\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "cancelling",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"cancelling\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "cancelling",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"changingTool\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "changingTool",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"changingTool\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "changingTool",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"processing\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "processing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"processing\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "processing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"simulating\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "simulating",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"simulating\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "simulating",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"starting\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "starting",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"starting\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "starting",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"halted\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "halted",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "error"
+   },
+   "cls": "person",
+   "main": "idle",
+   "legacy": "error"
+  },
+  {
+   "why": "duet \"halted\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "halted",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "error"
+   },
+   "cls": "person",
+   "main": "printing",
+   "legacy": "error"
+  },
+  {
+   "why": "duet \"off\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "off",
+    "progress": 0
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "idle",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "duet \"off\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "off",
+    "progress": 40
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": "unlinked",
+   "main": "printing",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "duet \"updating\"",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "updating",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "duet \"updating\", progress 40",
+   "protocol": "duet",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "updating",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"idle\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "idle",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "sdcp \"idle\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "idle",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "idle"
+   },
+   "cls": "idle",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"printing\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "printing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"printing\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "printing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"transferring\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "transferring",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"transferring\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "transferring",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"exposure_testing\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "exposure_testing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"exposure_testing\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "exposure_testing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"self_testing\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "self_testing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"self_testing\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "self_testing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"homing\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "homing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"homing\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "homing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"dropping\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "dropping",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"dropping\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "dropping",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"exposing\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "exposing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"exposing\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "exposing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"lifting\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "lifting",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"lifting\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "lifting",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"pausing\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "pausing",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"pausing\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "pausing",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"paused\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "paused",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"paused\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "paused",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "paused"
+   },
+   "cls": "paused",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"stopping\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "stopping",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"stopping\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "stopping",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"stopped\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "stopped",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "sdcp \"stopped\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "stopped",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"complete\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "complete",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "sdcp \"complete\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "complete",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "finished"
+   },
+   "cls": "finished",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"file_checking\"",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "file_checking",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "idle",
+   "legacy": "printing"
+  },
+  {
+   "why": "sdcp \"file_checking\", progress 40",
+   "protocol": "sdcp",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "file_checking",
+    "progress": 40
+   },
+   "status": {
+    "link": "online",
+    "activity": "printing"
+   },
+   "cls": "busy",
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "manual offline wins over a printing poll",
+   "machine": {
+    "isOffline": true,
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "printing",
+    "progress": 50
+   },
+   "status": {
+    "link": "offline",
+    "activity": null
+   },
+   "cls": null,
+   "main": "offline",
+   "legacy": "offline"
+  },
+  {
+   "why": "no printer API, never polled: unpaired (legacy idle)",
+   "machine": {
+    "id": "M2"
+   },
+   "entry": null,
+   "status": {
+    "link": "unpaired",
+    "activity": null
+   },
+   "cls": null,
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "a printer API, never heard from: connecting (legacy unknown)",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": null,
+   "status": {
+    "link": "connecting",
+    "activity": null
+   },
+   "cls": null,
+   "main": "unknown",
+   "legacy": "unknown"
+  },
+  {
+   "why": "one failed poll: reconnecting",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "error": "ETIMEDOUT",
+    "consecutiveFailures": 1
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": null,
+   "main": "reconnecting",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "three failed polls: offline",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "error": "ETIMEDOUT",
+    "consecutiveFailures": 3
+   },
+   "status": {
+    "link": "offline",
+    "activity": null
+   },
+   "cls": null,
+   "main": "offline",
+   "legacy": "offline"
+  },
+  {
+   "why": "HTTP 401 kept by the poller: unauthorized (legacy as a failing poll)",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "error": "The printer refused the API key",
+    "httpStatus": 401,
+    "consecutiveFailures": 1
+   },
+   "status": {
+    "link": "unauthorized",
+    "activity": null
+   },
+   "cls": null,
+   "main": "reconnecting",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "403 in the error words, no status kept: unauthorized",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "error": "Printer responded 403",
+    "consecutiveFailures": 4
+   },
+   "status": {
+    "link": "unauthorized",
+    "activity": null
+   },
+   "cls": null,
+   "main": "offline",
+   "legacy": "offline"
+  },
+  {
+   "why": "a 500 kept by the poller, words mention \"access code\": the status wins, not unauthorized",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "error": "check the access code",
+    "httpStatus": 500,
+    "consecutiveFailures": 1
+   },
+   "status": {
+    "link": "reconnecting",
+    "activity": null
+   },
+   "cls": null,
+   "main": "reconnecting",
+   "legacy": "reconnecting"
+  },
+  {
+   "why": "unknown word \"Kneading\": the old rule, as main",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Kneading",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "unknown word \"Kneading\", progress 10: the old rule, as main",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Kneading",
+    "progress": 10
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "unknown word \"SOMETHING_NEW\": the old rule, as main",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "SOMETHING_NEW",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "unknown word \"SOMETHING_NEW\", progress 10: the old rule, as main",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "SOMETHING_NEW",
+    "progress": 10
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "unknown word \"Printing (custom)\": the old rule, as main",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Printing (custom)",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "unknown word \"Printing (custom)\", progress 10: the old rule, as main",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "Printing (custom)",
+    "progress": 10
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "printing",
+   "legacy": "printing"
+  },
+  {
+   "why": "unknown word \"warming up error\": the old rule, as main",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "warming up error",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "error",
+   "legacy": "error"
+  },
+  {
+   "why": "unknown word \"warming up error\", progress 10: the old rule, as main",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "warming up error",
+    "progress": 10
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "error",
+   "legacy": "error"
+  },
+  {
+   "why": "unknown word \"\": the old rule, as main",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "",
+    "progress": 0
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "idle",
+   "legacy": "idle"
+  },
+  {
+   "why": "unknown word \"\", progress 10: the old rule, as main",
+   "machine": {
+    "id": "M1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "entry": {
+    "state": "",
+    "progress": 10
+   },
+   "status": {
+    "link": "online",
+    "activity": "unknown"
+   },
+   "cls": null,
+   "main": "printing",
+   "legacy": "printing"
+  }
+ ]
+}

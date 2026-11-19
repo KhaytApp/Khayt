@@ -518,3 +518,19 @@ test('a relaunched poller adds to the saved completions instead of replacing the
   const many = { M1: Array.from({ length: 12 }, (_, i) => a(i + 1, i + '.gcode')) };
   assert.equal(C.mergePersisted(many, {}).M1.length, C.COMPLETIONS_KEPT);
 });
+
+test('a failed poll keeps the HTTP status the printer answered, and only a real one (C2)', () => {
+  const PC = require('../lib/printer-poll-cache.js');
+  const PA = require('../lib/printer-activity.js');
+  const m = { printerApi: { type: 'prusalink' } };
+  const f1 = PC.mergePollFailure({ state: 'IDLE' }, 'The printer refused the API key', 1000, 401);
+  assert.equal(f1.httpStatus, 401);
+  assert.equal(PA.machineStatus(m, f1).link, 'unauthorized');
+  // A network failure next: no status, and the old one does not linger.
+  const f2 = PC.mergePollFailure(f1, 'ETIMEDOUT', 2000, undefined);
+  assert.equal('httpStatus' in f2, false);
+  assert.equal(PA.machineStatus(m, f2).link, 'reconnecting');
+  for (const bad of [0, 99, 600, 401.5, '401', null]) assert.equal('httpStatus' in PC.mergePollFailure({}, 'x', 1, bad), false, String(bad));
+  // A good poll is a fresh entry.
+  assert.equal('httpStatus' in PC.mergePollSuccess(f1, { ok: true, state: 'IDLE' }, 3000), false);
+});
