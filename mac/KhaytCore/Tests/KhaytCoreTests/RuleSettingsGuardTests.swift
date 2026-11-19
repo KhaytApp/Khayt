@@ -101,7 +101,7 @@ struct RuleSettingsGuardTests {
         "pluginRunnable", "pluginSetSwitch", "pluginUpdateFetches", "portalPayload",
         "portalRecordPayment", "portalRefresh", "portalUndoPayment", "powerByMachine",
         "priceComparables", "priceProduct", "printRateDefaults", "printRates", "printerAlerts",
-        "productPricingFields", "productProfit", "quoteFunnel", "quotesToChase",
+        "productJobParts", "productPricingFields", "productProfit", "quoteFunnel", "quotesToChase",
         "rawPriceComparables", "receivables", "recordPayment", "recordQcFailure",
         "recurringOrders", "reminderEmail", "reminderPlan", "restoreDeposit", "shoppingList",
         "smsAccount", "spoolColours", "statusGate", "statusGates", "stockRunway",
