@@ -71,6 +71,30 @@
    * `idBase` makes each part's id (`<idBase>-P1`, …) so the same delivery
    * always builds the same ids.
    */
+  /**
+   * A product's line of `units` pieces: { parts, labourCost, packagingCost }.
+   * A product with its own rates (labour once) goes through
+   * lib/product-pricing.js productJobParts, as a hand-made job from it does:
+   * parts without labour and packaging, which the job carries ONCE for the
+   * line, prep once + post × units (KhaytOrderMoney.lineLabour; Turki, Nov
+   * 19), and a box per piece. Any other product: each part rated and costed,
+   * its own labour per line (prep once, post per piece), as before.
+   */
+  function productLine(product, units, book, idBase) {
+    const PP = sibling('KhaytProductPricing', './product-pricing.js');
+    const n = Math.max(1, count(units));
+    const once = PP && typeof PP.usesProductRates === 'function' && PP.usesProductRates(product)
+      && product.labourPerPart !== true && typeof PP.productJobParts === 'function';
+    if (!once) return { parts: productParts(product, n, book, idBase), labourCost: 0, packagingCost: 0 };
+    const b = book || {};
+    const jp = PP.productJobParts(product, { inventory: b.inventory || [], settings: b.settings || {}, consumables: b.consumables || [], units: n });
+    const parts = jp.parts.map((p, i) => Object.assign({}, p, {
+      id: `${idBase}-P${i + 1}`, qty: Math.min(MAX_QTY, p.qty), partStatus: 'pending',
+      baseCost: +(+p.baseCost || 0).toFixed(4),
+    }));
+    return { parts, labourCost: +jp.labourCost || 0, packagingCost: +jp.packagingCost || 0 };
+  }
+
   function productParts(product, units, book, idBase) {
     const PR = sibling('KhaytPrintRates', './print-rates.js');
     const CC = sibling('KhaytCalculatorCost', './calculator-cost.js');
@@ -167,6 +191,7 @@
     const all = !!(reading && reading.allFromShelf);
     const lines = (reading && Array.isArray(reading.lines)) ? reading.lines : [];
     const parts = [];
+    let labourCost = 0, packagingCost = 0;
     const made = new Map();
     lines.forEach((line, i) => {
       const product = line.productId ? byId.get(str(line.productId)) : null;
@@ -181,9 +206,16 @@
       }
       const units = all ? count(line.qty) : count(line.toPrint);
       made.set(str(product.id), (made.get(str(product.id)) || 0) + units);
-      if (units > 0) parts.push(...productParts(product, units, b, `${idBase}-L${i + 1}`));
+      if (units > 0) {
+        const one = productLine(product, units, b, `${idBase}-L${i + 1}`);
+        parts.push(...one.parts);
+        labourCost += one.labourCost; packagingCost += one.packagingCost;
+      }
     });
     const out = { storeLines, notes, parts, productId: null };
+    // A product's labour and packaging once per line, on the job (absent when 0).
+    if (labourCost > 0) out.labourCost = +labourCost.toFixed(4);
+    if (packagingCost > 0) out.packagingCost = +packagingCost.toFixed(4);
     if (made.size === 1) {
       const [id, units] = [...made][0];
       out.productId = id;
@@ -200,6 +232,8 @@
       next.parts = job.parts;
       Object.assign(next, summary(job.parts));
     }
+    if (job.labourCost > 0) next.labourCost = job.labourCost;
+    if (job.packagingCost > 0) next.packagingCost = job.packagingCost;
     if (job.productId) {
       next.productId = job.productId;
       next.components = job.components;
@@ -230,7 +264,11 @@
     const next = Object.assign({}, o);
     next.storeLines = lines.map((l, i) => (i === index
       ? Object.assign({}, l, { productId: str(product.id), matchedBy: 'shop' }) : l));
-    const added = productParts(product, Math.max(1, count(line.qty)), book, `${str(o.id)}-L${index + 1}`);
+    const placedLine = productLine(product, Math.max(1, count(line.qty)), book, `${str(o.id)}-L${index + 1}`);
+    const added = placedLine.parts;
+    // Its once-costs join the job's (lib/order-money.js jobFixedCost).
+    if (placedLine.labourCost > 0) next.labourCost = +((+o.labourCost || 0) + placedLine.labourCost).toFixed(4);
+    if (placedLine.packagingCost > 0) next.packagingCost = +((+o.packagingCost || 0) + placedLine.packagingCost).toFixed(4);
     // The Mac's cloud queue keeps an unmatched line as a bare part named after
     // it (no weight, no spool, no model). Placed now, that stand-in is replaced
     // rather than printed beside the real parts.
@@ -296,7 +334,7 @@
     return lines.map((l, index) => ({ index, line: l })).filter((x) => x.line && !x.line.productId);
   }
 
-  const api = { NOT_MATCHED, unmatchedNote, productParts, summary, linesOf, build, apply, assignLine, unmatched, orderPrice };
+  const api = { NOT_MATCHED, unmatchedNote, productLine, productParts, summary, linesOf, build, apply, assignLine, unmatched, orderPrice };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytStoreOrderJob = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

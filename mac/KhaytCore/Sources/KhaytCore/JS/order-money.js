@@ -344,6 +344,25 @@
    * of goods leaves components out). The ONE place these fields are read
    * (test/job-cost-ratchet.test.js).
    */
+  /**
+   * The labour of ONE LINE of work, before any failure buffer: prep ONCE for
+   * the line, post-processing / assembly PER PIECE (Turki, Nov 19):
+   *   (prepTime + postTime × qty) × laborRate.
+   * A line is a part (its own qty), or a product (qty = how many of it, the
+   * product's own hours; its parts' qty do not multiply post: assembly is per
+   * finished product), or a store order's line of N products. The ONE rule:
+   * the calculator's part cost (lib/calculator-cost.js), a product's labour
+   * (lib/product-pricing.js) and store orders (lib/store-order-job.js) all
+   * call it, and so do the Mac and the phone. It used to be (prep + post) ×
+   * rate per PIECE, so prep was charged qty times: +24.75 a piece by default.
+   */
+  function lineLabour(line) {
+    const l = line || {};
+    const pos = (v) => Math.max(0, +v || 0);
+    const qty = Math.max(1, +l.qty || 1);
+    return (pos(l.prepTime) + pos(l.postTime) * qty) * pos(l.laborRate);
+  }
+
   function jobFixedCost(order, opts) {
     const o = order || {};
     const x = opts || {};
@@ -381,6 +400,7 @@
   }
 
   const api = {
+    lineLabour,
     HAND_PARTS_SHARE_ONCE: false,   // Turki, Nov 19 (see addedPartMark)
     addedPartMark,
     jobCost, jobFixedCost,
