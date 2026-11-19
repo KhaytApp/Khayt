@@ -84,7 +84,7 @@ try {
 
   // ── 2. Ready → Send → Copy → Sent ────────────────────────────────────────
   await switchTab(window, 'logs-tab');
-  await window.click('[data-act="edit-log"][data-id="QPL-READY"]');
+  await window.evaluate((id) => openOrderEditor(id), 'QPL-READY');  // the OLD editor, until step 8 (the Orders Log's Edit opens the job sheet now)
   await window.waitForSelector('.qpl-line[data-state="ready"]', { timeout: 10_000 });
   ok((await window.textContent('.qpl-line[data-state="ready"]')).includes('Quote approved. Not paid.'), 'the job line says Ready');
   await window.click('.qpl-line[data-state="ready"] [data-act="qpl-send"]');
@@ -119,7 +119,7 @@ try {
   await window.click('.modal-form [data-act="cancel"]');
 
   // ── 3. Can't send: a part with no weight ─────────────────────────────────
-  await window.click('[data-act="edit-log"][data-id="QPL-NOWEIGHT"]');
+  await window.evaluate((id) => openOrderEditor(id), 'QPL-NOWEIGHT');  // the OLD editor, until step 8 (the Orders Log's Edit opens the job sheet now)
   await window.waitForSelector('.qpl-line[data-state="ready"]', { timeout: 10_000 });
   await window.click('.qpl-line [data-act="qpl-send"]');
   await window.waitForSelector('.qpl-sheet .qpl-why[data-reason="no_weight"]', { timeout: 10_000 });
@@ -136,17 +136,17 @@ try {
     ['QPL-MISMATCH', 'mismatch', '290.00 paid, 340.00 quoted'],
     ['QPL-OUTDATED', 'sent', 'The quote has changed since: this link charges 290.00, the quote now comes to 340.00'],
   ]) {
-    await window.click(`[data-act="edit-log"][data-id="${id}"]`);
+    await window.evaluate((i) => openOrderEditor(i), id);  // the OLD editor, until step 8
     await window.waitForSelector(`.qpl-line[data-state="${state}"]`, { timeout: 10_000 });
     const text = await window.textContent(`.qpl-line[data-state="${state}"]`);
     ok(text.includes(words), `${state}: "${text.replace(/\s+/g, ' ').trim()}"`);
     await window.click('.modal-form [data-act="cancel"]');
   }
-  await window.click('[data-act="edit-log"][data-id="QPL-OUTDATED"]');
+  await window.evaluate((id) => openOrderEditor(id), 'QPL-OUTDATED');  // the OLD editor, until step 8 (the Orders Log's Edit opens the job sheet now)
   await window.waitForSelector('.qpl-line[data-outdated="true"] .btn.primary[data-act="qpl-send"]', { timeout: 10_000 });
   ok((await window.textContent('.qpl-line[data-outdated="true"] [data-act="qpl-send"]')).trim() === 'Send again', 'an outdated link offers Send again');
   await window.click('.modal-form [data-act="cancel"]');
-  await window.click('[data-act="edit-log"][data-id="QPL-CANCELLED"]');
+  await window.evaluate((id) => openOrderEditor(id), 'QPL-CANCELLED');  // the OLD editor, until step 8 (the Orders Log's Edit opens the job sheet now)
   await window.waitForSelector('.modal-form', { timeout: 10_000 });
   ok(!(await window.$('.modal-form .qpl-line')), 'a cancelled job shows no pay link line');
   await window.click('.modal-form [data-act="cancel"]');

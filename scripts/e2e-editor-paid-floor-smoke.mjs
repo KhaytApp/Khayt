@@ -42,7 +42,7 @@ try {
   });
 
   await switchTab(window, 'logs-tab');
-  await window.click('[data-act="edit-log"][data-id="PF-1"]');
+  await window.evaluate((id) => openOrderEditor(id), 'PF-1');  // the OLD editor, until step 8 (the Orders Log's Edit opens the job sheet now)
   await window.waitForSelector('#modalMount .modal-form [data-f="discountPct"]', { state: 'visible', timeout: 5_000 });
   await window.fill('#modalMount [data-f="discountPct"]', '50');
   await window.click('#modalMount [data-act="save"]');
@@ -61,7 +61,7 @@ try {
 
   // A reopened job is not name-only: its discount saves (nothing was paid).
   await switchTab(window, 'logs-tab');
-  await window.click('[data-act="edit-log"][data-id="PF-2"]');
+  await window.evaluate((id) => openOrderEditor(id), 'PF-2');  // the OLD editor, until step 8 (the Orders Log's Edit opens the job sheet now)
   await window.waitForSelector('#modalMount .modal-form [data-f="discountPct"]', { state: 'visible', timeout: 5_000 });
   await window.fill('#modalMount [data-f="discountPct"]', '10');
   await window.click('#modalMount [data-act="save"]');

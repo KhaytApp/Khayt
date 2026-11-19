@@ -428,7 +428,7 @@
     // just replaced), so listeners cannot accumulate across re-renders.
     const openRow = (el) => {
       const id = el && el.dataset.orderId;
-      if (id && typeof openOrderEditor === 'function') openOrderEditor(id);
+      if (id && typeof openJobPage === 'function') openJobPage(id);
     };
     host.addEventListener('click', (e) => {
       const li = e.target.closest('li.is-openable');

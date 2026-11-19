@@ -41,6 +41,22 @@ import Testing
         #expect(result.surplus == -3000)
     }
 
+    /// A product's labour and packaging carried ONCE on the job (#2581): its
+    /// parts are costed without them, so the margin counts them from the job,
+    /// as lib/break-even.js does. Left out, a once-job read 75% here and 70%
+    /// on the desktop.
+    @Test("a job's once-costs count against its margin")
+    func onceCostsCount() async throws {
+        let engine = try KhaytEngine()
+        guard case .object(var o) = Self.job("2026-09-01", price: 1000, grams: 100, cost: 250) else { return }
+        o["labourCost"] = .number(40); o["packagingCost"] = .number(10)
+        o["componentsCost"] = .number(999); o["overheadCost"] = .number(999)  // not this report's
+        let result = try await engine.breakEven(
+            fixedCosts: [.object(["name": .string("Rent"), "amount": .number(3000)])],
+            completed: [.object(o)], since: "2026-01-01", month: "2026-09", settings: [:], clients: [])
+        #expect(abs((result.marginPct ?? 0) - 0.70) < 1e-9, "\(String(describing: result.marginPct))")
+    }
+
     /// Nulls, not zeroes. A shop with no finished work has an UNKNOWN margin,
     /// and zero would render as "you can never break even" — a statement about
     /// the shop rather than about the absence of data.

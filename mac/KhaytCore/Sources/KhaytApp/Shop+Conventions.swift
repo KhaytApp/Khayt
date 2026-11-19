@@ -335,6 +335,12 @@ extension Shop {
         for key in Self.carriedOnDuplicate {
             if let value = input[key], value != .null { seed.carried[key] = value }
         }
+        // The original's once-costs, as the desktop's duplicate carries them.
+        // From the ORIGINAL row: they are the shop's currency, never converted.
+        if case .object(let o) = row {
+            seed.onceCosts = ProductOnceCosts(labour: max(0, Self.plainNumber(o["labourCost"]) ?? 0),
+                                              packaging: max(0, Self.plainNumber(o["packagingCost"]) ?? 0))
+        }
         return seed
     }
 

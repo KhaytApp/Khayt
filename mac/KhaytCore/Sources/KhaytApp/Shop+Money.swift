@@ -152,6 +152,12 @@ extension Shop {
             if case .array(let uses)? = p.raw["consumables"], !uses.isEmpty {
                 row["consumables"] = .array(uses)
             }
+            // A part of a product that charges its labour and packaging ONCE
+            // (`productJobParts`, #2581) says so, and every later re-costing
+            // (an edit here, the desktop's qty edit, product profit) leaves
+            // those two out of it: they are on the job. Dropped, the part's
+            // next edit put the labour back on every part.
+            if p.raw["orderLevelCosts"] == .bool(true) { row["orderLevelCosts"] = .bool(true) }
             // The rates this part was costed at, written down beside the cost.
             //
             // Not bookkeeping. `renderer/build.js` reads them straight back into
@@ -221,6 +227,7 @@ extension Shop {
                      rule: PriceRule = PriceRule(),
                      extraLines: [ExtraLine] = [],
                      overheadPerHour: Double = 0,
+                     onceCosts: ProductOnceCosts = .none,
                      notes: String = "", dueDate: String? = nil,
                      priorityLevel: String = "normal",
                      carried: [String: JSONValue] = [:]) -> [String: JSONValue] {
@@ -256,6 +263,11 @@ extension Shop {
         // SHOWED the price with them in may charge them: a shelf sale or an
         // online order is priced at what the catalogue published.
         if overheadPerHour > 0 { input["overheadPerHour"] = .number(overheadPerHour) }
+        // A product's labour and packaging, once, at the job level (#2581):
+        // `newOrder` prices them into the marked-up base and freezes them on
+        // the job. Absent, as `newOrder` writes them, when 0.
+        if onceCosts.labour > 0 { input["labourCost"] = .number(onceCosts.labour) }
+        if onceCosts.packaging > 0 { input["packagingCost"] = .number(onceCosts.packaging) }
         // ── WHAT THE PRODUCT BRINGS WITH IT ───────────────────────────────
         //
         // The components (magnets, screws, a box) and the assembly count are
