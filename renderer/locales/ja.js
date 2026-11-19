@@ -1258,6 +1258,8 @@
   "pe.description": "説明",
   "pe.description_ph": "この製品に関する短いメモ（任意）",
   "pe.default_margin": "既定の上乗せ率",
+  "pe.per_box": "1箱あたりの個数",
+  "pe.per_box_hint": "この製品が1箱に何個入るか。梱包費は箱ごとにかかります。",
   "pe.cost": "原価",
   "pe.default_price": "既定価格",
   "bom.components": "コンポーネント（非印刷）",

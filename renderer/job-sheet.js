@@ -445,7 +445,8 @@
       const colour = q('pColour').value.trim();
       if (st.editing === -1) {
         const fil = filamentFields(filId) || {};
-        st.parts.push(costed(Object.assign({ name, printWeight: grams, printTime: hours, qty }, fil, colour ? { colour } : {}), order));
+        // A NEW part: prep once for its line, post per piece (labourPerLine).
+        st.parts.push(costed(Object.assign({ name, printWeight: grams, printTime: hours, qty, labourPerLine: true }, fil, colour ? { colour } : {}), order));
       } else {
         const old = st.parts[st.editing];
         let p = Object.assign({}, old, { name });

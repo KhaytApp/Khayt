@@ -2266,6 +2266,7 @@ function trackShipment(trackingNumber, carrier) {
       filamentId: item ? item.id : '',
       material: item ? (item.material || '') : '',
       extraMaterials: [],
+      labourPerLine: true,   // a new part: prep once, post per piece
     }, { settings, preset });
     // A LINE total, as every part's baseCost is (lib/calculator-cost.js).
     part.baseCost = CC.partTotalCost(part, { inventory: inv, settings });

@@ -1259,6 +1259,8 @@
   "pe.description": "Descrição",
   "pe.description_ph": "Observações curtas sobre este produto (opcional)",
   "pe.default_margin": "Acréscimo padrão",
+  "pe.per_box": "Peças por caixa",
+  "pe.per_box_hint": "Quantas unidades deste produto cabem em uma caixa. A embalagem é cobrada por caixa.",
   "pe.cost": "Custo",
   "pe.default_price": "Preço padrão",
   "bom.components": "Componentes (não impressos)",

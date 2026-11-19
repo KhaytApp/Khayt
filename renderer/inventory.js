@@ -620,7 +620,7 @@ function routeKhaytScan(raw) {
     const order = scan.type === 'order'
       ? (printLog || []).find((o) => o.id === scan.id)
       : (printLog || []).find((o) => o.trackingToken === scan.token);
-    if (order && typeof openOrderEditor === 'function') openOrderEditor(order.id);
+    if (order && typeof openJobPage === 'function') openJobPage(order.id);
     else toast(t('scan.order_missing') || 'That order was not found.', 'error');
   }
   return true;
@@ -3092,8 +3092,15 @@ function appendProductParts(p) {
   // catalogue says.
   const PPr = (typeof window !== 'undefined' && window.KhaytProductPricing) || null;
   if (PPr && PPr.usesProductRates && PPr.usesProductRates(p) && p.labourPerPart !== true && PPr.productJobParts) {
-    const jp = PPr.productJobParts(p, { inventory, settings: typeof settings !== 'undefined' ? settings : {},
-      consumables: typeof consumables !== 'undefined' ? consumables : [] });
+    const book = { inventory, settings: typeof settings !== 'undefined' ? settings : {},
+      consumables: typeof consumables !== 'undefined' ? consumables : [] };
+    // The same product added AGAIN is one line of N (Turki, Nov 19): prep
+    // once and post per finished piece only work out if the cart holds one
+    // group for it. Merged only when that group's parts are still exactly as
+    // they were added; a part the shop has edited keeps its edit, and the
+    // product then goes in as a group of its own, as before.
+    if (mergeProductAgain(p, PPr, book)) return;
+    const jp = PPr.productJobParts(p, book);
     const group = uid('ONCE');
     for (const part of jp.parts) {
       const partCopy = { ...part, id: uid('PRT'), onceGroup: group };
@@ -3111,7 +3118,7 @@ function appendProductParts(p) {
       groups.JOB = { labourCost: +currentFixedCosts.labourCost || 0, packagingCost: +currentFixedCosts.packagingCost || 0 };
       for (const q of currentBuild) if (q && q.orderLevelCosts === true && !q.onceGroup) q.onceGroup = 'JOB';
     }
-    groups[group] = { labourCost: jp.labourCost, packagingCost: jp.packagingCost };
+    groups[group] = { labourCost: jp.labourCost, packagingCost: jp.packagingCost, productId: p.id, units: 1 };
     currentFixedCosts = { labourCost: (+currentFixedCosts.labourCost || 0) + jp.labourCost,
       packagingCost: (+currentFixedCosts.packagingCost || 0) + jp.packagingCost, groups };
     return;
@@ -3123,6 +3130,8 @@ function appendProductParts(p) {
     // seven on every part it saves, so the job records what it was charged.
     const PRt = (typeof window !== 'undefined' && window.KhaytPrintRates) || null;
     const rated = PRt ? PRt.withRates(part, { settings: typeof settings !== 'undefined' ? settings : {} }) : part;
+    // Unmarked (no labourPerLine): a product without rates keeps the old
+    // labour sum, as the catalogue costs it, until "Use the new cost".
     const partCopy = { ...rated, id: uid('PRT') };
     if (!partCopy.material && partCopy.filamentId) {
       const inv = inventory.find(i => i.id === partCopy.filamentId);
@@ -3135,6 +3144,54 @@ function appendProductParts(p) {
     partCopy.baseCost = partTotalCost(partCopy);
     currentBuild.push(partCopy);
   }
+}
+
+/**
+ * Raise the cart's group for product `p` by one finished piece, if it has one
+ * whose parts are untouched: the parts are taken again at units + 1 (each
+ * part's qty × units) in place, ids kept, and the group's labour and
+ * packaging become the line's (prep once, post × units; ceil(units / perBox)
+ * boxes). Returns true when it merged.
+ */
+function mergeProductAgain(p, PPr, book) {
+  const groups = currentFixedCosts && currentFixedCosts.groups;
+  if (!groups || !p || p.id == null) return false;
+  const key = Object.keys(groups).find((k) => groups[k] && groups[k].productId === p.id);
+  if (!key) return false;
+  const units = Math.max(1, Math.floor(+groups[key].units || 1));
+  const at = [];
+  currentBuild.forEach((q, i) => { if (q && q.onceGroup === key) at.push(i); });
+  const was = PPr.productJobParts(p, Object.assign({}, book, { units })).parts;
+  // UNTOUCHED means every key: an agreed price, a colour, a note, a file, a
+  // rate typed on the part, anything the shop changed in the cart makes it
+  // the shop's line, and it is not rebuilt (money review of #2586, MED 4).
+  // Only what the cart itself adds is set aside: its id and group, and the
+  // material it fills in from the spool when the product's part has none.
+  const canon = (v) => (Array.isArray(v) ? v.map(canon)
+    : (v && typeof v === 'object' ? Object.keys(v).sort().reduce((o, k) => { if (v[k] !== undefined) o[k] = canon(v[k]); return o; }, {}) : v));
+  const bare = (q, w) => {
+    const o = Object.assign({}, q);
+    delete o.id; delete o.onceGroup;
+    if (!w.material) delete o.material;
+    return JSON.stringify(canon(o));
+  };
+  const same = at.length === was.length && at.every((i, n) => {
+    const w = Object.assign({}, was[n]);
+    if (!w.material) delete w.material;
+    return bare(currentBuild[i], was[n]) === JSON.stringify(canon(w));
+  });
+  if (!same) return false;
+  const jp = PPr.productJobParts(p, Object.assign({}, book, { units: units + 1 }));
+  at.forEach((i, n) => {
+    const q = currentBuild[i];
+    currentBuild[i] = Object.assign({}, jp.parts[n], { id: q.id, onceGroup: key, material: q.material || jp.parts[n].material });
+  });
+  const kept = Object.assign({}, groups);
+  kept[key] = Object.assign({}, groups[key], { labourCost: jp.labourCost, packagingCost: jp.packagingCost, units: units + 1 });
+  currentFixedCosts = Object.assign({}, currentFixedCosts, { groups: kept });
+  // The cart's totals are the sum of its groups (renderer/build.js).
+  if (typeof syncFixedCosts === 'function') syncFixedCosts();
+  return true;
 }
 
 function quoteFromProduct(productId) {
@@ -3482,7 +3539,16 @@ function openProductEditor(productId = null) {
         defaultMargin: 30,
         priceTiers: [],
         parts: [],
-        createdAt: localDateStr()
+        createdAt: localDateStr(),
+        /* A NEW product carries its own rates, as the Mac's ProductSheet
+         * does (Dev Hub, Nov 19): the shop's current defaults copied as
+         * numbers (KhaytPrintRates.defaultsFor), so its labour is charged
+         * ONCE for the product, prep once and post per finished piece. A
+         * later change to the shop's rates does not move it. An existing
+         * product is never given rates here: it keeps its figures until the
+         * shop chooses "Use the new cost" (Turki, Nov 19). */
+        ...(window.KhaytPrintRates && typeof window.KhaytPrintRates.defaultsFor === 'function'
+          ? { rates: window.KhaytPrintRates.defaultsFor(typeof settings !== 'undefined' ? settings : {}) } : {}),
       };
   /* A product with no parts list opens like one with an empty list. The
    * sample products (lib/sample-data.js) and records from older builds or
@@ -3773,6 +3839,10 @@ function openProductEditor(productId = null) {
 
     <label>${escapeHtml(t('pe.default_margin'))} (${escapeHtml(t('common.percent'))})</label>
     <input type="number" min="0" data-f="defaultMargin" value="${draft.defaultMargin ?? 30}">
+    ${KhaytProductPricing.usesProductRates(draft) && draft.labourPerPart !== true ? `
+    <label for="pePerBox">${escapeHtml(t('pe.per_box'))}</label>
+    <input type="number" id="pePerBox" min="1" step="1" placeholder="1" value="${draft.perBox != null ? escapeHtml(String(draft.perBox)) : ''}">
+    <div class="hint" style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('pe.per_box_hint'))}</div>` : ''}
 
     <div id="prodPriceSummary" style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border-soft); border-radius:var(--radius);">
       <span style="font-size:12px; color:var(--text-muted);">${escapeHtml(t('pe.cost') || 'Cost')}: <b id="prodCostVal">—</b></span>
@@ -3927,6 +3997,17 @@ function openProductEditor(productId = null) {
       if (roundStepEl) roundStepEl.addEventListener('change', syncPriceRule);
       if (roundModeEl) roundModeEl.addEventListener('change', syncPriceRule);
       if (overrideEl) overrideEl.addEventListener('input', syncPriceRule);
+
+      // Pieces per box (Turki, Nov 19): a line of N products ships in
+      // ceil(N / perBox) boxes. Blank is 1, a box each, and leaves the
+      // record without the key.
+      const perBoxEl = modal.querySelector('#pePerBox');
+      if (perBoxEl) perBoxEl.addEventListener('input', () => {
+        const b = Math.floor(+perBoxEl.value);
+        if (String(perBoxEl.value).trim() === '' || !(b >= 1)) delete draft.perBox;
+        else draft.perBox = b;
+        refreshPricing();
+      });
 
       // Sync top-level inputs into draft
       modal.querySelectorAll('[data-f]').forEach(input => {

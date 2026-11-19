@@ -803,10 +803,9 @@ function renderDashboard() {
     </div>
   </div>`;
 
-  // Wire the edit-log and goto-tab buttons inside the dashboard
-  el.querySelectorAll('[data-act="edit-log"]').forEach(btn =>
-    btn.addEventListener('click', () => openOrderEditor(btn.dataset.id))
-  );
+  // The edit-log buttons are handled by wire-events.js's delegated listener on
+  // #dashboardContent (it opens the job page). They were ALSO wired here, so
+  // one click opened the editor twice (old-editor retirement step 7).
   el.querySelectorAll('[data-act="goto-tab"]').forEach(btn =>
     btn.addEventListener('click', () => switchTab(btn.dataset.tab))
   );

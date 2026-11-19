@@ -586,9 +586,10 @@ async function assertQuietChromeAndOperableGroups(window) {
   // job would pop the editor every time.
   const rowClick = await window.evaluate(() => {
     const out = { opened: null, openedFromButton: null };
-    const realOpen = window.openOrderEditor;
+    // A row opens the job PAGE now (old-editor retirement step 7).
+    const realOpen = window.openJobPage;
     let lastId = null;
-    window.openOrderEditor = (id) => { lastId = id; };
+    window.openJobPage = (id) => { lastId = id; };
     try {
       const row = document.querySelector('.ql-row.is-openable');
       if (!row) return { skipped: true };
@@ -601,7 +602,7 @@ async function assertQuietChromeAndOperableGroups(window) {
       const btn = row.querySelector('button[data-act="status"]');
       if (btn) { lastId = null; btn.click(); out.openedFromButton = (lastId !== null); }
       return out;
-    } finally { window.openOrderEditor = realOpen; }
+    } finally { window.openJobPage = realOpen; }
   });
   if (!rowClick.skipped) {
     if (!rowClick.opened) throw new Error('clicking a queue row did not open its order');

@@ -1,0 +1,218 @@
+{
+  "about": "Jobs stored BEFORE the qty-labour rule (#2586): their parts carry no labourPerLine. Every reader must cost them byte-identically to main at 6f966002c.",
+  "settings": {
+    "currency": "SAR",
+    "defaultMargin": 30,
+    "defaultPackagingCost": 5
+  },
+  "inventory": [
+    {
+      "id": "S1",
+      "material": "PLA",
+      "materialType": "filament",
+      "cost": 90,
+      "weight": 1000,
+      "spoolWeight": 1000
+    }
+  ],
+  "products": [
+    {
+      "id": "PR1",
+      "nameEn": "Stand",
+      "parts": []
+    }
+  ],
+  "orders": [
+    {
+      "id": "J1",
+      "status": "completed",
+      "date": "2026-10-04",
+      "productId": "PR1",
+      "price": 1100,
+      "parts": [
+        {
+          "name": "bracket",
+          "qty": 10,
+          "filamentId": "S1",
+          "printWeight": 100,
+          "printTime": 0.5,
+          "spoolCost": 90,
+          "spoolWeight": 1000,
+          "laborRate": 90,
+          "prepTime": 0.25,
+          "postTime": 0.5,
+          "wearRate": 0.75,
+          "powerDraw": 150,
+          "elecRate": 0.18,
+          "failureRate": 10,
+          "baseCost": 847
+        }
+      ]
+    },
+    {
+      "id": "J2",
+      "status": "completed",
+      "date": "2026-10-12",
+      "price": 400,
+      "parts": [
+        {
+          "name": "lid",
+          "qty": 3,
+          "printWeight": 40,
+          "printTime": 1,
+          "spoolCost": 95,
+          "spoolWeight": 750,
+          "laborRate": 60,
+          "prepTime": 0.1,
+          "postTime": 0.2,
+          "failureRate": 5,
+          "baseCost": 120
+        },
+        {
+          "name": "base",
+          "qty": 1,
+          "printWeight": 120,
+          "printTime": 3,
+          "spoolCost": 85,
+          "spoolWeight": 1000,
+          "laborRate": 60,
+          "prepTime": 0.5,
+          "postTime": 0.25,
+          "failureRate": 5,
+          "baseCost": 80
+        }
+      ]
+    },
+    {
+      "id": "J3",
+      "status": "completed",
+      "date": "2026-11-02",
+      "productId": "PR1",
+      "price": 900,
+      "componentsCost": 12,
+      "parts": [
+        {
+          "name": "clip",
+          "qty": 25,
+          "printWeight": 8,
+          "printTime": 0.2,
+          "spoolCost": 90,
+          "spoolWeight": 1000,
+          "laborRate": 90,
+          "prepTime": 0.25,
+          "postTime": 0.05,
+          "failureRate": 10,
+          "perBox": 10,
+          "baseCost": 700
+        }
+      ]
+    }
+  ],
+  "frozenFrom": "origin/main 6f966002c (before #2586)",
+  "figures": {
+    "parts": {
+      "J1#0": 851.2735,
+      "J2#0": 77.91,
+      "J2#1": 63.21,
+      "J3#0": 767.8
+    },
+    "breakdown": {
+      "J1#0": {
+        "material": 9.5,
+        "machine": 0.3885,
+        "labor": 67.5,
+        "buffer": 7.73885
+      },
+      "J2#0": {
+        "material": 6.733333,
+        "machine": 0,
+        "labor": 18,
+        "buffer": 1.236667
+      },
+      "J2#1": {
+        "material": 15.2,
+        "machine": 0,
+        "labor": 45,
+        "buffer": 3.01
+      },
+      "J3#0": {
+        "material": 0.92,
+        "machine": 0,
+        "labor": 27,
+        "buffer": 2.792
+      }
+    },
+    "orderCost": {
+      "J1": 95,
+      "J2": 35.527161,
+      "J3": 23
+    },
+    "stockShare": {
+      "J1": 0.111598,
+      "J2": 0.251751,
+      "J3": 0.029956
+    },
+    "productProfit": {
+      "rows": [
+        {
+          "productId": "PR1",
+          "name": "",
+          "jobs": 2,
+          "revenue": 2000,
+          "cost": 1631.0735,
+          "hours": 10,
+          "profit": 368.9265,
+          "marginPct": 18.446325,
+          "profitPerHour": 36.89265
+        },
+        {
+          "productId": "__none__",
+          "name": "",
+          "jobs": 1,
+          "revenue": 400,
+          "cost": 141.12,
+          "hours": 6,
+          "profit": 258.88,
+          "marginPct": 64.72,
+          "profitPerHour": 43.146667
+        }
+      ],
+      "totals": {
+        "revenue": 2400,
+        "cost": 1772.1935,
+        "hours": 16,
+        "profit": 627.8065,
+        "jobs": 3,
+        "marginPct": 26.158604,
+        "profitPerHour": 39.237906,
+        "bestPerHour": {
+          "productId": "__none__",
+          "name": "",
+          "jobs": 1,
+          "revenue": 400,
+          "cost": 141.12,
+          "hours": 6,
+          "profit": 258.88,
+          "marginPct": 64.72,
+          "profitPerHour": 43.146667
+        }
+      }
+    },
+    "breakEven": {
+      "totalFixed": 1000,
+      "breakEvenRevenue": 3751.134132,
+      "marginPct": 0.266586,
+      "avgRevenuePerJob": 800,
+      "jobsCounted": 3,
+      "billedThisMonth": 1500,
+      "surplus": -2251.134132,
+      "progressPct": 39.987906,
+      "costs": [
+        {
+          "name": "rent",
+          "amount": 1000
+        }
+      ]
+    }
+  }
+}
