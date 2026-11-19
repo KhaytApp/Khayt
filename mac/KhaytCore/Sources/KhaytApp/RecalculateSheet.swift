@@ -15,6 +15,7 @@ struct RecalculateSheet: View {
     @State private var preview: Shop.RepriceAnswer?
     @State private var asking: String?
     @State private var saving = false
+    @State private var partsCost: Double?
 
     private var typedMarkup: Double? {
         let t = markup.trimmingCharacters(in: .whitespaces)
@@ -34,6 +35,14 @@ struct RecalculateSheet: View {
             switch preview {
             case .ready(_, let was, let now, _)?:
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                    // What the markup is put on (Figma 174:235): the repriced
+                    // job's cost by the shared rule, `lib/order-money.js jobCost`.
+                    if let partsCost {
+                        GridRow {
+                            Text(shop.words.callIt("mac.rc_parts_cost"))
+                            Text(Money.text(partsCost, currency)).monospacedDigit().gridColumnAlignment(.trailing)
+                        }
+                    }
                     GridRow {
                         Text(shop.words.callIt("mac.rc_price_now"))
                         Text(Money.text(was, currency)).monospacedDigit().gridColumnAlignment(.trailing)
@@ -103,6 +112,11 @@ struct RecalculateSheet: View {
         if Task.isCancelled { return }
         asking = nil
         preview = await shop.previewReprice(jobId, marginPct: typedMarkup)
+        if case .ready(let out, _, _, _)? = preview, let engine = shop.engine {
+            partsCost = try? await engine.jobCost(out)
+        } else {
+            partsCost = nil
+        }
     }
 
     /// Save; a question the rule asks is asked here, and answered once.

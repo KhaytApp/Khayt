@@ -79,6 +79,8 @@ struct JobSheet: View {
     @State private var customerLock: String?
     /// nil = not read yet; .some(nil) = cannot be said (a typed price).
     @State private var margin: Double??
+    /// "Kept as typed at …; the parts now come to …" for a typed price.
+    @State private var keptHint: String?
     /// The rule's answer to the sheet as it stands.
     @State private var newTotal: String?
     @State private var refusal: String?
@@ -313,7 +315,16 @@ struct JobSheet: View {
                         Text(verbatim: "%").foregroundStyle(.secondary)
                     }
                 case .some(.none):
-                    Text(shop.words.callIt("mac.js_margin_typed")).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(shop.words.callIt("mac.js_margin_typed")).foregroundStyle(.secondary)
+                        // What the parts would come to now (Figma 174:223),
+                        // by the same rule Recalculate uses; nothing saved.
+                        if let keptHint {
+                            Text(keptHint).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .task(id: subject.id) { await readKeptHint() }
                 case .none:
                     Text(verbatim: " ")
                 }
@@ -420,6 +431,14 @@ struct JobSheet: View {
     private func label(_ key: String) -> some View {
         Text(shop.words.callIt(key)).foregroundStyle(.secondary).fixedSize()
             .gridColumnAlignment(.trailing)
+    }
+
+    private func readKeptHint() async {
+        guard case .ready(_, let was, let now, let used)? = await shop.previewReprice(subject.id, marginPct: nil),
+              let used else { keptHint = nil; return }
+        keptHint = shop.words.callIt("mac.rc_kept_hint", [
+            "kept": .string(Money.text(was, currency)), "price": .string(Money.text(now, currency)),
+            "pct": .string(Money.fieldValue(used))])
     }
 
     // MARK: - Opening, previewing, saving

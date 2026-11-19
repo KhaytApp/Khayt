@@ -4073,5 +4073,7 @@
  "mac.apps_approve": "Os números conferem — aprovar",
  "mac.apps_deny": "Recusar",
  "mac.apps_timed_out": "Nenhum fatiador pareou a tempo. Clique em Parear um fatiador para tentar de novo.",
- "mac.apps_pin_unreadable": "Não foi possível ler o PIN da rede local nas Chaves, então nada foi pareado. Defina o PIN da rede local de novo acima e depois pareie o fatiador."
+ "mac.apps_pin_unreadable": "Não foi possível ler o PIN da rede local nas Chaves, então nada foi pareado. Defina o PIN da rede local de novo acima e depois pareie o fatiador.",
+ "mac.rc_parts_cost": "Custo das peças",
+ "mac.rc_kept_hint": "Mantido como digitado: {kept}. As peças agora somam {price} com margem de {pct}%."
 }
