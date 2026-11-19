@@ -69,6 +69,7 @@ extension LanServer {
     ]
 
     nonisolated static let connectorSealSalt = "khayt-connector-seal-v1"
+    nonisolated static let connectorEtagSalt = "khayt-connector-etag-v1"
     nonisolated static let connectorReplyPrefix = "khayt-reply-v1"
     /// The header a file upload names its body's hash in; the signature
     /// covers it (the canonical request carries that hash).
@@ -349,6 +350,22 @@ extension LanServer {
                                info: Data(connectorId.utf8), outputByteCount: 32)
     }
 
+    /// The queue's ETag: `HMAC-SHA256(HKDF(K, salt "khayt-connector-etag-v1",
+    /// info connectorId), content)`, 32 hex digits, quoted.
+    ///
+    /// The ETag travels in the clear while the queue itself is sealed. A plain
+    /// SHA-256 of the content (as it was) let anyone on the network confirm a
+    /// guess about a shop's queue (job numbers and stages are a small space)
+    /// without the key. Keyed by the connector's own key, it says only "same
+    /// as before", and two plugins never share one. The plugin only echoes it.
+    nonisolated static func queueEtag(_ content: String, key: Data, connectorId: String) -> String {
+        let etagKey = HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: key),
+                                             salt: Data(connectorEtagSalt.utf8),
+                                             info: Data(connectorId.utf8), outputByteCount: 32)
+        let mac = HMAC<SHA256>.authenticationCode(for: Data(content.utf8), using: etagKey)
+        return "\"" + String(hex(Data(mac)).prefix(32)) + "\""
+    }
+
     /// What a sealed body is bound to: `METHOD + " " + path`, so a capture
     /// cannot be replayed as another route's body.
     nonisolated static func sealAad(method: String, path: String) -> Data {
@@ -553,7 +570,7 @@ extension LanServer {
               pair.count == 2 else {
             return .json(500, #"{"ok":false,"reason":"queue"}"#)
         }
-        let etag = "\"" + String(Self.hex(SHA256.hash(data: Data(pair[1].utf8))).prefix(32)) + "\""
+        let etag = Self.queueEtag(pair[1], key: caller.key, connectorId: caller.id)
         if let asked = request.headers["if-none-match"],
            asked.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }).contains(etag) {
             var r = Response(status: 304, headers: [:], body: Data())

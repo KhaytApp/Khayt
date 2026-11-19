@@ -330,7 +330,7 @@ announces again.
 its number, stage, machine name and `file` (only the name of a file THIS
 connector sent for that job; null otherwise). Never a title (a title can hold a
 client's name), a client, a price or a note. Sealed as the capture is, with AAD
-`"GET /api/connectors/queue"`; the ETag covers everything but `at`.
+`"GET /api/connectors/queue"`; the ETag covers everything but `at`. It is keyed, because it travels in the clear while the queue is sealed: `HMAC-SHA256(HKDF-SHA256(K, salt "khayt-connector-etag-v1", info connectorId), content)`, first 32 hex digits, quoted. A plugin only echoes it in `If-None-Match`.
 Vectors: `docs/connector-routes.vectors.json`. The desktop (`lib/lan-server.js`) has none of this yet.
 
 ### `GET /api/library`, its thumbnails, and `POST /api/library/{id}/estimate` — pricing a model from the phone
