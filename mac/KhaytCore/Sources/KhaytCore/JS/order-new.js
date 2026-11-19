@@ -388,6 +388,30 @@
     return localDateStr(d);
   }
 
+  /**
+   * The share of a job's parts that are priced at cost plus markup, by their
+   * cost: 0 when every part has an agreed price, 1 when none has. A product's
+   * labour and packaging (order-level) go into the PRICE only in this share,
+   * never on top of what the customer agreed (money review of #2581); newOrder
+   * and every edit (lib/order-edit.js) price them by this one rule.
+   */
+  function costedShare(parts) {
+    // A frozen components line (lib/order-edit.js repriceFromParts) is not a
+    // part: newOrder's share was over the parts alone.
+    const list = arrayOf(parts).filter((p) => p && typeof p === 'object' && p.kind !== 'components');
+    // No parts: nothing is agreed, so all of it is priced (money review: a
+    // product with labour and no parts lost both). Shares by cost; where the
+    // costed parts cost nothing on record but exist beside agreed ones, by
+    // count, so a 0-cost part does not drop the labour to 0.
+    if (list.length === 0) return 1;
+    const open = list.filter((p) => !isAgreed(p));
+    if (open.length === 0) return 0;
+    const all = list.reduce((s, p) => s + Math.max(0, num(p.baseCost, 0)), 0);
+    const costed = open.reduce((s, p) => s + Math.max(0, num(p.baseCost, 0)), 0);
+    if (all > 0 && costed > 0) return costed / all;
+    return open.length / list.length;
+  }
+
   /** A part the customer has agreed a price for. Zero is a price; absent is not. */
   function isAgreed(p) {
     const v = p && p.agreedPrice;
@@ -552,13 +576,23 @@
     const components = arrayOf(i.components).filter(x => x && x.consumableId).map(x => Object.assign({}, x));
     const assemblyQty = num(i.assemblyQty, 0) > 0 ? num(i.assemblyQty, 1) : 1;
     const compCost = componentsCost(components, assemblyQty, c.consumables);
+    // A product's labour and packaging, ONCE, at the ORDER level (lib/product-
+    // pricing.js productJobParts): costed and marked up with the parts, as the
+    // catalogue prices them, never a part of their own. Shop currency.
+    const labourCost = positive(i.labourCost);
+    const packagingCost = positive(i.packagingCost);
     const costedBase = parts.reduce((s, p) => s + (isAgreed(p) ? 0 : num(p.baseCost, 0)), 0) + compCost;
+    // In the PRICE only in proportion to the parts that are costed (by their
+    // cost), never on top of what the customer AGREED: a job whose every part
+    // has an agreed price priced 300 at 419.63, its invoice lines still
+    // summing to 300 (money review of #2581). Always stored as COST, whole.
+    const costedAll = costedBase + (labourCost + packagingCost) * costedShare(parts);
 
     const P = pricing();
     if (!P) throw new Error('KhaytOrderNew needs KhaytPricing');
     const rushEnabled = !!i.rushEnabled;
     const quote = P.quoteTotal({
-      baseCost: toJob(costedBase),
+      baseCost: toJob(costedAll),
       agreedAmount,
       qty: 1,                    // the cart's parts already carry their own qty
       margin: positive(i.margin),
@@ -574,7 +608,7 @@
       printHours: overheadHours(parts, { productId: i.productId }),
       business: true,
     });
-    return { cur, fx, toJob, parts, totalPrintTime, extraLines, agreedAmount, components, assemblyQty, compCost, costedBase, P, quote };
+    return { cur, fx, toJob, parts, totalPrintTime, extraLines, agreedAmount, components, assemblyQty, compCost, labourCost, packagingCost, costedBase: costedAll, P, quote };
   }
 
   /**
@@ -669,7 +703,7 @@
     const now = c.now instanceof Date ? c.now : new Date(typeof c.now === 'number' ? c.now : Date.now());
     const tokens = ctxOf(c.tokens);
     const asQuote = !!i.asQuote;
-    const { cur, fx, toJob, parts, totalPrintTime, extraLines, agreedAmount, components, assemblyQty, compCost, costedBase, P, quote } = priced(i, c);
+    const { cur, fx, toJob, parts, totalPrintTime, extraLines, agreedAmount, components, assemblyQty, compCost, labourCost, packagingCost, costedBase, P, quote } = priced(i, c);
 
     const year = now.getFullYear();
     const prefix = asQuote ? (settings.quotePrefix || 'QUO') : (settings.invPrefix || 'INV');
@@ -813,6 +847,11 @@
       // `baseCost` — the price above includes them, so the cost beside it has
       // to. ABSENT on a job with none, so every other record keeps its shape.
       ...(compCost > 0 ? { componentsCost: +compCost.toFixed(2) } : {}),
+      // A product's labour and packaging, once, frozen like componentsCost
+      // (shop currency). ABSENT unless the job was taken from a product with
+      // its own rates, so every other record keeps its shape.
+      ...(labourCost > 0 ? { labourCost: +labourCost.toFixed(4) } : {}),
+      ...(packagingCost > 0 ? { packagingCost: +packagingCost.toFixed(4) } : {}),
       // The share of the shop's fixed costs this job was priced to carry
       // (lib/overhead-rate.js). Beside the parts' cost, NEVER inside it: the
       // P&L and the break-even target count the fixed costs themselves, and a
@@ -943,7 +982,7 @@
   const TOKEN_BYTES = 16;
 
   const api = {
-    TOKEN_BYTES,
+    costedShare, TOKEN_BYTES,
     allocateInvoice, allocateInvoiceNumber, allocateQuoteSeq, mintOrderId, jobRef, renumber, renumberSnapshot, undoRenumber, avgDailyWorkingHours,
     estimateDueDate, newOrder, previewTotal, canTake, componentsCost, jobCurrency, inShopCurrency, overheadHours, isAgreed,
     invoiceNumberOwed, ensureInvoiceNumber, beganAsQuote, awaitingApproval,

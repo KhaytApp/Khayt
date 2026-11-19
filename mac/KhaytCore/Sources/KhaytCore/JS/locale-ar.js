@@ -5444,6 +5444,7 @@
   "jp.parts": "القطع",
   "jp.money": "المال",
   "jp.activity": "السجل",
+  "jp.labour_once": "العمالة والتغليف (مرة واحدة)",
   "jp.plan": "خطة الدفع",
   "ppd.title": "خطة الدفع",
   "ppd.due": "تستحق {date}",

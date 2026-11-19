@@ -23,6 +23,40 @@ let currentPurgeGrams = 0;
 let currentConsumableLines = [];
 // BOM: non-printed components + assembly count carried from a product into the order.
 let currentComponents = [];
+// A product's labour and packaging, ONCE, at the order level (lib/product-
+// pricing.js productJobParts): never a part. Shop currency. Set when a product
+// with its own rates is added, or a once-labour job is copied; passed to
+// newOrder as labourCost / packagingCost.
+let currentFixedCosts = { labourCost: 0, packagingCost: 0 };
+/** The product's labour and packaging carried once (order-level), costed and
+ *  marked up in the cart as the saved job prices them (newOrder's labourCost /
+ *  packagingCost). updateGrandTotal reads it through a typeof guard. */
+function onceFixedCost() {
+  return Math.max(0, +currentFixedCosts.labourCost || 0) + Math.max(0, +currentFixedCosts.packagingCost || 0);
+}
+/**
+ * The once-costs follow the parts they came with. Each product added (and a
+ * duplicated or reprinted once-job) is a GROUP: its parts carry the group's
+ * key (`onceGroup`, stripped before newOrder) and `currentFixedCosts.groups`
+ * holds its labour and packaging. A group whose last part leaves the cart
+ * takes its costs with it: removing a product's parts and logging a manual
+ * part sent the product's 79.75 anyway (money review of #2581, HIGH).
+ */
+function syncFixedCosts() {
+  const f = currentFixedCosts || {};
+  const groups = f.groups && typeof f.groups === 'object' ? f.groups : null;
+  if (groups) {
+    const live = new Set((currentBuild || []).map((p) => p && p.onceGroup).filter(Boolean));
+    const kept = {}; let lab = 0, pkg = 0;
+    for (const key of Object.keys(groups)) {
+      if (!live.has(key)) continue;
+      kept[key] = groups[key]; lab += +groups[key].labourCost || 0; pkg += +groups[key].packagingCost || 0;
+    }
+    currentFixedCosts = { labourCost: +lab.toFixed(4), packagingCost: +pkg.toFixed(4), groups: kept };
+  } else if (!(currentBuild || []).some((p) => p && p.orderLevelCosts === true)) {
+    currentFixedCosts = { labourCost: 0, packagingCost: 0 };
+  }
+}
 let currentAssemblyQty = 1;
 
 // Feature 5: Price tiers for the current part being configured
@@ -181,6 +215,10 @@ if (typeof document !== 'undefined') {
     currentBuildFromProductId = saved.productId || null;
     currentClientId = saved.clientId || null;
     currentExtraLines = saved.extraLines || [];
+    currentFixedCosts = saved.fixedCosts && typeof saved.fixedCosts === 'object'
+      ? Object.assign({ labourCost: +saved.fixedCosts.labourCost || 0, packagingCost: +saved.fixedCosts.packagingCost || 0 },
+        saved.fixedCosts.groups && typeof saved.fixedCosts.groups === 'object' ? { groups: saved.fixedCosts.groups } : {})
+      : { labourCost: 0, packagingCost: 0 };
     // Show toast after DOM ready
     document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => toast(t('calc.draft_restored'), 'info', 3000), 600);
@@ -224,6 +262,7 @@ function saveBuildDraft() {
     productId:  currentBuildFromProductId,
     clientId:   currentClientId,
     extraLines: currentExtraLines,
+    fixedCosts: currentFixedCosts,
     savedAt:    new Date().toISOString(),
     // Persist calculator form state
     formState: {
@@ -346,6 +385,34 @@ function applyPartExtras(snap) {
   return snap;
 }
 
+/**
+ * The part in the form, when it came from Edit on a part whose labour and
+ * packaging are on the ORDER (`orderLevelCosts`, a product's once-costs, in
+ * its `onceGroup`): null otherwise. editPart writes it on the Add button
+ * beside the part's id and place; addPart puts both back on the part. Rebuilt
+ * from the form without them, an edited part was costed with labour and
+ * packaging again (91.36 for 11.61) while the order still carried them, and
+ * lost its group (money review of #2581, HIGH).
+ */
+function editingOnce() {
+  const btn = (typeof document !== 'undefined') ? document.getElementById('btnAddPart') : null;
+  if (!btn || !btn.dataset || !btn.dataset.editing || btn.dataset.editingOnce !== '1') return null;
+  return { orderLevelCosts: true, onceGroup: btn.dataset.editingOnceGroup || undefined };
+}
+
+/**
+ * Whether the part in the form carries `orderLevelCosts`: one being edited
+ * from a marked part (editingOnce), or a hand part when the shared rule says
+ * so (KhaytOrderMoney.addedPartMark on the cart's once-costs; false since
+ * Turki, Nov 19). Read by calculateLivePartCost, so the part is COSTED as it
+ * is stored: marking it after costing kept its labour (money review, #2581).
+ */
+function formPartMarked() {
+  if (editingOnce()) return true;
+  const Mo = (typeof KhaytOrderMoney !== 'undefined') ? KhaytOrderMoney : null;
+  return !!(Mo && Mo.addedPartMark && Mo.addedPartMark(currentFixedCosts));
+}
+
 function calculateLivePartCost() {
   // Snapshot the DOM into a part-shaped object and reuse the pure helper.
   // qty and filamentId MUST be included or the live preview disagrees with the cart:
@@ -368,6 +435,7 @@ function calculateLivePartCost() {
     laborRate:     $('#laborRate').value,
     failureRate:   $('#failureRate').value,
     extraMaterials: currentExtraMaterials.filter(m => m.material && m.weight > 0),
+    orderLevelCosts: formPartMarked() ? true : undefined,
   }));
 }
 
@@ -394,6 +462,8 @@ async function aiSuggestPrice() {
   const cost = (currentBuild.length
     ? currentBuild.reduce((s, p) => s + (+p.baseCost || 0), 0)
     : calculateLivePartCost() * qty) + compCost;
+  // + a product's labour and packaging, once (order-level, as the saved job prices them).
+  const costOnce = cost + (typeof onceFixedCost === 'function' ? onceFixedCost() : 0);
   const grams = currentBuild.length
     ? currentBuild.reduce((s, p) => s + ((+p.printWeight || 0) + (+p.supportWeight || 0)) * (+p.qty || 1), 0)
     : ((clampPositive($('#printWeight').value) + num($('#supportWeight')?.value, 0)) * qty);
@@ -403,7 +473,7 @@ async function aiSuggestPrice() {
   const cur = (typeof currencySymbol === 'function') ? currencySymbol() : '';
 
   // Default to the deterministic suggestion (median realized margin).
-  let reco = { suggestedMargin: comps.suggestedMargin, suggestedPrice: cost > 0 ? Math.round((cost / (1 - comps.suggestedMargin / 100)) * 100) / 100 : null, rationale: '' };
+  let reco = { suggestedMargin: comps.suggestedMargin, suggestedPrice: costOnce > 0 ? Math.round((costOnce / (1 - comps.suggestedMargin / 100)) * 100) / 100 : null, rationale: '' };
 
   const ai = settings.ai || {};
   // Per-feature consent, not just the master switch — see lib/ai-privacy.js.
@@ -412,7 +482,7 @@ async function aiSuggestPrice() {
     const status = toast(t('ai.price_thinking') || 'Analyzing your pricing history…', 'info', 8000);
     try {
       const system = KhaytAiPrice.buildPriceSystem({ shopName: shopField('biz') || 'Khayt', lang: settings.lang });
-      const request = KhaytAiPrice.buildPriceRequest(comps, { material, grams, hours, cost, currency: cur });
+      const request = KhaytAiPrice.buildPriceRequest(comps, { material, grams, hours, cost: costOnce, currency: cur });
       const r = await khaytAiExtract({ apiKey: ai.apiKey, model: ai.model || 'claude-opus-5', task: 'price', system, request, schema: KhaytAiPrice.PRICE_SCHEMA });
       if (r && r.ok) reco = KhaytAiPrice.pickPrice(r, reco) || reco;
     } catch (_) { /* fall back to deterministic */ }
@@ -600,6 +670,11 @@ function updateGrandTotal() {
     totalBase += componentsBase;
     totalCost += componentsBase;
   }
+  // Priced only on the costed share of the parts, as newOrder prices it
+  // (KhaytOrderNew.costedShare); the cost counts it whole.
+  const onceFixed = typeof onceFixedCost === 'function' ? onceFixedCost() : 0;
+  totalBase += onceFixed * (onceFixed > 0 && typeof KhaytOrderNew !== 'undefined' && KhaytOrderNew.costedShare ? KhaytOrderNew.costedShare(currentBuild) : 1);
+  totalCost += onceFixed;
   const compLine = $('#calcComponentsLine');
   if (compLine) {
     compLine.style.display = componentsBase > 0 ? 'inline' : 'none';
@@ -919,6 +994,11 @@ function addPart() {
     return;
   }
   const part = snapshotPartFromForm();
+  // Its once-costs mark and group, as it had them (editingOnce).
+  // Marked as it was costed (formPartMarked); an edited part keeps its group.
+  const once = editingOnce();
+  if (formPartMarked()) part.orderLevelCosts = true;
+  if (once && once.onceGroup) part.onceGroup = once.onceGroup;
   // A part coming back from the form after Edit is the SAME part: it keeps
   // its id and its place in the cart. It was given a new id at the end,
   // so nothing that pointed at it (lib/part-ids.js, a part sheet, a file
@@ -970,6 +1050,8 @@ function addPart() {
     delete addBtn.dataset.editing;
     delete addBtn.dataset.editingId;
     delete addBtn.dataset.editingAt;
+    delete addBtn.dataset.editingOnce;
+    delete addBtn.dataset.editingOnceGroup;
   }
   renderBuild();
   saveBuildDraft();
@@ -977,6 +1059,7 @@ function addPart() {
 
 function removePart(index) {
   currentBuild.splice(index, 1);
+  syncFixedCosts();
   renderBuild();
   saveBuildDraft();
 }
@@ -1048,6 +1131,12 @@ function editPart(index) {
   currentPriceTiers = (part.priceTiers || []).map(ti => ({ ...ti }));
   renderPriceTiers();
 
+  // Marked as being edited BEFORE the cart renders: its pending total costs
+  // the form through calculateLivePartCost, which reads editingOnce().
+  { const b = $('#btnAddPart');
+    if (b) { b.dataset.editing = '1';
+      if (part.orderLevelCosts === true) b.dataset.editingOnce = '1'; else delete b.dataset.editingOnce;
+      if (part.onceGroup) b.dataset.editingOnceGroup = String(part.onceGroup); else delete b.dataset.editingOnceGroup; } }
   currentBuild.splice(index, 1);
   renderBuild();
   calculateLivePartCost();
@@ -1061,6 +1150,9 @@ function editPart(index) {
     // The part's id and place, so Update puts back the same part (addPart).
     if (part.id) addBtn.dataset.editingId = String(part.id); else delete addBtn.dataset.editingId;
     addBtn.dataset.editingAt = String(index);
+    // Its once-costs mark and group (editingOnce): Update gives them back.
+    if (part.orderLevelCosts === true) addBtn.dataset.editingOnce = '1'; else delete addBtn.dataset.editingOnce;
+    if (part.onceGroup) addBtn.dataset.editingOnceGroup = String(part.onceGroup); else delete addBtn.dataset.editingOnceGroup;
     addBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
@@ -1978,6 +2070,7 @@ function updateResinFieldsVisibility() {
 
   const api = {
     formHasPendingPart,
+    syncFixedCosts,     // order-flows.js Log: drop once-cost groups with no part left (#2581)
     renderColourLines,
     renderConsumableLines,
     applyPartExtras,

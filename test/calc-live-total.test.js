@@ -13,7 +13,10 @@ const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 test('the total counts the pending part, and says so', () => {
   const b = read('renderer/build.js');
   const at = b.indexOf('function updateGrandTotal');
-  const body = b.slice(at, at + 9000);
+  // The whole function: a fixed 9000-character window sat 60 characters short
+  // of the note on main, so any addition earlier in the function failed it.
+  const end = b.indexOf('\nfunction ', at + 10);
+  const body = b.slice(at, end > at ? end : at + 20000);
   assert.match(body, /if \(formHasPendingPart\(\)\) \{/);
   assert.match(body, /totalBase \+= pendingBase;/);
   assert.match(body, /calcPendingNote/);
@@ -23,7 +26,10 @@ test('the total counts the pending part, and says so', () => {
 test('a pending part is "a weight or a time in the form", which addPart clears', () => {
   const b = read('renderer/build.js');
   assert.match(b, /function formHasPendingPart\(\) \{\n\s+return clampPositive\(\$\('#printWeight'\)\?\.value\) > 0 \|\| clampPositive\(\$\('#printTime'\)\?\.value\) > 0;/);
-  const add = b.slice(b.indexOf('function addPart()'), b.indexOf('function addPart()') + 1500);
+  // The whole function, not a fixed 1500 characters: lines added near its top
+  // (the once-costs mark, #2581) pushed the clearing out of the window.
+  const addAt = b.indexOf('function addPart()');
+  const add = b.slice(addAt, b.indexOf('\nfunction ', addAt + 10));
   assert.match(add, /\$\('#printWeight'\)\.value = '';/);
   assert.match(add, /\$\('#printTime'\)\.value = '';/);
 });

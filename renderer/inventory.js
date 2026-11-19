@@ -3086,6 +3086,36 @@ function renderCatalog() {
  *  Catalog parts store raw inputs only — baseCost is recomputed so it reflects
  *  current numbers and any later calculator changes. */
 function appendProductParts(p) {
+  // A product with its own rates (labour once): its parts as a job takes them,
+  // without labour and packaging, which go to the order level
+  // (lib/product-pricing.js productJobParts), so the job costs what the
+  // catalogue says.
+  const PPr = (typeof window !== 'undefined' && window.KhaytProductPricing) || null;
+  if (PPr && PPr.usesProductRates && PPr.usesProductRates(p) && p.labourPerPart !== true && PPr.productJobParts) {
+    const jp = PPr.productJobParts(p, { inventory, settings: typeof settings !== 'undefined' ? settings : {},
+      consumables: typeof consumables !== 'undefined' ? consumables : [] });
+    const group = uid('ONCE');
+    for (const part of jp.parts) {
+      const partCopy = { ...part, id: uid('PRT'), onceGroup: group };
+      if (!partCopy.material && partCopy.filamentId) {
+        const inv = inventory.find(i => i.id === partCopy.filamentId);
+        if (inv) partCopy.material = inv.material;
+      }
+      currentBuild.push(partCopy);
+    }
+    // This product's labour and packaging as its own group (build.js
+    // syncFixedCosts): they leave the cart with its parts.
+    const groups = Object.assign({}, currentFixedCosts.groups || {});
+    if (!currentFixedCosts.groups && onceFixedCost() > 0) {
+      // A once-job copied in before (no groups yet): its parts become one group.
+      groups.JOB = { labourCost: +currentFixedCosts.labourCost || 0, packagingCost: +currentFixedCosts.packagingCost || 0 };
+      for (const q of currentBuild) if (q && q.orderLevelCosts === true && !q.onceGroup) q.onceGroup = 'JOB';
+    }
+    groups[group] = { labourCost: jp.labourCost, packagingCost: jp.packagingCost };
+    currentFixedCosts = { labourCost: (+currentFixedCosts.labourCost || 0) + jp.labourCost,
+      packagingCost: (+currentFixedCosts.packagingCost || 0) + jp.packagingCost, groups };
+    return;
+  }
   for (const part of (p.parts || [])) {
     // At the rates the catalogue costs it at (`KhaytPrintRates.withRates`, as
     // lib/product-pricing.js does): its own, and the shop's default for any it

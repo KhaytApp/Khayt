@@ -5444,6 +5444,7 @@
   "jp.parts": "パーツ",
   "jp.money": "お金",
   "jp.activity": "履歴",
+  "jp.labour_once": "作業と梱包（1回）",
   "jp.plan": "支払い計画",
   "ppd.title": "支払い計画",
   "ppd.due": "期日 {date}",

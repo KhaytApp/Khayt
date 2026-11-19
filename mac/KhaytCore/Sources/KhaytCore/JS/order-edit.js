@@ -817,6 +817,11 @@
       components: frozenComp.length ? [] : order.components,
       assemblyQty: order.assemblyQty,
       productId: order.productId,
+      // A product's labour and packaging, carried once at the order level in the
+      // shop's currency: priced again as newOrder priced them (costedShare), so
+      // a reprice keeps them instead of dropping them from the price.
+      labourCost: +order.labourCost > 0 ? +order.labourCost : 0,
+      packagingCost: +order.packagingCost > 0 ? +order.packagingCost : 0,
     };
     const q = N.previewTotal(input, { settings: st, clients: c.clients, consumables: c.consumables }).quote;
     const was = +order.price || 0;
@@ -981,7 +986,16 @@
       base = discountPct < 100 ? costedPart / (1 - discountPct / 100) : costedPart;
     }
     const rushPct = rushAmt > 0 && subtotal > 0 ? rushAmt / subtotal * 100 : 0;
-    const costed = costedOf(parts) + Math.max(0, +order.componentsCost || 0) + Math.max(0, +order.overheadCost || 0);
+    const Mo = (typeof globalThis !== 'undefined' && globalThis.KhaytOrderMoney) || (typeof require === 'function' ? require('./order-money.js') : null);
+    // Components, overhead, and a product's labour and packaging (order-level):
+    // lib/order-money.js jobFixedCost, the one reader of those fields.
+    // Components and overhead whole; a product's labour and packaging only in
+    // the costed share of the parts (KhaytOrderNew.costedShare), as newOrder
+    // priced them: never on top of agreed prices (money review of #2581).
+    const Nw = (typeof globalThis !== 'undefined' && globalThis.KhaytOrderNew) || (typeof require === 'function' ? require('./order-new.js') : null);
+    const once = Mo && Mo.jobFixedCost ? Mo.jobFixedCost(order, { components: false, overhead: false }) : 0;
+    const costed = costedOf(parts) + (Mo && Mo.jobFixedCost ? Mo.jobFixedCost(order, { labour: false, packaging: false }) : 0)
+      + (once > 0 && Nw && Nw.costedShare ? once * Nw.costedShare(parts) : once);
     // At a 100% discount the base cannot be backed out of a price of 0, but
     // a STORED base still says what the markup was: without it the factor
     // was lost, and taking the discount off later priced the parts at bare
@@ -1235,7 +1249,12 @@
       || newOverhead !== oldOverhead);
     const changes = { parts: { from: partsLine(before), to: partsLine(next) } };
     if (costMoved) {
-      const fixedCosts = Math.max(0, +order.componentsCost || 0) + newOverhead;
+      const Mo = (typeof globalThis !== 'undefined' && globalThis.KhaytOrderMoney) || (typeof require === 'function' ? require('./order-money.js') : null);
+      // A product's labour and packaging in the NEW parts' costed share.
+      const Nw = (typeof globalThis !== 'undefined' && globalThis.KhaytOrderNew) || (typeof require === 'function' ? require('./order-new.js') : null);
+      const once = Mo && Mo.jobFixedCost ? Mo.jobFixedCost(order, { components: false, overhead: false }) : 0;
+      const fixedCosts = (Mo && Mo.jobFixedCost ? Mo.jobFixedCost(order, { overhead: false, labour: false, packaging: false }) : 0) + newOverhead
+        + (once > 0 && Nw && Nw.costedShare ? once * Nw.costedShare(next) : once);
       // No factor: the old parts cost nothing on record, so the price was not
       // built from them. With no markup given, a price that is there stays
       // (below, as a typed one): it fell to the bare cost of the new part,
