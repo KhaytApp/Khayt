@@ -111,3 +111,8 @@ test('review B2–B4: downloads from khaytapp.com only; host permissions plain; 
   const rec = slicer();
   assert.equal(D.pageFor(slicerListing(), { ...rec, url: 'https://khaytapp.com/a.whl' }, { ...rec, kind: 'connector' }, orcaOwner).error, 'slicer-record');
 });
+
+test('review re-check: a connector page refuses a "manifest" that says it is another kind', () => {
+  assert.equal(D.pageFor(listing(), row(), { ...lamha, kind: 'slicer' }, owner).error, 'mismatch');
+  assert.equal(D.pageFor(listing(), row(), lamha, owner).state, 'listed');
+});
