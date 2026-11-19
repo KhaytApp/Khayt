@@ -684,7 +684,7 @@ test('two writes in flight: the old read-modify-write loses one', async () => {
   // The bug, driven against the primitive it replaced, so the fix is measured
   // against something real rather than asserted.
   const io = makeStoreIo();
-  let mem = { printLog: [], expenses: [] };
+  let mem = { settings: {}, printLog: [], expenses: [] };
   await io.persistLanStoreUpdate(mem);
   mem = io.recoverStoreRaw().data;
 
@@ -712,7 +712,7 @@ test('updateStoreOnDisk: two writes in flight both survive', async () => {
     getStore: () => mem,
   });
   try {
-    mem = { printLog: [], expenses: [] };
+    mem = { settings: {}, printLog: [], expenses: [] };
     await io.persistLanStoreUpdate(mem);
 
     const pa = io.updateStoreOnDisk((cur) => ({ ...cur, printLog: [{ id: 'O-A' }, ...(cur.printLog || [])] }));
@@ -728,7 +728,7 @@ test('updateStoreOnDisk: two writes in flight both survive', async () => {
 
 test('updateStoreOnDisk: many concurrent appends all land', async () => {
   const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-store-io-many-'));
-  let mem = { printLog: [] };
+  let mem = { settings: {}, printLog: [] };
   const io = createStoreIo({
     app: { getPath: () => tmp2 }, fs,
     safeStorage: { isEncryptionAvailable: () => false },
@@ -747,7 +747,7 @@ test('updateStoreOnDisk: many concurrent appends all land', async () => {
 
 test('updateStoreOnDisk: a failing mutator does not poison the chain', async () => {
   const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-store-io-poison-'));
-  let mem = { printLog: [] };
+  let mem = { settings: {}, printLog: [] };
   const io = createStoreIo({
     app: { getPath: () => tmp2 }, fs,
     safeStorage: { isEncryptionAvailable: () => false },
@@ -1012,3 +1012,45 @@ test('connectorUpdates: a restore brings back the backup\'s, not today\'s', asyn
     assert.deepEqual(merged.settings.plugins, []);
   });
 }
+
+test('updateStoreOnDisk refuses an unreadable book, and any change to the lock, roles or operators (#2592)', async () => {
+  const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-store-io-lock-'));
+  let mem = {};
+  const io = createStoreIo({
+    app: { getPath: () => tmp2 }, fs,
+    safeStorage: { isEncryptionAvailable: () => false },
+    safeJsonParse, crypto,
+    onStoreUpdated: (d) => { mem = d; },
+    getStore: () => mem,
+  });
+  try {
+    // Nothing readable: refused, nothing written (it used to write {settings:…} over the book).
+    await assert.rejects(() => io.updateStoreOnDisk((cur) => ({ ...cur, settings: { lanApi: { intakeToken: 'x' } } })), /store_unreadable/);
+    assert.equal(io.recoverStoreRaw().data, null, 'nothing was written');
+    mem = { settings: { operatorLockEnabled: true, activeOperatorId: 'V', lanApi: {} }, operators: [{ id: 'V', roleKey: 'viewer' }], printLog: [] };
+    await io.persistLanStoreUpdate(mem);
+    for (const [what, fn] of [
+      ['lock off', (c) => ({ ...c, settings: { ...c.settings, operatorLockEnabled: false } })],
+      ['sign-in', (c) => ({ ...c, settings: { ...c.settings, activeOperatorId: 'O' } })],
+      ['limits', (c) => ({ ...c, settings: { ...c.settings, roleLimits: {} } })],
+      ['a role', (c) => ({ ...c, operators: [{ id: 'V', roleKey: 'owner' }] })],
+    ]) {
+      await assert.rejects(() => io.updateStoreOnDisk(fn), /mutator may not change/, what);
+    }
+    // An ordinary field write still lands, settings included.
+    await io.updateStoreOnDisk((c) => ({ ...c, settings: { ...c.settings, lanApi: { calendarToken: 't' } }, printLog: [{ id: 'J' }] }));
+    const d = io.recoverStoreRaw().data;
+    assert.deepEqual(d.printLog, [{ id: 'J' }]);
+    assert.equal(d.settings.operatorLockEnabled, true);
+    assert.equal(d.operators[0].roleKey, 'viewer');
+  } finally { fs.rmSync(tmp2, { recursive: true, force: true }); }
+});
+
+test('the LAN server never starts on a book it could not read, and writes nothing (#2592)', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'lan-server.js'), 'utf8');
+  const at = src.indexOf("ipcMain.handle('hub:start-lan-server'");
+  const body = src.slice(at, at + 2400);
+  assert.doesNotMatch(body, /setLanServerStore\(\{\}\)/, 'an empty book is never put in place of the real one');
+  const refuse = body.indexOf("return { ok: false, error: 'store_unreadable' }");
+  assert.ok(refuse !== -1 && refuse < body.indexOf('writeStoreToDisk('), 'refused before any write');
+});

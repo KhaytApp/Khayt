@@ -2842,6 +2842,7 @@
   "set.restore_confirm": "Dieses Backup wiederherstellen?",
   "set.restore_success": "Daten erfolgreich wiederhergestellt",
   "set.restore_error": "Backup konnte nicht wiederhergestellt werden",
+  "set.restore_owner_only": "Diese Sicherung kann nicht wiederhergestellt werden, solange die Shop-Sperre aktiv ist. Bitte den Inhaber, sich anzumelden und sie wiederherzustellen.",
   "queue.pos": "Position",
   "queue.est_start": "Geschätzte Startzeit",
   "queue.move_up": "Nach oben",

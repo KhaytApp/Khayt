@@ -2842,6 +2842,7 @@
   "set.restore_confirm": "このバックアップを復元しますか？現在のデータはすべて置き換えられます。",
   "set.restore_success": "データを正常に復元しました",
   "set.restore_error": "バックアップを復元できませんでした",
+  "set.restore_owner_only": "ショップのロックがオンの間はこのバックアップを復元できません。オーナーにサインインして復元してもらってください。",
   "queue.pos": "順番",
   "queue.est_start": "開始予定",
   "queue.move_up": "上に移動",

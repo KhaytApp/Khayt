@@ -2843,6 +2843,7 @@
   "set.restore_confirm": "Restore this backup? All current data will be replaced.",
   "set.restore_success": "Data restored successfully",
   "set.restore_error": "Could not restore backup",
+  "set.restore_owner_only": "This backup can’t be restored while the shop lock is on. Ask the owner to sign in and restore it.",
   "queue.pos": "Position",
   "queue.est_start": "Est. start",
   "queue.move_up": "Move up",

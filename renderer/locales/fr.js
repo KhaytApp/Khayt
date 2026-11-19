@@ -2842,6 +2842,7 @@
   "set.restore_confirm": "Restaurer cette sauvegarde ?",
   "set.restore_success": "Données restaurées avec succès",
   "set.restore_error": "Impossible de restaurer la sauvegarde",
+  "set.restore_owner_only": "Cette sauvegarde ne peut pas être restaurée tant que le verrou de la boutique est actif. Demandez au propriétaire de se connecter et de la restaurer.",
   "queue.pos": "Position",
   "queue.est_start": "Début estimé",
   "queue.move_up": "Monter",

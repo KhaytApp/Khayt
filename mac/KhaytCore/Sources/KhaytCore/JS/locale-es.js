@@ -2842,6 +2842,7 @@
   "set.restore_confirm": "¿Restaurar esta copia? Se reemplazarán todos los datos.",
   "set.restore_success": "Datos restaurados con éxito",
   "set.restore_error": "No se pudo restaurar la copia",
+  "set.restore_owner_only": "Esta copia de seguridad no se puede restaurar mientras el bloqueo de la tienda esté activo. Pide al propietario que inicie sesión y la restaure.",
   "queue.pos": "Posición",
   "queue.est_start": "Inicio estimado",
   "queue.move_up": "Subir",

@@ -2842,6 +2842,7 @@
   "set.restore_confirm": "恢复此备份？所有当前数据将被替换。",
   "set.restore_success": "数据恢复成功",
   "set.restore_error": "无法恢复备份",
+  "set.restore_owner_only": "商店锁定开启时无法恢复此备份。请店主登录后再恢复。",
   "queue.pos": "位置",
   "queue.est_start": "预计开始时间",
   "queue.move_up": "上移",

@@ -403,3 +403,29 @@ test('every writer of the whole book is guarded or main\'s own (ratchet; the lis
     }
   }
 });
+
+test('every field writer (updateStoreOnDisk / persistLanStoreUpdate) that touches settings is listed, with the key it writes', () => {
+  // updateStoreOnDisk itself refuses any change to the lock, sign-in, roles or
+  // operators (lib/store-io.js lockFieldsChanged), whoever calls it. This list
+  // says which writers touch settings at all, so a new one is looked at.
+  const root = path.join(__dirname, '..');
+  const LISTED = {
+    'main.js': ['connectorUpdates.applyPrepared'],                    // connector updates (settings.connectorUpdates…)
+    'lib/lan-server.js': ['ApiTokens.markUsed'],                      // an API token's lastUsedAt
+    'lib/main/quote-link-keys-ipc.js': ['settings.quoteLinkKey'],
+    'lib/main/quote-pay-link-sign.js': ['settings.quotePayLink'],
+  };
+  const files = ['main.js', 'lib/lan-server.js', ...fs.readdirSync(path.join(root, 'lib', 'main')).filter((x) => x.endsWith('.js')).map((x) => 'lib/main/' + x)];
+  for (const file of files) {
+    const src = fs.readFileSync(path.join(root, file), 'utf8');
+    for (const m of src.matchAll(/\b(updateStoreOnDisk|persistLanStoreUpdate)\(\s*\(/g)) {
+      const body = handlerBody(src, m.index);
+      if (!/\bsettings\b|\boperators\b/.test(body)) continue;
+      const ok = (LISTED[file] || []).some((k) => body.includes(k));
+      assert.ok(ok, `${file}: an unlisted writer touches settings/operators at line ${src.slice(0, m.index).split('\n').length}`);
+      assert.doesNotMatch(body, /\boperators\b|operatorLockEnabled|activeOperatorId|roleLimits/, `${file}: a field writer names the lock or operators`);
+    }
+  }
+  const io = fs.readFileSync(path.join(root, 'lib', 'store-io.js'), 'utf8');
+  assert.match(io, /const changed = lockFieldsChanged\(current, next\);\s*if \(changed\) throw new Error\('mutator may not change ' \+ changed\);/);
+});

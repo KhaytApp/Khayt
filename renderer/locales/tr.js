@@ -2842,6 +2842,7 @@
   "set.restore_confirm": "Bu yedek geri yüklensin mi? Tüm mevcut veriler değiştirilecektir.",
   "set.restore_success": "Veriler başarıyla geri yüklendi",
   "set.restore_error": "Yedek geri yüklenemedi",
+  "set.restore_owner_only": "Mağaza kilidi açıkken bu yedek geri yüklenemez. Sahibinden oturum açıp geri yüklemesini isteyin.",
   "queue.pos": "Sıra",
   "queue.est_start": "Tah. başlangıç",
   "queue.move_up": "Yukarı taşı",

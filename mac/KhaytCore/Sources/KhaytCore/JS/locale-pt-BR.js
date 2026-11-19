@@ -2843,6 +2843,7 @@
   "set.restore_confirm": "Restaurar este backup? Todos os dados atuais serão substituídos.",
   "set.restore_success": "Dados restaurados com sucesso",
   "set.restore_error": "Não foi possível restaurar o backup",
+  "set.restore_owner_only": "Este backup não pode ser restaurado enquanto o bloqueio da loja estiver ativo. Peça ao proprietário para entrar e restaurá-lo.",
   "queue.pos": "Posição",
   "queue.est_start": "Início est.",
   "queue.move_up": "Mover para cima",
