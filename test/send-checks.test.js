@@ -62,3 +62,14 @@ test('parsePrinterHeader: Orca, PrusaSlicer, offsets, nothing, and a hostile out
   assert.ok(Date.now() - t < 500, 'bounded');
   assert.ok(r.bed && r.bed.x <= 64, 'only the first 64 corners are read');
 });
+
+test('only placed extents can block on the bed: mesh, toolpath or unsaid bounds at most warn (#2591 review)', () => {
+  const machine = { model: 'X', bed: { x: 100, y: 100, z: 100 } };
+  for (const source of [undefined, 'mesh', 'toolpath', 'placed', 'PLACED-EXTENTS', 7]) {
+    const bounds = { x: 500, y: 500, z: 500 }; if (source !== undefined) bounds.source = source;
+    const f = S.sendChecks({ name: 'p.gcode', bounds }, machine);
+    assert.ok(f.length >= 2 && f.every((x) => x.severity === 'warn'), String(source));
+    assert.equal(S.blocks(f), false, String(source));
+  }
+  assert.equal(S.blocks(S.sendChecks({ name: 'p.gcode', bounds: { x: 500, y: 500, z: 500, source: 'placed-extents' } }, machine)), true);
+});

@@ -122,7 +122,8 @@
     "bounds": {
      "x": 300,
      "y": 300,
-     "z": 10
+     "z": 10,
+     "source": "placed-extents"
     }
    },
    "machine": {
@@ -157,7 +158,8 @@
     "bounds": {
      "x": 100,
      "y": 100,
-     "z": 280
+     "z": 280,
+     "source": "placed-extents"
     }
    },
    "machine": {
@@ -192,7 +194,8 @@
     "bounds": {
      "x": 200,
      "y": 300,
-     "z": 10
+     "z": 10,
+     "source": "placed-extents"
     }
    },
    "machine": {
@@ -216,6 +219,122 @@
       "x": 0,
       "y": 50,
       "z": 0
+     }
+    }
+   ]
+  },
+  {
+   "why": "a 300 x 10 rod by its MESH dimensions on a 250 x 250 bed: fits on the diagonal (353 mm), so it only warns, never blocks",
+   "file": {
+    "name": "p.gcode",
+    "bounds": {
+     "x": 300,
+     "y": 10,
+     "z": 10,
+     "source": "mesh"
+    }
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 250,
+     "y": 250,
+     "z": 250
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": [
+    {
+     "code": "bed-footprint",
+     "severity": "warn",
+     "over": {
+      "x": 50,
+      "y": 0,
+      "z": 0
+     }
+    }
+   ]
+  },
+  {
+   "why": "raw TOOLPATH extents that include a purge line at y -4 (274 deep on a 270 bed): warns, never blocks",
+   "file": {
+    "name": "p.gcode",
+    "bounds": {
+     "x": 200,
+     "y": 274,
+     "z": 20,
+     "source": "toolpath"
+    }
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": [
+    {
+     "code": "bed-footprint",
+     "severity": "warn",
+     "over": {
+      "x": 0,
+      "y": 4,
+      "z": 0
+     }
+    }
+   ]
+  },
+  {
+   "why": "bounds with no source at all: warns, never blocks",
+   "file": {
+    "name": "p.gcode",
+    "bounds": {
+     "x": 300,
+     "y": 300,
+     "z": 300
+    }
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": [
+    {
+     "code": "bed-footprint",
+     "severity": "warn",
+     "over": {
+      "x": 30,
+      "y": 30,
+      "z": 30
+     }
+    },
+    {
+     "code": "bed-height",
+     "severity": "warn",
+     "over": {
+      "x": 30,
+      "y": 30,
+      "z": 30
      }
     }
    ]
@@ -342,6 +461,49 @@
     "printerApi": {
      "type": "moonraker"
     }
+   },
+   "loaded": null,
+   "want": []
+  },
+  {
+   "why": "a header naming just \"U1\" sent to the \"Snapmaker U1\": the same printer, no finding",
+   "file": {
+    "name": "p.gcode",
+    "headerText": "; printer_model = U1\n"
+   },
+   "machine": {
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "loaded": null,
+   "want": []
+  },
+  {
+   "why": "the machine records its slicer printer model: that is compared, not its display name",
+   "file": {
+    "name": "p.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n"
+   },
+   "machine": {
+    "model": "Workshop big one",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    },
+    "printerModel": "Snapmaker U1"
    },
    "loaded": null,
    "want": []
@@ -797,7 +959,8 @@
     "bounds": {
      "x": 300,
      "y": 200,
-     "z": 100
+     "z": 100,
+     "source": "placed-extents"
     },
     "filaments": [
      {
