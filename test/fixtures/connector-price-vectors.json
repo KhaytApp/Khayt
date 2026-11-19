@@ -1,0 +1,615 @@
+{
+  "about": "lib/connector-price.js priceSlice: the shop price for a plate sliced in OrcaSlicer (the Khayt tab), from the capture facts (lib/connector-slice.js names) and a qty. A SAMPLE shop, never a real book. Run by the Node test and the Mac (JSC). ctx per case = the shop below with the case's ctx merged over it (settings merged key by key).",
+  "shop": {
+    "settings": {
+      "currency": "SAR",
+      "defaultMargin": 30,
+      "defaultPackagingCost": 5
+    },
+    "inventory": [
+      {
+        "id": "S1",
+        "material": "PLA",
+        "color": "#1E1E1E",
+        "cost": 90,
+        "spoolWeight": 1000,
+        "weight": 800
+      },
+      {
+        "id": "S2",
+        "material": "PLA Basic",
+        "color": "#222222",
+        "cost": 80,
+        "spoolWeight": 1000,
+        "weight": 400
+      },
+      {
+        "id": "S3",
+        "material": "PLA",
+        "color": "#FFFFFF",
+        "cost": 60,
+        "spoolWeight": 1000,
+        "weight": 900
+      },
+      {
+        "id": "S4",
+        "material": "PLA",
+        "color": "#1E1E1E",
+        "cost": 40,
+        "spoolWeight": 1000,
+        "weight": 0
+      },
+      {
+        "id": "S5",
+        "material": "PETG",
+        "color": "#C0392B",
+        "cost": 100,
+        "spoolWeight": 1000,
+        "weight": 700
+      }
+    ],
+    "printers": [
+      {
+        "id": "P1",
+        "name": "Snapmaker U1 0.4 nozzle",
+        "laborRate": 60,
+        "prepTime": 0.25,
+        "postTime": 0.1,
+        "wearRate": 0.5,
+        "powerDraw": 200,
+        "elecRate": 0.2,
+        "failureRate": 5
+      }
+    ]
+  },
+  "cases": [
+    {
+      "why": "qty 1, one PLA, the U1 preset matched: the near-black spool S2 (8/kg cheaper than S1; S4 is out of stock, S3 is white). Per piece: material 272.4 g x 0.08 = 21.792, wear 14.9 h x 0.5 = 7.45, power 14.9 x 0.2 kW x 0.2 = 0.596, labour (0.25 + 0.1) x 60 = 21, packaging 5; x 1.05 failure = 58.6299; x 1.3 margin = 76.22",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 272.4
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {},
+      "want": {
+        "currency": "SAR",
+        "qty": 1,
+        "unit": 76.22,
+        "total": 76.22,
+        "rounded": false,
+        "basis": "measured",
+        "cost": {
+          "unit": 58.6299,
+          "total": 58.63
+        },
+        "margin": {
+          "pct": 23.08
+        }
+      }
+    },
+    {
+      "why": "qty 10: prep once for the line (labourPerLine): labour (0.25 + 0.1 x 10) x 60 / 10 = 7.50 a piece, packaging 5 / 10 = 0.50; 37.838 x 1.05 = 39.7299 a piece; 397.30 cost, 516.49 price",
+      "facts": {
+        "v": 1,
+        "qty": 10,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 272.4
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {},
+      "want": {
+        "currency": "SAR",
+        "qty": 10,
+        "unit": 51.65,
+        "total": 516.49,
+        "rounded": false,
+        "basis": "measured",
+        "cost": {
+          "unit": 39.7299,
+          "total": 397.3
+        },
+        "margin": {
+          "pct": 23.08
+        }
+      }
+    },
+    {
+      "why": "a printer preset the shop has no preset for: the shop defaults (KhaytPrintRates), basis assumed",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 272.4
+          }
+        ],
+        "printer": {
+          "preset": "Unknown printer"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {},
+      "want": {
+        "currency": "SAR",
+        "qty": 1,
+        "unit": 151.39,
+        "total": 151.39,
+        "rounded": false,
+        "basis": "assumed",
+        "cost": {
+          "unit": 116.4562,
+          "total": 116.46
+        },
+        "margin": {
+          "pct": 23.08
+        }
+      }
+    },
+    {
+      "why": "two filaments, PLA black and PETG red: one blended part, each spool by its own type and colour",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 120,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 200
+          },
+          {
+            "slot": 2,
+            "type": "PETG",
+            "colour": "#C0392B",
+            "grams": 50
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {},
+      "want": {
+        "currency": "SAR",
+        "qty": 1,
+        "unit": 75.14,
+        "total": 75.14,
+        "rounded": false,
+        "basis": "measured",
+        "cost": {
+          "unit": 57.7983,
+          "total": 57.8
+        },
+        "margin": {
+          "pct": 23.08
+        }
+      }
+    },
+    {
+      "why": "an ABS plate in a shop with no ABS and no quote-sheet material: no price",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "ABS",
+            "colour": "#000000",
+            "grams": 100
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {},
+      "want": {
+        "unpriced": "no-material"
+      }
+    },
+    {
+      "why": "an ABS plate, no ABS spool, even with the quote sheet material set: no price (a typed material is never priced as the default; #2588 review)",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "ABS",
+            "colour": "#000000",
+            "grams": 100
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {
+        "settings": {
+          "lanApi": {
+            "intakeQuote": {
+              "spoolCost": 100,
+              "spoolWeight": 1000
+            }
+          }
+        }
+      },
+      "want": {
+        "unpriced": "no-material"
+      }
+    },
+    {
+      "why": "a filament with NO type, the quote sheet material flat at 100 per 1000 g: priced off it. 100 g x 0.10 = 10 + wear 7.45 + power 0.596 + labour 21 + packaging 5 = 44.046 x 1.05 = 46.2483",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "colour": "#000000",
+            "grams": 100
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {
+        "settings": {
+          "lanApi": {
+            "intakeQuote": {
+              "spoolCost": 100,
+              "spoolWeight": 1000
+            }
+          }
+        }
+      },
+      "want": {
+        "currency": "SAR",
+        "qty": 1,
+        "unit": 60.12,
+        "total": 60.12,
+        "rounded": false,
+        "basis": "measured",
+        "cost": {
+          "unit": 46.2483,
+          "total": 46.25
+        },
+        "margin": {
+          "pct": 23.07
+        }
+      }
+    },
+    {
+      "why": "a filament with no type, the quote sheet material a RESIN bottle: no default, no price",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "colour": "#000000",
+            "grams": 100
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {
+        "settings": {
+          "lanApi": {
+            "intakeQuote": {
+              "filamentId": "R1"
+            }
+          }
+        },
+        "inventory": [
+          {
+            "id": "R1",
+            "material": "Standard Resin",
+            "materialType": "resin",
+            "cost": 120,
+            "spoolWeight": 1000,
+            "weight": 900
+          }
+        ]
+      },
+      "want": {
+        "unpriced": "no-material"
+      }
+    },
+    {
+      "why": "a shop with no currency set: no figure",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 272.4
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {
+        "settings": {
+          "currency": ""
+        }
+      },
+      "want": {
+        "unpriced": "no-currency"
+      }
+    },
+    {
+      "why": "0 g is refused",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 0
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {},
+      "want": {
+        "unpriced": "bad-facts"
+      }
+    },
+    {
+      "why": "0 seconds is refused",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 0,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 272.4
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {},
+      "want": {
+        "unpriced": "bad-facts"
+      }
+    },
+    {
+      "why": "the shop rounds slicer prices up to 5: 76.22 becomes 80.00, rounded",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 272.4
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {
+        "round": {
+          "step": 5,
+          "mode": "up"
+        }
+      },
+      "want": {
+        "currency": "SAR",
+        "qty": 1,
+        "unit": 80,
+        "total": 80,
+        "rounded": true,
+        "basis": "measured",
+        "cost": {
+          "unit": 58.6299,
+          "total": 58.63
+        },
+        "margin": {
+          "pct": 26.71
+        }
+      }
+    },
+    {
+      "why": "overhead 2 an hour on the print hours: (58.6299 + 29.80) x 1.3 = 114.96",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 272.4
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {
+        "overheadPerHour": 2
+      },
+      "want": {
+        "currency": "SAR",
+        "qty": 1,
+        "unit": 114.96,
+        "total": 114.96,
+        "rounded": false,
+        "basis": "measured",
+        "cost": {
+          "unit": 88.4299,
+          "total": 88.43
+        },
+        "margin": {
+          "pct": 23.08
+        }
+      }
+    },
+    {
+      "why": "qty 0 is refused",
+      "facts": {
+        "v": 1,
+        "qty": 0,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 272.4
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {},
+      "want": {
+        "unpriced": "bad-facts"
+      }
+    },
+    {
+      "why": "no filaments is refused",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 53640,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {},
+      "want": {
+        "unpriced": "bad-facts"
+      }
+    }
+  ]
+}
