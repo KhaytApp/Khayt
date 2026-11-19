@@ -261,3 +261,26 @@ test('a machine already sent a job that has not started is not offered another',
   assert.deepEqual(out.idle, []);
   assert.deepEqual(out.waiting, []);
 });
+
+/* ── The state word means what lib/printer-activity.js says (C2 follow-up) ── */
+
+test('dispatch reads a printer\'s state through the one closed set: paused, preparing and failed are never free', () => {
+  const m = machine({ clearsOwnBed: true });
+  for (const w of ['Paused', 'PAUSED', 'pausing', 'Preparing', 'Slicing', 'BUSY', 'homing', 'changingTool', 'Printing']) {
+    assert.equal(ad.machineBlocked(m, { state: w }), 'ad.busy', w);
+  }
+  for (const w of ['Failed', 'ATTENTION', 'halted', 'error']) assert.equal(ad.machineBlocked(m, { state: w }), 'ad.printer_error', w);
+  // OctoPrint answering while the printer behind it is unplugged: no reading.
+  for (const w of ['Offline', 'Connecting', 'Opening serial port']) assert.equal(ad.machineBlocked(m, { state: w }), 'ad.no_reading', w);
+  // Free: idle and a job that ended (the bed check still applies to the rest).
+  for (const w of ['idle', 'Operational', 'READY', 'standby', 'complete', 'Finished', 'cancelled', 'STOPPED']) {
+    assert.equal(ad.machineBlocked(m, { state: w }), null, w);
+  }
+});
+
+test('a state word no table knows keeps dispatch\'s own lists, exactly as before', () => {
+  const m = machine({ clearsOwnBed: true });
+  assert.equal(ad.machineBlocked(m, { state: 'offline after error' }), 'ad.printer_error');
+  assert.equal(ad.machineBlocked(m, { state: 'fault' }), 'ad.printer_error');
+  assert.equal(ad.machineBlocked(m, { state: 'Kneading' }), 'ad.busy');
+});
