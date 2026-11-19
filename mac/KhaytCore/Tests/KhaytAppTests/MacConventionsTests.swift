@@ -230,6 +230,54 @@ struct MacConventionsTests {
         #expect(saved.count == parts.count, "the carried parts replaced the sheet's")
     }
 
+    /// A job from a product that charges its labour and packaging ONCE: its
+    /// parts are marked and costed without them, so the copy must carry the
+    /// two, or it is priced on its filament alone (money review of #2577:
+    /// 164.04 became 60.37, and every later re-cost missed the labour too).
+    @Test("a copied once-job keeps its labour and packaging")
+    func duplicateKeepsOnceCosts() async throws {
+        let shop = await Self.sample()
+        let (_, row) = try #require(Self.jobWithParts(shop))
+        guard case .object(var record) = row, case .array(let parts)? = record["parts"] else { Issue.record("no parts"); return }
+        record["parts"] = .array(parts.map { p in
+            guard case .object(var o) = p else { return p }
+            o["orderLevelCosts"] = .bool(true); return .object(o)
+        })
+        record["labourCost"] = .number(70); record["packagingCost"] = .number(9.75)
+
+        let seed = try #require(await shop.duplicateSeed(of: .object(record)))
+        #expect(seed.onceCosts.labour == 70 && seed.onceCosts.packaging == 9.75)
+        #expect(seed.parts.allSatisfy { $0.raw["orderLevelCosts"] == .bool(true) }, "the copy's parts keep the mark")
+
+        let input = shop.newJobInput(parts: seed.parts, project: seed.project, clientId: seed.clientId,
+                                     margin: seed.margin, discountPct: seed.discountPct,
+                                     shippingCost: seed.shippingCost, deposit: 0, rush: false,
+                                     asQuote: seed.asQuote, extraLines: seed.extraLines,
+                                     onceCosts: seed.onceCosts, carried: seed.carried)
+        #expect(input["labourCost"] == .number(70) && input["packagingCost"] == .number(9.75))
+
+        // Every marked part removed: a job of hand parts only carries none.
+        #expect(NewJobSheet.cartOnce(parts: seed.parts, once: seed.onceCosts) == seed.onceCosts)
+        var hand = try #require(NewJobSheet.Draft.from(.object(["name": .string("Hand"), "printWeight": .number(10)])))
+        hand.raw.removeValue(forKey: "orderLevelCosts")
+        #expect(NewJobSheet.cartOnce(parts: [hand], once: seed.onceCosts) == .none)
+        #expect(NewJobSheet.cartOnce(parts: seed.parts + [hand], once: seed.onceCosts) == seed.onceCosts)
+
+        // The margin advice's cost counts them too, through the shared jobCost.
+        let without = await shop.cartCost(parts: seed.parts, componentsCost: 0, once: .none)
+        let with = await shop.cartCost(parts: seed.parts, componentsCost: 0, once: seed.onceCosts)
+        #expect(abs(with - without - 79.75) < 1e-9)
+
+        // And the sheet applies the seed's once-costs and charges them while a
+        // marked part is in the cart, product or not.
+        let src = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp/NewJobSheet.swift")
+        let sheet = try String(contentsOf: src, encoding: .utf8)
+        #expect(sheet.contains("onceCosts = seed.onceCosts"))
+        #expect(sheet.contains("onceCosts: cartOnce,"))
+        #expect(!sheet.contains("product == nil ? .none : onceCosts"))
+    }
+
     @Test("carried fields never overwrite what the sheet itself set")
     func carriedNeverWins() async {
         let shop = await Self.sample()

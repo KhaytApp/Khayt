@@ -195,10 +195,14 @@ struct Alpha59ReviewTests {
     // MARK: - B2: a job's components in its own margin
 
     @Test("the ledger's margin counts the components the job was priced with")
-    func ledgerMarginWithComponents() throws {
-        let json = #"{"id":"J1","status":"completed","price":100,"costBasis":40,"componentsCost":15,"parts":[]}"#
-        let order = try JSONDecoder().decode(Order.self, from: Data(json.utf8))
+    func ledgerMarginWithComponents() async throws {
+        // The parts come to the 40 `costBasis` says, as every saved job's do.
+        let json = #"{"id":"J1","status":"completed","price":100,"costBasis":40,"componentsCost":15,"parts":[{"baseCost":40}]}"#
+        var order = try JSONDecoder().decode(Order.self, from: Data(json.utf8))
         #expect(order.componentsCost == 15)
+        // The job's cost comes from the shared rule (`jobCost`), as the app reads it.
+        order.figures = try await KhaytEngine().orderFigures([JSONValue.decode(JSONValue.self, from: Data(json.utf8))],
+                                                             settings: [:], clients: [])["J1"]
         let money = Shop.ledgerMoney(order)
         #expect(money.marginMoney == 45)
         let odd = try JSONDecoder().decode(Order.self, from: Data(

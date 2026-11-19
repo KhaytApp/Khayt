@@ -221,6 +221,18 @@ struct NewJobSheet: View {
     /// What the product's components add (magnets, a box) — priced with the
     /// cart at cost plus margin, as the shared rule saves the job.
     @State private var componentsCost: Double = 0
+    /// The product's labour and packaging, once, at the job level (#2581).
+    @State private var onceCosts: ProductOnceCosts = .none
+    /// The once-costs this cart charges: a product's, or a copied job's,
+    /// while one of its marked parts (`orderLevelCosts`, costed without
+    /// them) is still in the cart. Not tied to `product`: a copy has none.
+    private var cartOnce: ProductOnceCosts { Self.cartOnce(parts: parts, once: onceCosts) }
+
+    /// Once every marked part is gone (a job of hand parts only), nothing is
+    /// left that the once-costs were taken off, so none are charged.
+    static func cartOnce(parts: [Draft], once: ProductOnceCosts) -> ProductOnceCosts {
+        parts.contains { $0.raw["orderLevelCosts"] == .bool(true) } ? once : .none
+    }
     /// How many assemblies the job makes: what the components are counted
     /// by (`lib/order-new.js`, `qtyPerUnit × assemblyQty`). Starts at the
     /// product's own, and the paper's Components line can change it.
@@ -328,7 +340,11 @@ struct NewJobSheet: View {
                 // COSTED, not just measured: see `Shop.jobParts`. The engine
                 // is asked once per part, so the cart fills in a beat later
                 // than the name — and the total with it.
-                Task { parts = await shop.jobParts(from: taken) }
+                Task {
+                    let built = await shop.jobFrom(taken)
+                    parts = built.parts
+                    onceCosts = built.once
+                }
                 assemblyQty = Shop.assemblyQty(of: taken)
                 Task { componentsCost = await shop.jobComponentsCost(of: taken, assemblyQty: Double(assemblyQty)) }
             }
@@ -352,6 +368,7 @@ struct NewJobSheet: View {
                 shippingCost = seed.shippingCost
                 if !seed.extraLines.isEmpty { extraLines = seed.extraLines }
                 carried = seed.carried
+                onceCosts = seed.onceCosts
                 if let n = Shop.plainNumber(seed.carried["assemblyQty"]), n >= 1 {
                     assemblyQty = min(999, Int(saturating: n.rounded()))
                 }
@@ -1198,10 +1215,17 @@ struct NewJobSheet: View {
         // worked out at. They have to agree, so they are asked for together
         // rather than computed twice from the same inputs.
         defer { Task { await readComparables() } }
+        // A hand part beside a product that charges its labour once: whether
+        // it shares those is the shop's rule (`addedPartMark`), asked of this
+        // cart's once-costs BEFORE costing it.
+        let cart: JSONValue = .object(["labourCost": .number(cartOnce.labour),
+                                       "packagingCost": .number(cartOnce.packaging)])
+        let mark = await shop.handPartMark(cart)
+        if mark { next.raw["orderLevelCosts"] = .bool(true) }
         let costed = await shop.costedPart(spoolId: next.spoolId,
                                            grams: TypedNumber.parse(next.grams) ?? 0,
                                            hours: TypedNumber.parse(next.hours) ?? 0,
-                                           qty: next.qty)
+                                           qty: next.qty, extra: next.raw)
         next.cost = costed?.cost ?? 0
         next.parts = costed?.parts
         next.rates = costed?.rates
@@ -1261,9 +1285,11 @@ struct NewJobSheet: View {
             part.spoolId.flatMap { id in shop.spools.first { $0.id == id }?.material }
         }.first ?? ""
         guard let raw = await shop.priceComparablesRaw(material: material) else { return }
-        // What the job costs, components included: the margin advised is
-        // measured against everything the price has to cover.
-        let cost = parts.reduce(0.0) { $0 + $1.cost * Double($1.qty) } + componentsCost
+        // What the job costs: parts, components, and a product's labour and
+        // packaging carried once (`lib/order-money.js jobCost`, as the
+        // desktop's aiSuggestPrice): the margin advised is measured against
+        // everything the price has to cover.
+        let cost = await shop.cartCost(parts: parts, componentsCost: componentsCost, once: cartOnce)
         let grams = parts.reduce(0.0) { $0 + (TypedNumber.parse($1.grams) ?? 0) * Double($1.qty) }
         let hours = parts.reduce(0.0) { $0 + (TypedNumber.parse($1.hours) ?? 0) * Double($1.qty) }
         switch await shop.recommendMargin(comparables: c, raw: raw, cost: cost,
@@ -1293,6 +1319,7 @@ struct NewJobSheet: View {
             // The rate the preview was priced at, so the job is saved at the
             // price the sheet showed.
             overheadPerHour: shop.overheadPerHour,
+            onceCosts: cartOnce,
             notes: notes, dueDate: promised && !asQuote ? Shop.localDay(promisedDay) : nil,
             priorityLevel: priority,
             carried: carried)

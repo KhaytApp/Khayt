@@ -1,0 +1,14 @@
+{
+  "about": "KhaytOrderMoney.addedPartMark(order): whether a part added BY HAND to an existing job carries orderLevelCosts (costed without labour and packaging, which the order carries once). Turki, Nov 19: a hand-added part gets its OWN labour, so false for every order while HAND_PARTS_SHARE_ONCE is false. `flipped` is what each case gives with the switch set to true. The desktop (renderer/job-sheet.js, renderer/build.js) and the Mac (partsForSave) call this one function.",
+  "switch": false,
+  "cases": [
+    { "why": "an ordinary job (no once-costs)", "order": { "parts": [{ "baseCost": 20 }] }, "want": false, "flipped": false },
+    { "why": "a job from a product with labour and packaging once", "order": { "labourCost": 74.25, "packagingCost": 5.5 }, "want": false, "flipped": true },
+    { "why": "labour once only", "order": { "labourCost": 20 }, "want": false, "flipped": true },
+    { "why": "packaging once only", "order": { "packagingCost": 5 }, "want": false, "flipped": true },
+    { "why": "components and overhead are NOT once-costs of a product", "order": { "componentsCost": 80, "overheadCost": 12 }, "want": false, "flipped": false },
+    { "why": "zero or negative once-costs are none", "order": { "labourCost": 0, "packagingCost": -3 }, "want": false, "flipped": false },
+    { "why": "the calculator's cart state (currentFixedCosts) is read the same way", "order": { "labourCost": 74.25, "packagingCost": 5.5, "groups": { "G1": { "labourCost": 74.25, "packagingCost": 5.5 } } }, "want": false, "flipped": true },
+    { "why": "no order at all", "order": null, "want": false, "flipped": false }
+  ]
+}

@@ -54,7 +54,15 @@ function orderFamilies(o) {
  * shop's price is anyway.
  */
 function realizedMargin(o, profile) {
-  const charged = +o.price || 0, cost = +o.costBasis || 0;
+  // The price is in the JOB's currency; the cost is the SHOP's (the parts'
+  // baseCost, plus a product's labour and packaging carried once at the order
+  // level, lib/order-money.js jobFixedCost, 0 on every older job), so it is
+  // divided by the rate the job was taken at to compare like with like (money
+  // review, Nov 19). 1 for a job in the shop's currency.
+  const Mo = (typeof globalThis !== 'undefined' && globalThis.KhaytOrderMoney) || null;
+  const fx = +o.fxRate > 0 ? +o.fxRate : 1;
+  const charged = +o.price || 0;
+  const cost = ((+o.costBasis || 0) + (Mo && Mo.jobFixedCost && +o.costBasis > 0 ? Mo.jobFixedCost(o, { components: false, overhead: false }) : 0)) / fx;
   if (charged <= 0 || cost <= 0) return null;
   const T = (typeof globalThis !== 'undefined' && globalThis.KhaytTax) || null;
   const price = (T && profile && typeof T.netOfTax === 'function')

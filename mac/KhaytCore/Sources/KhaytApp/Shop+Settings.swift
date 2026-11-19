@@ -902,6 +902,9 @@ extension Shop {
         for key in ["assemblyQty", "priceRound", "priceOverride"] {
             if let value = product.rest[key] { forPricing[key] = value }
         }
+        // A product's own rates and its labour switch, so the save prices
+        // labour once where the product says so (`ProductRates`).
+        for (key, value) in ProductRates.pricingFields(product.rest) { forPricing[key] = value }
         return forPricing
     }
 

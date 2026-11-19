@@ -8990,6 +8990,11 @@ public actor KhaytEngine {
               var c = Number(globalThis.KhaytCalculatorCost.partTotalCost(parts[j], ctx));
               if (isFinite(c)) sum += c;
             }
+            // A product's labour and packaging carried ONCE on the job: its
+            // parts are costed without them (orderLevelCosts), so they are
+            // added here, as lib/break-even.js does (money review of #2581).
+            var once = Number(globalThis.KhaytOrderMoney.jobFixedCost(o, { components: false, overhead: false }));
+            if (isFinite(once)) sum += once;
             cost.push(sum);
           }
           return [revenue, cost];
@@ -13569,10 +13574,29 @@ public actor KhaytEngine {
         /// caller; read it through `earnedOrNet`.
         public let earned: Double?
         public var earnedOrNet: Double { earned ?? net }
+        /// What the job cost, in the SHOP's currency (`KhaytOrderMoney.jobCost`):
+        /// parts, components, overhead, and a product's labour and packaging.
+        /// The one place a job's cost is summed on the Mac (`JobCostTests`).
+        /// Nil when not worked out.
+        public let cost: Double?
+        /// Shop currency per unit of the job's: its frozen `fxRate`, 1 for a
+        /// job in the shop's currency. Every figure above but `cost` is in the
+        /// job's currency; times this, the shop's.
+        public let fx: Double
         public init(billed: Double, net: Double, tax: Double, owed: Double, due: Double? = nil,
-                    earned: Double? = nil) {
+                    earned: Double? = nil, cost: Double? = nil, fx: Double = 1) {
             self.billed = billed; self.net = net; self.tax = tax; self.owed = owed; self.due = due ?? billed
-            self.earned = earned
+            self.earned = earned; self.cost = cost; self.fx = fx
+        }
+        private enum CodingKeys: String, CodingKey { case billed, net, tax, owed, due, earned, cost, fx }
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            billed = try c.decode(Double.self, forKey: .billed); net = try c.decode(Double.self, forKey: .net)
+            tax = try c.decode(Double.self, forKey: .tax); owed = try c.decode(Double.self, forKey: .owed)
+            due = try c.decode(Double.self, forKey: .due)
+            earned = try c.decodeIfPresent(Double.self, forKey: .earned)
+            cost = try c.decodeIfPresent(Double.self, forKey: .cost)
+            fx = try c.decodeIfPresent(Double.self, forKey: .fx) ?? 1
         }
     }
 
@@ -13600,6 +13624,14 @@ public actor KhaytEngine {
                   billed: M.orderGrossRaw(o, ctx), net: split.subtotal,
                   tax: split.taxTotal, owed: M.orderOwedRaw(o, ctx), due: M.orderDueRaw(o, ctx),
                   earned: T.netOfTax(kept, profile),
+                  // The job's cost, SHOP currency: the shared jobCost once it
+                  // is in lib (#2581), else the same sum of what a job holds
+                  // today (parts' baseCost, components, overhead).
+                  cost: M.jobCost ? M.jobCost(o) : (Array.isArray(o.parts) ? o.parts : [])
+                          .reduce(function (s, p) { return s + Math.max(0, +(p && p.baseCost) || 0); }, 0)
+                        + Math.max(0, +o.componentsCost || 0) + Math.max(0, +o.overheadCost || 0),
+                  // The price is the JOB's currency: its frozen rate to the shop's.
+                  fx: (+o.fxRate > 0) ? +o.fxRate : 1,
                 };
               }
               return out;
@@ -15842,6 +15874,55 @@ public actor KhaytEngine {
     /// not exist here, and the resin branch is chosen by looking a part's
     /// filament up in the shelf. Without it a resin part is priced by the
     /// filament formula — a different answer, not a missing one.
+    /// A product's parts as a job taken from it holds them, and its labour
+    /// and packaging as job-level costs (`lib/product-pricing.js`
+    /// `productJobParts`, #2581). With the product's own rates each part is
+    /// costed WITHOUT labour and packaging and the two come back once, for
+    /// `newOrder`'s `labourCost` / `packagingCost`; without, the parts as
+    /// before and both 0. So a job from the product costs what the catalogue says.
+    public struct ProductJobParts: Decodable, Sendable {
+        public let parts: [JSONValue]
+        public let labourCost: Double
+        public let packagingCost: Double
+    }
+
+    public func productJobParts(_ product: JSONValue, inventory: [JSONValue],
+                                settings: [String: JSONValue],
+                                consumables: [JSONValue]) throws -> ProductJobParts {
+        try runtime.call2("""
+            KhaytProductPricing.productJobParts(ARG0,
+              { inventory: ARG1, settings: ARG2, consumables: ARG3 })
+            """,
+            [product, .array(inventory), .object(settings), .array(consumables)],
+            as: ProductJobParts.self)
+    }
+
+    /// A job's cost (`lib/order-money.js jobCost`): its parts' `baseCost` plus
+    /// the job-level costs, each counted unless its flag is false.
+    public func jobCost(_ order: JSONValue, components: Bool = true, overhead: Bool = true,
+                        labour: Bool = true, packaging: Bool = true) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.jobCost(ARG0, ARG1)",
+                          [order, .object(["components": .bool(components), "overhead": .bool(overhead),
+                                           "labour": .bool(labour), "packaging": .bool(packaging)])],
+                          as: Double.self)
+    }
+
+    /// Whether a part added BY HAND to this job is marked `orderLevelCosts`
+    /// (shares the job's once-costs, so it is costed without its own labour
+    /// and packaging). The shop's rule, in one place for every app:
+    /// `lib/order-money.js addedPartMark` (Turki, Nov 19: no, for now).
+    /// `flipped` asks it with the switch on, for the shared vectors only.
+    public func addedPartMark(_ order: JSONValue, flipped: Bool? = nil) throws -> Bool {
+        try runtime.call2("""
+            (function (order, flip) {
+              var M = KhaytOrderMoney, was = M.HAND_PARTS_SHARE_ONCE;
+              if (flip !== null) M.HAND_PARTS_SHARE_ONCE = flip;
+              try { return M.addedPartMark(order) === true; }
+              finally { M.HAND_PARTS_SHARE_ONCE = was; }
+            })(ARG0, ARG1)
+            """, [order, flipped.map { .bool($0) } ?? .null], as: Bool.self)
+    }
+
     public func priceProduct(_ product: JSONValue, inventory: [JSONValue],
                              settings: [String: JSONValue],
                              consumables: [JSONValue]) throws -> ProductPricing {

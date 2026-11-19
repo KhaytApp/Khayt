@@ -100,14 +100,14 @@ extension Shop {
 
         // COSTED, not just measured — the same call the new-job sheet makes,
         // so a shelf sale carries exactly the cost the catalogue prices with.
-        let parts = await jobParts(from: product)
+        let (parts, once) = await jobFrom(product)
         var input = newJobInput(parts: parts,
                                 project: product.anyName(),
                                 clientId: nil,
                                 margin: product.margin ?? defaultMargin,
                                 discountPct: 0, shippingCost: 0, deposit: 0,
                                 rush: false, asQuote: false, fromProduct: product,
-                                rule: Self.priceRule(of: product))
+                                rule: Self.priceRule(of: product), onceCosts: once)
         input["fromStock"] = JSONValue.bool(true)
         let notEnough = words.callIt("mac.not_enough_on_shelf")
 
@@ -679,9 +679,13 @@ extension Shop {
 
     func priceProduct(parts: [JSONValue], margin: Double?,
                       components: JSONValue?, assemblyQty: JSONValue? = nil,
-                      rule: PriceRule = PriceRule()) async -> KhaytEngine.ProductPricing? {
+                      rule: PriceRule = PriceRule(),
+                      productRates: [String: JSONValue] = [:]) async -> KhaytEngine.ProductPricing? {
         guard let engine else { return nil }
         var record: [String: JSONValue] = ["parts": .array(parts)]
+        // The product's own rates and labour switch (`ProductRates`): with
+        // them the shared rule charges labour once; without, as before.
+        for (key, value) in productRates { record[key] = value }
         if let margin { record["defaultMargin"] = .number(margin) }
         if let components { record["components"] = components }
         // What the save prices with (`pricingInput`), so the sheet shows it.

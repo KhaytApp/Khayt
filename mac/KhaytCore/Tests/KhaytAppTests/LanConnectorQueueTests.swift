@@ -112,6 +112,20 @@ struct LanConnectorQueueTests {
         #expect((snap?["jobs"] as? [[String: Any]])?.contains { $0["id"] as? String == "J-9002-yy88" } == true)
     }
 
+    @Test("the ETag is keyed: no plain hash of the queue in the clear, none shared between plugins")
+    func etagIsKeyed() {
+        let content = #"{"v":1,"jobs":[{"number":"J-1001","stage":"printing"}]}"#
+        let k1 = Data(repeating: 1, count: 32), k2 = Data(repeating: 2, count: 32)
+        let a = LanServer.queueEtag(content, key: k1, connectorId: "dev_SampleStudioPC0001")
+        #expect(a == LanServer.queueEtag(content, key: k1, connectorId: "dev_SampleStudioPC0001"), "stable for one plugin")
+        #expect(a.count == 34 && a.hasPrefix("\"") && a.hasSuffix("\""))
+        let plain = "\"" + String(LanServer.hex(SHA256.hash(data: Data(content.utf8))).prefix(32)) + "\""
+        #expect(a != plain, "a plain SHA-256 lets an eavesdropper confirm a guessed queue")
+        #expect(a != LanServer.queueEtag(content, key: k2, connectorId: "dev_SampleStudioPC0001"), "another key")
+        #expect(a != LanServer.queueEtag(content, key: k1, connectorId: "dev_SampleStudioPC0002"), "another plugin")
+        #expect(a != LanServer.queueEtag(content + " ", key: k1, connectorId: "dev_SampleStudioPC0001"), "another queue")
+    }
+
     @Test("dark while off, and only a connector may ask")
     func gate() async throws {
         let (off, offRoot) = try await R.bench(enabled: false)

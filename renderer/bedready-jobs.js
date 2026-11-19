@@ -99,6 +99,7 @@
     currentBuildFromProductId = null;
     currentExtraLines = [];
     if (typeof currentComponents !== 'undefined') currentComponents = [];
+    if (typeof currentFixedCosts !== 'undefined') currentFixedCosts = { labourCost: 0, packagingCost: 0 };
     if (typeof currentAssemblyQty !== 'undefined') currentAssemblyQty = 1;
     try { localStorage.removeItem('hub_current_build_v1'); } catch (_) {}
     if (typeof renderBuild === 'function') { try { renderBuild(); } catch (_) {} }

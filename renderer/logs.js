@@ -13,6 +13,9 @@
  * because buying them is already booked as an expense.
  */
 function jobCostForMargin(o) {
+  // lib/order-money.js jobCost: parts + components (+ a product's labour and
+  // packaging, once), without overhead, as this column always read.
+  if (typeof KhaytOrderMoney !== 'undefined' && KhaytOrderMoney.jobCost) return KhaytOrderMoney.jobCost(o, { overhead: false });
   return ((o && o.parts) || []).reduce((s, p) => s + (+p.baseCost || 0), 0) + (+(o && o.componentsCost) || 0);
 }
 

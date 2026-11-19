@@ -85,6 +85,10 @@
       const line = modal.querySelector('[data-pp="summary"]');
       line.textContent = r.ok ? t('ppd.adds_up', { open: fmt(open), owed: fmt(PP().owedNow(order, ctxOf())) }) : reasonText(r);
       line.classList.toggle('is-refused', !r.ok);
+      // Over what is owed: offer the plan trimmed to it (lib/payment-plan.js
+      // trimToOwed, oldest rows first) rather than only refusing.
+      const trim = modal.querySelector('[data-pp="trim"]');
+      trim.hidden = !(!r.ok && r.reason === 'over_owed');
       modal.querySelector('[data-act="save"]').disabled = !r.ok;
       // Money recorded outside the plan pays the oldest payments first (allocate).
       const outside = al.unallocated;
@@ -172,6 +176,7 @@
         <div class="jp-actions">
           <button type="button" class="btn" data-pp="monthly">${escapeHtml(t('ppd.monthly'))}</button>
           <button type="button" class="btn" data-pp="add">${escapeHtml(t('ppd.add'))}</button>
+          <button type="button" class="btn primary" data-pp="trim" hidden>${escapeHtml(t('ppd.trim'))}</button>
         </div></div>`,
       onMount(m) {
         modal = m;
@@ -194,6 +199,7 @@
           if (b.dataset.pp === 'remove') { rows.splice(i, 1); draw(); return; }
           if (b.dataset.pp === 'record') { record(i); return; }
           if (b.dataset.pp === 'cover') { cover(i); return; }
+          if (b.dataset.pp === 'trim') { rows = PP().trimToOwed(order, rows, ctxOf()); draw(); return; }
           if (b.dataset.pp === 'monthly') {
             const owed = PP().owedNow(order, ctxOf());
             if (owed <= 0) { toast(t((+order.price || 0) <= 0 ? 'inst.need_price' : 'inst.nothing_owed'), 'error'); return; }

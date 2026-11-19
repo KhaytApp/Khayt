@@ -102,10 +102,15 @@ function logPrint(asQuote = false) {
   // shop that still had to open Electron to take an order.
   //
   // The form is still this file's. The record is not.
+  // A product part taken out by Edit and never put back (the form cleared)
+  // must not leave its once-costs behind: drop every group with no part in
+  // the cart (build.js syncFixedCosts; money review of #2581).
+  if (typeof syncFixedCosts === 'function') syncFixedCosts();
   const bytes = (n) => { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; };
   const N = NewOrderRules();
   const entry = N.newOrder({
-    parts: currentBuild,
+    // `onceGroup` is the cart's own bookkeeping (build.js syncFixedCosts), not the job's.
+    parts: currentBuild.map((p) => { if (!p || !p.onceGroup) return p; const { onceGroup, ...rest } = p; return rest; }),
     project: $('#clientInput').value.trim(),
     clientId: currentClientId || null,
     clientRef: ($('#calcClientRef')?.value || '').trim() || null,
@@ -118,6 +123,8 @@ function logPrint(asQuote = false) {
     depositAmount: Math.max(0, num($('#depositAmount')?.value, 0)),
     rushEnabled: !!$('#calcRushFee')?.checked,
     extraLines: currentExtraLines,
+    labourCost: typeof currentFixedCosts !== 'undefined' ? currentFixedCosts.labourCost : 0,
+    packagingCost: typeof currentFixedCosts !== 'undefined' ? currentFixedCosts.packagingCost : 0,
     priceRound: (() => {
       const step = Math.max(0, num($('#priceRoundStep')?.value, 0));
       return step > 0 ? { step, mode: $('#priceRoundMode')?.value || 'nearest' } : null;
@@ -152,6 +159,7 @@ function logPrint(asQuote = false) {
   currentClientId = null;
   currentExtraLines = [];
   if (typeof currentComponents !== 'undefined') currentComponents = [];
+  if (typeof currentFixedCosts !== 'undefined') currentFixedCosts = { labourCost: 0, packagingCost: 0 };
   if (typeof currentAssemblyQty !== 'undefined') currentAssemblyQty = 1;
   localStorage.removeItem(K.CURRENT_BUILD);
   renderBuild();
@@ -1446,7 +1454,9 @@ function openPaymentModal(orderId) {
         paidAt: draft.paidAt,
       }, { today: localDateStr(), settings });   // the cap is price + tax for a tax-added shop
       runPaymentEffects(order, out.effects);
-      return true;
+      // Refused (below what the job's payment plan recorded): nothing changed,
+      // the toast says why, and the dialog stays open to correct the figure.
+      return !out.refused;
     }
   });
 }
@@ -2676,12 +2686,22 @@ function duplicateOrder(orderId) {
   // the calculator reads the shop's (lib/order-new.js inShopCurrency).
   const shop = NewOrderRules() ? NewOrderRules().inShopCurrency(order, settings)
     : { shippingCost: order.shippingCost, extraLines: order.extraLines || [], parts: order.parts || [] };
+  // A once-labour job (labourCost / packagingCost at the order level) keeps
+  // them there: its parts are costed without labour and packaging, which would
+  // otherwise come back in every part.
+  const srcJob = order;
+  const onceJob = +srcJob.labourCost > 0 || +srcJob.packagingCost > 0;
+  if (typeof currentFixedCosts !== 'undefined') currentFixedCosts = onceJob
+    ? { labourCost: +srcJob.labourCost || 0, packagingCost: +srcJob.packagingCost || 0, groups: { JOB: { labourCost: +srcJob.labourCost || 0, packagingCost: +srcJob.packagingCost || 0 } } }
+    : { labourCost: 0, packagingCost: 0 };
   currentBuild = (shop.parts || []).map(p => {
     const copy = { ...p, id: uid('PRT') };
     // baseCost is a LINE total (unit cost x qty), matching what the calculator stores
     // when the part is first added. Using the per-unit cost here re-quoted a duplicated
     // or reprinted order at 1/qty of its real cost while still printing every unit.
-    copy.baseCost = partTotalCost(copy);
+    copy.baseCost = onceJob ? partTotalCost(copy, undefined, { labour: false, packaging: false }) : partTotalCost(copy);
+    // The source job's once-costs leave with its parts (build.js syncFixedCosts).
+    if (onceJob) { copy.orderLevelCosts = true; copy.onceGroup = 'JOB'; }
     return copy;
   });
   currentBuildFromProductId = order.productId || null;
@@ -2710,12 +2730,22 @@ function createLinkedReprint(original, reason, costMode) {
   // the calculator reads the shop's (lib/order-new.js inShopCurrency).
   const shop = NewOrderRules() ? NewOrderRules().inShopCurrency(original, settings)
     : { shippingCost: original.shippingCost, extraLines: original.extraLines || [], parts: original.parts || [] };
+  // A once-labour job (labourCost / packagingCost at the order level) keeps
+  // them there: its parts are costed without labour and packaging, which would
+  // otherwise come back in every part.
+  const srcJob = original;
+  const onceJob = +srcJob.labourCost > 0 || +srcJob.packagingCost > 0;
+  if (typeof currentFixedCosts !== 'undefined') currentFixedCosts = onceJob
+    ? { labourCost: +srcJob.labourCost || 0, packagingCost: +srcJob.packagingCost || 0, groups: { JOB: { labourCost: +srcJob.labourCost || 0, packagingCost: +srcJob.packagingCost || 0 } } }
+    : { labourCost: 0, packagingCost: 0 };
   currentBuild = (shop.parts || []).map(p => {
     const copy = { ...p, id: uid('PRT') };
     // baseCost is a LINE total (unit cost x qty), matching what the calculator stores
     // when the part is first added. Using the per-unit cost here re-quoted a duplicated
     // or reprinted order at 1/qty of its real cost while still printing every unit.
-    copy.baseCost = partTotalCost(copy);
+    copy.baseCost = onceJob ? partTotalCost(copy, undefined, { labour: false, packaging: false }) : partTotalCost(copy);
+    // The source job's once-costs leave with its parts (build.js syncFixedCosts).
+    if (onceJob) { copy.orderLevelCosts = true; copy.onceGroup = 'JOB'; }
     return copy;
   });
   currentBuildFromProductId = original.productId || null;

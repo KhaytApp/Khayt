@@ -61,8 +61,10 @@
     // as its price is. It was multiplied by the quantity again and shown in
     // the job's currency unconverted (pre-release review, Nov 16).
     const fx = +o.fxRate > 0 && +o.fxRate !== 1 ? +o.fxRate : 1;
-    const cost = (parts.reduce((s, p) => s + Math.max(0, +p.baseCost || 0), 0)
-      + Math.max(0, +o.componentsCost || 0) + Math.max(0, +o.overheadCost || 0)) / fx;
+    // The job's cost (lib/order-money.js jobCost): parts, components, overhead,
+    // and a product's labour and packaging carried once at the order level.
+    const cost = KhaytOrderMoney.jobCost(o) / fx;
+    const once = KhaytOrderMoney.jobFixedCost(o, { components: false, overhead: false });
     const margin = ED() && ED().marginOf ? ED().marginOf(o) : null;
     const row = (label, value, cls) => `<div class="jp-row ${cls || ''}"><span>${escapeHtml(label)}</span><span class="jp-num">${escapeHtml(value)}</span></div>`;
     return row(t('jp.price'), money(o, +o.price || 0))
@@ -70,6 +72,8 @@
       + row(t('jp.owing'), quote ? '—' : money(o, steps.owed || 0), 'is-strong' + (!quote && steps.late && steps.owed > 0 ? ' is-late' : ''))
       + (quote ? `<p class="jp-note">${escapeHtml(t('jp.quote_money_note'))}</p>` : '')
       + row(t('jp.cost'), cost > 0 ? money(o, cost) : '—', 'is-muted')
+      // A product's labour and packaging, charged once at the order level.
+      + (once > 0 ? row(t('jp.labour_once'), money(o, once / fx), 'is-muted') : '')
       + row(t('jp.margin'), margin === null ? t('jp.margin_typed') : `${margin} %`, 'is-muted');
   }
 
