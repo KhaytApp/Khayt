@@ -1,5 +1,5 @@
 {
- "about": "lib/send-checks.js sendChecks(file, machine, loaded): the findings before a send (C8). `file.headerText` is a hand-written slicer header (never a customer file), read with gcode-parse.parsePrinterHeader; `loaded.ptc` is a U1 print_task_config read with loaded-colours.fromPrintTaskConfig, `loaded.loaded` slots set by hand. Synthetic.",
+ "about": "lib/send-checks.js sendChecks(file, machine, loaded, live, opts): the findings before a send (C8). `file.headerText` is a hand-written slicer header (never a customer file), read with gcode-parse.parsePrinterHeader; `loaded.ptc` is a U1 print_task_config read with loaded-colours.fromPrintTaskConfig, `loaded.loaded` slots set by hand. Synthetic. `live` is the printer's poll entry (state, lastActivityAt in ms); left out, the bed says nothing. `opts.lastFinishedByMachine` is plan()'s map. The bed rule is lib/auto-dispatch.js bedState.",
  "cases": [
   {
    "why": "a clean send: fits, sliced for this printer, the loaded PLA black",
@@ -1082,6 +1082,287 @@
      "code": "head-not-reported",
      "severity": "info",
      "slot": 4
+    }
+   ]
+  },
+  {
+   "why": "bed-not-cleared (warn): the print finished and nobody has said the bed is clear (Turki's manual send, Nov 19)",
+   "file": {
+    "name": "plate.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n; printable_area = 0x0,270x0,270x270,0x270\n; printable_height = 270\n",
+    "bounds": {
+     "x": 100,
+     "y": 100,
+     "z": 50
+    }
+   },
+   "machine": {
+    "id": "M1",
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "live": {
+    "state": "complete",
+    "lastActivityAt": 1763600000000
+   },
+   "want": [
+    {
+     "code": "bed-not-cleared",
+     "severity": "warn",
+     "since": 1763600000000,
+     "clearedAt": null
+    }
+   ]
+  },
+  {
+   "why": "bed-not-cleared (warn): the bed was cleared BEFORE the print was cancelled",
+   "file": {
+    "name": "plate.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n; printable_area = 0x0,270x0,270x270,0x270\n; printable_height = 270\n",
+    "bounds": {
+     "x": 100,
+     "y": 100,
+     "z": 50
+    }
+   },
+   "machine": {
+    "id": "M1",
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    },
+    "bedClearedAt": "2025-11-19T23:53:20.000Z"
+   },
+   "live": {
+    "state": "cancelled",
+    "lastActivityAt": 1763600000000
+   },
+   "want": [
+    {
+     "code": "bed-not-cleared",
+     "severity": "warn",
+     "since": 1763600000000,
+     "clearedAt": "2025-11-19T23:53:20.000Z"
+    }
+   ]
+  },
+  {
+   "why": "bed-not-cleared (warn): stopped with no activity time and no clear said",
+   "file": {
+    "name": "plate.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n; printable_area = 0x0,270x0,270x270,0x270\n; printable_height = 270\n",
+    "bounds": {
+     "x": 100,
+     "y": 100,
+     "z": 50
+    }
+   },
+   "machine": {
+    "id": "M1",
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "live": {
+    "state": "stopped"
+   },
+   "want": [
+    {
+     "code": "bed-not-cleared",
+     "severity": "warn",
+     "since": null,
+     "clearedAt": null
+    }
+   ]
+  },
+  {
+   "why": "bed clear: cleared AFTER the print finished says nothing",
+   "file": {
+    "name": "plate.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n; printable_area = 0x0,270x0,270x270,0x270\n; printable_height = 270\n",
+    "bounds": {
+     "x": 100,
+     "y": 100,
+     "z": 50
+    }
+   },
+   "machine": {
+    "id": "M1",
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    },
+    "bedClearedAt": "2025-11-20T00:54:20.000Z"
+   },
+   "live": {
+    "state": "complete",
+    "lastActivityAt": 1763600000000
+   },
+   "want": []
+  },
+  {
+   "why": "bed clear: a printer that clears its own bed says nothing",
+   "file": {
+    "name": "plate.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n; printable_area = 0x0,270x0,270x270,0x270\n; printable_height = 270\n",
+    "bounds": {
+     "x": 100,
+     "y": 100,
+     "z": 50
+    }
+   },
+   "machine": {
+    "id": "M1",
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    },
+    "clearsOwnBed": true
+   },
+   "live": {
+    "state": "complete",
+    "lastActivityAt": 1763600000000
+   },
+   "want": []
+  },
+  {
+   "why": "bed-not-cleared (warn): idle now, but the book has a job finished on it after the last clear",
+   "file": {
+    "name": "plate.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n; printable_area = 0x0,270x0,270x270,0x270\n; printable_height = 270\n",
+    "bounds": {
+     "x": 100,
+     "y": 100,
+     "z": 50
+    }
+   },
+   "machine": {
+    "id": "M1",
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    },
+    "bedClearedAt": "2025-11-19T22:53:20.000Z"
+   },
+   "live": {
+    "state": "standby"
+   },
+   "opts": {
+    "lastFinishedByMachine": {
+     "M1": 1763600000000
+    }
+   },
+   "want": [
+    {
+     "code": "bed-not-cleared",
+     "severity": "warn",
+     "since": null,
+     "clearedAt": "2025-11-19T22:53:20.000Z"
+    }
+   ]
+  },
+  {
+   "why": "bed-unknown (info): the printer reports no state, and nobody has said the bed is clear",
+   "file": {
+    "name": "plate.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n; printable_area = 0x0,270x0,270x270,0x270\n; printable_height = 270\n",
+    "bounds": {
+     "x": 100,
+     "y": 100,
+     "z": 50
+    }
+   },
+   "machine": {
+    "id": "M1",
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "live": {},
+   "want": [
+    {
+     "code": "bed-unknown",
+     "severity": "info"
+    }
+   ]
+  },
+  {
+   "why": "bed-unknown (info): idle, and the bed was never said to be clear",
+   "file": {
+    "name": "plate.gcode",
+    "headerText": "; printer_model = Snapmaker U1\n; printable_area = 0x0,270x0,270x270,0x270\n; printable_height = 270\n",
+    "bounds": {
+     "x": 100,
+     "y": 100,
+     "z": 50
+    }
+   },
+   "machine": {
+    "id": "M1",
+    "model": "Snapmaker U1",
+    "toolheads": 4,
+    "bed": {
+     "x": 270,
+     "y": 270,
+     "z": 270
+    },
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "live": {
+    "state": "standby"
+   },
+   "want": [
+    {
+     "code": "bed-unknown",
+     "severity": "info"
     }
    ]
   }
