@@ -295,6 +295,25 @@ test('MED 1: "Connected" (a Bambu report without gcode_state) is not idle, and w
   assert.equal(ad.machineBlocked(m, { state: 'complete', progress: 100 }), null, 'a finished print at 100% is left to the bed check');
 });
 
+test('pre-cut review MED1: a printer that keeps its last progress after a cancel is not busy for ever', () => {
+  const at = Date.parse('2026-11-19T22:00:00Z');
+  // The job ENDED: believed over the stale progress, and the bed check holds it until it is cleared.
+  const m = machine();
+  for (const w of ['cancelled', 'stopped', 'complete']) {
+    assert.notEqual(ad.machineBlocked(m, { state: w, progress: 37, lastActivityAt: at }), 'ad.busy', w + ' at 37%');
+    assert.equal(ad.machineBlocked(m, { state: w, progress: 37, lastActivityAt: at }), 'ad.bed_not_clear', w + ': held by the bed (cleared before it ended), and says so');
+  }
+  const cleared = machine({ bedClearedAt: new Date(at + 60000).toISOString() });
+  assert.equal(ad.machineBlocked(cleared, { state: 'cancelled', progress: 37, lastActivityAt: at }), null, 'cancelled at 37%, bed cleared after: free');
+  // IDLE with progress (OctoPrint "Operational" after a cancel): busy, unless someone cleared the bed after the last change.
+  assert.equal(ad.machineBlocked(cleared, { state: 'Operational', progress: 37, lastActivityAt: at }), null, 'Operational at 37%, bed cleared after: free');
+  const before = machine({ bedClearedAt: new Date(at - 60000).toISOString() });
+  assert.equal(ad.machineBlocked(before, { state: 'Operational', progress: 37, lastActivityAt: at }), 'ad.busy', 'cleared BEFORE the change: still busy');
+  assert.equal(ad.machineBlocked(cleared, { state: 'Operational', progress: 37 }), 'ad.busy', 'no activity time: still busy (fails safe)');
+  // A word that is not idle or ended keeps the #2594 rule.
+  assert.equal(ad.machineBlocked(cleared, { state: 'Connected', progress: 40, lastActivityAt: at }), 'ad.busy');
+});
+
 test('MED 2: a print that ended (stopped, cancelled, complete…) is free only once the bed was cleared AFTER it ended', () => {
   const ended = Date.parse('2026-09-11T12:00:00Z');
   for (const w of ['STOPPED', 'stopped', 'cancelled', 'canceled', 'complete', 'Finished', 'FINISH']) {
