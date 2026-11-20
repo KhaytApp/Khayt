@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Shared rule (not yet on screen): before a file goes to a printer, say when its bed may not be clear.** Turki's uncleared-bed incident (Nov 19) was a file sent by hand, which the dispatcher's bed check never saw. `lib/send-checks.js` `sendChecks(file, machine, loaded, live, opts)` now takes the printer's poll entry and says `bed-not-cleared` (a warning, never a block) when its last print finished, stopped or was cancelled and nobody has said the bed is clear since, or when the book has a job finished on it after the last "clear". It says `bed-unknown` (information) when there is nothing to go by. The rule is the dispatcher's own, moved into `lib/auto-dispatch.js` `bedState` and shared, so a manual send and dispatch judge a bed the same way. The Mac and desktop send sheets will show it, with a "Bed is clear" button that stamps `bedClearedAt`. Left out, `live` says nothing, so today's callers are unchanged. Tests: `test/send-checks.test.js`, 8 new vectors in `test/fixtures/send-checks-vectors.json`.
+
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
   - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.
   - **Recalculate.**
