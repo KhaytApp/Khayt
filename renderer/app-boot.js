@@ -865,6 +865,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Business Mode setup wizard (new first-run experience)
   initWizard();
 
+  // The staff lock is on and nobody is signed in: the window is a viewer until
+  // someone is (P5, #2592), so ask who it is now rather than leave the shop to
+  // find "Switch operator" (pre-cut review MED2). Not over the first-run
+  // wizard, which sets the lock up itself.
+  if (settings.operatorLockEnabled && typeof openPinPadModal === 'function'
+      && !(typeof shouldShowSetupWizard === 'function' && shouldShowSetupWizard())) {
+    const signedIn = settings.activeOperatorId
+      && (operators || []).some((o) => o && o.id === settings.activeOperatorId && o.active !== false);
+    if (!signedIn) setTimeout(() => { try { openPinPadModal(); } catch (e) { console.error('PIN pad at start:', e); } }, 0);
+  }
+
   // The search shortcut is drawn as Ctrl K, the key on Windows and Linux; a
   // macOS build shows its own symbol (preload tags <html> platform-darwin).
   if (document.documentElement.classList.contains('platform-darwin')) {
