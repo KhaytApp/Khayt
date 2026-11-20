@@ -242,6 +242,9 @@ contextBridge.exposeInMainWorld('hubAPI', {
   themesRemove:    (o)    => ipcRenderer.invoke('hub:themes-remove', o),
   webcamProbe: (o)        => ipcRenderer.invoke('hub:webcam-probe', o),
   // Quit handshake: main asks the renderer to flush its debounced save before exiting.
+  launchGate:           () => ipcRenderer.invoke('hub:launch-gate'),
+  launchGateAccept:     () => ipcRenderer.invoke('hub:launch-gate-accept'),
+  launchGateAcceptedInUpdate: (version) => ipcRenderer.invoke('hub:launch-gate-accepted-in-update', String(version || '')),
   onFlushSaveRequest:   (cb) => { ipcRenderer.on('hub:flush-save-request', () => { try { cb(); } catch { /* noop */ } }); },
   flushSaveDone:        ()   => ipcRenderer.send('hub:flush-save-done'),
   telemetryPurge: ()      => ipcRenderer.invoke('hub:telemetry-purge'),
