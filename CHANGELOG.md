@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Shared rules (printer batch 3, not yet on screen): how each print ended, each printer's success rate, and "waiting at the machine" that survives a restart.**
+  - **One result per print.** A printer's finished job now records how it ended (finished, cancelled or failed) when its last word says so (`lib/printer-poll-cache.js`). `lib/run-result.js` puts one result on each print run, once. The shop's own mark (a failed check, a scrapped print) beats the printer's "complete", which is kept beside it.
+  - **Success rate per printer.** `lib/printer-success.js` counts finished against failed runs per printer, worst first. Cancelled runs are shown but not counted against the printer, and a printer with fewer than five decided runs is flagged as too few to judge.
+  - **Waiting at the machine.** `lib/waiting-at-machine.js` says when a printer needs a person: a print to take off, leftovers to clear after a failed or cancelled print, a filament runout, or the printer asking for attention. The bed is read from what's saved (the printer's finished jobs and when the bed was last said to be clear), so a print still on the plate is still shown after the app restarts or the printer reconnects answering "idle".
+  - Tests: `test/printer-batch3.test.js`, with vectors in `test/fixtures/run-result-vectors.json`, `printer-success-vectors.json` and `waiting-at-machine-vectors.json`.
+
 - **Shared rules (printer batch 2, not yet on screen): what is wrong with a printer, what each model can do, and a poll that waits for a person's command.**
   - **One problem list for every printer.** `lib/printer-problems.js` `problemsFor(type, report)` turns what each protocol reports into the same closed list (code, severity, what to do), worst first: Bambu's fault codes, the U1's exceptions and power loss, OctoPrint, PrusaLink, Duet and Klipper error states, and Elegoo's file errors. A Bambu fault is read by its fixed sentence, and a test checks every bundled code has a meaning. A cancelled Bambu task no longer counts as serious.
   - **What a card can offer, per model.** `lib/printer-capabilities.js` checks each control against the model as well as the protocol. A Bambu P1P no longer offers a light switch unless the shop records its camera-and-LED kit. The U1's chamber light shows only on the U1, and resin printers don't offer "exclude object". A model the table doesn't know is left to what its protocol can send, so a missing row never hides a button.
