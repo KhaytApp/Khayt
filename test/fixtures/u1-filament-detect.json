@@ -1,0 +1,373 @@
+{
+ "about": "Snapmaker U1 (Moonraker 2.0.0, stock firmware) /printer/objects/query?filament_detect&print_task_config, read-only GET from the Baby U1 on Nov 19 2026. T1 and T2 carry Snapmaker RFID tags; T3 and T4 are empty (no tag). CARD_UID (the tag's serial) is zeroed, same shape. Every filament_detect field is a number except VENDOR/MANUFACTURER/MAIN_TYPE/SUB_TYPE (strings, 'NONE' when empty). RGB_n/ARGB_COLOR are packed ints (RGB_1 526861 = #080A0D). Units are inferred, not documented: DIAMETER looks like hundredths of a mm (175 for 1.75 mm), WEIGHT grams (500 on a 500 g spool), LENGTH metres (150, about right for 500 g of 1.75 mm PLA). SKU is an int (900001); MF_DATE reads 19700101 on these tags (unset).",
+ "result": {
+  "status": {
+   "filament_detect": {
+    "info": [
+     {
+      "VERSION": 1,
+      "VENDOR": "Snapmaker",
+      "MANUFACTURER": "Polymaker",
+      "MAIN_TYPE": "PLA",
+      "SUB_TYPE": "SnapSpeed",
+      "TRAY": 0,
+      "ALPHA": 255,
+      "MULTI_MODE": 0,
+      "COLOR_NUMS": 1,
+      "ARGB_COLOR": 4278716941,
+      "RGB_1": 526861,
+      "RGB_2": 0,
+      "RGB_3": 0,
+      "RGB_4": 0,
+      "RGB_5": 0,
+      "DIAMETER": 175,
+      "WEIGHT": 500,
+      "LENGTH": 150,
+      "DRYING_TEMP": 55,
+      "DRYING_TIME": 6,
+      "HOTEND_MAX_TEMP": 230,
+      "HOTEND_MIN_TEMP": 190,
+      "BED_TYPE": 1,
+      "BED_TEMP": 60,
+      "FIRST_LAYER_TEMP": 230,
+      "OTHER_LAYER_TEMP": 220,
+      "SKU": 900001,
+      "MF_DATE": "19700101",
+      "RSA_KEY_VERSION": 0,
+      "OFFICIAL": true,
+      "CARD_UID": [
+       0,
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "VERSION": 1,
+      "VENDOR": "Snapmaker",
+      "MANUFACTURER": "Polymaker",
+      "MAIN_TYPE": "PLA",
+      "SUB_TYPE": "SnapSpeed",
+      "TRAY": 0,
+      "ALPHA": 255,
+      "MULTI_MODE": 0,
+      "COLOR_NUMS": 1,
+      "ARGB_COLOR": 4293058267,
+      "RGB_1": 14868187,
+      "RGB_2": 0,
+      "RGB_3": 0,
+      "RGB_4": 0,
+      "RGB_5": 0,
+      "DIAMETER": 175,
+      "WEIGHT": 500,
+      "LENGTH": 150,
+      "DRYING_TEMP": 55,
+      "DRYING_TIME": 6,
+      "HOTEND_MAX_TEMP": 230,
+      "HOTEND_MIN_TEMP": 190,
+      "BED_TYPE": 1,
+      "BED_TEMP": 60,
+      "FIRST_LAYER_TEMP": 230,
+      "OTHER_LAYER_TEMP": 220,
+      "SKU": 900000,
+      "MF_DATE": "19700101",
+      "RSA_KEY_VERSION": 0,
+      "OFFICIAL": true,
+      "CARD_UID": [
+       0,
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "VERSION": 0,
+      "VENDOR": "NONE",
+      "MANUFACTURER": "NONE",
+      "MAIN_TYPE": "NONE",
+      "SUB_TYPE": "NONE",
+      "TRAY": 0,
+      "ALPHA": 255,
+      "MULTI_MODE": 0,
+      "COLOR_NUMS": 1,
+      "ARGB_COLOR": 4294967295,
+      "RGB_1": 16777215,
+      "RGB_2": 16777215,
+      "RGB_3": 16777215,
+      "RGB_4": 16777215,
+      "RGB_5": 16777215,
+      "DIAMETER": 0,
+      "WEIGHT": 0,
+      "LENGTH": 0,
+      "DRYING_TEMP": 0,
+      "DRYING_TIME": 0,
+      "HOTEND_MAX_TEMP": 0,
+      "HOTEND_MIN_TEMP": 0,
+      "BED_TYPE": 0,
+      "BED_TEMP": 0,
+      "FIRST_LAYER_TEMP": 0,
+      "OTHER_LAYER_TEMP": 0,
+      "SKU": 0,
+      "MF_DATE": "19700101",
+      "RSA_KEY_VERSION": 0,
+      "OFFICIAL": false,
+      "CARD_UID": 0
+     },
+     {
+      "VERSION": 0,
+      "VENDOR": "NONE",
+      "MANUFACTURER": "NONE",
+      "MAIN_TYPE": "NONE",
+      "SUB_TYPE": "NONE",
+      "TRAY": 0,
+      "ALPHA": 255,
+      "MULTI_MODE": 0,
+      "COLOR_NUMS": 1,
+      "ARGB_COLOR": 4294967295,
+      "RGB_1": 16777215,
+      "RGB_2": 16777215,
+      "RGB_3": 16777215,
+      "RGB_4": 16777215,
+      "RGB_5": 16777215,
+      "DIAMETER": 0,
+      "WEIGHT": 0,
+      "LENGTH": 0,
+      "DRYING_TEMP": 0,
+      "DRYING_TIME": 0,
+      "HOTEND_MAX_TEMP": 0,
+      "HOTEND_MIN_TEMP": 0,
+      "BED_TYPE": 0,
+      "BED_TEMP": 0,
+      "FIRST_LAYER_TEMP": 0,
+      "OTHER_LAYER_TEMP": 0,
+      "SKU": 0,
+      "MF_DATE": "19700101",
+      "RSA_KEY_VERSION": 0,
+      "OFFICIAL": false,
+      "CARD_UID": 0
+     }
+    ]
+   },
+   "print_task_config": {
+    "filament_vendor": [
+     "Snapmaker",
+     "Snapmaker",
+     "Generic",
+     "Generic"
+    ],
+    "filament_type": [
+     "PLA",
+     "PLA",
+     "PLA",
+     "PLA"
+    ],
+    "filament_sub_type": [
+     "SnapSpeed",
+     "SnapSpeed",
+     "",
+     "Silk"
+    ],
+    "filament_color": [
+     4278716941,
+     4293058267,
+     4281179737,
+     4294895013
+    ],
+    "filament_color_rgba": [
+     "080A0DFF",
+     "E2DEDBFF",
+     "2D9E59FF",
+     "FEE5A5FF"
+    ],
+    "filament_color_multi": [
+     {
+      "nums": 1,
+      "alpha": 255,
+      "mode": 0,
+      "colors": [
+       "080A0D"
+      ]
+     },
+     {
+      "nums": 1,
+      "alpha": 255,
+      "mode": 0,
+      "colors": [
+       "E2DEDB"
+      ]
+     },
+     {
+      "nums": 1,
+      "alpha": 255,
+      "mode": 0,
+      "colors": [
+       "2D9E59"
+      ]
+     },
+     {
+      "nums": 1,
+      "alpha": 255,
+      "mode": 0,
+      "colors": [
+       "FEE5A5"
+      ]
+     }
+    ],
+    "filament_official": [
+     true,
+     true,
+     false,
+     false
+    ],
+    "filament_sku": [
+     900001,
+     900000,
+     0,
+     0
+    ],
+    "filament_edit": [
+     false,
+     false,
+     true,
+     true
+    ],
+    "filament_exist": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "filament_soft": [
+     false,
+     false,
+     false,
+     false
+    ],
+    "extruder_map_table": [
+     2,
+     1,
+     3,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "extruders_used": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "extruders_replenished": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "time_lapse_camera": false,
+    "auto_bed_leveling": false,
+    "flow_calibrate": false,
+    "flow_calib_extruders": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "shaper_calibrate": false,
+    "auto_replenish_filament": true,
+    "replenish_ignore_color": false,
+    "filament_entangle_detect": true,
+    "filament_entangle_sen": "medium",
+    "end_led_turn_off": false,
+    "end_unload_filament": [
+     false,
+     false,
+     false,
+     false
+    ],
+    "reprint_info": {
+     "auto_bed_leveling": false,
+     "flow_calibrate": false,
+     "flow_calib_extruders": [
+      true,
+      true,
+      true,
+      true
+     ],
+     "time_lapse_camera": false,
+     "extruder_map_table": [
+      2,
+      1,
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "extruders_used": [
+      true,
+      true,
+      true,
+      true
+     ],
+     "end_unload_filament": [
+      false,
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  }
+ }
+}

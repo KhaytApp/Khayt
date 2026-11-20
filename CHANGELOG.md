@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Shared rules (not yet on screen): four things a Snapmaker U1 already reports, read for the shop.** Ideas only from bloodf/u1control's docs, no code. Each was checked against read-only queries on the shop's own U1.
+  - **Spool tags.** `lib/rfid-tray.js` reads a head's RFID tag (`filament_detect`) as maker, material, colours, weight and diameter. An empty head reports white, and that is not read as a tag. `spoolMatch` answers link, ask, add or none against the shop's spools. It never changes a spool: linking or adding is the shop's own confirmed step.
+  - **Filament per head.** `lib/printer-actuals.js` `perHeadActuals` splits a print's MEASURED filament across its heads in proportion to the slicer's per-head grams (`basis: 'proportional'`, so no head is called measured on its own). `perHeadPatch` writes it once per print, keyed by the printer's history job id: a re-poll, or the Mac and the desktop both finding the print, changes nothing.
+  - **Time-lapse as proof.** `lib/timelapse-attach.js` decides whether a print's video can be copied into the job's files when the shop presses "Keep as proof": up to 150 MB, kept once, the file name the shop's own. Otherwise it stays a link on the printer, and says why. `.mp4` is now on the list of attachments the app will open.
+  - **Problems.** `lib/moonraker-problems.js` turns the U1's `exception_manager` into a closed list, worst first, in the shape of `lib/bambu-faults.js`, so batch 2's problem catalogue can fold both. Exception 523 reads as a filament runout on the head the message names. Other ids show the printer's own message, with its level as the severity. A power loss mid-print is information only; Khayt never resumes or discards.
+  - Tests: `test/rfid-tray.test.js` (the U1 read, fixture `test/fixtures/u1-filament-detect.json`), `test/per-head-actuals.test.js` (vectors `test/fixtures/per-head-actuals-vectors.json`), `test/timelapse-attach.test.js`, `test/moonraker-problems.test.js`.
+
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
   - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.
   - **Recalculate.**
