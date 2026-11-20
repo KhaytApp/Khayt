@@ -87,8 +87,20 @@
     // Work in flight, whatever the word says: a partial report or a word that
     // reads idle while the job is at 40% must never be given a second job
     // (#2594 review). 100% is a finished print, left to the bed check below.
+    //
+    // But a printer KEEPS its last progress after a cancel (octoprint.js
+    // reads job.progress.completion, and Moonraker's progress stays until the
+    // next print), so a cancelled printer stayed "busy" for ever (pre-cut
+    // review, MED1). A word saying the job ENDED (finished, stopped,
+    // cancelled) is believed: the bed check below holds that printer until
+    // someone clears it, and says so. A word saying IDLE with progress is
+    // still taken as busy, unless someone said the bed was clear after the
+    // printer last changed what it was doing: a person has looked at it.
     const progress = Math.round(+status.progress || 0);
-    if (progress > 0 && progress < 100) return 'ad.busy';
+    const ended = !!(st && st.cls === 'finished');
+    const looked = Date.parse(text(machine.bedClearedAt)) > Number(status.lastActivityAt);
+    const resting = !!(st && st.activity === 'idle') && looked;
+    if (progress > 0 && progress < 100 && !ended && !resting) return 'ad.busy';
     if (st && st.word !== undefined && st.cls) {
       if (st.link !== 'online') return 'ad.no_reading';           // "Offline" in its own state text
       if (st.activity === 'error') return 'ad.printer_error';     // failed, attention, halted
