@@ -407,6 +407,9 @@ jobs:
       - name: E2E smoke (Settings read-only for a manager)
         run: xvfb-run -a npm run test:e2e:settingsro
 
+      - name: E2E smoke (the PIN pad opens at start under the lock with nobody signed in)
+        run: xvfb-run -a npm run test:e2e:lockpin
+
       - name: E2E smoke (a filed VAT return keeps its figures)
         run: xvfb-run -a npm run test:e2e:vatfiled
 

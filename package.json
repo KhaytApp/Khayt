@@ -57,6 +57,7 @@
     "test:e2e:simplepanes": "node scripts/e2e-simple-panes-smoke.mjs",
     "test:e2e:plainfixes": "node scripts/e2e-plain-fixes-smoke.mjs",
     "test:e2e:settingsro": "node scripts/e2e-settings-readonly-smoke.mjs",
+    "test:e2e:lockpin": "node scripts/e2e-lock-pin-at-boot-smoke.mjs",
     "test:e2e:vatfiled": "node scripts/e2e-vat-filed-smoke.mjs",
     "test:e2e:wabcampaign": "node scripts/e2e-whatsapp-business-campaign-smoke.mjs",
     "test:e2e:planpicker": "node scripts/e2e-cloud-plan-picker-smoke.mjs",
