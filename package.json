@@ -117,6 +117,8 @@
     "test:e2e:package": "node scripts/e2e-package-a-group-smoke.mjs",
     "test:e2e:biglib": "node scripts/e2e-big-library-smoke.mjs",
     "test:e2e:consent": "node scripts/e2e-update-consent-smoke.mjs",
+    "test:e2e:launchgate": "node scripts/e2e-launch-gate-smoke.mjs",
+    "release:gates": "node scripts/write-release-gates.js",
     "test:e2e:dedupe": "node scripts/e2e-model-dedupe-smoke.mjs",
     "test:e2e:filelink": "node scripts/e2e-order-file-link-smoke.mjs",
     "test:e2e:estimator": "node scripts/e2e-estimator-settings-smoke.mjs",

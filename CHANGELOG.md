@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Windows/Linux: an update installed from the Microsoft Store or by hand now shows its "Before you update" items at first start.** Only updates through Khayt's own update dialog showed them, before the download. A Store install is updated by the Store, and a manual one by its installer, so both reached a major change, such as 4.11.0's "update Khayt on every computer before you use product rates", without a word. Now the first start of a new version on a computer shows every such item since the version that computer last ran, and holds the window until the shop ticks "I have read these changes" and continues. A brand-new install isn't asked, and nor is a shop that already accepted the items in the update dialog. Which version each computer last ran is kept on that computer (`last-run-version.json`), never in the book, which syncs. The items ship in the app as `lib/release-gates.json`, generated from CHANGELOG.md by `npm run release:gates`; a test fails a cut that forgets it. Tests: `test/release-gates.test.js`, `npm run test:e2e:launchgate`.
+
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
   - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.
   - **Recalculate.**

@@ -865,6 +865,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Business Mode setup wizard (new first-run experience)
   initWizard();
 
+  // A major change reached this computer without the update dialog (the
+  // Microsoft Store, an installer run by hand): its items, held until read.
+  if (typeof showLaunchGateIfNeeded === 'function') showLaunchGateIfNeeded().catch((e) => console.error('launch gate:', e));
+
   // The search shortcut is drawn as Ctrl K, the key on Windows and Linux; a
   // macOS build shows its own symbol (preload tags <html> platform-darwin).
   if (document.documentElement.classList.contains('platform-darwin')) {

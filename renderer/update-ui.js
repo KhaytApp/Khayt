@@ -93,6 +93,12 @@
   function wireFooterActions() {
     updateOverlay?.querySelector('[data-upd="later"]')?.addEventListener('click', closeUpdateModal);
     updateOverlay?.querySelector('[data-upd="download"]')?.addEventListener('click', () => {
+      // Read and accepted here: the first launch of that version does not ask
+      // again (lib/main/launch-gate.js `acceptedFor`).
+      const major = activeUpdateInfo && activeUpdateInfo.majorChanges;
+      if (consentGiven && major && major.needsConsent && activeUpdateInfo.version) {
+        window.hubAPI?.launchGateAcceptedInUpdate?.(activeUpdateInfo.version)?.catch?.(() => {});
+      }
       startUpdateDownload();
     });
     updateOverlay?.querySelector('[data-upd="install"]')?.addEventListener('click', async () => {
@@ -443,10 +449,57 @@
     if (statusEl) statusEl.textContent = '⚠ Update check returned no result';
   }
 
+  /**
+   * The first start of a new version, for installs the update dialog never
+   * saw (the Microsoft Store, an installer run by hand): the same "Before you
+   * update" items, held until read (lib/main/launch-gate.js). There is no
+   * "Later": the update has already happened, so this is the last moment the
+   * shop can be told before it works on the new version.
+   */
+  async function showLaunchGateIfNeeded() {
+    let gate = null;
+    try { gate = await global.hubAPI?.launchGate?.(); } catch (_) { gate = null; }
+    if (!gate || !Array.isArray(gate.items) || !gate.items.length) return false;
+    const overlay = document.createElement('div');
+    overlay.id = 'launchGateOverlay';
+    overlay.className = 'modal-backdrop confirm-modal-overlay update-modal';
+    overlay.style.zIndex = '10060';
+    overlay.innerHTML = `
+      <div class="modal modal-form" role="dialog" aria-modal="true" aria-labelledby="launchGateTitle" style="max-width:560px;">
+        <div class="modal-header"><h3 id="launchGateTitle">${escapeHtml(tr('upd.launch_title', '{product} was updated to {version}', { product: PRODUCT, version: String(gate.version || '') }))}</h3></div>
+        <div class="modal-body">
+          <div class="update-consent" role="group" aria-labelledby="launchGateHead">
+            <h4 class="update-consent-head" id="launchGateHead">${escapeHtml(tr('upd.consent_head', 'This update changes how you work'))}</h4>
+            <ul class="update-consent-list">${gate.items.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul>
+            <label class="update-consent-accept">
+              <input type="checkbox" id="launchGateAccept">
+              <span>${escapeHtml(tr('upd.launch_accept', 'I have read these changes'))}</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer"><button class="btn primary" id="launchGateContinue" disabled>${escapeHtml(tr('upd.launch_continue', 'Continue'))}</button></div>
+      </div>`;
+    (document.getElementById('modalMount') || document.body).appendChild(overlay);
+    const accept = overlay.querySelector('#launchGateAccept');
+    const go = overlay.querySelector('#launchGateContinue');
+    accept.addEventListener('change', () => { go.disabled = !accept.checked; });
+    // No backdrop click and no Escape: read, ticked and continued, or not at all.
+    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); } }, true);
+    go.addEventListener('click', async () => {
+      if (!accept.checked) return;
+      go.disabled = true;
+      try { await global.hubAPI?.launchGateAccept?.(); } catch (e) { console.error('launch gate accept failed:', e); }
+      overlay.remove();
+    });
+    accept.focus();
+    return true;
+  }
+
   const api = {
     wireUpdateUI,
     showUpdateChangesModal,
     handleManualUpdateCheckResult,
+    showLaunchGateIfNeeded,
   };
 
   Object.assign(global, api);

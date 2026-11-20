@@ -314,7 +314,7 @@ const { registerPrinterDiscovery } = require('./lib/main/printer-discovery.js');
 const { registerWebcamProxy } = require('./lib/main/webcam-proxy.js');
 const { registerPaymentLinks } = require('./lib/main/payment-links.js');
 const { registerQuotePayLink } = require('./lib/main/quote-pay-link-sign.js');
-const { registerUpdater } = require('./lib/updater');
+const { registerUpdater, isVersionNewer } = require('./lib/updater');
 const { setupAutoUpdater } = registerUpdater({
   app,
   fs,
@@ -2139,6 +2139,20 @@ const machineSecrets = require('./lib/main/machine-secrets.js').createMachineSec
 
 // A printer's smart plug (lib/main/smart-plug.js): read, switch, and the
 // auto-off after a cooled print. Same LAN pinning and secret fill as printers.
+// The "Before you update" items on the first launch of a new version, for the
+// installs the update dialog never sees: the Microsoft Store and installers
+// run by hand (lib/main/launch-gate.js).
+require('./lib/main/launch-gate.js').registerLaunchGate({
+  ipcMain,
+  userDataDir: () => app.getPath('userData'),
+  current: app.getVersion(),
+  gates: (() => { try { return require('./lib/release-gates.json').gates || {}; } catch (_) { return {}; } })(),
+  // Asked once, as the app starts: the window writes a fresh install's first
+  // book before it asks for the gate, and that is not an upgrade.
+  hasBook: (() => { let had = false; try { had = fs.existsSync(dataFilePath()); } catch (_) { had = false; } return () => had; })(),
+  isNewer: (a, b) => isVersionNewer(String(a), String(b)),
+});
+
 require('./lib/main/smart-plug.js').registerSmartPlug({
   ipcMain,
   // Switching a printer's power is controlling it (P5); reading it is not.
