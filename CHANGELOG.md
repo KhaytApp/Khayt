@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Fixed (Windows/Linux): three small things from the 4.11.0 review.** A PIN saved in the old format is no longer "reset" at the PIN pad. Under the staff lock that reset was put back at once, so the pad said "PIN reset" over nothing, and had it gone through the person would have had no PIN at all. The pad now says the owner can set a new one, in the shop's language. Restoring a backup that the staff lock kept only in part now says what was not restored, instead of reporting success. And testing or sending to a printer whose address was changed but not saved now says "save the new address first", where it used to fail as a wrong access code (the code is only ever sent to the saved address). Tests: `test/precut-lows.test.js`.
+
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
   - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.
   - **Recalculate.**

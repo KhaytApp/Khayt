@@ -1110,6 +1110,13 @@ async function restoreSnapshotForWindow(parsed, event, label) {
     const g = PrinterPermission.guardSave(parsed, disk, { verified: operatorVerified, consume: consumeVerified });
     if (!g.store) { console.error(`${label}: refused, the backup has no settings`); return null; }
     parsed = g.store;
+    // What the guard put back as it is on disk is said in the window, as a
+    // refused save is; it used to be dropped here, and the restore reported
+    // success over parts it never restored (pre-cut review LOW).
+    if (g.refused && g.refused.length) {
+      console.warn(`${label}: refused for this role:`, g.refused.join(', '));
+      try { event.sender.send('hub:restore-refused', g.refused.slice()); } catch (_) { /* window gone */ }
+    }
   } catch (e) { console.error(`${label}: role guard failed:`, e && e.message); return null; }
   // Decrypting the backup and sealing it again are both keychain work. Explain once first.
   await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
@@ -1598,6 +1605,7 @@ ipcMain.handle('hub:detect-slicers', async () => {
 // too; this function is the wire.
 async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
@@ -5624,6 +5632,7 @@ ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
  */
 async function fetchPrinterHistory(machine, limit) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
     return { ok: false, error: `Only Klipper/Moonraker printers keep a job history ${FLAVOR_NAME} can read` };
@@ -5664,6 +5673,7 @@ function nextBambuSequence() { _bambuSeq = (_bambuSeq + 1) % 1e9; return String(
 
 async function sendPrinterCommand(machine, command) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey, printerSlug, accessCode, serial } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
@@ -5825,6 +5835,7 @@ async function sendPrinterCommand(machine, command) {
  */
 async function plateObjects(machine) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
     return { ok: false, error: 'Only Klipper/Moonraker printers can drop one object' };
@@ -5890,6 +5901,7 @@ ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) => {
  */
 async function sendPrinterControl(machine, control, value) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
   if (type !== 'bambu') return { ok: false, error: `${control} is not available for this printer type` };
   const target = await resolvePrinterTarget(host);
@@ -5958,6 +5970,7 @@ function stockOptsFor(machine) {
 
 async function fetchPrinterStatus(machine) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey, accessCode, printerSlug, serial } = machine.printerApi || {};
   // sanitizePrinterHost runs inside resolvePrinterTarget (no @, / or : injection).
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN

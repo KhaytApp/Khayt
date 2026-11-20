@@ -243,6 +243,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   webcamProbe: (o)        => ipcRenderer.invoke('hub:webcam-probe', o),
   // Quit handshake: main asks the renderer to flush its debounced save before exiting.
   onFlushSaveRequest:   (cb) => { ipcRenderer.on('hub:flush-save-request', () => { try { cb(); } catch { /* noop */ } }); },
+  onRestoreRefused:     (cb) => { ipcRenderer.on('hub:restore-refused', (_e, refused) => { try { cb(Array.isArray(refused) ? refused.map(String) : []); } catch { /* noop */ } }); },
   flushSaveDone:        ()   => ipcRenderer.send('hub:flush-save-done'),
   telemetryPurge: ()      => ipcRenderer.invoke('hub:telemetry-purge'),
   telemetryRecord: (o)    => ipcRenderer.invoke('hub:telemetry-record', o),

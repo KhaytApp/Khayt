@@ -525,6 +525,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // iOS companion: react to spools/orders changed via LAN API from phone
   // Quit handshake: persist the debounced save before the app exits. Without this, any
   // edit made within saveAll()'s ~300ms debounce of Cmd+Q or a window close was lost.
+  // A restore main kept only in part (the role guard put some of it back).
+  window.hubAPI?.onRestoreRefused?.((refused) => { if (typeof _restoreRefused === 'function') _restoreRefused(refused); });
+
   if (window.hubAPI?.onFlushSaveRequest) {
     window.hubAPI.onFlushSaveRequest(() => {
       Promise.resolve()
