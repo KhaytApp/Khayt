@@ -191,3 +191,24 @@ test('a webhook order keeps the platform\'s total as its price, parts or not, in
   assert.equal(r.order.price, 200, 'the total Salla says was paid, not cost plus margin and not a line sum');
   assert.ok(r.order.parts.length > 0);
 });
+
+test('a job that had once-costs, rebuilt from a product without rates, keeps no labourCost/packagingCost', () => {
+  // 4.11.0 release review, L3: apply only ever SET the once-costs, so a 0 from
+  // the rebuild left the old figure on the job and its cost counted labour and
+  // packaging the new basket does not have.
+  const reading = S.readLines(S.structuredLines([{ name: 'Flexi Dragon', qty: 2 }]),
+    { products: [hood, dragon], stock: {} });
+  const job = J.build(reading, book(), 'INV-7');
+  assert.ok(job.parts.length > 0, 'the dragon is printed');
+  assert.equal(job.labourCost, undefined);
+  assert.equal(job.packagingCost, undefined);
+  const before = { id: 'INV-7', price: 120, labourCost: 12.5, packagingCost: 3, notes: '' };
+  const next = J.apply(before, job);
+  assert.equal(Object.prototype.hasOwnProperty.call(next, 'labourCost'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(next, 'packagingCost'), false);
+  assert.equal(before.labourCost, 12.5, 'the order handed in is not changed');
+  // A rebuild that does carry them still sets them.
+  const withOnce = J.apply(before, Object.assign({}, job, { labourCost: 4, packagingCost: 1.5 }));
+  assert.equal(withOnce.labourCost, 4);
+  assert.equal(withOnce.packagingCost, 1.5);
+});

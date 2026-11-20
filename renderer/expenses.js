@@ -559,7 +559,14 @@ function buildProfitabilityHtml(order) {
   const estCost = order.parts.reduce((s, p) => s + partTotalCost(p), 0)
     + (typeof KhaytOrderMoney !== 'undefined' ? KhaytOrderMoney.jobFixedCost(order, { components: false, overhead: false }) : 0);
   if (estCost <= 0) return '';
-  const revenue = +order.price || 0;
+  // The cost above is in the SHOP's currency; the price is in the JOB's. A job
+  // taken in another currency carries `fxRate` (shop currency per one unit of
+  // the job's), so its price is converted before the cost comes off it — the
+  // same rule as renderer/job-page.js moneyHtml (a missing, non-positive or 1
+  // rate means the job is already in shop currency). It subtracted SAR cost
+  // from a USD price (4.11.0 release review, L2).
+  const fx = +order.fxRate > 0 && +order.fxRate !== 1 ? +order.fxRate : 1;
+  const revenue = (+order.price || 0) * fx;
 
   // --- Estimated row ---
   const estProfit = revenue - estCost;
