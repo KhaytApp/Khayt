@@ -1,0 +1,256 @@
+{
+ "about": "lib/printer-problems.js problemsFor(type, report): one closed problem list for every protocol (C3). Bambu codes as the printer packs them (print_error int, hms attr/code ints); the U1 row in the shape the shop's U1 reported; the rest synthetic, in each adapter's normalised status. The Mac and iPhone run these through JSC.",
+ "cases": [
+  {
+   "why": "bambu: a runout pause is filament-runout, load filament",
+   "type": "bambu",
+   "report": {
+    "gcode_state": "PAUSE",
+    "print_error": 50364420
+   },
+   "want": [
+    {
+     "code": "filament-runout",
+     "severity": "serious",
+     "action": "load-filament",
+     "source": "bambu",
+     "ref": "0300_8004"
+    }
+   ]
+  },
+  {
+   "why": "bambu: an HMS nozzle over-temperature is fatal, check the heater",
+   "type": "bambu",
+   "report": {
+    "gcode_state": "RUNNING",
+    "hms": [
+     {
+      "attr": 50332160,
+      "code": 65539
+     }
+    ]
+   },
+   "want": [
+    {
+     "code": "temperature",
+     "severity": "fatal",
+     "action": "check-heater",
+     "source": "bambu",
+     "ref": "HMS_0300_0200_0001_0003"
+    }
+   ]
+  },
+  {
+   "why": "bambu: a cancelled task is info, nothing to do",
+   "type": "bambu",
+   "report": {
+    "gcode_state": "FAILED",
+    "print_error": 50348044
+   },
+   "want": [
+    {
+     "code": "print-cancelled",
+     "severity": "info",
+     "action": "none",
+     "source": "bambu",
+     "ref": "0300_400C"
+    }
+   ]
+  },
+  {
+   "why": "bambu: the door open while printing",
+   "type": "bambu",
+   "report": {
+    "gcode_state": "PAUSE",
+    "print_error": 50364431
+   },
+   "want": [
+    {
+     "code": "door-open",
+     "severity": "common",
+     "action": "close-door",
+     "source": "bambu",
+     "ref": "0300_800F"
+    }
+   ]
+  },
+  {
+   "why": "bambu: an unknown code on a stopped job is printer-error with its code to look up",
+   "type": "bambu",
+   "report": {
+    "gcode_state": "FAILED",
+    "print_error": 50336308
+   },
+   "want": [
+    {
+     "code": "printer-error",
+     "severity": "serious",
+     "action": "check-printer",
+     "source": "bambu",
+     "ref": "0300_1234"
+    }
+   ]
+  },
+  {
+   "why": "bambu: an unknown code on a running job is not a problem",
+   "type": "bambu",
+   "report": {
+    "gcode_state": "RUNNING",
+    "print_error": 50336308
+   },
+   "want": []
+  },
+  {
+   "why": "moonraker (U1): runout on head 1 and a power loss, worst first",
+   "type": "moonraker",
+   "report": {
+    "exception_manager": {
+     "exceptions": [
+      {
+       "id": 523,
+       "level": 2,
+       "message": "e1_filament runout"
+      }
+     ]
+    },
+    "power_loss_check": {
+     "power_loss_flag": true
+    }
+   },
+   "want": [
+    {
+     "code": "filament-runout",
+     "severity": "serious",
+     "action": "load-filament",
+     "source": "moonraker",
+     "head": 1,
+     "ref": "523"
+    },
+    {
+     "code": "power-lost",
+     "severity": "info",
+     "action": "resume-on-printer",
+     "source": "moonraker"
+    }
+   ]
+  },
+  {
+   "why": "moonraker (plain Klipper): print_stats error with its message",
+   "type": "moonraker",
+   "report": {
+    "print_stats": {
+     "state": "error",
+     "message": "MCU shutdown"
+    }
+   },
+   "want": [
+    {
+     "code": "printer-error",
+     "severity": "serious",
+     "action": "check-printer",
+     "source": "moonraker",
+     "message": "MCU shutdown"
+    }
+   ]
+  },
+  {
+   "why": "octoprint: Error state with the job error",
+   "type": "octoprint",
+   "report": {
+    "state": "Error",
+    "message": "Thermal Runaway"
+   },
+   "want": [
+    {
+     "code": "printer-error",
+     "severity": "serious",
+     "action": "check-printer",
+     "source": "octoprint",
+     "message": "Thermal Runaway"
+    }
+   ]
+  },
+  {
+   "why": "prusalink: ATTENTION with the printer message",
+   "type": "prusalink",
+   "report": {
+    "state": "ATTENTION",
+    "message": "Filament runout"
+   },
+   "want": [
+    {
+     "code": "printer-attention",
+     "severity": "common",
+     "action": "check-printer",
+     "source": "prusalink",
+     "message": "Filament runout"
+    }
+   ]
+  },
+  {
+   "why": "duet: halted",
+   "type": "duet",
+   "report": {
+    "state": "halted",
+    "message": null
+   },
+   "want": [
+    {
+     "code": "printer-error",
+     "severity": "serious",
+     "action": "check-printer",
+     "source": "duet"
+    }
+   ]
+  },
+  {
+   "why": "sdcp: sliced for a different machine is file-rejected, reslice",
+   "type": "sdcp",
+   "report": {
+    "state": "idle",
+    "message": "File was sliced for a different machine"
+   },
+   "want": [
+    {
+     "code": "file-rejected",
+     "severity": "serious",
+     "action": "reslice",
+     "source": "sdcp",
+     "message": "File was sliced for a different machine"
+    }
+   ]
+  },
+  {
+   "why": "sdcp: a checksum failure, send the file again",
+   "type": "sdcp",
+   "report": {
+    "state": "idle",
+    "message": "File checksum failed"
+   },
+   "want": [
+    {
+     "code": "file-rejected",
+     "severity": "serious",
+     "action": "resend-file",
+     "source": "sdcp",
+     "message": "File checksum failed"
+    }
+   ]
+  },
+  {
+   "why": "octoprint: printing with a message is not a problem",
+   "type": "octoprint",
+   "report": {
+    "state": "Printing",
+    "message": "Printing from SD"
+   },
+   "want": []
+  },
+  {
+   "why": "nothing reported",
+   "type": "repetier",
+   "report": {},
+   "want": []
+  }
+ ]
+}
