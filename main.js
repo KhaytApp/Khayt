@@ -1596,6 +1596,13 @@ ipcMain.handle('hub:detect-slicers', async () => {
 // (SSRF-safe). WHAT each printer is asked — which files it runs, the remote
 // name, the request — is `lib/printer-upload.js`, which the Mac app sends with
 // too; this function is the wire.
+// A person's command to a printer: the background poll leaves that printer
+// alone until the reply (lib/poll-yield.js, C6), so a poll read a moment
+// before the command cannot come back after it and undo what the card shows.
+// Every caller below goes through yieldingFor.
+const pollYield = require('./lib/poll-yield.js').createPollYield();
+const yieldingFor = (machine, fn) => pollYield.around(machine && machine.id, fn);
+
 async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
@@ -1676,7 +1683,7 @@ ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startP
   if (!gate.ok) return gate;
   try {
     if (!gcodePath || !fs.existsSync(gcodePath)) return { ok: false, error: 'G-code file not found.' };
-    return await uploadGcodeToPrinter(machine, gcodePath, startPrint);
+    return await yieldingFor(machine, () => uploadGcodeToPrinter(machine, gcodePath, startPrint));
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
@@ -1688,7 +1695,7 @@ ipcMain.handle('hub:slice-and-print', async (_e, { modelPath, slicerPath, args, 
     const r = await runSlice({ modelPath, slicerPath, args });
     if (!r.ok) return r;
     outDir = r.outDir;
-    const up = await uploadGcodeToPrinter(machine, r.gcodePath, startPrint);
+    const up = await yieldingFor(machine, () => uploadGcodeToPrinter(machine, r.gcodePath, startPrint));
     return up.ok ? { ok: true, meta: r.meta, ...up } : up;
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   finally { rmDir(outDir); }
@@ -1704,11 +1711,11 @@ ipcMain.handle('hub:print-order-file', async (_e, { orderFile, machine, slicerPa
   try {
     const full = path.join(orderFilesDir(), path.basename(String(orderFile || '')));
     if (!orderFile || !fs.existsSync(full)) return { ok: false, error: 'Attached file not found.' };
-    if (/\.(gcode|gco|g|nc)$/i.test(full)) return await uploadGcodeToPrinter(machine, full, startPrint);
+    if (/\.(gcode|gco|g|nc)$/i.test(full)) return await yieldingFor(machine, () => uploadGcodeToPrinter(machine, full, startPrint));
     const r = await runSlice({ modelPath: full, slicerPath, args });
     if (!r.ok) return r;
     outDir = r.outDir;
-    const up = await uploadGcodeToPrinter(machine, r.gcodePath, startPrint);
+    const up = await yieldingFor(machine, () => uploadGcodeToPrinter(machine, r.gcodePath, startPrint));
     return up.ok ? { ok: true, meta: r.meta, ...up } : up;
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   finally { rmDir(outDir); }
@@ -5550,6 +5557,9 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
     let captured = false;
     for (const machine of machineList) {
       if (!machine.printerApi?.type || machine.printerApi.type === 'none') continue;
+      // A person's command is on its way to this printer: its reply says
+      // what happened, not a poll that may have been read before it landed.
+      if (pollYield.yielding(machine.id, Date.now())) continue;
       try {
         const status = await fetchPrinterStatus(machine);
         const before = printerStatusCache[machine.id];
@@ -5862,6 +5872,8 @@ ipcMain.handle('hub:printer-plate', async (_e, { machine } = {}) => {
 ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) => {
   const gate = printerGate('control');
   if (!gate.ok) return gate;
+  pollYield.begin(machine && machine.id, Date.now());
+  try {
   const read = await plateObjects(machine);
   if (!read.ok) return read;
   const req = excludeObject.excludeRequest(name, read.data);
@@ -5876,11 +5888,12 @@ ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) 
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
+  } finally { pollYield.end(machine && machine.id, Date.now()); }
 });
 
 ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) => {
   const gate = printerGate('control');
-  return gate.ok ? sendPrinterCommand(machine, command) : gate;
+  return gate.ok ? yieldingFor(machine, () => sendPrinterCommand(machine, command)) : gate;
 });
 
 /**
@@ -5906,7 +5919,7 @@ async function sendPrinterControl(machine, control, value) {
 }
 ipcMain.handle('hub:printer-control', async (_e, { machine, control, value } = {}) => {
   const gate = printerGate('control');
-  return gate.ok ? sendPrinterControl(machine, control, value) : gate;
+  return gate.ok ? yieldingFor(machine, () => sendPrinterControl(machine, control, value)) : gate;
 });
 // Read-only: safe to call while the printer is mid-job, which is when a shop is
 // most likely to reach for it.

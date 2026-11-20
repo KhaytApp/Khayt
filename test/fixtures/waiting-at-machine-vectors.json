@@ -1,0 +1,150 @@
+{
+ "about": "lib/waiting-at-machine.js waiting(machine, opts): a printer that needs a person (C4), derived from stored stamps (bedClearedAt, persisted completions with result, the book's lastFinishedAt) so it survives a reconnect, plus live problems. Times in ms or ISO.",
+ "cases": [
+  {
+   "why": "after a reconnect: a print finished an hour ago, the bed not cleared since — still waiting (stored, not live)",
+   "machine": {
+    "id": "M1",
+    "bedClearedAt": "2026-11-19T18:00:00.000Z"
+   },
+   "opts": {
+    "completions": [
+     {
+      "at": 1795114800000,
+      "result": "finished"
+     }
+    ]
+   },
+   "want": [
+    {
+     "reason": "print-to-take-off",
+     "since": 1795114800000
+    }
+   ]
+  },
+  {
+   "why": "cleared after it finished: nothing",
+   "machine": {
+    "id": "M1",
+    "bedClearedAt": "2026-11-19T19:30:00.000Z"
+   },
+   "opts": {
+    "completions": [
+     {
+      "at": 1795114800000,
+      "result": "finished"
+     }
+    ]
+   },
+   "want": []
+  },
+  {
+   "why": "a cancelled print's leftovers",
+   "machine": {
+    "id": "M1"
+   },
+   "opts": {
+    "completions": [
+     {
+      "at": 1795114800000,
+      "result": "cancelled"
+     }
+    ]
+   },
+   "want": [
+    {
+     "reason": "bed-to-clear",
+     "since": 1795114800000
+    }
+   ]
+  },
+  {
+   "why": "a job completed in the book after the last completion the printer gave",
+   "machine": {
+    "id": "M1",
+    "bedClearedAt": "2026-11-19T18:00:00.000Z"
+   },
+   "opts": {
+    "completions": [
+     {
+      "at": 1795109400000,
+      "result": "finished"
+     }
+    ],
+    "lastFinishedAt": "2026-11-19T19:59:00.000Z"
+   },
+   "want": [
+    {
+     "reason": "print-to-take-off",
+     "since": 1795118340000
+    }
+   ]
+  },
+  {
+   "why": "a machine that clears its own bed never waits for one",
+   "machine": {
+    "id": "M1",
+    "clearsOwnBed": true
+   },
+   "opts": {
+    "completions": [
+     {
+      "at": 1795118400000,
+      "result": "finished"
+     }
+    ]
+   },
+   "want": []
+  },
+  {
+   "why": "live: a runout and the door, with the bed to clear, most urgent first",
+   "machine": {
+    "id": "M1"
+   },
+   "opts": {
+    "completions": [
+     {
+      "at": 1795114800000,
+      "result": "failed"
+     }
+    ],
+    "problems": [
+     {
+      "code": "door-open"
+     },
+     {
+      "code": "filament-runout",
+      "head": 2
+     },
+     {
+      "code": "filament-runout",
+      "head": 3
+     }
+    ]
+   },
+   "want": [
+    {
+     "reason": "filament-runout",
+     "since": null,
+     "head": 2
+    },
+    {
+     "reason": "printer-attention",
+     "since": null
+    },
+    {
+     "reason": "bed-to-clear",
+     "since": 1795114800000
+    }
+   ]
+  },
+  {
+   "why": "never printed, nothing live: not waiting",
+   "machine": {
+    "id": "M1"
+   },
+   "opts": {},
+   "want": []
+  }
+ ]
+}

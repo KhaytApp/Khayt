@@ -291,6 +291,7 @@ test('the clock never reaches the saved completions', () => {
     [T0 + 610_000, bambuStatus('Finished', 100)],
   ]);
   const saved = C.completionsToPersist({ M: e });
-  assert.deepEqual(Object.keys(saved.M[0]).sort(), ['actuals', 'at', 'filename']);
+  assert.deepEqual(Object.keys(saved.M[0]).sort(), ['actuals', 'at', 'filename', 'result']);
+  assert.equal(saved.M[0].result, 'finished', 'how it ended is kept (P4); the clock is not');
   assert.equal(saved.M[0].actuals.durationS, 600);
 });
