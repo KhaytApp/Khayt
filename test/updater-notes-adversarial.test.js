@@ -165,3 +165,30 @@ test('sanitizeReleaseNotesHtml: handlers still go, whatever separates them', () 
   }
   assert.equal(sanitizeReleaseNotesHtml('<p class="once">done</p>'), '<p class="once">done</p>');
 });
+
+// Correctness review of #2602: the heading match cut trailing ':' with a
+// regex that retried from every character (80 KB of ':' then 'x': 4.5 s), and
+// the handler strip was slow on 80 K spaces (3.7 s) and 80 K newlines (5.9 s).
+test('parseMajorChanges: one long line of punctuation is fast', () => {
+  const { parseMajorChanges } = require('../lib/major-changes.js');
+  for (const s of [':'.repeat(80 * 1024) + 'x', '# ' + ':'.repeat(80 * 1024) + 'x', '*'.repeat(80 * 1024) + 'x']) {
+    const t = ms(() => parseMajorChanges(s));
+    assert.ok(t < 500, `took ${t} ms`);
+  }
+});
+
+test('sanitizeReleaseNotesHtml: 80 K spaces or newlines are fast', () => {
+  const { formatReleaseNotesText } = require('../lib/release-notes.js');
+  for (const ws of [' ', '\n']) {
+    const t = ms(() => formatReleaseNotesText('<p>x</p>' + ws.repeat(80 * 1024) + '>'));
+    assert.ok(t < 500, `took ${t} ms`);
+  }
+});
+
+test('parseMajorChanges: the heading still matches with trailing punctuation', () => {
+  const { parseMajorChanges } = require('../lib/major-changes.js');
+  for (const h of ['## Before you update:', 'Before you update.', '**Before you update:**', '## Before you update']) {
+    const r = parseMajorChanges(h + '\n- Do this first\n');
+    assert.equal(r.needsConsent, true, h);
+  }
+});
