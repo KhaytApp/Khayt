@@ -133,3 +133,35 @@ test('notesSince still wraps HTML notes in <h2> headings and markdown in ##', ()
   const md = notesSince([{ version: '2.0.1', note: 'b' }, { version: '2.0.0', note: 'a' }], '1.9.9');
   assert.match(md.text, /^## .* 2\.0\.1/);
 });
+
+// Security review of #2602: the inline-handler strip went quadratic on a long
+// run of whitespace (`\s+on…` tried every split): 200 KB took ~28 s in main.
+test('formatReleaseNotesText: 200 KB of whitespace after a tag is fast', () => {
+  const { formatReleaseNotesText } = require('../lib/release-notes.js');
+  const s = '<p>x</p>' + ' '.repeat(200 * 1024) + '>';
+  const t = ms(() => formatReleaseNotesText(s));
+  assert.ok(t < 1000, `took ${t} ms`);
+});
+
+test('sanitizeReleaseNotesHtml: many unclosed quoted handlers are fast', () => {
+  const { sanitizeReleaseNotesHtml } = require('../lib/release-notes.js');
+  const s = '<p'.concat(' onx="a'.repeat(30000));
+  const t = ms(() => sanitizeReleaseNotesHtml(s));
+  assert.ok(t < 1000, `took ${t} ms`);
+  assert.doesNotMatch(sanitizeReleaseNotesHtml(s), /\son\w+\s*=/i);
+});
+
+test('sanitizeReleaseNotesHtml: handlers still go, whatever separates them', () => {
+  const { sanitizeReleaseNotesHtml } = require('../lib/release-notes.js');
+  for (const html of [
+    '<p onclick="alert(1)">Hi</p>',
+    "<p onclick='alert(1)'>Hi</p>",
+    '<img src=x onerror=alert(1)>',
+    '<img/onerror=alert(1)>',
+    '<a href="x"onmouseover="alert(1)">a</a>',
+    '<p\n\tONCLICK = "alert(1)">Hi</p>',
+  ]) {
+    assert.doesNotMatch(sanitizeReleaseNotesHtml(html), /on\w+\s*=/i, html);
+  }
+  assert.equal(sanitizeReleaseNotesHtml('<p class="once">done</p>'), '<p class="once">done</p>');
+});
