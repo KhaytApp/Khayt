@@ -1611,14 +1611,22 @@ const yieldingFor = async (machine, fn) => {
  * as the poll, and never beside a full poll: two polls in flight is the
  * completion race the poll loop guards (printerPollInFlight). */
 const SETTLE_POLL_MS = 1500;
+const printerSoonPolling = new Set();   // ids a soon-poll is reading now
+let printerFullPollOn = null;           // the id the full poll is reading now
 function pollPrinterSoon(machine, tries = 0) {
   const id = machine && machine.id;
   if (!id || !machine.printerApi?.type || machine.printerApi.type === 'none' || tries > 5) return;
   setTimeout(async () => {
     if (pollYield.yielding(id, Date.now())) return;           // another command went out; its reply polls
     if (tries === 0 && !pollYield.justSettled(id, Date.now())) return;   // settled long ago: the poll has it
-    if (printerPollInFlight || !printerPollInterval) { if (printerPollInterval) pollPrinterSoon(machine, tries + 1); return; }
-    printerPollInFlight = true;
+    // Per printer, not the fleet's flag: holding printerPollInFlight here made
+    // a 30 s tick (or the first poll after start) landing meanwhile skip EVERY
+    // printer (re-review of #2612). Two reads of one printer at once is the
+    // completion race, so this waits while the full poll is on this printer,
+    // and the full poll skips a printer this is reading.
+    if (!printerPollInterval) return;
+    if (printerFullPollOn === id || printerSoonPolling.has(id)) { pollPrinterSoon(machine, tries + 1); return; }
+    printerSoonPolling.add(id);
     const sent = pollYield.seq(id);
     try {
       const status = await fetchPrinterStatus(machine);
@@ -1627,7 +1635,7 @@ function pollPrinterSoon(machine, tries = 0) {
       printerStatusCache[id] = mergePollSuccess(before, status, Date.now());
       if (completionIsNew(before, printerStatusCache[id])) persistCompletions().catch(() => {});
       BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('printer-status-update', printerStatusCache));
-    } catch (_) { /* the next full poll says it */ } finally { printerPollInFlight = false; }
+    } catch (_) { /* the next full poll says it */ } finally { printerSoonPolling.delete(id); }
   }, SETTLE_POLL_MS);
 }
 
@@ -5592,6 +5600,9 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
       // what it read stale, and it is dropped rather than written over the
       // command's effect (correctness review of #2612).
       const sentBefore = pollYield.seq(machine.id);
+      // A soon-poll is reading this printer right now: its answer stands.
+      if (printerSoonPolling.has(machine.id)) continue;
+      printerFullPollOn = machine.id;
       try {
         const status = await fetchPrinterStatus(machine);
         if (pollYield.seq(machine.id) !== sentBefore || pollYield.yielding(machine.id, Date.now())) continue;
@@ -5604,7 +5615,7 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
         printerStatusCache[machine.id] = mergePollFailure(
           printerStatusCache[machine.id], e.message, Date.now(), e && e.status,
         );
-      }
+      } finally { printerFullPollOn = null; }
     }
     const wins = BrowserWindow.getAllWindows();
     wins.forEach(w => w.webContents.send('printer-status-update', printerStatusCache));
