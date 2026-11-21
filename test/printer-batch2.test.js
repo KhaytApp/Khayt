@@ -80,8 +80,16 @@ test('C6 desktop: every send and control path yields, and the poll skips a print
   assert.match(body, /finally \{ pollYield\.end\(machine && machine\.id, Date\.now\(\), yieldToken\); pollPrinterSoon\(machine\); \}/);
   assert.match(main, /if \(pollYield\.yielding\(machine\.id, Date\.now\(\)\)\) continue;/);
   // A poll in flight when a command went out drops what it read (correctness review).
-  assert.match(main, /const sentBefore = pollYield\.seq\(machine\.id\);\s*\n\s*try \{\s*\n\s*const status = await fetchPrinterStatus\(machine\);\s*\n\s*if \(pollYield\.seq\(machine\.id\) !== sentBefore \|\| pollYield\.yielding\(machine\.id, Date\.now\(\)\)\) continue;/);
+  assert.match(main, /const sentBefore = pollYield\.seq\(machine\.id\);[\s\S]{0,200}?try \{\s*\n\s*const status = await fetchPrinterStatus\(machine\);\s*\n\s*if \(pollYield\.seq\(machine\.id\) !== sentBefore \|\| pollYield\.yielding\(machine\.id, Date\.now\(\)\)\) continue;/);
   // And the printer is asked again right after the reply, not 30 s later.
   assert.match(main, /finally \{ pollPrinterSoon\(machine\); \}/);
   assert.match(main, /justSettled\(id, Date\.now\(\)\)/);
+  // Re-review: the soon-poll never holds the fleet's flag, and it and the full
+  // poll never read one printer at once.
+  const soon = main.slice(main.indexOf('function pollPrinterSoon('), main.indexOf('async function uploadGcodeToPrinter('));
+  assert.doesNotMatch(soon, /printerPollInFlight\s*=/);
+  assert.match(soon, /printerSoonPolling\.add\(id\)/);
+  assert.match(soon, /finally \{ printerSoonPolling\.delete\(id\); \}/);
+  assert.match(main, /if \(printerSoonPolling\.has\(machine\.id\)\) continue;\s*\n\s*printerFullPollOn = machine\.id;/);
+  assert.match(main, /finally \{ printerFullPollOn = null; \}/);
 });
