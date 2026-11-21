@@ -145,6 +145,89 @@
    },
    "opts": {},
    "want": []
+  },
+  {
+   "why": "printing again after a clear nobody stamped: not waiting for the bed (correctness review of #2613)",
+   "machine": {
+    "id": "M1"
+   },
+   "opts": {
+    "completions": [
+     {
+      "at": "2026-11-18T10:00:00Z",
+      "result": "finished"
+     }
+    ],
+    "live": {
+     "state": "printing"
+    }
+   },
+   "want": []
+  },
+  {
+   "why": "paused mid-print: the bed holds the running job, not a finished one",
+   "machine": {
+    "id": "M1"
+   },
+   "opts": {
+    "completions": [
+     {
+      "at": "2026-11-18T10:00:00Z",
+      "result": "failed"
+     }
+    ],
+    "live": {
+     "state": "PAUSE"
+    }
+   },
+   "want": []
+  },
+  {
+   "why": "idle again with the print still on it: still waiting",
+   "machine": {
+    "id": "M1"
+   },
+   "opts": {
+    "completions": [
+     {
+      "at": "2026-11-18T10:00:00Z",
+      "result": "finished"
+     }
+    ],
+    "live": {
+     "state": "idle"
+    }
+   },
+   "want": [
+    {
+     "reason": "print-to-take-off",
+     "since": 1794996000000
+    }
+   ]
+  },
+  {
+   "why": "a poll that failed says nothing about the bed: still waiting",
+   "machine": {
+    "id": "M1"
+   },
+   "opts": {
+    "completions": [
+     {
+      "at": "2026-11-18T10:00:00Z",
+      "result": "cancelled"
+     }
+    ],
+    "live": {
+     "state": "printing",
+     "error": "timeout"
+    }
+   },
+   "want": [
+    {
+     "reason": "bed-to-clear",
+     "since": 1794996000000
+    }
+   ]
   }
  ]
 }

@@ -35,6 +35,15 @@ test('P4: the poll cache keeps how a job ended, from the word it ended on', () =
   for (const [w, want] of [['complete', 'finished'], ['FINISH', 'finished'], ['cancelled', 'cancelled'], ['stopped', 'cancelled'], ['error', 'failed'], ['FAILED', 'failed'], ['idle', null], ['Operational', null], ['', null]]) {
     assert.equal(PC.endedAs(w), want, w);
   }
+  // A Bambu cancel ends on FAILED; its print_error says it was a cancel (correctness review).
+  const B = require('../lib/bambu-faults.js');
+  for (const code of [0x0300400C, 0x0500400E]) {
+    const fault = B.faultText({ print_error: code });
+    assert.ok(fault, 'decoded');
+    assert.equal(PC.endedAs('FAILED', fault), 'cancelled', fault);
+  }
+  assert.equal(PC.endedAs('FAILED', B.faultText({ print_error: 0x03008004 }) || ''), 'failed', 'a runout is a failure');
+  assert.equal(PC.endedAs('FAILED', null), 'failed');
 });
 
 test('P4: withResult never changes the job it is given, and junk is null', () => {
