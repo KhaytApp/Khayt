@@ -822,7 +822,9 @@ enum KhaytAPIError: Error, Sendable {
 struct PrinterProblem: Codable, Equatable, Sendable {
     let code: String
     let severity: String
-    let action: String
+    /// `problem.action.<action>`. The rule always gives one; a row without it
+    /// (an older or partial sender) is still a problem, shown with no action.
+    let action: String?
     let source: String?
     /// The head (tool) a filament problem is on, when the printer said which.
     let head: Int?
@@ -839,8 +841,11 @@ struct PrinterProblem: Codable, Equatable, Sendable {
 struct WaitingReason: Codable, Equatable, Sendable {
     /// `filament-runout`, `printer-attention`, `print-to-take-off` or `bed-to-clear`.
     let reason: String
-    /// Epoch milliseconds, as the rule gives it.
+    /// Epoch milliseconds, as the rule gives it; null for a live reason
+    /// (a runout) the printer did not date.
     let since: Double?
+    /// The head a filament runout is on, when the printer said which (#2621).
+    var head: Int? = nil
 
     static let reasons = ["filament-runout", "printer-attention", "print-to-take-off", "bed-to-clear"]
     var sinceDate: Date? { since.map { Date(timeIntervalSince1970: $0 / 1000) } }

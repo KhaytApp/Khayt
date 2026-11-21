@@ -95,4 +95,38 @@ final class PrinterNeedsTests: XCTestCase {
         XCTAssertEqual(rows[1].problems, [])
         XCTAssertEqual(rows[1].waiting, [])
     }
+
+    /// Rows exactly as the Mac's live route builds them (#2621,
+    /// `LanServer.liveRow`, from its MachinesLiveTests and PrinterNeedsTests):
+    /// every key present, nulls where nothing was read, a minimal problem row,
+    /// and a live runout with no date and its head.
+    func testTheMacsLiveRouteShape() throws {
+        let json = #"""
+        [{"id":"M-1","name":"U1","hasPrinterApi":true,"state":"printing","progress":42,"filename":"dragon.gcode",
+          "timeRemaining":3600,"tempNozzle":215,"tempBed":59,"error":null,"lastUpdated":"2026-09-21T13:33:20.000Z",
+          "apiType":"moonraker","problems":[],"waiting":[]},
+         {"id":"M-1","name":"U1","hasPrinterApi":true,"state":null,"progress":null,"filename":null,
+          "timeRemaining":null,"tempNozzle":null,"tempBed":null,"error":null,"lastUpdated":null,"apiType":"moonraker",
+          "problems":[{"code":"power-lost","severity":"info"}],
+          "waiting":[{"reason":"print-to-take-off","since":1}]},
+         {"id":"u1","name":"U1","hasPrinterApi":true,"state":"paused","progress":64,"filename":null,
+          "timeRemaining":null,"tempNozzle":null,"tempBed":null,"error":null,"lastUpdated":null,"apiType":"moonraker",
+          "problems":[{"code":"filament-runout","severity":"serious","action":"load-filament","source":"moonraker","head":1}],
+          "waiting":[{"reason":"filament-runout","since":null,"head":1}]}]
+        """#
+        let rows = try JSONDecoder().decode([MachineLiveStatus].self, from: Data(json.utf8))
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows[0].problems, [])
+        XCTAssertEqual(rows[0].waiting, [])
+        XCTAssertEqual(rows[1].problems.map(\.code), ["power-lost"], "a row without an action is kept")
+        XCTAssertNil(rows[1].problems.first?.action)
+        XCTAssertEqual(rows[1].waiting.first?.reason, "print-to-take-off")
+        XCTAssertEqual(rows[1].waiting.first?.since, 1)
+        XCTAssertEqual(rows[2].problems.first?.head, 1)
+        XCTAssertEqual(rows[2].problems.first?.action, "load-filament")
+        XCTAssertEqual(rows[2].waiting.first?.reason, "filament-runout")
+        XCTAssertNil(rows[2].waiting.first?.since, "an undated live reason")
+        XCTAssertNil(rows[2].waiting.first?.sinceDate)
+        XCTAssertEqual(rows[2].waiting.first?.head, 1)
+    }
 }
