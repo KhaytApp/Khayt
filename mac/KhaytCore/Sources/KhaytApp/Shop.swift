@@ -1984,6 +1984,11 @@ final class Shop {
     let lanConnectorPairing = LanConnectorPairing()
     /// Slicer plugins paired with this Mac (`Shop+ConnectedApps`), as last read.
     var connectedApps: [LanDevices.Listed] = []
+    /// "Show prices in OrcaSlicer" as the screen shows it (`Shop+ConnectorPrices`).
+    /// The server reads the switch itself, from the same defaults.
+    var connectorPricesOn = LanConnectorPairing.pricesOn
+    /// Where the switch is kept. A test hands in its own.
+    var connectorPricesDefaults: UserDefaults = .standard
     /// A test's own device store; the app uses the Keychain's (`.shared`).
     var lanDevicesForTests: LanDevices?
     /// Hands a linked file the app fetched back to its cloud drive, so its
