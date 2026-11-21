@@ -1,5 +1,5 @@
 {
- "about": "lib/poll-yield.js createPollYield(opts): the background poll leaves a printer alone while a person's command to it is in flight (C6). Each case is a sequence of begin/end/yielding/justSettled at a time in ms.",
+ "about": "lib/poll-yield.js createPollYield(opts): the background poll leaves a printer alone while a person's command to it is in flight (C6). Each case is a sequence of begin/end/yielding/justSettled/seq at a time in ms. `as` names the token a begin returns; `token` hands it to end.",
  "cases": [
   {
    "why": "a command holds that printer until its reply, then it is polled at once",
@@ -156,6 +156,104 @@
      "id": "",
      "at": 1,
      "want": false
+    }
+   ]
+  },
+  {
+   "why": "a reply that comes after the force-release ends nothing: the newer command still holds the printer (security review of #2612)",
+   "opts": {
+    "maxMs": 20000
+   },
+   "steps": [
+    {
+     "op": "begin",
+     "id": "M1",
+     "at": 0,
+     "as": "old",
+     "want": null
+    },
+    {
+     "op": "yielding",
+     "id": "M1",
+     "at": 20000,
+     "want": false
+    },
+    {
+     "op": "begin",
+     "id": "M1",
+     "at": 21000,
+     "as": "new",
+     "want": null
+    },
+    {
+     "op": "end",
+     "id": "M1",
+     "at": 21500,
+     "token": "old",
+     "want": null
+    },
+    {
+     "op": "yielding",
+     "id": "M1",
+     "at": 21600,
+     "want": true
+    },
+    {
+     "op": "end",
+     "id": "M1",
+     "at": 22000,
+     "token": "new",
+     "want": null
+    },
+    {
+     "op": "yielding",
+     "id": "M1",
+     "at": 22100,
+     "want": false
+    }
+   ]
+  },
+  {
+   "why": "seq counts the commands sent, so a poll in flight can tell one went out under it (correctness review of #2612)",
+   "opts": null,
+   "steps": [
+    {
+     "op": "seq",
+     "id": "M1",
+     "at": 0,
+     "want": 0
+    },
+    {
+     "op": "begin",
+     "id": "M1",
+     "at": 10,
+     "as": "a",
+     "want": null
+    },
+    {
+     "op": "seq",
+     "id": "M1",
+     "at": 20,
+     "want": 1
+    },
+    {
+     "op": "end",
+     "id": "M1",
+     "at": 30,
+     "token": "a",
+     "want": null
+    },
+    {
+     "op": "seq",
+     "id": "M1",
+     "at": 40,
+     "want": 1
+    },
+    {
+     "op": "seq",
+     "id": "M2",
+     "at": 40,
+     "want": 0
     }
    ]
   }

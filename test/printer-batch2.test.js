@@ -25,9 +25,10 @@ for (const c of vec('printer-capabilities').cases) test('C5 ' + c.why, () => {
 });
 for (const c of vec('poll-yield').cases) test('C6 ' + c.why, () => {
   const y = Y.createPollYield(c.opts || {});
+  const tokens = {};
   for (const s of c.steps) {
-    if (s.op === 'begin') y.begin(s.id, s.at);
-    else if (s.op === 'end') y.end(s.id, s.at);
+    if (s.op === 'begin') { const t = y.begin(s.id, s.at); if (s.as) tokens[s.as] = t; }
+    else if (s.op === 'end') y.end(s.id, s.at, s.token ? tokens[s.token] : undefined);
     else assert.equal(y[s.op](s.id, s.at), s.want, `${s.op} ${s.id} at ${s.at}`);
   }
 });
@@ -75,7 +76,12 @@ test('C6 desktop: every send and control path yields, and the poll skips a print
   assert.equal(wrapped.length, calls.length, 'each call goes through yieldingFor');
   const ex = main.slice(main.indexOf("ipcMain.handle('hub:printer-exclude-object'"));
   const body = ex.slice(0, ex.indexOf('\n});'));
-  assert.match(body, /pollYield\.begin\(machine && machine\.id/);
-  assert.match(body, /finally \{ pollYield\.end\(machine && machine\.id/);
+  assert.match(body, /const yieldToken = pollYield\.begin\(machine && machine\.id/);
+  assert.match(body, /finally \{ pollYield\.end\(machine && machine\.id, Date\.now\(\), yieldToken\); pollPrinterSoon\(machine\); \}/);
   assert.match(main, /if \(pollYield\.yielding\(machine\.id, Date\.now\(\)\)\) continue;/);
+  // A poll in flight when a command went out drops what it read (correctness review).
+  assert.match(main, /const sentBefore = pollYield\.seq\(machine\.id\);\s*\n\s*try \{\s*\n\s*const status = await fetchPrinterStatus\(machine\);\s*\n\s*if \(pollYield\.seq\(machine\.id\) !== sentBefore \|\| pollYield\.yielding\(machine\.id, Date\.now\(\)\)\) continue;/);
+  // And the printer is asked again right after the reply, not 30 s later.
+  assert.match(main, /finally \{ pollPrinterSoon\(machine\); \}/);
+  assert.match(main, /justSettled\(id, Date\.now\(\)\)/);
 });
