@@ -1601,7 +1601,35 @@ ipcMain.handle('hub:detect-slicers', async () => {
 // before the command cannot come back after it and undo what the card shows.
 // Every caller below goes through yieldingFor.
 const pollYield = require('./lib/poll-yield.js').createPollYield();
-const yieldingFor = (machine, fn) => pollYield.around(machine && machine.id, fn);
+const yieldingFor = async (machine, fn) => {
+  try { return await pollYield.around(machine && machine.id, fn); }
+  finally { pollPrinterSoon(machine); }
+};
+/* After a command's reply, ask that printer again in a moment rather than
+ * leaving its card on the old state for up to 30 s (correctness review of
+ * #2612; lib/poll-yield.js justSettled). One printer, through the same merge
+ * as the poll, and never beside a full poll: two polls in flight is the
+ * completion race the poll loop guards (printerPollInFlight). */
+const SETTLE_POLL_MS = 1500;
+function pollPrinterSoon(machine, tries = 0) {
+  const id = machine && machine.id;
+  if (!id || !machine.printerApi?.type || machine.printerApi.type === 'none' || tries > 5) return;
+  setTimeout(async () => {
+    if (pollYield.yielding(id, Date.now())) return;           // another command went out; its reply polls
+    if (tries === 0 && !pollYield.justSettled(id, Date.now())) return;   // settled long ago: the poll has it
+    if (printerPollInFlight || !printerPollInterval) { if (printerPollInterval) pollPrinterSoon(machine, tries + 1); return; }
+    printerPollInFlight = true;
+    const sent = pollYield.seq(id);
+    try {
+      const status = await fetchPrinterStatus(machine);
+      if (pollYield.seq(id) !== sent || pollYield.yielding(id, Date.now())) return;
+      const before = printerStatusCache[id];
+      printerStatusCache[id] = mergePollSuccess(before, status, Date.now());
+      if (completionIsNew(before, printerStatusCache[id])) persistCompletions().catch(() => {});
+      BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('printer-status-update', printerStatusCache));
+    } catch (_) { /* the next full poll says it */ } finally { printerPollInFlight = false; }
+  }, SETTLE_POLL_MS);
+}
 
 async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
@@ -5560,8 +5588,13 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
       // A person's command is on its way to this printer: its reply says
       // what happened, not a poll that may have been read before it landed.
       if (pollYield.yielding(machine.id, Date.now())) continue;
+      // Read before the fetch: a command sent while it was in flight makes
+      // what it read stale, and it is dropped rather than written over the
+      // command's effect (correctness review of #2612).
+      const sentBefore = pollYield.seq(machine.id);
       try {
         const status = await fetchPrinterStatus(machine);
+        if (pollYield.seq(machine.id) !== sentBefore || pollYield.yielding(machine.id, Date.now())) continue;
         const before = printerStatusCache[machine.id];
         printerStatusCache[machine.id] = mergePollSuccess(before, status, Date.now());
         // A job just ended. This is the only moment its figures are true, and
@@ -5872,7 +5905,7 @@ ipcMain.handle('hub:printer-plate', async (_e, { machine } = {}) => {
 ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) => {
   const gate = printerGate('control');
   if (!gate.ok) return gate;
-  pollYield.begin(machine && machine.id, Date.now());
+  const yieldToken = pollYield.begin(machine && machine.id, Date.now());
   try {
   const read = await plateObjects(machine);
   if (!read.ok) return read;
@@ -5888,7 +5921,7 @@ ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) 
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
-  } finally { pollYield.end(machine && machine.id, Date.now()); }
+  } finally { pollYield.end(machine && machine.id, Date.now(), yieldToken); pollPrinterSoon(machine); }
 });
 
 ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) => {
