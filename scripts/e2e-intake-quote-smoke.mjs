@@ -88,9 +88,10 @@ async function configureViaSettingsPanel(window) {
 }
 
 async function startServer(window) {
-  const r = await window.evaluate(() => window.hubAPI.startLanServer({
+  // Main reads the book from disk: write the panel's debounced save first.
+  const r = await window.evaluate(async () => { await flushSave(); return window.hubAPI.startLanServer({
     port: 13219, pin: 'e2e-smoke-pin', bindLan: 'loopback',
-  }));
+  }); });
   if (!r || !r.ok) throw new Error(`LAN server did not start: ${JSON.stringify(r)}`);
 }
 

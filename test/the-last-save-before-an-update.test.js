@@ -49,7 +49,8 @@ function flushBlock() {
 }
 
 test('the flush uses the shared writer', () => {
-  assert.match(flushBlock(), /await writeStoreToDisk\(normalized\)/,
+  // Through the shared writer, after the same guards as a save (#2592).
+  assert.match(flushBlock(), /await writeStoreToDisk\(g\.store\)/,
     'the pre-install flush writes the store by hand again');
 });
 

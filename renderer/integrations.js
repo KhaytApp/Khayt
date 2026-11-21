@@ -626,6 +626,10 @@ async function startLanServer() {
   ensureLanNetworkAccess();
   const lan = settings.lanApi || {};
   const bindLan = lan.bindLan || settings.onlineEnabled;
+  // Main reads the book from disk and will not start on one without settings
+  // (#2592: it used to write an empty book over one it could not read). A save
+  // still waiting out saveAll's 300 ms would not be there yet, so write it now.
+  if (typeof flushSave === 'function') { try { await flushSave(); } catch (_) { /* main says why */ } }
   const res = await window.hubAPI?.startLanServer?.({
     port: lan.port || 3219,
     pin: lan.pin || '',
@@ -667,6 +671,10 @@ async function startLanServer() {
     renderOnlineCustomerLinks?.();
     renderWaitingOnlinePanel?.();
     renderOnlineSettings?.();
+  } else if (res?.error === 'store_unreadable') {
+    // Main refused to start on a book it could not read, and wrote nothing (#2592).
+    if (statusRow) statusRow.textContent = '❌ ' + t('lan.store_unreadable');
+    toast(t('lan.store_unreadable'), 'error', 12000);
   } else {
     if (statusRow) statusRow.textContent = `❌ Failed: ${res?.error || 'unknown error'}`;
     toast((t('lan.start_failed') || 'LAN server failed to start') + ': ' + (res?.error || 'unknown'), 'error', 8000);

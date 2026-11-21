@@ -18,7 +18,7 @@ const ROOT = path.join(__dirname, '..');
 const ALLOWED = {
   'lib/order-money.js': 4,      // jobFixedCost: the one reader
   'lib/order-new.js': 2,        // writes them
-  'lib/store-order-job.js': 25,  // a store line of a once-labour product carries its labourCost / packagingCost onto the job (productLine, build, apply, assignLine)
+  'lib/store-order-job.js': 19,  // a store line of a once-labour product carries its labourCost / packagingCost onto the job (productLine, build, assignLine; apply sets or deletes them by key)
   'lib/reprint.js': 6,          // copies a once-labour job's figures to its reprint
   'lib/order-edit.js': 13,      // applyParts rescales overheadCost with the hours; repriceFromParts (#2576) rebuilds newOrder's INPUT from the stored components, overhead, labour and packaging
   'lib/kpi-rows.js': 1,         // a comment saying why it does NOT add componentsCost

@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { registerSmartPlug } = require('../lib/main/smart-plug.js');
 
-function setup({ cache = {}, machines = [], reply = { ison: true, power: 12.5 } } = {}) {
+function setup({ cache = {}, machines = [], reply = { ison: true, power: 12.5 }, gate = () => ({ ok: true }) } = {}) {
   const handlers = {}; const seen = []; const told = [];
   globalThis.fetch = async (url, init) => { seen.push({ url, method: init.method, headers: init.headers }); return new Response(JSON.stringify(reply), { status: 200 }); };
   const plug = registerSmartPlug({
@@ -14,6 +14,7 @@ function setup({ cache = {}, machines = [], reply = { ison: true, power: 12.5 } 
     fill: (m) => (m.smartPlug && m.smartPlug.token === 'MASK' ? { ...m, smartPlug: { ...m.smartPlug, token: 'REAL' } } : m),
     resolveTarget: async (host) => (host === 'plug.local' ? { ok: true, urlHost: '192.168.1.40' } : host.startsWith('192.168.') ? { ok: true, urlHost: host } : { ok: false, error: 'Invalid printer host' }),
     statusCache: () => cache, readMachines: () => machines, notify: (m) => told.push(m.id), log: { warn() {} },
+    ...(gate ? { gate } : {}),
   });
   return { handlers, seen, told, plug };
 }
@@ -71,4 +72,19 @@ test('auto-off fires once per finished print, after the delay and once cool', as
   assert.deepEqual(seen.map((x) => x.url), ['http://192.168.1.40/relay/0?turn=off']);
   assert.deepEqual(told, ['M1']);
   plug.stop();
+});
+
+test('switching the power is gated as printer control; reading is not (P5)', async () => {
+  const asked = [];
+  const { handlers, seen } = setup({ gate: (verb) => { asked.push(verb); return { ok: false, error: 'not_permitted', verb, role: 'viewer' }; } });
+  for (const action of ['on', 'off']) {
+    const r = await handlers['hub:smart-plug'](null, { machine: shelly, action });
+    assert.deepEqual(r, { ok: false, error: 'not_permitted', verb: 'control', role: 'viewer' });
+  }
+  assert.deepEqual(asked, ['control', 'control']);
+  assert.equal(seen.length, 0, 'nothing reached the plug');
+  assert.equal((await handlers['hub:smart-plug'](null, { machine: shelly, action: 'status' })).ok, true);
+  // Registered with no gate at all: no switching.
+  const bare = setup({ gate: null });
+  assert.equal((await bare.handlers['hub:smart-plug'](null, { machine: shelly, action: 'on' })).ok, false);
 });

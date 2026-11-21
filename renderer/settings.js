@@ -3966,6 +3966,8 @@ function renderOperatorLockSettings() {
     renderOperatorLockSettings();
     applyOperatorPermissions();
     toast(t('op.lock') || 'Locked', 'info', 1800);
+    // Locked means nobody is signed in: the PIN pad, not owner controls.
+    if (typeof openPinPadModal === 'function') openPinPadModal();
   });
 
   el.querySelectorAll('.op-save-pin').forEach(btn => {
@@ -6348,6 +6350,7 @@ async function openOffsiteRestoreModal() {
     async onSave(modal) {
       const chosen = modal.querySelector('input[name="offsiteChoice"]:checked');
       if (!chosen) return false;
+      if (restoreRefusedForRole()) return false;
       if (!(await confirmModal(t('set.restore_confirm'), { danger: true }))) return false;
       const got = await window.hubAPI.offsiteRestore(chosen.value).catch((e) => ({ ok: false, error: e.message }));
       if (!got || !got.ok) { toast(t('offsite.failed') + ' ' + _offsiteWords(got && got.code, got && got.error), 'error', 9000); return false; }
@@ -6370,6 +6373,18 @@ async function openOffsiteRestoreModal() {
 /* ============================================================
    Backup restore UI (Feature 6)
    ============================================================ */
+/**
+ * Restoring a whole book is the owner's while the operator lock is on: main
+ * refuses it for anyone else (#2592). Say so before asking, rather than a
+ * bare "restore failed" after.
+ */
+function restoreRefusedForRole() {
+  if (!settings.operatorLockEnabled) return false;
+  if (typeof operatorCan === 'function' && operatorCan('security', 'edit')) return false;
+  toast(t('set.restore_owner_only'), 'error', 9000);
+  return true;
+}
+
 async function openRestoreBackupModal() {
   if (!window.hubAPI?.listBackups) { toast(t('set.restore_error'), 'error'); return; }
   // Distinguish "the listing failed" from "there genuinely are none". This modal is
@@ -6411,6 +6426,7 @@ async function openRestoreBackupModal() {
       if (!chosen) return false;
       const ok = await confirmModal(t('set.restore_confirm'), { danger: true });
       if (!ok) return false;
+      if (restoreRefusedForRole()) return false;
       try {
         const json = await window.hubAPI.restoreBackup(chosen.value);
         if (!json) { toast(t('set.restore_error'), 'error'); return false; }
@@ -6466,6 +6482,7 @@ async function openRestorePointsModal() {
       else toast((r && r.error) || 'Failed', 'error');
     });
     modal.querySelectorAll('.rpRestore').forEach((b) => b.addEventListener('click', async () => {
+      if (restoreRefusedForRole()) return;
       if (!(await confirmModal(t('rp.restore_q') || 'Replace all current data with this restore point? This cannot be undone.', { danger: true }))) return;
       const json = await window.hubAPI.readRestorePoint(b.dataset.f);
       if (!json) { toast(t('set.restore_error') || 'Restore failed', 'error'); return; }

@@ -98,6 +98,14 @@ final class LanServer {
         /// The window the owner opens for a slicer plugin
         /// (`LanConnectorPairing`). Nil: never opened, `pairing-closed`.
         var connectorPairing: LanConnectorPairing? = nil
+        /// "Show prices in OrcaSlicer" (Connected apps ▸ Slicers), off by
+        /// default. Off, every connector is answered `{"prices":"off"}`
+        /// whatever its grant. A test that never sets it has prices off.
+        var connectorPrices: @MainActor () -> Bool = { false }
+        /// What `lib/connector-price.js` prices a slice with: the shop's
+        /// settings, shelf, printer presets and overhead per print hour. Nil:
+        /// no price is answered (`off`).
+        var slicePriceContext: (@MainActor () -> JSONValue)? = nil
         /// This Mac's identity key (`LanIdentity`), asked for when a route
         /// needs it. A test hands its own, so parallel tests never share one.
         var identity: @Sendable () -> Curve25519.Signing.PrivateKey? = { LanIdentity.key() }
@@ -3138,6 +3146,9 @@ extension Shop {
         host.devices = lanDeviceStore
         host.pairing = lanPairing
         host.connectorPairing = lanConnectorPairing
+        // "Show prices in OrcaSlicer": this Mac's, beside "Pair a slicer".
+        host.connectorPrices = { LanConnectorPairing.pricesOn }
+        host.slicePriceContext = { [weak self] in self?.slicePriceContext ?? .object([:]) }
         host.library = { [weak self] q, folder, offset, limit, filter in
             self?.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit, filter: filter) ?? .object([:])
         }

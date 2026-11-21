@@ -1222,6 +1222,8 @@ struct NewJobSheet: View {
                                        "packagingCost": .number(cartOnce.packaging)])
         let mark = await shop.handPartMark(cart)
         if mark { next.raw["orderLevelCosts"] = .bool(true) }
+        // A new part: prep once for its line, finishing per piece.
+        for (key, value) in Shop.newPartMark { next.raw[key] = value }
         let costed = await shop.costedPart(spoolId: next.spoolId,
                                            grams: TypedNumber.parse(next.grams) ?? 0,
                                            hours: TypedNumber.parse(next.hours) ?? 0,
