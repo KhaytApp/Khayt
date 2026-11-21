@@ -43,7 +43,7 @@ struct LanConnectorPriceTests {
     func vectorsAgree() async throws {
         let v = Self.obj(try Self.vectors())
         guard case .array(let cases)? = v["cases"] else { Issue.record("no cases"); return }
-        #expect(cases.count >= 15)
+        #expect(cases.count >= 16)
         let shop = Self.obj(v["shop"])
         let engine = try KhaytEngine()
         for value in cases {
@@ -205,6 +205,11 @@ struct LanConnectorPriceTests {
         #expect(cost["preset"] == nil)
         let price = LanServer.priceAnswer(priced, grant: "price")
         #expect(Set(price.keys) == Set(["prices", "round"] + LanServer.priceKeys))
+        // A margin with no pctOnCost (the cost shows as 0.00) stays without one:
+        // the route never fills a 0 in.
+        var free = priced
+        free["margin"] = .object(["pct": .number(61.28), "amount": .number(0.01)])
+        #expect(LanServer.priceAnswer(free, grant: "cost")["margin"] == .object(["pct": .number(61.28), "amount": .number(0.01)]))
         // A step with no rounding, a zero step or a text step is not passed on.
         var plain = priced; plain["rounded"] = .bool(false)
         #expect(LanServer.priceAnswer(plain, grant: "cost")["round"] == nil)
