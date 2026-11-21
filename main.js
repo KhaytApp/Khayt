@@ -1810,6 +1810,21 @@ async function migrateLegacyOwnerOnDisk() {
   return true;
 }
 
+// Once per process, before the first window reads the book: under the lock,
+// nobody stays signed in across a restart (lib/main/printer-permission.js
+// signedOutAtStart, #2608 security review).
+let signedOutThisStart = false;
+async function signOutAtStartOnDisk() {
+  if (signedOutThisStart) return false;
+  signedOutThisStart = true;
+  const disk = readStoreDecryptedFromDisk();
+  if (!disk || !disk.settings) return false;
+  const r = PrinterPermission.signedOutAtStart(disk);
+  if (!r.changed) return false;
+  await writeStoreToDisk(r.store);
+  return true;
+}
+
 ipcMain.handle('hub:load-store', async (event) => {
   // No keychain explanation here. This handler reads raw JSON, validates it and
   // MASKS secrets for the renderer — it never decrypts, so it never touches the
@@ -1849,8 +1864,11 @@ ipcMain.handle('hub:load-store', async (event) => {
     // A lock older than roleKey: its translated admin becomes the owner, once,
     // on disk and in what the window gets (#2592 data review, MED-3).
     try { await migrateLegacyOwnerOnDisk(); } catch (e) { console.error('hub:load-store: owner migration failed:', e && e.message); }
+    let signedOut = false;
+    try { signedOut = await signOutAtStartOnDisk(); } catch (e) { console.error('hub:load-store: sign-out at start failed:', e && e.message); }
     let { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
     if (normalized) normalized = PrinterPermission.migrateLegacyOwner(normalized).store;
+    if (normalized && signedOut) normalized = PrinterPermission.signedOutAtStart(normalized).store;
     if (!normalized) {
       console.error('hub:load-store: unrecoverable store shape:', errors.join('; '));
       return { __corrupt: true, error: errors[0] || 'Invalid store' };

@@ -4,7 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Windows/Linux: with the staff lock on and nobody signed in, the PIN pad opens as Khayt starts.** Since 4.11.0 that window is a viewer until someone signs in, and the shop had to find "Switch operator" to do it. It also opens when the person signed in is no longer on the team. Not over the first-run setup. Tests: `npm run test:e2e:lockpin`.
+- **Windows/Linux: with the staff lock on and nobody signed in, the PIN pad opens as Khayt starts.** Since 4.11.0 that window is a viewer until someone signs in, and the shop had to find "Switch operator" to do it. It also opens when the person signed in is no longer on the team. Not over the first-run setup. With the lock on, nobody stays signed in when Khayt is closed: whoever was signed in (the owner, say) was still signed in for the next person to open the app, with their printer rights. Each start now opens on the PIN pad. With the lock off nothing changes. Tests: `npm run test:e2e:lockpin`.
 
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
   - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.

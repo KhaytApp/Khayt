@@ -1,8 +1,9 @@
 /**
  * E2E smoke — the staff lock is on and nobody is signed in: the app asks who
  * it is as it starts (pre-cut review MED2, after #2592 made that window a
- * viewer). A book with someone signed in, or with the lock off, starts with
- * no PIN pad.
+ * viewer). Under the lock nobody stays signed in across a restart (#2608
+ * security review): a book saved with the owner signed in opens on the PIN
+ * pad too, and is saved signed out. With the lock off nothing changes.
  *
  * Run: npm run test:e2e:lockpin   (CI wraps it in xvfb-run)
  */
@@ -41,8 +42,14 @@ let failed = false;
 try {
   ok(await padShown(bookWith({ lock: true, activeOperatorId: null })), 'lock on, nobody signed in: the PIN pad opens at start');
   ok(await padShown(bookWith({ lock: true, activeOperatorId: 'op-gone' })), 'lock on, signed in as someone no longer on the team: the PIN pad opens');
-  ok(!(await padShown(bookWith({ lock: true, activeOperatorId: 'op-staff' }))), 'lock on, someone signed in: no PIN pad');
+  const owner = bookWith({ lock: true, activeOperatorId: 'op-owner' });
+  ok(await padShown(owner), 'lock on, the owner signed in when the app closed: the PIN pad opens anyway');
+  const saved = JSON.parse(fs.readFileSync(path.join(owner, 'khayt-store.json'), 'utf8'));
+  ok(saved.settings && saved.settings.activeOperatorId === null, 'and the book is saved with nobody signed in');
   ok(!(await padShown(bookWith({ lock: false, activeOperatorId: null }))), 'lock off: no PIN pad');
+  const off = bookWith({ lock: false, activeOperatorId: 'op-staff' });
+  ok(!(await padShown(off)), 'lock off with someone recorded: no PIN pad');
+  ok(JSON.parse(fs.readFileSync(path.join(off, 'khayt-store.json'), 'utf8')).settings.activeOperatorId === 'op-staff', 'and nothing is changed');
   console.log('\ne2e-lock-pin-at-boot: ok');
 } catch (e) {
   failed = true;
