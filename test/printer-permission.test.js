@@ -12,6 +12,13 @@ test('signedOutAtStart: under the lock nobody stays signed in across a restart (
   assert.equal(signedOutAtStart({ settings: { operatorLockEnabled: false, activeOperatorId: 'o' } }).changed, false);
   assert.equal(signedOutAtStart({ settings: { operatorLockEnabled: true, activeOperatorId: null } }).changed, false);
   assert.equal(signedOutAtStart(null).changed, false);
+  // Re-review: someone whose PIN the pad cannot check stays signed in.
+  const legacy = { settings: { operatorLockEnabled: true, activeOperatorId: 'o' }, operators: [{ id: 'o', roleKey: 'owner', pinHash: 'bm90LWEtcGlu!' }] };
+  assert.equal(signedOutAtStart(legacy).changed, false);
+  const managed = { settings: { operatorLockEnabled: true, activeOperatorId: 'o' }, operators: [{ id: 'o', roleKey: 'owner', pinHash: require('../lib/pin-hash.js').hashPin('12345678') }] };
+  assert.equal(signedOutAtStart(managed).changed, true);
+  const noPin = { settings: { operatorLockEnabled: true, activeOperatorId: 'o' }, operators: [{ id: 'o', roleKey: 'owner' }] };
+  assert.equal(signedOutAtStart(noPin).changed, true, 'no PIN: the pad signs them in with no PIN, so signing out costs nothing');
   const main = require('fs').readFileSync(require('path').join(__dirname, '..', 'main.js'), 'utf8');
   assert.match(main, /signedOut = await signOutAtStartOnDisk\(\)/);
 });

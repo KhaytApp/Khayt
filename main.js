@@ -240,6 +240,7 @@ const {
   isEncryptionAvailable,
   persistLanStoreUpdate,
   updateStoreOnDisk,
+  updateStoreOnDiskAllowingLock,
   resolveStoreSecret,
   resolveStoreSecretFor,
   isStoreSecretMasked,
@@ -1801,12 +1802,16 @@ async function maybeShowKeychainExplanation(win) {
  * owner, so it changes nothing twice.
  */
 async function migrateLegacyOwnerOnDisk() {
-  const disk = readStoreDecryptedFromDisk();
-  if (!disk || !disk.settings) return false;
-  const m = PrinterPermission.migrateLegacyOwner(disk);
-  if (!m.changed) return false;
-  await writeStoreToDisk(m.store);
-  console.warn('owner migration: operator', m.operatorId, 'is the owner by roleKey now (a lock older than #2264)');
+  // Inside the write chain (lib/store-io.js updateStoreOnDiskAllowingLock).
+  let operatorId = null;
+  await updateStoreOnDiskAllowingLock((cur) => {
+    const m = PrinterPermission.migrateLegacyOwner(cur);
+    if (!m.changed) return cur;
+    operatorId = m.operatorId;
+    return m.store;
+  }, ['operators']);
+  if (!operatorId) return false;
+  console.warn('owner migration: operator', operatorId, 'is the owner by roleKey now (a lock older than #2264)');
   return true;
 }
 
@@ -1817,12 +1822,16 @@ let signedOutThisStart = false;
 async function signOutAtStartOnDisk() {
   if (signedOutThisStart) return false;
   signedOutThisStart = true;
-  const disk = readStoreDecryptedFromDisk();
-  if (!disk || !disk.settings) return false;
-  const r = PrinterPermission.signedOutAtStart(disk);
-  if (!r.changed) return false;
-  await writeStoreToDisk(r.store);
-  return true;
+  // Inside the write chain: a write queued ahead of this (a LAN order
+  // arriving as the window loads) is kept (re-review of #2608).
+  let changed = false;
+  await updateStoreOnDiskAllowingLock((cur) => {
+    const r = PrinterPermission.signedOutAtStart(cur);
+    if (!r.changed) return cur;
+    changed = true;
+    return r.store;
+  }, ['settings.activeOperatorId']);
+  return changed;
 }
 
 ipcMain.handle('hub:load-store', async (event) => {

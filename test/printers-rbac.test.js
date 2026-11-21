@@ -383,8 +383,9 @@ test('every writer of the whole book is guarded or main\'s own (ratchet; the lis
     'main.js': {
       'atomicWriteStore(': ["ipcMain.handle('hub:save-store'"],                 // after guardWindowStore
       'restoreSnapshotToDisk(': ['function restoreSnapshotForWindow('],          // after restoreAllowed + guardSave
-      // main's own: the one-time owner migration, and signing nobody in at start (#2608)
-      'writeStoreToDisk(': ['async function migrateLegacyOwnerOnDisk(', 'async function signOutAtStartOnDisk('],
+      // main's own lock-field changes at load go through the write chain now
+      // (updateStoreOnDiskAllowingLock), so nothing in main.js writes the whole book this way.
+      'writeStoreToDisk(': [],
     },
     'lib/updater.js': { 'writeStoreToDisk(': ["ipcMain.handle('hub:install-update'"] },   // after guardStore
     // MAIN-originated: the LAN server's own generated tokens and PIN.
@@ -430,7 +431,9 @@ test('every field writer (updateStoreOnDisk / persistLanStoreUpdate) that touche
     }
   }
   const io = fs.readFileSync(path.join(root, 'lib', 'store-io.js'), 'utf8');
-  assert.match(io, /const changed = lockFieldsChanged\(current, next\);\s*if \(changed\) throw new Error\('mutator may not change ' \+ changed\);/);
+  assert.match(io, /const changed = lockFieldsChanged\(current, next, allowed\);\s*if \(changed\) throw new Error\('mutator may not change ' \+ changed\);/);
+  // The ordinary writer allows no lock field at all (re-review of #2608).
+  assert.match(io, /async function updateStoreOnDisk\(mutate\) \{\s*return chainedUpdate\(mutate, \[\]\);/);
 });
 
 /* ── #2592 release review MED-1: the shop always keeps an owner ─────────── */
@@ -576,4 +579,23 @@ test('a refusal reloads the book at most once at a time, so it can never loop (s
   await new Promise((r) => setImmediate(r));
   assert.equal(loads, 1, 'one reload');
   assert.equal(toasts, 3, 'every refusal is still said');
+});
+
+test('re-review of #2608: lock fields change outside a window save only in main\'s own load-time steps, inside the write chain', () => {
+  const root = path.join(__dirname, '..');
+  const main = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
+  const fns = [];
+  let i = -1;
+  while ((i = main.indexOf('updateStoreOnDiskAllowingLock(', i + 1)) !== -1) {
+    const head = main.slice(0, i);
+    const at = head.lastIndexOf('\nasync function ');
+    fns.push(at >= 0 ? main.slice(at + 16, main.indexOf('(', at + 16)) : '?');
+  }
+  const uses = fns;
+  for (const f of uses) assert.ok(['migrateLegacyOwnerOnDisk', 'signOutAtStartOnDisk', 'upgradeLegacyPinsOnDisk'].includes(f), 'called from ' + f);
+  assert.ok(uses.includes('signOutAtStartOnDisk'));
+  // And the chain itself: a write queued first is kept.
+  const io = fs.readFileSync(path.join(root, 'lib', 'store-io.js'), 'utf8');
+  assert.match(io, /async function updateStoreOnDiskAllowingLock\(mutate, allowed\)/);
+  assert.match(io, /if \(next === current\) return current;/);
 });
