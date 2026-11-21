@@ -480,6 +480,18 @@
         <div class="modal-footer"><button class="btn primary" id="launchGateContinue" disabled>${escapeHtml(tr('upd.launch_continue', 'Continue'))}</button></div>
       </div>`;
     (document.getElementById('modalMount') || document.body).appendChild(overlay);
+    // Everything else is inert while the gate is open: blocking Escape alone
+    // left Tab and a screen reader free to reach the app behind it (security
+    // review of #2610). Every sibling on the way from the overlay up to <body>
+    // is made inert, and given back exactly as it was on Continue.
+    const madeInert = [];
+    for (let node = overlay; node && node !== document.body && node.parentElement; node = node.parentElement) {
+      for (const sib of node.parentElement.children) {
+        if (sib === node || sib.inert) continue;
+        sib.inert = true;
+        madeInert.push(sib);
+      }
+    }
     const accept = overlay.querySelector('#launchGateAccept');
     const go = overlay.querySelector('#launchGateContinue');
     accept.addEventListener('change', () => { go.disabled = !accept.checked; });
@@ -489,6 +501,7 @@
       if (!accept.checked) return;
       go.disabled = true;
       try { await global.hubAPI?.launchGateAccept?.(); } catch (e) { console.error('launch gate accept failed:', e); }
+      for (const el of madeInert) el.inert = false;
       overlay.remove();
     });
     accept.focus();

@@ -2151,6 +2151,7 @@ require('./lib/main/launch-gate.js').registerLaunchGate({
   // book before it asks for the gate, and that is not an upgrade.
   hasBook: (() => { let had = false; try { had = fs.existsSync(dataFilePath()); } catch (_) { had = false; } return () => had; })(),
   isNewer: (a, b) => isVersionNewer(String(a), String(b)),
+  offeredVersion: () => require('./lib/updater').offeredUpdateVersion(),
 });
 
 require('./lib/main/smart-plug.js').registerSmartPlug({

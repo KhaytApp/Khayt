@@ -51,11 +51,40 @@ test('the same build, an older one, or a version with no gate: nothing', () => {
   assert.deepEqual(run({ lastRun: '4.11.0' }, { current: '4.11.1' }), []);
 });
 
-test('nothing remembered: a fresh install is not warned; a shop\'s book (an upgrade from before this) gets this version\'s items', () => {
+test('nothing remembered: a fresh install is not warned; a shop\'s book counts as coming from the floor (4.10.3)', () => {
+  const { FLOOR } = require('../lib/main/launch-gate.js');
+  assert.equal(FLOOR, '4.10.3');
   assert.deepEqual(run(null, { hasBook: false }), []);
   assert.deepEqual(run(null), ['A', 'B']);
-  assert.deepEqual(run(null, { current: '4.10.3' }), [], 'a version with no gate of its own');
   assert.deepEqual(run('junk'), ['A', 'B']);
+  // A later build with no gate of its own still shows what came after the floor
+  // (reviews of #2610: the first draft showed nothing here).
+  assert.deepEqual(run(null, { current: '4.11.1' }), ['A', 'B']);
+  assert.deepEqual(run(null, { current: '4.12.0' }), ['A', 'B']);
+  assert.deepEqual(run(null, { current: '4.10.3' }), [], 'nothing after the floor yet');
+});
+
+test('accepted in the update dialog: only for a version the updater offered, never higher', () => {
+  const { registerLaunchGate } = require('../lib/main/launch-gate.js');
+  const files = {};
+  const fsFake = { readFileSync: (f) => { if (!(f in files)) throw new Error('ENOENT'); return files[f]; }, writeFileSync: (f, d) => { files[f] = d; } };
+  const handlers = {};
+  let offered = '';
+  registerLaunchGate({
+    ipcMain: { handle: (ch, fn) => { handlers[ch] = fn; } }, userDataDir: () => '/u', current: '4.11.0', gates,
+    hasBook: () => true, isNewer, fs: fsFake, path: require('path'), offeredVersion: () => offered,
+  });
+  const accept = (v) => handlers['hub:launch-gate-accepted-in-update']({}, v);
+  assert.equal(accept('4.12.0').ok, false, 'nothing offered yet');
+  offered = '4.12.0';
+  assert.equal(accept('99.0.0').ok, false, 'higher than offered');
+  assert.equal(accept('4.11.0').ok, false, 'not newer than this build');
+  assert.equal(accept('4.12.0').ok, true);
+  assert.equal(JSON.parse(files[require('path').join('/u', 'last-run-version.json')]).acceptedFor, '4.12.0');
+  const upd = fs.readFileSync(path.join(__dirname, '..', 'lib/updater.js'), 'utf8');
+  assert.match(upd, /noteOffered\(interpreted\.version\);\s*\n\s*const since/);
+  assert.match(upd, /if \(interpreted\.status === 'available'\) noteOffered\(interpreted\.version\);/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8'), /offeredVersion: \(\) => require\('\.\/lib\/updater'\)\.offeredUpdateVersion\(\)/);
 });
 
 test('the window holds it: no Later, no Escape, Continue only once ticked, and an accept in the update dialog is remembered', () => {

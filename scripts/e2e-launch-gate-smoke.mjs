@@ -45,19 +45,33 @@ async function start(dir) {
 
 let failed = false;
 try {
-  if (!gates[version]) {
-    console.log(`e2e-launch-gate: ${version} has no "Before you update" items; nothing to hold (ok)`);
+  // What a shop coming from before this file existed must read: every gate
+  // after the floor, up to this build. A build with no gate of its own still
+  // has these (reviews of #2610: the first draft skipped here, "nothing to
+  // hold (ok)", while the app showed nothing at all).
+  const { FLOOR } = require_(path.join(ROOT, 'lib/main/launch-gate.js'));
+  const parts = (v) => String(v).split('-')[0].split('.').map(Number);
+  const newer = (a, b) => { const x = parts(a), y = parts(b); for (let i = 0; i < 3; i++) { if (x[i] !== y[i]) return x[i] > y[i]; } return false; };
+  const since = Object.keys(gates).filter((v) => newer(v, FLOOR) && !newer(v, version));
+  const want = [...new Set(since.flatMap((v) => gates[v]))];
+  if (!want.length) {
+    if (Object.keys(gates).some((v) => newer(v, FLOOR))) throw new Error(`gates after ${FLOOR} exist but none applies to ${version}`);
+    console.log(`e2e-launch-gate: no "Before you update" items after ${FLOOR}; nothing to hold (ok)`);
     process.exit(0);
   }
-  const want = gates[version];
 
   // 1. Last run on an older version: held until read.
   const dir = profile({ seen: { lastRun: '0.0.1' } });
   let a = await start(dir);
   try {
-    ok(a.shown, `last run on 0.0.1: the ${version} items are shown at start`);
+    ok(a.shown, `last run on 0.0.1: the items up to ${version} are shown at start`);
     const items = await a.window.evaluate(() => [...document.querySelectorAll('#launchGateOverlay .update-consent-list li')].map((li) => li.textContent));
-    ok(want.every((w) => items.includes(w)), `every item of ${version} is on screen (${want.length})`);
+    ok(want.every((w) => items.includes(w)), `every item since ${FLOOR} is on screen (${want.length})`);
+    ok(await a.window.evaluate(() => {
+      const gate = document.getElementById('launchGateOverlay');
+      const rest = [...document.body.children].filter((c) => !c.contains(gate) && c.tagName !== 'SCRIPT');
+      return rest.length > 0 && rest.every((c) => c.inert);
+    }), 'everything behind it is inert while it is open');
     ok(await a.window.evaluate(() => document.getElementById('launchGateContinue').disabled), 'Continue is held until the box is ticked');
     await a.window.keyboard.press('Escape');
     ok(await a.window.evaluate(() => !!document.getElementById('launchGateOverlay')), 'Escape does not dismiss it');
@@ -66,8 +80,19 @@ try {
     await a.window.click('#launchGateContinue');
     await a.window.waitForFunction(() => !document.getElementById('launchGateOverlay'), { timeout: 5000 });
     ok(true, 'Continue closes it');
+    ok(await a.window.evaluate(() => ![...document.body.children].some((c) => c.inert)), 'and gives the app back');
   } finally { await a.electronApp.close(); }
   ok((seenFile(dir) || {}).lastRun === version, `this computer is remembered as on ${version}`);
+
+  // 1b. No file at all, a book present (an update from before the file
+  // existed, a Store or manual install): counted from the floor, so held.
+  const old = profile({ seen: null });
+  a = await start(old);
+  try {
+    ok(a.shown, `no record and a book: the items since ${FLOOR} are shown`);
+    const items = await a.window.evaluate(() => [...document.querySelectorAll('#launchGateOverlay .update-consent-list li')].map((li) => li.textContent));
+    ok(want.every((w) => items.includes(w)), `all ${want.length} of them`);
+  } finally { await a.electronApp.close(); }
 
   // 2. The next start asks nothing.
   a = await start(dir);
