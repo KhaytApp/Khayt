@@ -117,6 +117,24 @@ extension Shop {
         return false
     }
 
+    /// May whoever is at this Mac do `verb` to a printer (P5)? `send` a file,
+    /// `control` a print (pause, resume, stop, light, speed, skip an object,
+    /// the plug), edit the `connection`, or `unlink`. Printers are their own
+    /// area in `lib/rbac.js`, with the shop's tightening
+    /// (`settings.roleLimits`); they were covered by "edit orders".
+    func printerAllows(_ verb: String) -> Bool {
+        guard lockInForce else { return true }
+        guard let op = signedIn, let rbac else { return false }
+        return rbac.canPrinter(role: lockRole(op.id), verb: verb, lockEnabled: true, limits: settingsDict["roleLimits"])
+    }
+
+    /// The authority half of a printer action: refuse, and say so.
+    func permittedPrinter(_ verb: String) -> Bool {
+        if printerAllows(verb) { return true }
+        moveProblem = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
+        return false
+    }
+
     /// What a write to the book IS, to the lock — required by every Shop write
     /// helper (`writeToOneOrder`, `write`, `writeKits`, …), so a new writer
     /// cannot be added without saying. `WritersAreGatedTests` holds every
