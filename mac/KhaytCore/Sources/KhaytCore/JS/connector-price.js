@@ -34,7 +34,7 @@
  *              sliced plate is a new part with no price tiers of its own.
  *
  * Returns { currency, qty, cost: {unit, total} (overhead included), unit,
- * total, rounded, basis, margin: {pct of the price, pctOnCost, amount}, round: {step} only when rounded } or { unpriced: 'bad-facts' | 'no-material' | 'no-currency' }. The route
+ * total, rounded, basis, margin: {pct of the price, pctOnCost (absent when the cost is 0), amount}, round: {step} only when rounded } or { unpriced: 'bad-facts' | 'no-material' | 'no-currency' }. The route
  * decides which keys a device may see (price only, or price and cost).
  * `basis` is 'measured' when the rates came from a shop preset matched by the
  * slicer's printer preset, 'assumed' when they are the shop's defaults.
@@ -220,7 +220,8 @@ function priceSlice(facts, ctx) {
     // price (pct), on the cost (pctOnCost, a markup) and in money (amount).
     margin: {
       pct: total > 0 ? r2((total - costTotal) / total * 100) : 0,
-      pctOnCost: costTotal > 0 ? r2((total - costTotal) / costTotal * 100) : 0,
+      // No cost, no markup to state: left out, never a misleading 0%.
+      ...(costTotal > 0 ? { pctOnCost: r2((total - costTotal) / costTotal * 100) } : {}),
       amount: r2(total - costTotal),
     },
     // The step the price was rounded to, only when it was: a tab can say
