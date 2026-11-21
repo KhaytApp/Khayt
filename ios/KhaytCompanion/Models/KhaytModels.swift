@@ -268,6 +268,8 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
     /// every printer on the screen. It is read leniently and kept as text.
     let lastUpdated: String?
     let apiType: String?
+    /// The shared state set (C2, `PrinterActivity`), worked out once per reading.
+    let status: PrinterStatus?
 
     init(id: String, name: String?, hasPrinterApi: Bool, state: String?, progress: Int?, filename: String?,
          timeRemaining: Int?, tempNozzle: Int?, tempBed: Int?, error: String?, lastUpdated: String?,
@@ -276,6 +278,8 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
         self.progress = progress; self.filename = filename; self.timeRemaining = timeRemaining
         self.tempNozzle = tempNozzle; self.tempBed = tempBed; self.error = error
         self.lastUpdated = lastUpdated; self.apiType = apiType
+        status = PrinterActivity.status(hasPrinterApi: hasPrinterApi, apiType: apiType, state: state,
+                                        progress: progress, error: error)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -310,15 +314,35 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
             lastUpdated = nil
         }
         apiType = try? c.decodeIfPresent(String.self, forKey: .apiType)
+        status = PrinterActivity.status(hasPrinterApi: hasPrinterApi, apiType: apiType, state: state,
+                                        progress: progress, error: error)
     }
 
     var displayName: String { name ?? id }
 
-    var isPrinting: Bool { (state ?? "").lowercased().contains("print") }
+    /// Printing, by the shared rule (C2): every busy word each protocol
+    /// writes ("Printing from SD", "BUSY", "processing", …), not only words
+    /// that contain "print". A word in no table keeps the old reading.
+    var isPrinting: Bool {
+        if let s = status, s.isOnline, s.activity != "unknown" { return s.activity == "printing" }
+        return (state ?? "").lowercased().contains("print") && !isPaused
+    }
     /// Paused is a print still on the bed, not an ending — a pause raised a
     /// "Print finished" alert while `isPrinting` was the only question asked.
-    var isPaused: Bool { (state ?? "").lowercased().contains("pause") }
+    /// It is busy: never offered as free (C2).
+    var isPaused: Bool {
+        if let s = status, s.isOnline, s.activity != "unknown" { return s.activity == "paused" }
+        return (state ?? "").lowercased().contains("pause")
+    }
+    /// Working (printing or paused): the bed is not free.
+    var isBusy: Bool { isPrinting || isPaused }
     var hasError: Bool { !(error ?? "").isEmpty }
+    /// A printer that needs a person before it is free, by its own word
+    /// (error, failed, attention, halted), with or without an error message.
+    var needsPerson: Bool { hasError || status?.needsPerson == true }
+    /// A word that says the printer is not linked (OctoPrint "Offline",
+    /// "Connecting", Duet "off"), read as the shared rule reads it.
+    var saysUnlinked: Bool { status?.cls == "unlinked" }
     /// No state at all: the Mac's last poll of this printer failed (an
     /// unreachable printer comes back as `state: null` plus the poll's error).
     /// That is NOT HEARD, not "stopped printing". Read it as a print ending

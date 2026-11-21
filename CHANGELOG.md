@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: a printer's state comes from the shared state set (C2).** The phone read a printer as printing only when its word contained "print", so a paused printer showed as free, a PrusaLink BUSY or a Duet "processing" as not printing, and ATTENTION or "halted" as idle. It now asks `lib/printer-activity.js` (the Mac's and the desktop's rule, from KhaytCore's bundle): paused is busy and never free, a printer that needs a person shows as needing one, and a word that says the printer is not linked shows it offline. A word no table knows keeps the old reading. The phone's own connection is mapped onto the same link set. Tests: the 160 shared vectors through the phone; the old rule's faults; a printer not heard from is connecting, never stopped.
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
   - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.
   - **Recalculate.**
