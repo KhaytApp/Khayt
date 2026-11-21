@@ -16,8 +16,13 @@ const order = (over) => ({ id: 'PO-17', attachedFiles: [], ...over });
 test('a video within the budget is copied: the attachment row', () => {
   assert.deepEqual(T.timelapseAttach(order(), match(), { machineId: 'M1', stamp: 'lx9k2' }), {
     action: 'attach',
+    maxBytes: T.MAX_BYTES,   // the host stops reading here, whatever `bytes` claimed (security review)
     row: { filename: 'PO-17-timelapse-lx9k2.mp4', originalName: 'plate_1_20261119T101500.mp4', size: 42 * 1048576, kind: 'timelapse', from: { machineId: 'M1', video: 'plate_1_20261119T101500.mp4' } },
   });
+});
+
+test('the cap the host reads to travels with an attach, the shop\'s own when given', () => {
+  assert.equal(T.timelapseAttach(order(), match({ bytes: 5 }), { machineId: 'M1', maxBytes: 10 }).maxBytes, 10);
 });
 
 test('over the budget, or a size the printer did not give, stays on the printer as a link', () => {
