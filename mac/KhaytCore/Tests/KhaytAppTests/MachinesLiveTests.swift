@@ -25,7 +25,9 @@ struct MachinesLiveTests {
         #expect(o["lastUpdated"] == .string(StoreWriter.iso(at)))
         #expect(o["apiType"] == .string("moonraker"))
         #expect(Set(o.keys) == ["id", "name", "hasPrinterApi", "state", "progress", "filename", "timeRemaining",
-                                "tempNozzle", "tempBed", "error", "lastUpdated", "apiType"], "the desktop's keys, no more")
+                                "tempNozzle", "tempBed", "error", "lastUpdated", "apiType",
+                                "problems", "waiting"], "the desktop's keys, plus what the printer needs")
+        #expect(o["problems"] == .array([]) && o["waiting"] == .array([]), "nothing needed is two empty lists")
     }
 
     @Test("a machine never heard from: id, name and whether it has a printer, the rest null")

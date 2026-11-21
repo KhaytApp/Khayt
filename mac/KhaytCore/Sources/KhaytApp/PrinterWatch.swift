@@ -98,6 +98,9 @@ final class PrinterWatch {
         // cancelled (0300_400C / 0500_400E) from one that failed — without
         // it every cancelled Bambu print would alert as an error.
         if let fault = status.fault, !fault.isEmpty { entry["fault"] = .string(fault) }
+        // The printer's own sentence, which the problem rule reads beside the
+        // state word (`lib/printer-problems.js` fromStatus).
+        if let said = status.message, !said.isEmpty { entry["message"] = .string(said) }
         return entry
     }
 
@@ -1051,7 +1054,12 @@ final class PrinterWatch {
             // 2026 (`moonrakerSensors` in main.js); the Mac passed nothing, so
             // `filamentOut` was always null and a runout raised no alert.
             let watching = await Self.watching(machine, base: base, engine: engine, get: get)
-            let query = try await engine.moonrakerQuery(watching: watching)
+            var query = try await engine.moonrakerQuery(watching: watching)
+            // What the printer says is wrong (U1 idea 5): two more objects in
+            // the same read, only for a printer that listed them.
+            for name in Self.discovered[Self.discoveryKey(machine, base: base)]?.problemObjects ?? [] {
+                query += "&" + name
+            }
             let reply = try await get("/printer/objects/query?" + query)
             // Only the machines that need it pay for the second request, and a
             // failure there keeps toolhead zero's reading rather than nothing.
@@ -1110,6 +1118,10 @@ final class PrinterWatch {
         var watch: KhaytEngine.MoonrakerWatch
         var ok: Bool
         var at: Date
+        /// The printer's problem objects (a Snapmaker U1's exception list and
+        /// power-loss flag), when its own objects list names them. Asked for
+        /// only then: a Klipper printer without them is never asked.
+        var problemObjects: [String] = []
     }
     // Internal, not private: a test says what the poller has already learned.
     static var discovered: [String: Discovery] = [:]
@@ -1133,7 +1145,8 @@ final class PrinterWatch {
         do {
             let list = try await get("/printer/objects/list")
             let watch = try await engine.moonrakerDiscover(list)
-            discovered[key] = Discovery(watch: watch, ok: true, at: now)
+            discovered[key] = Discovery(watch: watch, ok: true, at: now,
+                                        problemObjects: KhaytEngine.moonrakerProblemObjects(in: list))
             return watch
         } catch {
             discovered[key] = Discovery(watch: .nothing, ok: false, at: now)

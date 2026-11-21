@@ -1069,6 +1069,13 @@ still lists it, and the phone hides it either way:
 
 `progress`, `timeRemaining` (seconds) and the temperatures are rounded integers. A machine never heard from has its `id`, `name` and `hasPrinterApi`, and `null` for the rest.
 
+**The native Mac adds two lists to every entry** (Nov 2026, draft), worked out there by the shared rules so a phone never works them out itself:
+
+- `problems`: what the printer says is wrong, worst first (`lib/printer-problems.js problemsFor`): `[{ code, severity, action, source, head?, message?, ref? }]`. For a Snapmaker U1 this includes its exceptions (a filament runout names the head) and "power was lost during a print" (information only: Khayt never sends resume or discard).
+- `waiting`: why the printer waits for a person, most urgent first (`lib/waiting-at-machine.js waiting`): `[{ reason, since, head? }]`, with `reason` one of `filament-runout`, `printer-attention`, `print-to-take-off`, `bed-to-clear`.
+
+Both are always present on the Mac and empty when nothing is needed. `lib/lan-server.js` does not send them yet, and an older Mac leaves them out: read a missing list as empty. The cloud's live snapshot carries the same rows.
+
 ### `POST /api/printer/{machineId}/{pause|resume|stop}`
 
 > **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it.
