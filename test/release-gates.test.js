@@ -92,6 +92,9 @@ test('the window holds it: no Later, no Escape, Continue only once ticked, and a
   const fn = ui.slice(ui.indexOf('async function showLaunchGateIfNeeded'), ui.indexOf('const api = {'));
   assert.match(fn, /id="launchGateContinue" disabled/);
   assert.match(fn, /e\.key === 'Escape'/);
+  // Re-review: later dialogs are held back too, and given back on Continue.
+  assert.match(fn, /new MutationObserver\(/);
+  assert.match(fn, /later\.disconnect\(\);\s*\n\s*for \(const el of madeInert\) el\.inert = false;/);
   assert.doesNotMatch(fn, /data-upd="later"/);
   assert.match(ui, /launchGateAcceptedInUpdate\?\.\(activeUpdateInfo\.version\)/);
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'renderer/app-boot.js'), 'utf8'), /showLaunchGateIfNeeded\(\)/);

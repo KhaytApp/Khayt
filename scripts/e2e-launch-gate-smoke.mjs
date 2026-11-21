@@ -72,6 +72,15 @@ try {
       const rest = [...document.body.children].filter((c) => !c.contains(gate) && c.tagName !== 'SCRIPT');
       return rest.length > 0 && rest.every((c) => c.inert);
     }), 'everything behind it is inert while it is open');
+    // Something that opens after it (the update dialog, the PIN pad) is held back too (re-review).
+    ok(await a.window.evaluate(async () => {
+      const late = document.createElement('div');
+      late.id = 'e2eLateModal';
+      late.innerHTML = '<button>late</button>';
+      (document.getElementById('modalMount') || document.body).appendChild(late);
+      await new Promise((r) => setTimeout(r, 50));
+      return late.inert === true;
+    }), 'a dialog opened after it is inert too');
     ok(await a.window.evaluate(() => document.getElementById('launchGateContinue').disabled), 'Continue is held until the box is ticked');
     await a.window.keyboard.press('Escape');
     ok(await a.window.evaluate(() => !!document.getElementById('launchGateOverlay')), 'Escape does not dismiss it');
@@ -81,6 +90,7 @@ try {
     await a.window.waitForFunction(() => !document.getElementById('launchGateOverlay'), { timeout: 5000 });
     ok(true, 'Continue closes it');
     ok(await a.window.evaluate(() => ![...document.body.children].some((c) => c.inert)), 'and gives the app back');
+    ok(await a.window.evaluate(() => document.getElementById('e2eLateModal').inert === false), 'including what opened after it');
   } finally { await a.electronApp.close(); }
   ok((seenFile(dir) || {}).lastRun === version, `this computer is remembered as on ${version}`);
 

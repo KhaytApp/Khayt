@@ -485,13 +485,23 @@
     // review of #2610). Every sibling on the way from the overlay up to <body>
     // is made inert, and given back exactly as it was on Continue.
     const madeInert = [];
+    const holdBack = (el) => {
+      if (!el || el.nodeType !== 1 || el.inert || el === overlay || el.contains(overlay) || overlay.contains(el)) return;
+      if (el.parentElement && el.parentElement.closest('[inert]')) return;   // already behind the gate
+      el.inert = true;
+      madeInert.push(el);
+    };
     for (let node = overlay; node && node !== document.body && node.parentElement; node = node.parentElement) {
-      for (const sib of node.parentElement.children) {
-        if (sib === node || sib.inert) continue;
-        sib.inert = true;
-        madeInert.push(sib);
-      }
+      for (const sib of node.parentElement.children) if (sib !== node) holdBack(sib);
     }
+    // And whatever opens AFTER it (the update dialog, the PIN pad at start):
+    // it would sit over the gate and work, so the update dialog could be
+    // accepted for a newer version before these items were read (re-review
+    // of #2610). Held back the same way until Continue.
+    const later = new MutationObserver((records) => {
+      for (const r of records) for (const n of r.addedNodes) holdBack(n);
+    });
+    later.observe(document.body, { childList: true, subtree: true });
     const accept = overlay.querySelector('#launchGateAccept');
     const go = overlay.querySelector('#launchGateContinue');
     accept.addEventListener('change', () => { go.disabled = !accept.checked; });
@@ -501,6 +511,7 @@
       if (!accept.checked) return;
       go.disabled = true;
       try { await global.hubAPI?.launchGateAccept?.(); } catch (e) { console.error('launch gate accept failed:', e); }
+      later.disconnect();
       for (const el of madeInert) el.inert = false;
       overlay.remove();
     });
