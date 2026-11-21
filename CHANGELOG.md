@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone (draft, on #2613): the phone reads a printer's problems and why it waits, when the Mac sends them.** `MachineLiveStatus` carries `problems` (#2612's catalogue: code, severity, action, head, message) and `waiting` (#2613's reasons: filament runout, attention, a print to take off, a bed to clear), decoded so a bad row is dropped and never the printer; an older Mac that sends neither reads as none. The phone never works them out itself. Screens are drawn in Figma for sign-off. Tests: both shared vector files through JavaScriptCore with lib loaded; the closed sets match the rules'; a lenient decode.
 - **Shared rules (printer batch 3, not yet on screen): how each print ended, each printer's success rate, and "waiting at the machine" that survives a restart.**
   - **One result per print.** A printer's finished job now records how it ended (finished, cancelled or failed) when its last word says so (`lib/printer-poll-cache.js`). `lib/run-result.js` puts one result on each print run, once. The shop's own mark (a failed check, a scrapped print) beats the printer's "complete", which is kept beside it.
   - **Success rate per printer.** `lib/printer-success.js` counts finished against failed runs per printer, worst first. Cancelled runs are shown but not counted against the printer, and a printer with fewer than five decided runs is flagged as too few to judge.

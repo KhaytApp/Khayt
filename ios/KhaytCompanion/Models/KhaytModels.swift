@@ -268,6 +268,10 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
     /// every printer on the screen. It is read leniently and kept as text.
     let lastUpdated: String?
     let apiType: String?
+    /// What the printer needs, worst first (#2612), when the Mac sends it.
+    var problems: [PrinterProblem] = []
+    /// Why it waits for a person, most urgent first (#2613), when the Mac sends it.
+    var waiting: [WaitingReason] = []
 
     init(id: String, name: String?, hasPrinterApi: Bool, state: String?, progress: Int?, filename: String?,
          timeRemaining: Int?, tempNozzle: Int?, tempBed: Int?, error: String?, lastUpdated: String?,
@@ -280,7 +284,7 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, hasPrinterApi, state, progress, filename, timeRemaining, tempNozzle, tempBed, error,
-             lastUpdated, apiType
+             lastUpdated, apiType, problems, waiting
     }
 
     init(from decoder: Decoder) throws {
@@ -310,6 +314,8 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
             lastUpdated = nil
         }
         apiType = try? c.decodeIfPresent(String.self, forKey: .apiType)
+        problems = c.lossyList(PrinterProblem.self, forKey: .problems)
+        waiting = c.lossyList(WaitingReason.self, forKey: .waiting)
     }
 
     var displayName: String { name ?? id }
