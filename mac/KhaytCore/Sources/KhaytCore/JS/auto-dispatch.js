@@ -95,10 +95,15 @@
     // cancelled) is believed: the bed check below holds that printer until
     // someone clears it, and says so. A word saying IDLE with progress is
     // still taken as busy, unless someone said the bed was clear after the
-    // printer last changed what it was doing: a person has looked at it.
+    // printer last changed what it was doing AND its progress has not moved
+    // since: a person has looked at it, and nothing has started under the
+    // idle word after they did (correctness review of #2607: a print started
+    // outside Khayt at 40% under "idle" was given a second job).
     const progress = Math.round(+status.progress || 0);
     const ended = !!(st && st.cls === 'finished');
-    const looked = Date.parse(text(machine.bedClearedAt)) > Number(status.lastActivityAt);
+    const clearedMs = Date.parse(text(machine.bedClearedAt));
+    const looked = clearedMs > Number(status.lastActivityAt)
+      && Number.isFinite(Number(status.progressChangedAt)) && clearedMs > Number(status.progressChangedAt);
     const resting = !!(st && st.activity === 'idle') && looked;
     if (progress > 0 && progress < 100 && !ended && !resting) return 'ad.busy';
     if (st && st.word !== undefined && st.cls) {
