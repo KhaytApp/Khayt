@@ -234,6 +234,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   webcamDetect:   (o)     => ipcRenderer.invoke('hub:webcam-detect', o),
   discoverPrinters: (o)   => ipcRenderer.invoke('hub:discover-printers', o),
   relocatePrinters: (o)   => ipcRenderer.invoke('hub:relocate-printers', o),
+  foundPrinters: ()       => ipcRenderer.invoke('hub:found-printers'),
+  forgetFoundPrinters: () => ipcRenderer.invoke('hub:found-printers-forget'),
   // Installed themes live in userData, not beside the app — see lib/theme-store.js.
   themesList:      ()     => ipcRenderer.invoke('hub:themes-list'),
   themesInstall:   (o)    => ipcRenderer.invoke('hub:themes-install', o),
