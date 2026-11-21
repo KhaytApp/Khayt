@@ -240,6 +240,7 @@ const {
   isEncryptionAvailable,
   persistLanStoreUpdate,
   updateStoreOnDisk,
+  updateStoreOnDiskAllowingLock,
   resolveStoreSecret,
   resolveStoreSecretFor,
   isStoreSecretMasked,
@@ -1817,24 +1818,31 @@ async function maybeShowKeychainExplanation(win) {
  * review). Returns id → new hash, so what the window gets matches the disk:
  * a window holding the old value would save it straight back. */
 async function upgradeLegacyPinsOnDisk() {
-  const disk = readStoreDecryptedFromDisk();
-  if (!disk || !Array.isArray(disk.operators)) return null;
-  const r = PrinterPermission.upgradeLegacyPins(disk, hashPinSalted);
-  if (!r.changed) return null;
-  await writeStoreToDisk(r.store);
-  console.warn('PIN upgrade:', r.count, 'operator PIN(s) from the first releases now hashed');
-  const out = new Map();
-  for (const o of r.store.operators) if (o && o.id) out.set(o.id, o.pinHash);
+  // Inside the write chain (re-review of #2608/#2609): a write queued ahead
+  // of this is kept.
+  let out = null;
+  await updateStoreOnDiskAllowingLock((cur) => {
+    const r = PrinterPermission.upgradeLegacyPins(cur, hashPinSalted);
+    if (!r.changed) return cur;
+    console.warn('PIN upgrade:', r.count, 'operator PIN(s) from the first releases now hashed');
+    out = new Map();
+    for (const o of r.store.operators) if (o && o.id) out.set(o.id, o.pinHash);
+    return r.store;
+  }, ['operators']);
   return out;
 }
 
 async function migrateLegacyOwnerOnDisk() {
-  const disk = readStoreDecryptedFromDisk();
-  if (!disk || !disk.settings) return false;
-  const m = PrinterPermission.migrateLegacyOwner(disk);
-  if (!m.changed) return false;
-  await writeStoreToDisk(m.store);
-  console.warn('owner migration: operator', m.operatorId, 'is the owner by roleKey now (a lock older than #2264)');
+  // Inside the write chain (lib/store-io.js updateStoreOnDiskAllowingLock).
+  let operatorId = null;
+  await updateStoreOnDiskAllowingLock((cur) => {
+    const m = PrinterPermission.migrateLegacyOwner(cur);
+    if (!m.changed) return cur;
+    operatorId = m.operatorId;
+    return m.store;
+  }, ['operators']);
+  if (!operatorId) return false;
+  console.warn('owner migration: operator', operatorId, 'is the owner by roleKey now (a lock older than #2264)');
   return true;
 }
 

@@ -383,8 +383,9 @@ test('every writer of the whole book is guarded or main\'s own (ratchet; the lis
     'main.js': {
       'atomicWriteStore(': ["ipcMain.handle('hub:save-store'"],                 // after guardWindowStore
       'restoreSnapshotToDisk(': ['function restoreSnapshotForWindow('],          // after restoreAllowed + guardSave
-      // main's own: the one-time owner migration, and hashing the first releases' btoa PINs (#2609)
-      'writeStoreToDisk(': ['async function migrateLegacyOwnerOnDisk(', 'async function upgradeLegacyPinsOnDisk('],
+      // main's own lock-field changes at load go through the write chain now
+      // (updateStoreOnDiskAllowingLock), so nothing in main.js writes the whole book this way.
+      'writeStoreToDisk(': [],
     },
     'lib/updater.js': { 'writeStoreToDisk(': ["ipcMain.handle('hub:install-update'"] },   // after guardStore
     // MAIN-originated: the LAN server's own generated tokens and PIN.
@@ -430,7 +431,9 @@ test('every field writer (updateStoreOnDisk / persistLanStoreUpdate) that touche
     }
   }
   const io = fs.readFileSync(path.join(root, 'lib', 'store-io.js'), 'utf8');
-  assert.match(io, /const changed = lockFieldsChanged\(current, next\);\s*if \(changed\) throw new Error\('mutator may not change ' \+ changed\);/);
+  assert.match(io, /const changed = lockFieldsChanged\(current, next, allowed\);\s*if \(changed\) throw new Error\('mutator may not change ' \+ changed\);/);
+  // The ordinary writer allows no lock field at all (re-review of #2608).
+  assert.match(io, /async function updateStoreOnDisk\(mutate\) \{\s*return chainedUpdate\(mutate, \[\]\);/);
 });
 
 /* ── #2592 release review MED-1: the shop always keeps an owner ─────────── */

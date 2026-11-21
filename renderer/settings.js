@@ -6364,7 +6364,8 @@ async function openOffsiteRestoreModal() {
       applyTheme(settings.theme);
       i18n.set(settings.lang);
       refreshCurrencyLabels();
-      toast(t('offsite.restored', { name: chosen.value }), 'success');
+      // Parts the staff lock put back were already said (re-review of #2609).
+      if (!(Array.isArray(data && data.__refused) && data.__refused.length)) toast(t('offsite.restored', { name: chosen.value }), 'success');
       return true;
     },
   });

@@ -107,6 +107,8 @@ test('correctness review: a restore with refused parts does not also say "Restor
   const set = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'settings.js'), 'utf8');
   assert.match(set, /if \(!\(Array\.isArray\(data && data\.__refused\) && data\.__refused\.length\)\) toast\(t\('set\.restore_success'\)/);
   assert.match(set, /if \(!\(Array\.isArray\(point && point\.__refused\) && point\.__refused\.length\)\) toast\(t\('set\.restore_success'\)/);
+  assert.match(set, /if \(!\(Array\.isArray\(data && data\.__refused\) && data\.__refused\.length\)\) toast\(t\('offsite\.restored'/, 'the offsite restore too (re-review)');
+  assert.match(set, /if \(!\(Array\.isArray\(data && data\.__refused\) && data\.__refused\.length\)\) toast\(t\('offsite\.restored'/, 'the offsite restore too (re-review)');
   // The marker never becomes part of the book.
   const V = require('../lib/store-validate.js');
   const { normalized } = V.normalizeStoreSnapshot({ settings: { bizName: 'x' }, printLog: [], __refused: ['operators'] });
