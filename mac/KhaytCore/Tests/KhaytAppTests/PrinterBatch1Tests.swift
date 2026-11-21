@@ -303,6 +303,17 @@ struct PrinterBatch1Tests {
         #expect(SendToPrinterSheet.sendKey(slicesFirst: true, start: true, findings: [material]) == "slicer.send_title")
     }
 
+    @Test("what is loaded: the printer's own report when it gave one, else the machine record")
+    func loadedSource() {
+        let record: JSONValue = .array([.object(["slot": .number(0), "hex": .string("#000000"), "material": .string("PLA")])])
+        #expect(SendToPrinterSheet.loaded(live: nil, record: record) == record)
+        #expect(SendToPrinterSheet.loaded(live: [], record: record) == record)
+        #expect(SendToPrinterSheet.loaded(live: nil, record: nil) == nil)
+        let live = [KhaytEngine.LoadedSlot(slot: 1, hex: "#FFFFFF", material: "PETG")]
+        #expect(SendToPrinterSheet.loaded(live: live, record: record)
+                == .array([.object(["slot": .number(1), "hex": .string("#FFFFFF"), "material": .string("PETG")])]))
+    }
+
     @Test("a long G-code file is read at both ends, where slicers write their comments")
     func readsBothEnds() throws {
         let url = FileManager.default.temporaryDirectory.appending(path: "khayt-sendcheck-\(UUID().uuidString).gcode")

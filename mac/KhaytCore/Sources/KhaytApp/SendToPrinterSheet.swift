@@ -141,6 +141,14 @@ struct SendToPrinterSheet: View {
         return start ? "mac.send_and_start" : "mac.send_only"
     }
 
+    /// What is loaded, for the checks: what the printer itself reported on
+    /// its last poll (a Snapmaker U1's `print_task_config`) when it reported
+    /// anything, else what the shop recorded on the machine.
+    static func loaded(live: [KhaytEngine.LoadedSlot]?, record: JSONValue?) -> JSONValue? {
+        guard let live, !live.isEmpty else { return record }
+        return .array(live.map { .object(["slot": .number(Double($0.slot)), "hex": .string($0.hex), "material": .string($0.material)]) })
+    }
+
     static func bed(_ machine: Machine) -> KhaytEngine.SendFinding.Size? {
         guard let bed = machine.bed else { return nil }
         return .init(x: bed.x, y: bed.y, z: bed.z)
@@ -156,7 +164,7 @@ struct SendToPrinterSheet: View {
         }
         let asked = (file, machine.id)
         let text = await SendChecks.gcodeText(file)
-        let loaded = Shop.asObject(row)?["loaded"]
+        let loaded = Self.loaded(live: shop.printers.readings[machine.id]?.status?.loaded, record: Shop.asObject(row)?["loaded"])
         let found = (try? await engine.sendChecks(fileName: file.lastPathComponent, gcodeText: text, bounds: nil,
                                                   machine: row, loaded: loaded)) ?? []
         // The answer to a question the sheet has stopped asking is dropped.

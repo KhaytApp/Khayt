@@ -170,7 +170,7 @@ function legacy(status, entry, opts) {
  *
  * @returns {'printing'|'paused'|'idle'|'reconnecting'|'unknown'|'error'|'offline'}
  */
-const CHIPS = ['printing', 'paused', 'idle', 'reconnecting', 'unknown', 'error', 'offline'];
+const CHIPS = Object.freeze(['printing', 'paused', 'idle', 'reconnecting', 'unknown', 'error', 'offline']);
 function chip(status, entry, opts) {
   const six = legacy(status, entry, opts);
   const s = status || {};
