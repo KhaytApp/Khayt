@@ -306,9 +306,14 @@ test('pre-cut review MED1: a printer that keeps its last progress after a cancel
   const cleared = machine({ bedClearedAt: new Date(at + 60000).toISOString() });
   assert.equal(ad.machineBlocked(cleared, { state: 'cancelled', progress: 37, lastActivityAt: at }), null, 'cancelled at 37%, bed cleared after: free');
   // IDLE with progress (OctoPrint "Operational" after a cancel): busy, unless someone cleared the bed after the last change.
-  assert.equal(ad.machineBlocked(cleared, { state: 'Operational', progress: 37, lastActivityAt: at }), null, 'Operational at 37%, bed cleared after: free');
+  assert.equal(ad.machineBlocked(cleared, { state: 'Operational', progress: 37, lastActivityAt: at, progressChangedAt: at }), null, 'Operational at 37%, bed cleared after, progress frozen since: free');
+  // Correctness review of #2607: a print started outside Khayt under an idle
+  // word. The bed was cleared after the last word change, but progress moved
+  // after the clear: something is printing.
+  assert.equal(ad.machineBlocked(cleared, { state: 'Operational', progress: 40, lastActivityAt: at, progressChangedAt: at + 120000 }), 'ad.busy', 'progress moved after the clear: busy');
+  assert.equal(ad.machineBlocked(cleared, { state: 'Operational', progress: 37, lastActivityAt: at }), 'ad.busy', 'no progress time: busy (fails safe)');
   const before = machine({ bedClearedAt: new Date(at - 60000).toISOString() });
-  assert.equal(ad.machineBlocked(before, { state: 'Operational', progress: 37, lastActivityAt: at }), 'ad.busy', 'cleared BEFORE the change: still busy');
+  assert.equal(ad.machineBlocked(before, { state: 'Operational', progress: 37, lastActivityAt: at, progressChangedAt: at }), 'ad.busy', 'cleared BEFORE the change: still busy');
   assert.equal(ad.machineBlocked(cleared, { state: 'Operational', progress: 37 }), 'ad.busy', 'no activity time: still busy (fails safe)');
   // A word that is not idle or ended keeps the #2594 rule.
   assert.equal(ad.machineBlocked(cleared, { state: 'Connected', progress: 40, lastActivityAt: at }), 'ad.busy');
@@ -326,4 +331,21 @@ test('MED 2: a print that ended (stopped, cancelled, complete…) is free only o
   }
   // An idle printer is not held by the new rule (the completedAt check still applies).
   assert.equal(ad.machineBlocked(machine({ bedClearedAt: '2026-09-11T10:00:00Z' }), { state: 'idle', lastActivityAt: ended }), null);
+});
+
+test('correctness review of #2607: the poll cache stamps when progress last moved', () => {
+  const PC = require('../lib/printer-poll-cache.js');
+  let e = PC.mergePollSuccess(undefined, { state: 'Operational', progress: 37 }, 1000);
+  assert.equal(e.progressChangedAt, 1000);
+  e = PC.mergePollSuccess(e, { state: 'Operational', progress: 37 }, 2000);
+  assert.equal(e.progressChangedAt, 1000, 'frozen progress keeps its time');
+  e = PC.mergePollSuccess(e, { state: 'Operational', progress: 38 }, 3000);
+  assert.equal(e.progressChangedAt, 3000, 'moving progress stamps now');
+  // The whole scenario, through the cache: cancelled at 37 under an idle word, bed cleared, then a print outside Khayt.
+  const m = machine({ bedClearedAt: new Date(2500).toISOString() });
+  let s = PC.mergePollSuccess(undefined, { state: 'Operational', progress: 37 }, 1000);
+  s = PC.mergePollSuccess(s, { state: 'Operational', progress: 37 }, 3000);
+  assert.equal(ad.machineBlocked(m, s), null, 'frozen since the clear: free');
+  s = PC.mergePollSuccess(s, { state: 'Operational', progress: 41 }, 4000);
+  assert.equal(ad.machineBlocked(m, s), 'ad.busy', 'climbing after the clear: busy');
 });
