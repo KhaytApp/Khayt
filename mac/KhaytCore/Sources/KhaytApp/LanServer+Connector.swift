@@ -506,6 +506,10 @@ extension LanServer {
     /// until somebody decides who may see it.
     nonisolated static let priceKeys = ["currency", "qty", "unit", "total", "rounded", "basis"]
     nonisolated static let costKeys = ["cost", "margin"]
+    /// Inside `cost` and `margin`, an allow-list too: the margin of the price
+    /// (`pct`), on the cost (`pctOnCost`) and in money (`amount`).
+    nonisolated static let costInnerKeys = ["unit", "total"]
+    nonisolated static let marginKeys = ["pct", "pctOnCost", "amount"]
 
     /// `POST /api/connectors/price`: the shop's price for a sliced plate, from
     /// the plugin's slice facts, priced by the shared rule
@@ -553,7 +557,24 @@ extension LanServer {
             return out
         }
         for key in priceKeys { if let v = priced[key] { out[key] = v } }
-        if grant == "cost" { for key in costKeys { if let v = priced[key] { out[key] = v } } }
+        // The step a price was rounded to says nothing of the cost, so the
+        // `price` grant sees it; only with `rounded: true`, and only a
+        // positive step.
+        if priced["rounded"] == .bool(true), case .object(let round)? = priced["round"],
+           case .number(let step)? = round["step"], step > 0, step.isFinite {
+            out["round"] = .object(["step": .number(step)])
+        }
+        if grant == "cost" {
+            if case .object(let cost)? = priced["cost"] { out["cost"] = .object(Self.only(costInnerKeys, of: cost)) }
+            if case .object(let margin)? = priced["margin"] { out["margin"] = .object(Self.only(marginKeys, of: margin)) }
+        }
+        return out
+    }
+
+    /// The named keys of an object, and only the numbers among them.
+    nonisolated static func only(_ keys: [String], of object: [String: JSONValue]) -> [String: JSONValue] {
+        var out: [String: JSONValue] = [:]
+        for key in keys { if case .number(let n)? = object[key], n.isFinite { out[key] = .number(n) } }
         return out
     }
 

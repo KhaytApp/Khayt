@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac and shared rule: the OrcaSlicer price answer says more about the margin and the rounding (still off; not visible yet).** `lib/connector-price.js priceSlice` now gives the margin three ways (`margin: {pct, pctOnCost, amount}`: of the price, on the cost, and in money), and the step a price was rounded to (`round: {step}`), only when it was rounded. The Mac's route (`POST /api/connectors/price`) passes the margin only to a device granted "Price and cost". The step goes to a device granted "Price" too, since it says nothing of the cost. The route's allow-list is now nested: a key the rule adds later inside `cost`, `margin` or `round` is not passed on until somebody decides who may see it. Existing fields are unchanged. Tests: the 15 shared vectors carry the new fields, a route test per grant, and the nested allow-list.
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
   - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.
   - **Recalculate.**
