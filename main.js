@@ -1088,6 +1088,7 @@ function restoreAllowed() {
 }
 
 async function restoreSnapshotForWindow(parsed, event, label) {
+  let refused = [];
   if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
     console.error(`${label}: the store on disk is from a newer ${FLAVOR_NAME}; not restoring over it`);
     return null;
@@ -1115,6 +1116,7 @@ async function restoreSnapshotForWindow(parsed, event, label) {
     // success over parts it never restored (pre-cut review LOW).
     if (g.refused && g.refused.length) {
       console.warn(`${label}: refused for this role:`, g.refused.join(', '));
+      refused = g.refused.slice();
       try { event.sender.send('hub:restore-refused', g.refused.slice()); } catch (_) { /* window gone */ }
     }
   } catch (e) { console.error(`${label}: role guard failed:`, e && e.message); return null; }
@@ -1124,7 +1126,10 @@ async function restoreSnapshotForWindow(parsed, event, label) {
   if (!r.ok) { console.error(`${label}:`, r.error); return null; }
   machineSecrets.forget();          // a printer's key may have changed with it
   _diskStoreVersion = typeof r.masked.version === 'number' ? r.masked.version : _diskStoreVersion;
-  return JSON.stringify(r.masked);
+  // `__refused` travels with the book (normalizeStoreSnapshot drops keys it
+  // does not know), so the window can skip "Restore successful" over a
+  // restore that put parts back as they were (correctness review of #2609).
+  return JSON.stringify(refused.length ? Object.assign({}, r.masked, { __refused: refused }) : r.masked);
 }
 
 ipcMain.handle('hub:restore-backup', async (event, backupPath) => {
@@ -1808,6 +1813,21 @@ async function maybeShowKeychainExplanation(win) {
  * admin the lock made gets roleKey 'owner'. Never runs on a book that has an
  * owner, so it changes nothing twice.
  */
+/** btoa operator PINs become real hashes, on disk, once (#2609 security
+ * review). Returns id → new hash, so what the window gets matches the disk:
+ * a window holding the old value would save it straight back. */
+async function upgradeLegacyPinsOnDisk() {
+  const disk = readStoreDecryptedFromDisk();
+  if (!disk || !Array.isArray(disk.operators)) return null;
+  const r = PrinterPermission.upgradeLegacyPins(disk, hashPinSalted);
+  if (!r.changed) return null;
+  await writeStoreToDisk(r.store);
+  console.warn('PIN upgrade:', r.count, 'operator PIN(s) from the first releases now hashed');
+  const out = new Map();
+  for (const o of r.store.operators) if (o && o.id) out.set(o.id, o.pinHash);
+  return out;
+}
+
 async function migrateLegacyOwnerOnDisk() {
   const disk = readStoreDecryptedFromDisk();
   if (!disk || !disk.settings) return false;
@@ -1857,8 +1877,14 @@ ipcMain.handle('hub:load-store', async (event) => {
     // A lock older than roleKey: its translated admin becomes the owner, once,
     // on disk and in what the window gets (#2592 data review, MED-3).
     try { await migrateLegacyOwnerOnDisk(); } catch (e) { console.error('hub:load-store: owner migration failed:', e && e.message); }
+    let upgradedPins = null;
+    try { upgradedPins = await upgradeLegacyPinsOnDisk(); } catch (e) { console.error('hub:load-store: PIN upgrade failed:', e && e.message); }
     let { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
     if (normalized) normalized = PrinterPermission.migrateLegacyOwner(normalized).store;
+    if (normalized && upgradedPins && Array.isArray(normalized.operators)) {
+      normalized.operators = normalized.operators.map((o) => (o && upgradedPins.has(o.id) && o.pinHash !== upgradedPins.get(o.id)
+        && require('./lib/pin-hash').decodeLegacyBtoaPin(o.pinHash) !== null ? { ...o, pinHash: upgradedPins.get(o.id) } : o));
+    }
     if (!normalized) {
       console.error('hub:load-store: unrecoverable store shape:', errors.join('; '));
       return { __corrupt: true, error: errors[0] || 'Invalid store' };

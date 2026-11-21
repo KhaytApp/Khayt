@@ -480,8 +480,9 @@ function openPinPadModal(afterUnlock) {
       // under the lock is a lock-field change main refuses and puts back (P5),
       // so the pad said "PIN reset" while nothing was; and had it gone
       // through, the operator would have had no PIN at all, a free switch for
-      // anyone at the pad (pre-cut review LOW). It stays, and the owner sets a
-      // new one in Settings.
+      // anyone at the pad (pre-cut review LOW). Main now hashes every one it
+      // can decode as the book loads (#2609 security review), so only a value
+      // that does not decode is left here, and the owner sets a new one.
       if (isLegacyPin(op.pinHash)) {
         if (errEl) errEl.textContent = t('op.pin_legacy');
         enteredPin = '';

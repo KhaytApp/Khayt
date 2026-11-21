@@ -383,7 +383,8 @@ test('every writer of the whole book is guarded or main\'s own (ratchet; the lis
     'main.js': {
       'atomicWriteStore(': ["ipcMain.handle('hub:save-store'"],                 // after guardWindowStore
       'restoreSnapshotToDisk(': ['function restoreSnapshotForWindow('],          // after restoreAllowed + guardSave
-      'writeStoreToDisk(': ['async function migrateLegacyOwnerOnDisk('],   // main's own, one-time owner migration
+      // main's own: the one-time owner migration, and hashing the first releases' btoa PINs (#2609)
+      'writeStoreToDisk(': ['async function migrateLegacyOwnerOnDisk(', 'async function upgradeLegacyPinsOnDisk('],
     },
     'lib/updater.js': { 'writeStoreToDisk(': ["ipcMain.handle('hub:install-update'"] },   // after guardStore
     // MAIN-originated: the LAN server's own generated tokens and PIN.

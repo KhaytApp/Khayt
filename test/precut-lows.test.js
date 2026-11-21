@@ -75,3 +75,40 @@ test('LOW 3: every printer call that fills secrets refuses an unsaved address fi
   assert.match(read('renderer/machines.js'), /t\('mach\.api_fail'\) \+ ': ' \+ explainRefusal\(s\.error\)/);
   for (const l of LANGS) assert.match(read(`renderer/locales/${l}.js`), /"err\.connection_unsaved":/, l);
 });
+
+test('security review: the first releases\' btoa PINs become real hashes in main, once', () => {
+  const PinHash = require('../lib/pin-hash.js');
+  const { upgradeLegacyPins } = require('../lib/main/printer-permission.js');
+  const b = (s) => Buffer.from(s, 'utf8').toString('base64');
+  assert.equal(PinHash.decodeLegacyBtoaPin(b('1234')), '1234');
+  assert.equal(PinHash.decodeLegacyBtoaPin(b('٤٥٦٧')), '4567', 'Arabic-Indic digits, as the pad normalises');
+  for (const v of ['', null, '__KHAYT_MASKED__', b('hello'), b('12'), 'a'.repeat(64), PinHash.hashPin('1234'), 'MTIzNA']) {
+    assert.equal(PinHash.decodeLegacyBtoaPin(v), null, String(v));
+  }
+  const store = { operators: [{ id: 'a', pinHash: b('1234') }, { id: 'b', pinHash: PinHash.hashPin('9999') }, { id: 'c' }, { id: 'd', pinHash: 'junk!' }] };
+  const r = upgradeLegacyPins(store, PinHash.hashPin);
+  assert.equal(r.changed, true);
+  assert.equal(r.count, 1);
+  assert.ok(PinHash.isPbkdf2Hash(r.store.operators[0].pinHash));
+  assert.equal(PinHash.verifyPin('1234', r.store.operators[0].pinHash), true);
+  assert.equal(r.store.operators[1], store.operators[1]);
+  assert.equal(r.store.operators[3].pinHash, 'junk!', 'what does not decode is left for the owner');
+  assert.equal(store.operators[0].pinHash, b('1234'), 'the input is not mutated');
+  assert.equal(upgradeLegacyPins(r.store, PinHash.hashPin).changed, false, 'once');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  assert.match(main, /upgradedPins = await upgradeLegacyPinsOnDisk\(\)/);
+});
+
+test('correctness review: a restore with refused parts does not also say "Restore successful"', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const fn = main.slice(main.indexOf('async function restoreSnapshotForWindow'), main.indexOf("ipcMain.handle('hub:restore-backup'"));
+  assert.match(fn, /refused = g\.refused\.slice\(\);/);
+  assert.match(fn, /Object\.assign\(\{\}, r\.masked, \{ __refused: refused \}\)/);
+  const set = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'settings.js'), 'utf8');
+  assert.match(set, /if \(!\(Array\.isArray\(data && data\.__refused\) && data\.__refused\.length\)\) toast\(t\('set\.restore_success'\)/);
+  assert.match(set, /if \(!\(Array\.isArray\(point && point\.__refused\) && point\.__refused\.length\)\) toast\(t\('set\.restore_success'\)/);
+  // The marker never becomes part of the book.
+  const V = require('../lib/store-validate.js');
+  const { normalized } = V.normalizeStoreSnapshot({ settings: { bizName: 'x' }, printLog: [], __refused: ['operators'] });
+  assert.equal(normalized.__refused, undefined);
+});
