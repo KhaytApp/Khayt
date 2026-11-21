@@ -84,3 +84,36 @@ extension PrinterStatus {
         phone == .connected ? self : PrinterStatus(link: phone.link, activity: nil)
     }
 }
+
+extension MachineLiveStatus {
+    /// The shared state set for this reading (C2). Asked each time: the rule
+    /// is a table lookup in a small context, and keeping it out of the model
+    /// keeps `KhaytModels.swift` free of KhaytCore.
+    var status: PrinterStatus? {
+        PrinterActivity.status(hasPrinterApi: hasPrinterApi, apiType: apiType, state: state,
+                               progress: progress, error: error)
+    }
+
+    /// Printing, by the shared rule (C2): every busy word each protocol
+    /// writes ("Printing from SD", "BUSY", "processing", …), not only words
+    /// that contain "print". A word in no table keeps the old reading.
+    var isPrinting: Bool {
+        if let s = status, s.isOnline, s.activity != "unknown" { return s.activity == "printing" }
+        return (state ?? "").lowercased().contains("print") && !isPaused
+    }
+    /// Paused is a print still on the bed, not an ending — a pause raised a
+    /// "Print finished" alert while `isPrinting` was the only question asked.
+    /// It is busy: never offered as free (C2).
+    var isPaused: Bool {
+        if let s = status, s.isOnline, s.activity != "unknown" { return s.activity == "paused" }
+        return (state ?? "").lowercased().contains("pause")
+    }
+    /// Working (printing or paused): the bed is not free.
+    var isBusy: Bool { isPrinting || isPaused }
+    /// A printer that needs a person before it is free, by its own word
+    /// (error, failed, attention, halted), with or without an error message.
+    var needsPerson: Bool { hasError || status?.needsPerson == true }
+    /// A word that says the printer is not linked (OctoPrint "Offline",
+    /// "Connecting", Duet "off"), read as the shared rule reads it.
+    var saysUnlinked: Bool { status?.cls == "unlinked" }
+}
