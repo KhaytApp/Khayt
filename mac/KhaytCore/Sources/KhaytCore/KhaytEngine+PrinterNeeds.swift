@@ -85,6 +85,19 @@ extension KhaytEngine {
         try runtime.call2("KhaytWaitingAtMachine.waiting(ARG0, ARG1 || {})", [machine, opts], as: JSONValue.self)
     }
 
+    /// What to write on a job for a finished print's filament per head
+    /// (`perHeadActuals` then `perHeadPatch`), or `.null` when the printer's
+    /// history row says nothing per head or the job already holds a split.
+    public func perHeadPatch(order: JSONValue, historyJob: JSONValue) throws -> JSONValue {
+        try runtime.call2("""
+            (function (order, job) {
+              var A = globalThis.KhaytPrinterActuals;
+              var split = A.perHeadActuals(job, {});
+              return split ? A.perHeadPatch(order, split) : null;
+            })(ARG0, ARG1)
+            """, [order, historyJob], as: JSONValue.self)
+    }
+
     public func rfidTrays(_ filamentDetect: JSONValue) throws -> JSONValue {
         try runtime.call2("KhaytRfidTray.trays(ARG0)", [filamentDetect], as: JSONValue.self)
     }
