@@ -272,7 +272,9 @@ extension Shop {
         printerBusy.insert(machine.id)
         defer { printerBusy.remove(machine.id) }
         do {
-            try await PrinterControl.send(verb, to: machine, engine: engine, build: source.build)
+            try await printers.commanding(machine, shop: self) {
+                try await PrinterControl.send(verb, to: machine, engine: engine, build: source.build)
+            }
             // Ask straight away rather than waiting for the next poll: a button
             // that appears to do nothing for ten seconds gets pressed again.
             await printers.refresh(machine, shop: self)
@@ -290,7 +292,9 @@ extension Shop {
         printerBusy.insert(machine.id)
         defer { printerBusy.remove(machine.id) }
         do {
-            try await PrinterControl.control(control, to: machine, engine: engine, build: source.build)
+            try await printers.commanding(machine, shop: self) {
+                try await PrinterControl.control(control, to: machine, engine: engine, build: source.build)
+            }
             await printers.refresh(machine, shop: self)
         } catch {
             printerProblem[machine.id] = PrinterWatch.problem(error, words)
@@ -374,7 +378,9 @@ extension Shop {
         defer { printerBusy.remove(machine.id) }
         do {
             let key = await PrinterControl.key(for: machine, build: source.build)
-            let sent = try await PrinterSend.send(file, to: machine, key: key, startPrint: startPrint, engine: engine)
+            let sent = try await printers.commanding(machine, shop: self) {
+                try await PrinterSend.send(file, to: machine, key: key, startPrint: startPrint, engine: engine)
+            }
             sendNote = words.callIt(sent.started ? "mac.send_started" : "mac.send_uploaded",
                                     ["name": .string(machine.name)])
             Telemetry.feature(.printSent, in: self)
@@ -466,7 +472,9 @@ extension Shop {
         printerBusy.insert(machine.id)
         defer { printerBusy.remove(machine.id) }
         do {
-            try await PrinterControl.drop(object, on: machine, engine: engine, build: source.build)
+            try await printers.commanding(machine, shop: self) {
+                try await PrinterControl.drop(object, on: machine, engine: engine, build: source.build)
+            }
         } catch {
             printerProblem[machine.id] = PrinterWatch.problem(error, words)
         }

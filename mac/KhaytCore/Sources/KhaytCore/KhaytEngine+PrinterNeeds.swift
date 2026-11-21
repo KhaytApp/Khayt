@@ -98,6 +98,48 @@ extension KhaytEngine {
             """, [order, historyJob], as: JSONValue.self)
     }
 
+    /// machine id → the card controls its MODEL or protocol cannot do
+    /// (`lib/printer-capabilities.js capability`: `no` or `addon`). A control
+    /// nobody has said anything about (`unknown`) is not listed: a missing
+    /// row never hides a button a printer has.
+    public func printerHiddenControls(machines: [JSONValue]) throws -> [String: [String]] {
+        try runtime.call2("""
+            (function (machines) {
+              var C = globalThis.KhaytPrinterCapabilities, out = {};
+              (machines || []).forEach(function (m) {
+                if (!m || !m.id) return;
+                var hidden = C.CONTROLS.filter(function (control) {
+                  var state = C.capability(m, control).state;
+                  return state === 'no' || state === 'addon';
+                });
+                if (hidden.length) out[m.id] = hidden;
+              });
+              return out;
+            })(ARG0)
+            """, [.array(machines)], as: [String: [String]].self)
+    }
+
+    /// How a print ended, by the word it ended on and, for a Bambu, the fault
+    /// it named (`lib/printer-poll-cache.js endedAs`): `finished`,
+    /// `cancelled`, `failed`, or nil when the printer did not say. A Bambu
+    /// print the shop cancelled ends on FAILED; its cancel codes make it
+    /// `cancelled`.
+    public func printEndedAs(state: String?, fault: String?) throws -> String? {
+        let said = try runtime.call2("(globalThis.KhaytPollCache.endedAs(ARG0, ARG1) || '')",
+                                     [state.map(JSONValue.string) ?? .null, fault.map(JSONValue.string) ?? .null], as: String.self)
+        return said.isEmpty ? nil : said
+    }
+
+    /// A job's `printRuns` with one run's result written
+    /// (`lib/run-result.js withResult`), or `.null` when nothing changes: the
+    /// result is already there, the shop's own mark stands, or no run on that
+    /// machine was sent before `at`.
+    public func runsWithResult(order: JSONValue, machineId: String, at: Date, result: String, source: String) throws -> JSONValue {
+        try runtime.call2("(globalThis.KhaytRunResult.withResult(ARG0, { machineId: ARG1, at: ARG2, result: ARG3, source: ARG4 }) || null)",
+                          [order, .string(machineId), .number((at.timeIntervalSince1970 * 1000).rounded()), .string(result), .string(source)],
+                          as: JSONValue.self)
+    }
+
     public func rfidTrays(_ filamentDetect: JSONValue) throws -> JSONValue {
         try runtime.call2("KhaytRfidTray.trays(ARG0)", [filamentDetect], as: JSONValue.self)
     }

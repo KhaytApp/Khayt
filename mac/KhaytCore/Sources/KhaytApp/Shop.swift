@@ -1665,6 +1665,7 @@ final class Shop {
         for (id, reading) in printers.readings {
             if let problems = reading.status?.problems { polled[id] = problems }
         }
+        machineHiddenControls = ((try? await engine.printerHiddenControls(machines: machineRows)) ?? [:]).mapValues(Set.init)
         machineNeeds = (try? await engine.printerNeeds(machines: fleet.machines, cache: fleet.cache, polled: polled,
                                                        completions: printerCompletions, orders: orderRows)) ?? [:]
     }
@@ -2003,6 +2004,9 @@ final class Shop {
     /// What each polled printer needs from a person (`KhaytEngine.printerNeeds`),
     /// as of the last sweep: its problems and why it waits at the machine.
     var machineNeeds: [String: KhaytEngine.PrinterNeeds] = [:]
+    /// The card controls each machine's model or protocol cannot do
+    /// (`KhaytEngine.printerHiddenControls`): the card leaves them out.
+    var machineHiddenControls: [String: Set<String>] = [:]
     /// A test's own device store; the app uses the Keychain's (`.shared`).
     var lanDevicesForTests: LanDevices?
     /// Hands a linked file the app fetched back to its cloud drive, so its

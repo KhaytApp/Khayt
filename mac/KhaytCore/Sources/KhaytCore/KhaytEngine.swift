@@ -371,6 +371,14 @@ public actor KhaytEngine {
         // `printerCompletions`, which is how this app can offer a measured
         // figure without polling a printer itself.
         "printer-poll-cache",
+        // The background poll steps aside while a person's command is on
+        // its way to a printer (C6): one instance, held in the runtime.
+        "poll-yield",
+        // One result per print run (P4), and which controls a model has on
+        // top of what its protocol can send (C5). printer-capabilities reads
+        // printer-commands at call time.
+        "run-result",
+        "printer-capabilities",
         // A printer that changed address is not a printer that went away. Reads
         // the cache above to decide which machines have actually gone quiet.
         "printer-relocate",
