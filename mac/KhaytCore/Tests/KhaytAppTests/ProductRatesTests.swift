@@ -96,7 +96,7 @@ struct ProductRatesTests {
     @Test("the sheet: the product's own section, never the pending part's, and nothing re-priced by itself")
     func wired() {
         let src = MenuCoverageTests.source("ProductSheet.swift")
-        #expect(src.contains("ProductRatesSection(shop: shop, rest: $draft.rest)"))
+        #expect(src.contains("ProductRatesSection(shop: shop, rest: $draft.rest, record: rateRecord)"))
         #expect(src.contains("productRates: ProductRates.pricingFields(draft.rest))"))
         #expect(src.contains("if !ProductRates.usesOwn(draft.rest), !newPart.hasRates { newPart.rates = defaults }"))
         #expect(src.contains("if isNew, !ProductRates.usesOwn(draft.rest) {"), "a new product starts with its own rates")

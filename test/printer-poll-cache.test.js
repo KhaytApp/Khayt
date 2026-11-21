@@ -534,3 +534,19 @@ test('a failed poll keeps the HTTP status the printer answered, and only a real 
   // A good poll is a fresh entry.
   assert.equal('httpStatus' in PC.mergePollSuccess(f1, { ok: true, state: 'IDLE' }, 3000), false);
 });
+
+test('lastActivityAt: stamped on the first reading and whenever the printer changes what it is doing (#2594)', () => {
+  const C = require('../lib/printer-poll-cache.js');
+  const a = C.mergePollSuccess(undefined, { ok: true, state: 'printing', progress: 10 }, 1000);
+  assert.equal(a.lastActivityAt, 1000, 'first reading');
+  const b = C.mergePollSuccess(a, { ok: true, state: 'Printing', progress: 50 }, 2000);
+  assert.equal(b.lastActivityAt, 1000, 'still printing: unchanged');
+  const c = C.mergePollSuccess(b, { ok: true, state: 'STOPPED', progress: 50 }, 3000);
+  assert.equal(c.lastActivityAt, 3000, 'stopped: a change');
+  const d = C.mergePollFailure(c, 'ETIMEDOUT', 4000);
+  assert.equal(d.lastActivityAt, 3000, 'a failed poll keeps it');
+  const e = C.mergePollSuccess(d, { ok: true, state: 'cancelled' }, 5000);
+  assert.equal(e.lastActivityAt, 3000, 'stopped → cancelled: the same class (a job that ended)');
+  const f = C.mergePollSuccess(e, { ok: true, state: 'idle' }, 6000);
+  assert.equal(f.lastActivityAt, 6000);
+});

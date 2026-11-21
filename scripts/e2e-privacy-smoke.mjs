@@ -33,7 +33,7 @@ try {
   await window.evaluate(async ({ port, pin }) => {
     settings.lanApi = { ...(settings.lanApi || {}), enabled: true, port, pin, intakePin: '', bindLan: false, intakeToken: 'e2e-intake-token' };
     settings.shopName = 'Test Shop';
-    saveAll();
+    await flushSave();
     await window.hubAPI.startLanServer({ port, pin, bindLan: false });
   }, { port: E2E_LAN_PORT, pin: E2E_LAN_PIN });
   await new Promise(r => setTimeout(r, 1200));
