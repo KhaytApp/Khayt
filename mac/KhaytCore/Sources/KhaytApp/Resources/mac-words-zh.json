@@ -2521,6 +2521,7 @@
  "mac.send_only": "发送",
  "mac.send_anyway": "仍然发送",
  "mac.sc_title": "已对照此打印机检查",
+ "mac.sc_bed_fits": "可放入打印平台：{w} × {d} mm，平台为 {bw} × {bd} mm",
  "mac.sc_bed_footprint": "对这个打印平台来说太大：{w} × {d} mm，平台为 {bw} × {bd} mm",
  "mac.sc_bed_height": "对这台打印机来说太高：{h} mm，最高 {bh} mm",
  "mac.sc_bed_hint": "请为 {name} 重新切片，或发送到更大的打印机。",

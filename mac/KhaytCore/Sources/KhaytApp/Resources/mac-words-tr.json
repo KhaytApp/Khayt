@@ -2521,6 +2521,7 @@
  "mac.send_only": "Gönder",
  "mac.send_anyway": "Yine de gönder",
  "mac.sc_title": "Bu yazıcıya göre denetlendi",
+ "mac.sc_bed_fits": "Tablaya sığıyor: {bw} × {bd} mm üzerinde {w} × {d} mm",
  "mac.sc_bed_footprint": "Bu tabla için fazla büyük: {bw} × {bd} mm üzerinde {w} × {d} mm",
  "mac.sc_bed_height": "Bu yazıcı için fazla yüksek: {h} mm, yazıcı {bh} mm alır",
  "mac.sc_bed_hint": "{name} için yeniden dilimleyin veya daha büyük bir yazıcıya gönderin.",

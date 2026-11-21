@@ -6299,6 +6299,7 @@ final class Words {
         "mac.send_only":     ["en": "Send", "ar": "إرسال"],
         "mac.send_anyway": ["en": "Send anyway", "ar": "أرسل على أي حال"],
         "mac.sc_title": ["en": "Checked against this printer", "ar": "تم الفحص مقابل هذه الطابعة"],
+        "mac.sc_bed_fits": ["en": "Fits the bed: {w} × {d} mm on {bw} × {bd} mm", "ar": "يناسب السرير: {w} × {d} مم على {bw} × {bd} مم"],
         "mac.sc_bed_footprint": ["en": "Too big for this bed: {w} × {d} mm on {bw} × {bd} mm", "ar": "أكبر من هذا السرير: {w} × {d} مم على {bw} × {bd} مم"],
         "mac.sc_bed_height": ["en": "Too tall for this printer: {h} mm, and it takes {bh} mm", "ar": "أطول مما تتحمله هذه الطابعة: {h} مم، وهي تتحمل {bh} مم"],
         "mac.sc_bed_hint": ["en": "Slice it again for {name}, or send it to a larger printer.", "ar": "قطّعه من جديد لـ{name}، أو أرسله إلى طابعة أكبر."],

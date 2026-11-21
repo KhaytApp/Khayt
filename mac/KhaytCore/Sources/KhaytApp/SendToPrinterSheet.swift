@@ -31,6 +31,8 @@ struct SendToPrinterSheet: View {
     @State private var slicesFirst = false
     /// The shared rule's findings for this file on this printer (C8).
     @State private var findings: [KhaytEngine.SendFinding] = []
+    /// The same answer whole: the size the bed rows were judged on.
+    @State private var check = KhaytEngine.SendCheck()
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
     /// Only one the sheet offers: a retired or under-service printer the job
@@ -82,8 +84,9 @@ struct SendToPrinterSheet: View {
                 // model that is sliced on the way is checked after slicing,
                 // not here: there is no sliced file to read yet.
                 if !slicesFirst, let machine {
-                    SendChecksRows(findings: findings, fits: nil, printer: machine.name,
-                                   bounds: nil, bed: Self.bed(machine), words: shop.words)
+                    SendChecksRows(findings: findings,
+                                   fits: SendChecks.fitsLine(check, bed: Self.bed(machine), words: shop.words),
+                                   printer: machine.name, bounds: check.bounds, bed: Self.bed(machine), words: shop.words)
                 }
             }
 
@@ -160,16 +163,17 @@ struct SendToPrinterSheet: View {
     private func recheck() async {
         guard let file, let machine, let engine = shop.engine,
               let row = shop.machineRows.first(where: { Shop.asObject($0)?["id"] == .string(machine.id) }) else {
-            findings = []; return
+            findings = []; check = .init(); return
         }
         let asked = (file, machine.id)
-        let text = await SendChecks.gcodeText(file)
+        let read = await SendChecks.gcode(file)
         let loaded = Self.loaded(live: shop.printers.readings[machine.id]?.status?.loaded, record: Shop.asObject(row)?["loaded"])
-        let found = (try? await engine.sendChecks(fileName: file.lastPathComponent, gcodeText: text, bounds: nil,
-                                                  machine: row, loaded: loaded)) ?? []
+        let found = (try? await engine.sendCheck(fileName: file.lastPathComponent, gcodeText: read?.text,
+                                                 wholeFile: read?.whole ?? false, machine: row, loaded: loaded)) ?? .init()
         // The answer to a question the sheet has stopped asking is dropped.
         guard asked.0 == self.file, asked.1 == machineId else { return }
-        findings = found
+        check = found
+        findings = found.findings
     }
 
     /// Asked again whenever the printer or the file changes.

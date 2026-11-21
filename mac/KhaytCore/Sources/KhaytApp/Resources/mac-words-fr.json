@@ -2521,6 +2521,7 @@
  "mac.send_only": "Envoyer",
  "mac.send_anyway": "Envoyer quand même",
  "mac.sc_title": "Vérifié avec cette imprimante",
+ "mac.sc_bed_fits": "Tient sur le plateau : {w} × {d} mm sur {bw} × {bd} mm",
  "mac.sc_bed_footprint": "Trop grand pour ce plateau : {w} × {d} mm sur {bw} × {bd} mm",
  "mac.sc_bed_height": "Trop haut pour cette imprimante : {h} mm, elle accepte {bh} mm",
  "mac.sc_bed_hint": "Tranchez-le à nouveau pour {name}, ou envoyez-le à une imprimante plus grande.",

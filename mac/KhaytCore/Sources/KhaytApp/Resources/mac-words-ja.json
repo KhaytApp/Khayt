@@ -2521,6 +2521,7 @@
  "mac.send_only": "送信",
  "mac.send_anyway": "このまま送信",
  "mac.sc_title": "このプリンターと照合",
+ "mac.sc_bed_fits": "ベッドに収まります：{w} × {d} mm（ベッド {bw} × {bd} mm）",
  "mac.sc_bed_footprint": "このベッドには大きすぎます：{w} × {d} mm（ベッド {bw} × {bd} mm）",
  "mac.sc_bed_height": "このプリンターには高すぎます：{h} mm（最大 {bh} mm）",
  "mac.sc_bed_hint": "{name} 用にスライスし直すか、より大きいプリンターに送ってください。",

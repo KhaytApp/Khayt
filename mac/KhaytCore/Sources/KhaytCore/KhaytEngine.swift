@@ -954,6 +954,11 @@ public actor KhaytEngine {
         // What to tell a shop before a file goes to a printer (C8): reads
         // gcode-parse, print-fit, printer-upload, loaded-colours and
         // color-mix at call time, so it only has to come after them.
+        // Where a sliced file's models sit on the bed (`file.bounds` for the
+        // bed rows of send-checks). gcode-geometry first: the reader falls
+        // back to it for a file with no object list.
+        "gcode-geometry",
+        "gcode-placed-extents",
         "send-checks",
         // Which customers are worth keeping.
         // Whether the shop can take another job, and when it would start.

@@ -2521,6 +2521,7 @@
  "mac.send_only": "Senden",
  "mac.send_anyway": "Trotzdem senden",
  "mac.sc_title": "Mit diesem Drucker abgeglichen",
+ "mac.sc_bed_fits": "Passt aufs Bett: {w} × {d} mm auf {bw} × {bd} mm",
  "mac.sc_bed_footprint": "Zu groß für dieses Bett: {w} × {d} mm auf {bw} × {bd} mm",
  "mac.sc_bed_height": "Zu hoch für diesen Drucker: {h} mm, möglich sind {bh} mm",
  "mac.sc_bed_hint": "Für {name} neu slicen oder an einen größeren Drucker senden.",

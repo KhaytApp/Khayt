@@ -2521,6 +2521,7 @@
  "mac.send_only": "Enviar",
  "mac.send_anyway": "Enviar de todos modos",
  "mac.sc_title": "Comprobado con esta impresora",
+ "mac.sc_bed_fits": "Cabe en la cama: {w} × {d} mm en {bw} × {bd} mm",
  "mac.sc_bed_footprint": "Demasiado grande para esta cama: {w} × {d} mm en {bw} × {bd} mm",
  "mac.sc_bed_height": "Demasiado alto para esta impresora: {h} mm, y admite {bh} mm",
  "mac.sc_bed_hint": "Lamínalo de nuevo para {name} o envíalo a una impresora más grande.",

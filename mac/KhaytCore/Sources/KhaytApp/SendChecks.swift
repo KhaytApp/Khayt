@@ -29,6 +29,40 @@ enum SendChecks {
         }
     }
 
+    /// A file up to this size is read whole, so its bed fit can be judged from
+    /// the moves when its slicer wrote no object list. The reader takes 8 MB
+    /// in about 70 ms; larger files are read at both ends only.
+    nonisolated static let wholeBytes = 32 * 1024 * 1024
+
+    /// The file's text and whether it is all of it.
+    nonisolated static func gcode(_ url: URL) async -> (text: String, whole: Bool)? {
+        let name = url.lastPathComponent.lowercased()
+        guard name.hasSuffix(".gcode") || name.hasSuffix(".gco") || name.hasSuffix(".g") else { return nil }
+        return await withCheckedContinuation { done in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? Int.max
+                if size <= wholeBytes, let data = try? Data(contentsOf: url, options: .mappedIfSafe) {
+                    done.resume(returning: (String(decoding: data, as: UTF8.self), true))
+                } else if let text = read(url) {
+                    done.resume(returning: (text, false))
+                } else {
+                    done.resume(returning: nil)
+                }
+            }
+        }
+    }
+
+    /// The frame's green first row: the models were measured from the
+    /// slicer's own outlines and no bed finding was raised.
+    static func fitsLine(_ check: KhaytEngine.SendCheck, bed: KhaytEngine.SendFinding.Size?, words: Words) -> Line? {
+        guard check.boundsSource == "placed-extents", let b = check.bounds, let bed,
+              let bw = bed.x, let bd = bed.y, bw > 0, bd > 0, b.x != nil, b.y != nil,
+              !check.findings.contains(where: { $0.code.hasPrefix("bed-") }) else { return nil }
+        return Line(title: words.callIt("mac.sc_bed_fits", [
+            "w": .string(mm(b.x, words)), "d": .string(mm(b.y, words)),
+            "bw": .string(mm(bw, words)), "bd": .string(mm(bd, words))]))
+    }
+
     nonisolated static func read(_ url: URL) -> String? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }

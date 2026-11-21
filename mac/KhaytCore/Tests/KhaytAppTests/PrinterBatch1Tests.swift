@@ -303,6 +303,67 @@ struct PrinterBatch1Tests {
         #expect(SendToPrinterSheet.sendKey(slicesFirst: true, start: true, findings: [material]) == "slicer.send_title")
     }
 
+    // MARK: - Bed fit, from the file's own object list (lib/gcode-placed-extents.js)
+
+    /// An Orca/Klipper file: one object, `w` × `d` mm, placed at the bed's middle.
+    static func placed(_ w: Double, _ d: Double, height: Double = 23.4) -> String {
+        let x0 = 135 - w / 2, x1 = 135 + w / 2, y0 = 135 - d / 2, y1 = 135 + d / 2
+        return """
+        ; printer_model = Snapmaker U1
+        ; max_z_height: \(height)
+        EXCLUDE_OBJECT_DEFINE NAME=part_1 CENTER=135,135 POLYGON=[[\(x0),\(y0)],[\(x1),\(y0)],[\(x1),\(y1)],[\(x0),\(y1)],[\(x0),\(y0)]]
+        G28
+        """
+    }
+
+    @Test("a file's own object outlines: fits says so, too big holds the send, too tall holds it")
+    func bedFitFromTheFile() async throws {
+        let engine = OperatorLockTests.sharedEngine
+        let shop = await OperatorLockTests.shop(on: false)
+        let bed = KhaytEngine.SendFinding.Size(x: 270, y: 270, z: 270)
+        let fits = try await engine.sendCheck(fileName: "plate.gcode", gcodeText: Self.placed(182, 140), machine: Self.u1, loaded: nil)
+        #expect(fits.findings.isEmpty && fits.boundsSource == "placed-extents")
+        #expect(fits.bounds?.x == 182 && fits.bounds?.y == 140)
+        #expect(SendChecks.fitsLine(fits, bed: bed, words: shop.words)?.title == "Fits the bed: 182 × 140 mm on 270 × 270 mm")
+
+        let big = try await engine.sendCheck(fileName: "plate.gcode", gcodeText: Self.placed(300, 300), machine: Self.u1, loaded: nil)
+        #expect(big.findings.map(\.code) == ["bed-footprint"] && SendChecks.holds(big.findings))
+        #expect(SendChecks.fitsLine(big, bed: bed, words: shop.words) == nil)
+        let line = try #require(SendChecks.line(big.findings[0], printer: "Workshop U1", bounds: big.bounds, bed: bed, words: shop.words))
+        #expect(line.title == "Too big for this bed: 300 × 300 mm on 270 × 270 mm")
+
+        // 300 × 210 fits no way round on 270 × 270; 260 × 100 fits as placed.
+        let tall = try await engine.sendCheck(fileName: "plate.gcode", gcodeText: Self.placed(100, 100, height: 300), machine: Self.u1, loaded: nil)
+        #expect(tall.findings.map(\.code) == ["bed-height"] && SendChecks.holds(tall.findings))
+    }
+
+    @Test("with no object list the bed is judged from the moves only when the whole file was read, and then it only warns")
+    func bedFitFromMoves() async throws {
+        let engine = OperatorLockTests.sharedEngine
+        // Extruding moves spanning 300 mm in X, no object list.
+        let moves = "G90\nM82\nG1 X10 Y10 Z0.2 F3000\nG1 X310 Y10 E10\nG1 X310 Y60 E20\nG1 X10 Y60 E30\n"
+        let partial = try await engine.sendCheck(fileName: "plate.gcode", gcodeText: moves, wholeFile: false, machine: Self.u1, loaded: nil)
+        #expect(partial.bounds == nil && partial.findings.isEmpty, "half a file's moves are not a footprint")
+        let whole = try await engine.sendCheck(fileName: "plate.gcode", gcodeText: moves, wholeFile: true, machine: Self.u1, loaded: nil)
+        #expect(whole.boundsSource == "toolpath")
+        #expect(!SendChecks.holds(whole.findings), "moves include skirt and purge: never a stop")
+        #expect(whole.findings.allSatisfy { $0.severity != "block" })
+        let shop = await OperatorLockTests.shop(on: false)
+        #expect(SendChecks.fitsLine(whole, bed: .init(x: 270, y: 270, z: 270), words: shop.words) == nil,
+                "the green row is only for the slicer's own outlines")
+    }
+
+    @Test("a file up to 32 MB is read whole; a larger one at both ends")
+    func wholeOrEnds() async throws {
+        let small = FileManager.default.temporaryDirectory.appending(path: "khayt-bedfit-\(UUID().uuidString).gcode")
+        defer { try? FileManager.default.removeItem(at: small) }
+        try Data(Self.placed(182, 140).utf8).write(to: small)
+        let read = try #require(await SendChecks.gcode(small))
+        #expect(read.whole && read.text.contains("EXCLUDE_OBJECT_DEFINE"))
+        #expect(await SendChecks.gcode(URL(fileURLWithPath: "/tmp/plate.gcode.3mf")) == nil, "a zip is not read as text")
+        #expect(SendChecks.wholeBytes == 32 * 1024 * 1024)
+    }
+
     @Test("what is loaded: the printer's own report when it gave one, else the machine record")
     func loadedSource() {
         let record: JSONValue = .array([.object(["slot": .number(0), "hex": .string("#000000"), "material": .string("PLA")])])
