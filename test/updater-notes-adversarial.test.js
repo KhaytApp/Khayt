@@ -192,3 +192,23 @@ test('parseMajorChanges: the heading still matches with trailing punctuation', (
     assert.equal(r.needsConsent, true, h);
   }
 });
+
+// Re-review of #2602: stripping one handler must not splice another.
+test('sanitizeReleaseNotesHtml: a strip that joins a new handler or scheme is stripped again', () => {
+  const { sanitizeReleaseNotesHtml } = require('../lib/release-notes.js');
+  for (const html of [
+    '<img src=x o onx="a"nerror=alert(1)>',
+    '<a href="javajavascript:script:alert(1)">x</a>',
+    '<p o o onx="a"nx="b"nclick=alert(1)>x</p>',
+  ]) {
+    const out = sanitizeReleaseNotesHtml(html);
+    assert.doesNotMatch(out, /(^|[\s"'\/])on\w+\s*=/i, html + ' → ' + out);
+    assert.doesNotMatch(out, /javascript\s*:/i, html + ' → ' + out);
+  }
+  // Something still changing after every pass is shown as text, never as HTML.
+  const deep = '<p' + ' o'.repeat(20) + ' onx="a"nx="a"'.repeat(20) + 'nclick=alert(1)>x</p>';
+  const out = sanitizeReleaseNotesHtml(deep);
+  assert.doesNotMatch(out, /<p/, 'escaped');
+  const t = ms(() => sanitizeReleaseNotesHtml('<p' + ' o'.repeat(50000) + '>'));
+  assert.ok(t < 1000, `took ${t} ms`);
+});
