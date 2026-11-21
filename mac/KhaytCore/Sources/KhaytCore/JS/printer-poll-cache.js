@@ -86,17 +86,25 @@
     // How it ended, when the printer's word says (P4): finished, cancelled or
     // failed. A printer that went straight back to "idle" did not say, and
     // the shop's mark decides (lib/run-result.js).
-    const result = endedAs(status && status.state);
+    const result = endedAs(status && status.state, status && status.fault);
     if (result) out.result = result;
     return out;
   }
 
-  /** 'finished' | 'cancelled' | 'failed' | null from the word a job ended on. */
-  function endedAs(state) {
+  /* Bambu's two "cancelled" print_error codes (lib/bambu-faults.js, the same
+   * test as lib/printer-alerts.js). A Bambu printer ends a print the shop
+   * cancelled on FAILED, and only `fault` (the decoded print_error) tells it
+   * from one that went wrong: without this every cancel counted against the
+   * printer's success rate (correctness review of #2613). */
+  const CANCELLED_FAULT = /\((?:0300_400C|0500_400E)\)/;
+
+  /** 'finished' | 'cancelled' | 'failed' | null from the word a job ended on
+   *  and, for Bambu, the fault it named. */
+  function endedAs(state, fault) {
     const cls = activityClass(state);
     const w = String(state || '').trim().toLowerCase();
     if (cls === 'finished') return /cancel|stopp/.test(w) ? 'cancelled' : 'finished';
-    if (cls === 'person') return 'failed';
+    if (cls === 'person') return CANCELLED_FAULT.test(String(fault || '')) ? 'cancelled' : 'failed';
     return null;
   }
 
