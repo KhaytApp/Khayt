@@ -8781,6 +8781,36 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytPluginUpdate.fetchesFor(ARG0, ARG1, ARG2)", [settings, index, ctx], as: JSONValue.self)
     }
 
+    /// One connector's row in the index, for an install the shop asked for by
+    /// link: whether the index may be acted on (`checkIndex`: signed, current,
+    /// well formed), the row for `id` if it lists one, and the versions of it
+    /// Khayt has withdrawn.
+    public struct PluginIndexListing: Decodable, Sendable, Equatable {
+        public struct Row: Decodable, Sendable, Equatable {
+            public let version: String
+            public let url: String
+            public let sha256: String
+        }
+        public let ok: Bool
+        public let reason: String?
+        public let row: Row?
+        public let revoked: [String]
+    }
+
+    public func pluginIndexListing(index: JSONValue, ctx: JSONValue, id: String) throws -> PluginIndexListing {
+        try runtime.call2("""
+            (function (index, ctx, id) {
+              var U = globalThis.KhaytPluginUpdate;
+              var check = U.checkIndex(index, ctx);
+              if (!check.ok) return { ok: false, reason: check.reason, row: null, revoked: [] };
+              var row = U.rowFor(index, id, 'connector');
+              if (!row) return { ok: true, reason: null, row: null, revoked: [] };
+              var revoked = (Array.isArray(row.revoked) ? row.revoked : []).map(function (x) { return String(x.version); });
+              return { ok: true, reason: null, row: { version: String(row.version), url: String(row.url), sha256: String(row.sha256) }, revoked: revoked };
+            })(ARG0, ARG1, ARG2)
+            """, [index, ctx, .string(id)], as: PluginIndexListing.self)
+    }
+
     /// Step 2: `{ ok, reason, settings, changed, notes }`. `fetched` maps id →
     /// a manifest this Mac has VERIFIED.
     public func pluginApplyIndex(settings: JSONValue, index: JSONValue, ctx: JSONValue, fetched: JSONValue) throws -> JSONValue {

@@ -276,9 +276,12 @@ final class Activator: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         // `khayt://job/new` first: read as a widget link it would be "job new".
         let jobLinks = urls.compactMap(NewJobLink.init)
+        // `khayt://plugin/install?id=…&version=…` (`PluginInstallLink`): it
+        // names a connector and opens the consent sheet; it installs nothing.
+        let installLinks = urls.compactMap(PluginInstallLink.init)
         let links = urls.filter { NewJobLink($0) == nil }.compactMap(ShopWidgetSnapshot.Link.init)
         let models = Shop.droppableModels(urls.filter(\.isFileURL))
-        guard !links.isEmpty || !models.isEmpty || !jobLinks.isEmpty else { return }
+        guard !links.isEmpty || !models.isEmpty || !jobLinks.isEmpty || !installLinks.isEmpty else { return }
         MainActor.assumeIsolated {
             // The window first: with it closed (⌘W, the app kept alive by
             // Settings, Help or the kiosk) nothing was listening, and the
@@ -286,6 +289,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             ShopWindowOpener.raise()
             if !links.isEmpty { Shop.openedLinks += links }
             if !jobLinks.isEmpty { Shop.openedJobLinks += jobLinks }
+            if !installLinks.isEmpty { Shop.openedInstallLinks += installLinks }
             if !models.isEmpty { Shop.openedFiles += models }
         }
     }
