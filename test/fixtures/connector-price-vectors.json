@@ -184,7 +184,7 @@
         },
         "margin": {
           "pct": 23.08,
-          "pctOnCost": 30,
+          "pctOnCost": 29.99,
           "amount": 34.93
         }
       }
@@ -626,6 +626,64 @@
       "ctx": {},
       "want": {
         "unpriced": "bad-facts"
+      }
+    },
+    {
+      "why": "a cost under half a cent shows as 0.00 and states no markup: 0.22 g of PLA on a preset with every rate at 0 and no packaging. pctOnCost is absent; amount is the whole price",
+      "facts": {
+        "v": 1,
+        "qty": 1,
+        "timeSec": 1,
+        "layers": 412,
+        "toolchanges": 0,
+        "filaments": [
+          {
+            "slot": 1,
+            "type": "PLA",
+            "colour": "#1E1E1E",
+            "grams": 0.22
+          }
+        ],
+        "printer": {
+          "preset": "Snapmaker U1 0.4 nozzle"
+        },
+        "process": {
+          "preset": "0.20mm Standard"
+        }
+      },
+      "ctx": {
+        "printers": [
+          {
+            "id": "P0",
+            "name": "Snapmaker U1 0.4 nozzle",
+            "laborRate": 0,
+            "prepTime": 0,
+            "postTime": 0,
+            "wearRate": 0,
+            "powerDraw": 0,
+            "elecRate": 0,
+            "failureRate": 0
+          }
+        ],
+        "settings": {
+          "defaultPackagingCost": 0
+        }
+      },
+      "want": {
+        "currency": "SAR",
+        "qty": 1,
+        "unit": 0.01,
+        "total": 0.01,
+        "rounded": false,
+        "basis": "measured",
+        "cost": {
+          "unit": 0.0039,
+          "total": 0
+        },
+        "margin": {
+          "pct": 61.28,
+          "amount": 0.01
+        }
       }
     }
   ]
