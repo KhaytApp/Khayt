@@ -6150,7 +6150,75 @@ function noteHeadActuals(machine, before, after) {
     const p = headActuals.noteEdge(machine, before, after, Date.now());
     if (p && typeof p.catch === 'function') p.catch(() => {});
   } catch (_) { /* never break polling */ }
+  // And its time-lapse (Figma 134:359, U1-3): found and named on the job.
+  try {
+    const q = timelapseKeep.noteEdge(machine, before, after);
+    if (q && typeof q.catch === 'function') q.catch(() => {});
+  } catch (_) { /* never break polling */ }
 }
+
+/* A GET on a Moonraker printer whose body is read as it comes (the
+ * time-lapse copy): the same pinned address and key as moonrakerRead, with
+ * no size limit of its own; the caller counts what it reads. */
+async function moonrakerStream(machine, pathAndQuery, signal) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) throw new Error('connection_unsaved');
+  const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
+  if (type !== 'moonraker') throw new Error('not a Moonraker printer');
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) throw new Error(target.error);
+  const portNum = parseInt(port || defaultPrinterPort(type), 10);
+  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) throw new Error('Invalid port number');
+  const headers = {};
+  if (apiKey) headers['X-Api-Key'] = apiKey;
+  // A printer that never answers is given up on after 8 s; once its reply
+  // starts, only the caller's cancel stops the copy (a long video takes time).
+  const ctl = new AbortController();
+  if (signal) { if (signal.aborted) ctl.abort(); else signal.addEventListener('abort', () => ctl.abort(), { once: true }); }
+  const timer = setTimeout(() => ctl.abort(), 8000);
+  try {
+    // outbound: lan (a printer: resolvePrinterTarget keeps it on the LAN)
+    return await fetch(`http://${target.urlHost}:${portNum}${pathAndQuery}`, { headers, redirect: 'manual', signal: ctl.signal });
+  } finally { clearTimeout(timer); }
+}
+
+/* A finished U1 print's time-lapse (lib/main/timelapse-keep.js; the Mac's
+ * Timelapse.swift): found after the print and named on the job; copied into
+ * the job's files only on "Keep as proof". */
+const timelapseKeep = require('./lib/main/timelapse-keep.js').createTimelapseKeep({
+  read: (machine, p) => moonrakerRead(machine, p, 10000),
+  stream: (machine, p, signal) => moonrakerStream(machine, p, signal),
+  readBook: () => {
+    if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+    return lanServerStore;
+  },
+  updateStoreOnDisk: (mutate) => updateStoreOnDisk(mutate),
+  filesDir: () => orderFilesDir(),
+  fs,
+  stopped: () => _quittingNow || _flushedForQuit || !printerPollInterval,
+  notify: (id, record) => BrowserWindow.getAllWindows().forEach((w) => { if (!w.isDestroyed()) w.webContents.send('printer-timelapse', { id, record }); }),
+  progress: (id, got, total) => BrowserWindow.getAllWindows().forEach((w) => { if (!w.isDestroyed()) w.webContents.send('timelapse-progress', { id, got, total }); }),
+});
+ipcMain.handle('hub:timelapse-keep', async (_e, { jobId } = {}) => {
+  const gate = printerGate('control');
+  if (!gate.ok) return gate;
+  try { return await timelapseKeep.keep(jobId); } catch (e) { return { ok: false, reason: 'unreachable' }; }
+});
+ipcMain.handle('hub:timelapse-cancel', (_e, { jobId } = {}) => ({ ok: timelapseKeep.cancel(jobId) }));
+/** "Open on printer": the video where the printer keeps it, in the browser. */
+ipcMain.handle('hub:timelapse-open', async (_e, { jobId } = {}) => {
+  const book = lanServerStore || {};
+  const order = (book.printLog || []).find((o) => o && String(o.id) === String(jobId || ''));
+  const t = order && order.printerTimelapse;
+  const machine = t && (book.machines || []).find((m) => m && String(m.id) === String(t.machineId));
+  const link = order && machine ? require('./lib/webcam.js').timelapseLink(order, machine) : null;
+  if (!link || !link.videoUrl) return { ok: false };
+  const host = (() => { try { return new URL(link.videoUrl).hostname; } catch (_) { return ''; } })();
+  if (!host || !isAllowedPrinterHost(host)) return { ok: false };
+  // outbound-exempt: browser — the shop's own browser opens a printer on the LAN
+  await shell.openExternal(link.videoUrl);
+  return { ok: true };
+});
 
 // Bambu's `sequence_id`: "incremented by 1 on each request" (OpenBambuAPI).
 // Each command opens its own connection here, so it only has to be distinct

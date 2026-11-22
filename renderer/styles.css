@@ -6136,3 +6136,12 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .mlink-opt:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
 .mlink-title { font-size: 13px; font-weight: 600; }
 .mlink-sub { font-size: 12px; color: var(--text-muted); }
+
+/* ── Job page › Files: a U1's time-lapse as the customer's proof (Figma 134:359, U1-3) ── */
+.jp-lapse { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+.jp-lapse-eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+[dir="rtl"] .jp-lapse-eyebrow { letter-spacing: 0; font-family: inherit; text-transform: none; }
+.jp-lapse-row { display: flex; align-items: center; gap: 12px; }
+.jp-lapse-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.jp-lapse-bar { height: 4px; border-radius: 2px; background: var(--bg-soft); overflow: hidden; margin-top: 6px; }
+.jp-lapse-bar i { display: block; height: 100%; background: var(--primary); }

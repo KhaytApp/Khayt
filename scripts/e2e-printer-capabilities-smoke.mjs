@@ -40,11 +40,23 @@ const tags = [
   null, null,
 ];
 
+// U1-3 (Figma 134:359): four jobs whose U1 recorded a time-lapse.
+const VIDEO = 'bracket-kit-plate-2_20261121111000.mp4';
+const lapse = (bytes) => ({ machineId: 'U1', video: VIDEO, bytes, at: '2026-11-21T11:10:00Z' });
+function lapseJobs() {
+  const job = (id, extra) => Object.assign({ id, date: '2026-11-21', status: 'completed', machineId: 'U1', project: 'Bracket kit ' + id, client: 'Sample client', price: 120, parts: [] }, extra);
+  return [
+    job('A1F', { printerTimelapse: lapse(42 * 1048576) }),
+    job('A20', { printerTimelapse: lapse(42 * 1048576), attachedFiles: [{ filename: 'A20-timelapse-x.mp4', originalName: VIDEO, size: 42 * 1048576, kind: 'timelapse', from: { machineId: 'U1', video: VIDEO } }] }),
+    job('A21', { printerTimelapse: lapse(310 * 1048576) }),
+  ];
+}
+
 async function run(lang) {
   const dir = makeUserDataDir();
   fs.writeFileSync(path.join(dir, 'khayt-store.json'), JSON.stringify({
     settings: { firstRun: false, firstRunDone: true, bizName: 'Sample Shop', lang, mode: 'professional' },
-    machines: machines.map((m) => (m.id === 'U1' ? { ...m, headSpools: { 0: 'S2' } } : m)), printLog: [], clients: [], inventory,
+    machines: machines.map((m) => (m.id === 'U1' ? { ...m, headSpools: { 0: 'S2' } } : m)), printLog: lapseJobs(), clients: [], inventory,
   }));
   const { electronApp, window } = await launchApp(dir);
   try {
@@ -91,7 +103,35 @@ async function run(lang) {
     const opts = await window.evaluate(() => [...document.querySelectorAll('.mlink-opt')].map((o) => o.querySelector('input').value));
     ok(opts.includes('__new'), `${lang}: the dialog offers "Add as a new spool" when nothing matches`);
     if (shot) await (await window.$('.modal')).screenshot({ path: path.join(shot, `p134-u1-2-${lang}.png`) });
+    // U1-3: the job page's Files card says where the time-lapse is.
+    const lapseOf = async (id) => {
+      await window.evaluate((i) => { document.querySelector('.modal [data-act="cancel"]')?.click(); openJobPage(i); }, id);
+      await window.waitForSelector('#jobPage .jp-lapse', { timeout: 8000 });
+      return window.evaluate(() => document.querySelector('#jobPage .jp-lapse').innerText.replace(/\s+/g, ' '));
+    };
+    const found = await lapseOf('A1F');
+    if (lang === 'en') ok(/Time-lapse found on Workshop U1/.test(found) && /42 MB/.test(found) && /Keep as proof/.test(found), 'U1-3: found on the printer, nothing copied');
+    if (shot) await (await window.$('#jobPage .jp-files')).screenshot({ path: path.join(shot, `p134-u1-3-found-${lang}.png`) });
+    const kept = await lapseOf('A20');
+    if (lang === 'en') ok(/kept as proof/.test(kept) && /Show/.test(kept) && /Remove/.test(kept), 'U1-3: kept');
+    const big = await lapseOf('A21');
+    if (lang === 'en') ok(/310 MB · stays on the printer/.test(big) && /Open on printer/.test(big), 'U1-3: too large to keep');
+    if (shot) await (await window.$('#jobPage .jp-files')).screenshot({ path: path.join(shot, `p134-u1-3-large-${lang}.png`) });
     if (lang === 'en') {
+      // Keep as proof on a printer that does not answer (192.0.2.x): nothing copied, try again.
+      await lapseOf('A1F');
+      await window.click('#jobPage [data-jpc="lapse-keep"]');
+      await window.waitForFunction(() => /Couldn’t reach the printer/.test(document.querySelector('#jobPage .jp-lapse')?.innerText || ''), null, { timeout: 20000 });
+      ok(await window.evaluate(() => !!document.querySelector('#jobPage [data-jpc="lapse-keep"]')), 'U1-3: a printer that does not answer: nothing copied, Try again');
+      ok(await window.evaluate(() => !(printLog.find((o) => o.id === 'A1F').attachedFiles || []).length), 'and no file was added to the job');
+      if (shot) await (await window.$('#jobPage .jp-files')).screenshot({ path: path.join(shot, 'p134-u1-3-offline-en.png') });
+    }
+    if (lang === 'en') {
+      // Back to the printers, and the Link dialog the U1-3 checks closed.
+      await window.evaluate(() => { document.querySelector('#jobPage [data-jp="back"]')?.click(); window.KhaytShell?.switchTab?.('settings-tab'); openSettingsSection('printers'); });
+      await paint();
+      await window.click('[data-head-link="U1"][data-head="1"]');
+      await window.waitForSelector('.mlink-opt', { timeout: 5000 });
       await window.click('[data-act="save"]');
       await window.waitForTimeout(300);
       const after = await window.evaluate(() => ({ head: machines.find((m) => m.id === 'U1').headSpools, n: inventory.length, made: inventory[inventory.length - 1], s2: inventory.find((x) => x.id === 'S2') }));
