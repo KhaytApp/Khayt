@@ -1,0 +1,1529 @@
+{
+ "about": "lib/outbound.js allowed(settings, purpose, ctx). Master switch in settings.network (book), stricter-only local override in ctx.local, each purpose's own opt-in after. lan is never blocked but must be a private address or LAN name while offline (or while the book is unread). Decided Nov 22 (D1-D6 as recommended). Mac and iPhone run this file through JSC. Round 2 (Nov 22): storefront, the shop's online store (Medusa, Salla, Zid; the desktop's Khayt Cloud storefront routes), a purpose of its own, keepable. ctx.answer is a person's one-call token (answerToken), live for ANSWER_MS (20 s) from `at` by ctx.now; an allowed answer also returns once:true (want.once; absent means the result carries no once), and the host keeps spend(token).",
+ "purposes": [
+  "updates",
+  "install-count",
+  "crash-reports",
+  "usage-stats",
+  "cloud",
+  "makerrun",
+  "catalogues",
+  "storage",
+  "messaging",
+  "webhooks",
+  "payments",
+  "storefront",
+  "ai",
+  "tax-authority",
+  "exchange-rates",
+  "lookups",
+  "tunnel",
+  "switch-sync",
+  "lan"
+ ],
+ "cases": [
+  {
+   "why": "no network block at all is today's behaviour",
+   "settings": {},
+   "purpose": "updates",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
+  },
+  {
+   "why": "the master switch blocks the update check",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "a kept purpose still goes out while offline",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "updates"
+     ]
+    }
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   }
+  },
+  {
+   "why": "keeping one purpose does not keep another",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "updates"
+     ]
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "crash reports stay opt-in even when online",
+   "settings": {
+    "telemetry": {
+     "crashOptIn": false
+    }
+   },
+   "purpose": "crash-reports",
+   "want": {
+    "allowed": false,
+    "reason": "opted-out"
+   }
+  },
+  {
+   "why": "crash reports opted in, online",
+   "settings": {
+    "telemetry": {
+     "crashOptIn": true
+    }
+   },
+   "purpose": "crash-reports",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
+  },
+  {
+   "why": "keeping crash reports does not opt the shop in",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "crash-reports"
+     ]
+    }
+   },
+   "purpose": "crash-reports",
+   "want": {
+    "allowed": false,
+    "reason": "opted-out"
+   }
+  },
+  {
+   "why": "opted in, but offline: the master switch wins and says so",
+   "settings": {
+    "network": {
+     "offline": true
+    },
+    "telemetry": {
+     "usageOptIn": true
+    }
+   },
+   "purpose": "usage-stats",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "the install count's own per-computer switch",
+   "settings": {},
+   "purpose": "install-count",
+   "want": {
+    "allowed": false,
+    "reason": "opted-out"
+   },
+   "ctx": {
+    "local": {
+     "installCountOff": true
+    }
+   }
+  },
+  {
+   "why": "this computer is stricter than the shop",
+   "settings": {
+    "network": {
+     "offline": false
+    }
+   },
+   "purpose": "webhooks",
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   },
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "no computer is looser than the shop (there is no local online)",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "messaging",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "local": {
+     "offline": false
+    }
+   }
+  },
+  {
+   "why": "a printer on the LAN is never blocked",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "192.168.1.40"
+   }
+  },
+  {
+   "why": "a hosted Spoolman is internet traffic while offline",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "spoolman.example.com"
+   }
+  },
+  {
+   "why": "lan cannot be put in keep to turn it into a bypass",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "lan"
+     ]
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "8.8.8.8"
+   }
+  },
+  {
+   "why": "the book not read yet: wait, do not send",
+   "settings": null,
+   "purpose": "install-count",
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
+   }
+  },
+  {
+   "why": "an unknown purpose fails closed",
+   "settings": {},
+   "purpose": "telemetry",
+   "want": {
+    "allowed": false,
+    "reason": "unknown-purpose"
+   }
+  },
+  {
+   "why": "anything present but false reads as offline: a string 'yes' fails closed (security review)",
+   "settings": {
+    "network": {
+     "offline": "yes"
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "an unknown id in keep is ignored",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "telemetry",
+      "storage"
+     ]
+    }
+   },
+   "purpose": "storage",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   }
+  },
+  {
+   "why": "IPv6 loopback is on this computer",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "::1"
+   }
+  },
+  {
+   "why": "IPv6 unique-local, bracketed",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "[fd00::12]"
+   }
+  },
+  {
+   "why": "an mDNS name is on the LAN",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "prusa-core-one.local"
+   }
+  },
+  {
+   "why": "a single-label name is the LAN's own DNS",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "octopi"
+   }
+  },
+  {
+   "why": "a public IPv6 address is not",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "2001:4860:4860::8888"
+   }
+  },
+  {
+   "why": "Tailscale's range counts as the shop's own network",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "100.101.102.103"
+   }
+  },
+  {
+   "why": "offline with no host to check: refused",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-missing"
+   }
+  },
+  {
+   "why": "online, a lan call to any host is today's behaviour",
+   "settings": {},
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "spoolman.example.com"
+   }
+  },
+  {
+   "why": "this computer offline: lan checks the address too",
+   "settings": {},
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "spoolman.example.com",
+    "local": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "the book not read yet: a printer on the LAN still answers",
+   "settings": null,
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "10.0.0.5"
+   }
+  },
+  {
+   "why": "the book not read yet: not to the internet",
+   "settings": null,
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "example.com"
+   }
+  },
+  {
+   "why": "this computer offline beats a kept purpose",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "cloud"
+     ]
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   },
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "a kept shop integration (D1)",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "messaging"
+     ]
+    }
+   },
+   "purpose": "messaging",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   }
+  },
+  {
+   "why": "settings that are not an object",
+   "settings": [],
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
+   }
+  },
+  {
+   "why": "a string 'true' is offline, not online",
+   "settings": {
+    "network": {
+     "offline": "true"
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "offline: false is online",
+   "settings": {
+    "network": {
+     "offline": false
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
+  },
+  {
+   "why": "this computer's switch written as 1 is offline here",
+   "settings": {},
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   },
+   "ctx": {
+    "local": {
+     "offline": 1
+    }
+   }
+  },
+  {
+   "why": "a hex IPv4 is an address, not a LAN name: 8.8.8.8",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "0x08080808"
+   }
+  },
+  {
+   "why": "a hex public address",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "0x5db8d822"
+   }
+  },
+  {
+   "why": "a name starting fc is not an IPv6 ULA",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "fcc.gov"
+   }
+  },
+  {
+   "why": "a name starting fd is not either",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "fdroid.org"
+   }
+  },
+  {
+   "why": "userinfo is refused",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "fd@evil.com"
+   }
+  },
+  {
+   "why": "an odd IPv4-mapped spelling of a public address",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "::ffff:0:808:808"
+   }
+  },
+  {
+   "why": "a host with a port, as printerApi.host holds it",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "192.168.1.40:7125"
+   }
+  },
+  {
+   "why": "a host with a scheme",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "http://192.168.1.40"
+   }
+  },
+  {
+   "why": "an mDNS name with a port",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "prusa.local:80"
+   }
+  },
+  {
+   "why": "mDNS discovery's multicast group",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "224.0.0.251"
+   }
+  },
+  {
+   "why": "IPv6 mDNS multicast",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "ff02::fb"
+   }
+  },
+  {
+   "why": "a router's .lan name",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "voron.lan"
+   }
+  },
+  {
+   "why": "the .home.arpa name",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "x.home.arpa"
+   }
+  },
+  {
+   "why": "a link-local address with a zone id",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "[fe80::1%en0]"
+   }
+  },
+  {
+   "why": "a fully-qualified trailing dot",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "printer.local."
+   }
+  },
+  {
+   "why": "an IPv4-mapped LAN address",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "::ffff:192.168.1.2"
+   }
+  },
+  {
+   "why": "a port out of range is no host",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "10.0.0.1:99999"
+   }
+  },
+  {
+   "why": "public IPv6",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "2001:4860:4860::8888"
+   }
+  },
+  {
+   "why": "storefront: online, the online store's calls go",
+   "settings": {},
+   "purpose": "storefront",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
+  },
+  {
+   "why": "storefront: offline and not kept, blocked",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "storefront",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "storefront: offline and kept by name, it goes",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "storefront"
+     ]
+    }
+   },
+   "purpose": "storefront",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   }
+  },
+  {
+   "why": "storefront: keeping the cloud does not keep the online store",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "cloud"
+     ]
+    }
+   },
+   "purpose": "storefront",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "storefront: keeping the online store does not keep the cloud",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "storefront"
+     ]
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "storefront: this computer's own switch beats keeping it",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "storefront"
+     ]
+    }
+   },
+   "purpose": "storefront",
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   },
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   }
+  },
+  {
+   "why": "storefront: the book not read yet, blocked",
+   "settings": null,
+   "purpose": "storefront",
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
+   }
+  },
+  {
+   "why": "settings.network present but a string: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": "x"
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but true: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": true
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but false: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": false
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but an array: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": []
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but a number: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": 1
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but null: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": null
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but an array holding an object: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": [
+     {
+      "offline": false
+     }
+    ]
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "a malformed network block keeps nothing, even a purpose named elsewhere",
+   "settings": {
+    "network": "x",
+    "keep": [
+     "updates"
+    ]
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "a malformed network block still lets a printer on the LAN be polled",
+   "settings": {
+    "network": true
+   },
+   "purpose": "lan",
+   "ctx": {
+    "host": "192.168.1.40"
+   },
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   }
+  },
+  {
+   "why": "a malformed network block refuses a public host for the LAN purpose",
+   "settings": {
+    "network": []
+   },
+   "purpose": "lan",
+   "ctx": {
+    "host": "example.com"
+   },
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   }
+  },
+  {
+   "why": "network absent (the key not there at all) is still today's behaviour",
+   "settings": {
+    "telemetry": {}
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
+  },
+  {
+   "why": "switch-sync online: allowed like anything else",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   },
+   "settings": {}
+  },
+  {
+   "why": "switch-sync while offline by the LAN or this shop's own switch (not via Khayt Cloud): no call at all",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "switch-sync while offline through Khayt Cloud: the one call kept",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud"
+    }
+   }
+  },
+  {
+   "why": "switch-sync unticked: not kept even through Khayt Cloud",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud",
+     "dropSwitchSync": true
+    }
+   }
+  },
+  {
+   "why": "switch-sync is never kept by the keep list: only the via rule decides",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "switch-sync"
+     ]
+    }
+   }
+  },
+  {
+   "why": "switch-sync: a via that is not exactly 'cloud' does not count",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "Cloud"
+    }
+   }
+  },
+  {
+   "why": "switch-sync: this computer offline on its own makes no call, even through Khayt Cloud",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud"
+    }
+   },
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "through Khayt Cloud keeps ONLY switch-sync: the cloud purpose itself stays blocked",
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud"
+    }
+   }
+  },
+  {
+   "why": "switch-sync with the book unread: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
+   },
+   "settings": null
+  },
+  {
+   "why": "a person's answer: one switch-sync call while the shop is offline and nothing keeps it",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "kept",
+    "once": true
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000005000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "a person's answer with switch-sync unticked (via cloud, dropped): the one call goes",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "kept",
+    "once": true
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000019999
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud",
+     "dropSwitchSync": true
+    }
+   }
+  },
+  {
+   "why": "an answer expired at ANSWER_MS: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000020000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer from the future (clock set back): blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1794999999999
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer stretched past ANSWER_MS: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795003600000,
+     "spent": false
+    },
+    "now": 1795000060000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "a spent answer: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": true
+    },
+    "now": 1795000001000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer with no clock: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    }
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer never opens another purpose",
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000001000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer made for another purpose: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "cloud",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000001000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer never overrides this computer's own switch",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000001000,
+    "local": {
+     "offline": true
+    }
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer never overrides an unread book",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000001000
+   }
+  },
+  {
+   "why": "online, an answer changes nothing",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000001000
+   },
+   "settings": {}
+  },
+  {
+   "why": "an answer is live from the moment it is made (now === at)",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "kept",
+    "once": true
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000000000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer whose window is empty (until <= at): blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000000000,
+     "spent": false
+    },
+    "now": 1795000000000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer whose spent is not exactly false: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": 0
+    },
+    "now": 1795000000001
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "switch-sync already kept through Khayt Cloud: allowed without spending the answer (no once)",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000000001
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud"
+    }
+   }
+  }
+ ]
+}
