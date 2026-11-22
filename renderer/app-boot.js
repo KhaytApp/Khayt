@@ -491,6 +491,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.textContent = 'Checking…';
       if (msg) msg.textContent = '';
       try {
+        // outbound-exempt: ipc — main's hub:check-for-updates asks the gate (lib/updater.js)
         const res = await window.hubAPI.checkForUpdates();
         await handleManualUpdateCheckResult(res, { currentVersion, statusEl: msg });
       } catch (e) {

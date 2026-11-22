@@ -42,9 +42,9 @@ test('opted-out is not a block: telemetryConsent asks often, and most shops neve
 });
 
 test('this computer can be stricter, and the install count keeps its own switch (D3)', () => {
-  const { g, setCountOff } = gate();
+  const { g, setCountOff, tick } = gate();
   assert.equal(g.check('install-count').allowed, true);
-  setCountOff(true);
+  setCountOff(true); tick();   // read at most once a second
   assert.equal(g.check('install-count').reason, 'opted-out');
   g.setLocal({ offline: true });
   assert.equal(g.check('webhooks').reason, 'offline-here');
@@ -142,10 +142,10 @@ test('cloud with a book on disk that cannot be read: not held back (it is how su
 test('PR 3 wiring: every cloud request asks the gate', () => {
   const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
   const cc = read('lib/cloud-client.js');
-  assert.match(cc, /return async \(\{ method, path, body \}\) => \{\s*\n\s*askGate\(\);/);
-  assert.match(cc, /const base = validateCloudBaseUrl\(baseUrl\);\s*\n\s*askGate\(\);\s*\n\s*\/\/ outbound: cloud\s*\n\s*const res = await fetch\(`\$\{base\}\/v1\/shops\/\$\{seg\(shopId\)\}\/intake/);
+  assert.match(cc, /return async \(\{ method, path, body \}\) => \{\s*\n\s*await askGate\(base \+ path, opts\.purpose === 'storefront' \? 'storefront' : 'cloud'\);/);
+  assert.match(cc, /const base = validateCloudBaseUrl\(baseUrl\);\s*\n\s*await askGate\(base\);\s*\n\s*\/\/ outbound: cloud\s*\n\s*const res = await fetch\(`\$\{base\}\/v1\/shops\/\$\{seg\(shopId\)\}\/intake/);
   const main = read('main.js');
-  assert.match(main, /cloudClient\.setOutboundGate\(\(purpose\) => outboundGate\.gate\(purpose\)\);/);
+  assert.match(main, /cloudClient\.setOutboundGate\(\(purpose, url\) => outboundGate\.gateFor\(purpose, url\)\);/);
   assert.equal((main.match(/outboundFetch: outboundGate\.for\('cloud'\),/g) || []).length, 2, 'both vault clients');
   assert.match(main, /outboundGate\.lastPush\(\(\) => cloudBackend\.push\(snapshot\)\)/);
   assert.match(main, /outboundGate\.lastPull\(\(\) => cloudBackend\.pull\(\)\)/);
@@ -174,6 +174,95 @@ test('the switch going on purges what was saved up before it (D5), once per chan
   assert.equal(purged, 2, 'this computer\'s switch too');
 });
 
+test('PR 4: gateFor — a purpose, or lan for the shop\'s own network, resolved while offline', async () => {
+  let settings = { network: { offline: true } };
+  let answers = [{ address: '192.168.1.9' }];
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => ({}), lookup: async () => answers });
+  await assert.rejects(g.gateFor('messaging', 'https://api.mailgun.net/'), (e) => isBlocked(e) && e.reason === 'offline');
+  // A self-hosted ntfy on the LAN, by name: resolved, every answer on the LAN.
+  assert.equal((await g.gateFor('messaging', 'http://ntfy.lan/topic')).allowed, true);
+  answers = [{ address: '192.168.1.9' }, { address: '93.184.216.34' }];
+  await assert.rejects(g.gateFor('messaging', 'http://ntfy.lan/topic'), (e) => isBlocked(e) && e.purpose === 'messaging' && e.reason === 'offline', 'one public answer: not the shop\'s network, so judged as messaging');
+  assert.equal(g.blocked().lan.reason, 'lan-host-public', 'and the lan refusal is counted');
+  answers = [];
+  await assert.rejects(g.gateFor('messaging', 'http://octopi/'), (e) => isBlocked(e), 'no answer: refused');
+  // An IP literal on the LAN needs no lookup.
+  assert.equal((await g.gateFor('webhooks', 'http://10.0.0.7:8080/hook')).allowed, true);
+  // Kept messaging still goes when the name leads outside (review of #2629).
+  settings = { network: { offline: true, keep: ['messaging'] } };
+  answers = [{ address: '93.184.216.34' }];
+  assert.equal((await g.gateFor('messaging', 'http://ntfy.lan/topic')).reason, 'kept');
+  // Online: no lookup at all, today's behaviour.
+  settings = {};
+  answers = [{ address: '8.8.8.8' }];
+  assert.equal((await g.gateFor('messaging', 'http://ntfy.lan/topic')).allowed, true);
+  assert.equal((await g.gateFor('messaging', 'https://api.mailgun.net/')).allowed, true);
+});
+
+test('PR 4: the runtime belt — offline, only the LAN and hosts a gated call just asked for', async () => {
+  let settings = { network: { offline: true, keep: ['storage'] } };
+  let t = 1000;
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => ({}), now: () => t });
+  assert.equal(g.beltAllows('http://192.168.1.40/api'), true);
+  assert.equal(g.beltAllows('https://evil.example.com/x'), false, 'unrouted');
+  assert.equal(g.blocked().unrouted.count, 1);
+  await g.gateFor('storage', 'https://s3.amazonaws.com/bucket/k');   // kept: noted
+  assert.equal(g.beltAllows('https://s3.amazonaws.com/bucket/other'), true);
+  t += 6 * 60 * 1000;
+  assert.equal(g.beltAllows('https://s3.amazonaws.com/bucket/other'), false, 'the note expires');
+  settings = {};
+  assert.equal(g.beltAllows('https://evil.example.com/x'), true, 'online: everything passes, as today');
+  assert.equal(g.beltAllows('/relative'), true, 'not the internet');
+});
+
+test('PR 4 wiring: every library call asks lib/outbound-hook.js; main sets it and wraps the global fetch', async () => {
+  const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+  for (const [f, p] of [['lib/s3-client.js', 'storage'], ['lib/gdrive-client.js', 'storage'], ['lib/sms.js', 'messaging'],
+    ['lib/main/payment-links.js', 'payments'], ['lib/makerrun-library.js', 'makerrun'], ['lib/makerrun-v1.js', 'makerrun'],
+    ['lib/makerrun-account.js', 'makerrun'], ['lib/orca-filament-install.js', 'catalogues'], ['lib/zatca-crypto.js', 'tax-authority'],
+    ['lib/custom-smtp.js', 'messaging'], ['lib/lan-server.js', 'tunnel']]) {
+    assert.match(read(f), new RegExp(`ask\\('${p}'`), f);
+  }
+  assert.match(read('lib/webhook-send.js'), /OutboundHook\.ask\(deps\.purpose \|\| 'webhooks', url\)/);
+  const main = read('main.js');
+  assert.match(main, /require\('\.\/lib\/outbound-hook\.js'\)\.setOutboundGate\(\(purpose, url\) => outboundGate\.gateFor\(purpose, url\)\);/);
+  assert.match(main, /globalThis\.fetch = function outboundBelt\(input, init\)/);
+  for (const p of ['exchange-rates', 'messaging', 'ai']) assert.match(main, new RegExp(`outboundRefusal\\('${p}'`), p);
+  assert.match(main, /GD\.exchangeCode\(outboundGate\.for\('storage'\)/);
+  assert.match(main, /await outboundGate\.gateFor\('catalogues', url\);/);
+  // A blocked integration answers in the one shape the window reads (PR 5).
+  const H = require('../lib/outbound-hook.js');
+  H.setOutboundGate(async (purpose) => { const e = new Error('x'); e.code = 'outbound.blocked'; e.purpose = purpose; e.reason = 'offline'; throw e; });
+  try {
+    const W = require('../lib/webhook-send.js');
+    assert.deepEqual(await W.postPinned('https://example.com/hook', {}), { ok: false, error: 'outbound.blocked', blocked: { purpose: 'webhooks', reason: 'offline' } });
+    const S = require('../lib/custom-smtp.js');
+    assert.deepEqual((await S.sendCustomSmtp({ host: 'smtp.example.com', from: 'a@b.c', to: 'd@e.f', subject: 's', html: 'h' })).blocked, { purpose: 'messaging', reason: 'offline' });
+  } finally { H.setOutboundGate(null); }
+});
+
+test('review of #2629: hosts noted while online let nothing through once the switch is on; kept calls gated without a URL are noted', () => {
+  let settings = {};
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => ({}) });
+  g.noteHost('https://cloud.khaytapp.com/v1/active');   // online: not noted
+  settings = { network: { offline: true, keep: ['install-count'] } };
+  g.check('updates');                                   // the switch goes on: the list is cleared
+  assert.equal(g.beltAllows('https://cloud.khaytapp.com/v1/active'), false);
+  g.noteHost('https://cloud.khaytapp.com/v1/active');   // a kept count, gated without its URL
+  assert.equal(g.beltAllows('https://cloud.khaytapp.com/v1/active'), true);
+  // The book not read yet: the belt reads the switch as it was at start.
+  const g2 = createOutboundGate({ getSettings: () => null, readLocal: () => ({}), startupOffline: true });
+  assert.equal(g2.beltAllows('https://example.com/'), false);
+  const g3 = createOutboundGate({ getSettings: () => null, readLocal: () => ({}), startupOffline: false });
+  assert.equal(g3.beltAllows('https://example.com/'), true);
+});
+
+test('review of #2629: an unreadable book holds back only the automatic calls home', () => {
+  const g = createOutboundGate({ getSettings: () => null, readLocal: () => ({}), bookUnreadable: () => true });
+  for (const p of ['cloud', 'messaging', 'storage', 'ai', 'payments']) assert.equal(g.check(p).allowed, true, p);
+  for (const p of ['updates', 'install-count', 'crash-reports', 'usage-stats']) assert.equal(g.check(p).reason, 'settings-unknown', p);
+});
+
 test('round 2 (Nov 22): only the owner changes the switch under the staff lock, the book\'s and this computer\'s', () => {
   const PP = require('../lib/main/printer-permission.js');
   const ops = [{ id: 'own', roleKey: 'owner' }, { id: 'mgr', roleKey: 'manager' }, { id: 'op', roleKey: 'operator' }];
@@ -195,6 +284,32 @@ test('round 2 (Nov 22): only the owner changes the switch under the staff lock, 
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
   const h = main.slice(main.indexOf("ipcMain.handle('hub:outbound-set-local'"));
   assert.match(h.slice(0, 400), /if \(!PrinterPermission\.mayChangeNetwork\(lanServerStore\)\) return \{ ok: false, error: 'not_permitted' \};/);
+});
+
+test('round 2 (Nov 22): the online store\'s cloud routes ask `storefront`, every other cloud request `cloud`', async () => {
+  const CC = require('../lib/cloud-client.js');
+  const asked = [];
+  const realFetch = global.fetch;
+  global.fetch = async () => ({ status: 200, json: async () => ({ ok: true, catalog: null, views: 0, carts: 0, orders: 0, items: [] }) });
+  CC.setOutboundGate(async (purpose, url) => { asked.push([purpose, new URL(url).pathname]); });
+  try {
+    const base = 'https://cloud.example.com';
+    await CC.putCatalog(base, 'S1', 't', { items: [] });
+    await CC.getCatalog(base, 'S1', 't');
+    await CC.storefrontStats(base, 'S1', 't');
+    await CC.putLeadTime(base, 'S1', 't', null);
+    await CC.listPublished(base, 'S1', 't');
+    await CC.health(base);
+  } finally {
+    global.fetch = realFetch;
+    CC.setOutboundGate(null);
+  }
+  assert.deepEqual(asked.map((a) => a[0]), ['storefront', 'storefront', 'storefront', 'storefront', 'cloud', 'cloud']);
+  // Kept alone, the online store goes and the cloud does not, and the reverse.
+  const { createOutboundGate } = require('../lib/main/outbound-fetch.js');
+  const g = createOutboundGate({ getSettings: () => ({ network: { offline: true, keep: ['storefront'] } }), readLocal: () => ({}) });
+  assert.equal(g.check('storefront').allowed, true);
+  assert.equal(g.check('cloud').allowed, false);
 });
 
 test('review: main\'s own writers may not change the outbound switch either (store-io LOCK_SETTINGS)', async () => {

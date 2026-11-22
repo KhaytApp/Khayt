@@ -29,11 +29,13 @@
   async function loadBundledThemes(reg) {
     const loaded = [];
     try {
+      // outbound-exempt: local-file — a theme folder inside the app
       const res = await fetch(INDEX_PATH, { cache: 'no-cache' });
       if (!res.ok) return loaded;
       const data = await res.json();
       for (const entry of data.themes || []) {
         const folder = entry.folder || entry.id;
+        // outbound-exempt: local-file — a theme folder inside the app
         const manifestRes = await fetch(`themes/custom/${folder}/manifest.json`, { cache: 'no-cache' });
         if (!manifestRes.ok) continue;
         const result = reg.registerCustomTheme(await manifestRes.json(), 'themes/custom');
