@@ -253,6 +253,7 @@ const hubAPI = {
   networkSwitchState: ()       => ipcRenderer.invoke('hub:network-switch-state'),
   networkSwitchShare: (on)     => ipcRenderer.invoke('hub:network-switch-share', on === true),
   networkSwitchAnswer: (apply) => ipcRenderer.invoke('hub:network-switch-answer', apply === true),
+  networkSwitchConflict: (choice) => ipcRenderer.invoke('hub:network-switch-conflict', choice === 'keep' ? 'keep' : 'adopt'),
   networkSwitchPublish: (o)    => ipcRenderer.invoke('hub:network-switch-publish', o),
   onNetworkApplied: (cb) => { ipcRenderer.on('hub:network-applied', (_e, n) => { try { cb(n && typeof n === 'object' ? n : null); } catch { /* noop */ } }); },
   activeCountSet: (on)    => ipcRenderer.invoke('hub:active-count-set', !!on),

@@ -58,7 +58,8 @@ function shopView() {
     keep: Array.isArray(n.keep) ? n.keep.filter((k) => typeof k === 'string') : [], changedAt: n.changedAt || null, changedBy: n.changedBy || null };
 }
 function shopOffline() { return !!shopView().offline; }
-function keptList() { return Array.isArray(shopView().keep) ? shopView().keep.slice() : []; }
+// switch-sync is kept by its own rule, never written into `keep` (review of #2645, L4).
+function keptList() { return Array.isArray(shopView().keep) ? shopView().keep.filter((k) => k !== 'switch-sync') : []; }
 
 /** Who may change it: the owner, or anyone while the staff lock is off (main decides; this only greys the controls). */
 function mayChange() {
@@ -252,7 +253,7 @@ async function saveNetwork(patch) {
   // (the owner, this computer's option); it answers at once when it does not.
   if (flipped && next.offline) {
     let pub = null;
-    try { pub = global.hubAPI && global.hubAPI.networkSwitchPublish ? await global.hubAPI.networkSwitchPublish({ offline: true, network: next, changedBy: next.changedBy }) : null; } catch (_) { pub = null; }
+    try { pub = global.hubAPI && global.hubAPI.networkSwitchPublish ? await global.hubAPI.networkSwitchPublish({ offline: true, network: next }) : null; } catch (_) { pub = null; }
     next.via = pub && pub.ok && pub.via === 'cloud' ? 'cloud' : null;
   }
   settings.network = next;
@@ -262,7 +263,8 @@ async function saveNetwork(patch) {
   // first and sends offline:false if a value is published there, whatever
   // this computer's own option (contract rule 1).
   if (flipped && !next.offline && global.hubAPI && global.hubAPI.networkSwitchPublish) {
-    try { await global.hubAPI.networkSwitchPublish({ offline: false, network: next, changedBy: next.changedBy }); } catch (_) { /* main keeps the outcome */ }
+    // Main sends what the BOOK holds, never this copy: a refused save sends nothing.
+    try { await global.hubAPI.networkSwitchPublish({ offline: false }); } catch (_) { /* main keeps the outcome */ }
   }
   // What main kept is what the window holds: a save that failed or was put
   // back must not wait in memory for the next save to carry it.

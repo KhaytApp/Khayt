@@ -74,6 +74,23 @@ test('keepNewerNetwork: a window cannot save an older switch over one main appli
   const local = { settings: { network: { offline: true, changedAt: '2026-11-22T10:00:00.000Z' } } };
   assert.equal(NS.keepNewerNetwork(stale, local), stale, 'only a value that came through the cloud is protected');
   assert.equal(NS.keepNewerNetwork({ settings: {} }, disk).settings.network.offline, true, 'a save with no switch keeps disk\'s');
+  // A stamp from the future protects nothing; the same stamp takes main's `via`.
+  const future = { settings: { network: { offline: true, changedAt: '9999-12-31T23:59:59.999Z', via: 'cloud' } } };
+  assert.equal(NS.keepNewerNetwork(stale, future, NOW), stale);
+  const untied = { settings: { network: { offline: true, changedAt: '2026-11-22T09:00:00.000Z', via: null } } };
+  const sameStamp = { settings: { network: { offline: true, changedAt: '2026-11-22T09:00:00.000Z', via: 'cloud', dropSwitchSync: true } } };
+  const k = NS.keepNewerNetwork(sameStamp, Object.assign({}, untied, { settings: { network: Object.assign({}, untied.settings.network, { via: 'cloud' }) } }), NOW);
+  assert.equal(k, sameStamp, 'same stamp, same via: unchanged');
+});
+
+test('keepNewerNetwork: on the same stamp, `via` is main\'s', () => {
+  const disk = { settings: { network: { offline: true, changedAt: '2026-11-22T09:00:00.000Z', via: 'cloud' } } };
+  const win = { settings: { network: { offline: true, changedAt: '2026-11-22T09:00:00.000Z', via: 'x', dropSwitchSync: true } } };
+  assert.deepEqual(NS.keepNewerNetwork(win, disk, NOW).settings.network, { offline: true, changedAt: '2026-11-22T09:00:00.000Z', via: 'cloud', dropSwitchSync: true });
+  // Main cleared it after a 404: a window still holding via:'cloud' does not put it back.
+  const cleared = { settings: { network: { offline: true, changedAt: '2026-11-22T09:00:00.000Z', via: null } } };
+  const stale = { settings: { network: { offline: true, changedAt: '2026-11-22T09:00:00.000Z', via: 'cloud' } } };
+  assert.equal(NS.keepNewerNetwork(stale, cleared, NOW).settings.network.via, null);
 });
 
 test('loads without require, as JavaScriptCore loads it', () => {
@@ -86,42 +103,49 @@ test('loads without require, as JavaScriptCore loads it', () => {
 
 // ── the calls ──────────────────────────────────────────────────────────────
 
+const SCOPE = 'https://cloud.example|' + SHOP;
 function harness(over = {}) {
   const dek = crypto.randomBytes(32);
-  const server = { value: null, puts: [], gets: 0, status: null, blocked: false, putStatus: null, hang: false };
+  const server = { value: null, puts: [], gets: 0, status: null, blocked: false, putStatus: null, hang: false, getFail: false };
   let book = { network: Object.assign({}, over.network || {}) };
-  let mine = Object.assign({}, over.mine || {});
+  let file = { v: 2, scopes: { [SCOPE]: Object.assign({}, over.mine || {}) } };
+  let sess = over.locked ? null : { url: 'https://cloud.example', shopId: SHOP, token: 't', role: over.role || 'owner', dek, scope: SCOPE };
+  let may = over.mayChange !== false;
   const notes = [];
   const logs = [];
   const client = {
     async getNetworkSwitch(url, shopId, token, opts) {
       server.gets += 1; server.lastGetPurpose = opts && opts.purpose;
       if (server.blocked) { const e = new Error('outbound blocked: switch-sync (offline)'); e.code = 'outbound.blocked'; throw e; }
+      if (server.getFail) throw new Error('ECONNREFUSED');
       if (server.status) return { status: server.status, body: null };
       if (!server.value) return { status: 404, body: { reason: 'none' } };
+      if (server.onGet) await server.onGet();
       return { status: 200, body: server.value };
     },
     async putNetworkSwitch(url, shopId, token, body) {
       if (server.hang) return new Promise(() => {});
       server.puts.push(body);
-      if (server.putStatus) return { status: server.putStatus, body: { reason: 'stale', changedAt: '2026-11-22T11:00:00.000Z' } };
+      if (server.putStatus) return { status: server.putStatus, body: { reason: 'stale', changedAt: '2026-11-22T10:05:00.000Z' } };
       server.value = { changedAt: body.changedAt, receivedAt: 'x', ciphertext: body.ciphertext };
       return { status: 200, body: { ok: true, changedAt: body.changedAt } };
     },
   };
   const sync = createNetworkSwitchSync({
     client, crypto: sc, now: () => over.now || NOW,
-    session: () => (over.locked ? null : { url: 'https://cloud.example', shopId: SHOP, token: 't', role: over.role || 'owner', dek }),
+    session: () => sess, mayChange: () => may,
     getSettings: () => book,
     updateNetwork: async (fn) => { const n = fn(book.network || {}); book = Object.assign({}, book, { network: n }); },
     notify: (n) => notes.push(n),
-    readMine: () => JSON.parse(JSON.stringify(mine)),
-    writeMine: (v) => { mine = JSON.parse(JSON.stringify(v)); },
+    readMine: () => JSON.parse(JSON.stringify(file)),
+    writeMine: (v) => { file = JSON.parse(JSON.stringify(v)); },
     log: (m) => logs.push(m),
   });
   const publishRemote = (p) => { server.value = { changedAt: p.changedAt, receivedAt: 'x', ciphertext: sc.encryptStore(p, dek) }; };
-  return { sync, server, dek, book: () => book, mine: () => mine, notes, logs, publishRemote };
+  return { sync, server, dek, book: () => book, setBook: (n) => { book = { network: n }; }, mine: () => file.scopes[SCOPE] || {}, file: () => file,
+    notes, logs, publishRemote, lock: () => { sess = null; }, unlock: () => { sess = { url: 'https://cloud.example', shopId: SHOP, token: 't', role: 'owner', dek, scope: SCOPE }; }, deny: () => { may = false; } };
 }
+const ON_NOW = { offline: true, keep: ['updates'], changedAt: '2026-11-22T10:00:00.000Z', changedBy: 'Sara' };
 
 test('pull: a value from another computer is applied, the window told, the stamp kept', async () => {
   const h = harness({ mine: { highestSeen: '2026-11-22T08:00:00.000Z' } });
@@ -132,11 +156,23 @@ test('pull: a value from another computer is applied, the window told, the stamp
   assert.equal(h.notes.length, 1);
   assert.equal(h.mine().highestSeen, '2026-11-22T09:00:00.000Z');
   assert.equal(h.server.lastGetPurpose, 'switch-sync');
-  // The same value again is not newer: ignored.
   assert.equal((await h.sync.pull()).why, 'not-newer');
 });
 
-test('pull: another shop\'s key, a replay with a lying server stamp, or a store blob are ignored, logged without content', async () => {
+test('review HIGH: an older cloud value never overwrites a newer switch set here, sent or not', async () => {
+  const h = harness({ mine: { highestSeen: '2026-11-22T08:00:00.000Z' }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  h.publishRemote(plain({ changedAt: '2026-11-22T09:00:00.000Z' }));
+  assert.equal((await h.sync.pull()).why, 'not-newer');
+  assert.equal(h.book().network.offline, false);
+  // A pull already judged when a newer local switch lands is refused inside the write chain.
+  const r = harness({ mine: { highestSeen: '2026-11-22T08:00:00.000Z' } });
+  r.publishRemote(plain());
+  r.server.onGet = async () => { r.setBook({ offline: false, changedAt: '2026-11-22T09:30:00.000Z' }); };
+  assert.equal((await r.sync.pull()).why, 'not-newer');
+  assert.equal(r.book().network.offline, false);
+});
+
+test('pull: another shop\'s key, a lying server stamp, a store blob, or a far-future stamp are ignored, logged without content', async () => {
   const h = harness({ mine: { highestSeen: '2026-11-22T08:00:00.000Z' } });
   h.server.value = { changedAt: '2026-11-22T09:00:00.000Z', ciphertext: sc.encryptStore(plain(), crypto.randomBytes(32)) };
   assert.equal((await h.sync.pull()).why, 'sealed');
@@ -145,7 +181,10 @@ test('pull: another shop\'s key, a replay with a lying server stamp, or a store 
   assert.equal((await h.sync.pull()).why, 'stamp-mismatch');
   h.publishRemote({ printLog: [], settings: {}, changedAt: '2026-11-22T09:00:00.000Z' });
   assert.equal((await h.sync.pull()).why, 'kind');
+  h.publishRemote(plain({ changedAt: '9999-12-31T23:59:59.999Z' }));
+  assert.equal((await h.sync.pull()).why, 'future');
   assert.equal(h.book().network.offline, undefined, 'nothing applied');
+  assert.equal(h.mine().highestSeen, '2026-11-22T08:00:00.000Z', 'the mark never jumps to the future');
   for (const l of h.logs) assert.match(l, /^network switch: ignored, [a-z-]+$/);
 });
 
@@ -163,81 +202,125 @@ test('pull: the age rule holds a week-old value until the person answers', async
   assert.deepEqual(await h2.sync.answerPending(false), { ok: true, applied: false });
   assert.equal(h2.book().network.offline, undefined);
   assert.equal((await h2.sync.pull()).why, 'not-newer', 'a declined value is not asked again');
+  // A computer whose book has a switch of its own is not "no stamp": it applies.
+  const h3 = harness({ network: { offline: false, changedAt: '2026-11-01T09:00:00.000Z' } });
+  h3.publishRemote(plain({ changedAt: '2026-11-10T09:00:00.000Z' }));
+  assert.equal((await h3.sync.pull()).act, 'apply');
 });
 
-test('pull: a 404 unties an offline computer from the cloud (it stops calling); locked or blocked does nothing', async () => {
+test('pull: a 404 unties an offline computer from the cloud and tells the window; locked or blocked does nothing', async () => {
   const h = harness({ network: { offline: true, via: 'cloud', changedAt: '2026-11-22T09:00:00.000Z' } });
   assert.equal((await h.sync.pull()).status, 404);
   assert.equal(h.book().network.via, null);
   assert.equal(h.book().network.offline, true, 'its value stands');
+  assert.equal(h.notes.length, 1);
   assert.equal((await harness({ locked: true }).sync.pull()).why, 'locked');
   const b = harness(); b.server.blocked = true;
   assert.equal((await b.sync.pull()).why, 'blocked');
 });
 
-test('publish on: only with this computer\'s option, only the owner, as the last call', async () => {
-  const net = { offline: true, keep: ['updates'], changedAt: '2026-11-22T10:00:00.000Z', changedBy: 'Sara' };
+test('publish on: only with this computer\'s option, the owner, the staff lock allowing, a fresh stamp', async () => {
   const off = harness();
-  assert.deepEqual(await off.sync.publish({ offline: true, network: net }), { ok: true, sent: false });
+  assert.deepEqual(await off.sync.publish({ offline: true, network: ON_NOW }), { ok: true, sent: false });
   assert.equal(off.server.puts.length, 0, 'option off: nothing sent');
   const h = harness({ mine: { share: true } });
-  const r = await h.sync.publish({ offline: true, network: net });
+  const r = await h.sync.publish({ offline: true, network: ON_NOW });
   assert.equal(r.ok, true); assert.equal(r.via, 'cloud');
-  assert.equal(h.server.puts.length, 1);
-  assert.equal(h.server.puts[0].changedAt, '2026-11-22T10:00:00.000Z');
   const opened = sc.decryptStore(h.server.puts[0].ciphertext, h.dek);
   assert.deepEqual(opened, { kind: 'khayt-network-switch', v: 1, shopId: SHOP, offline: true, keep: ['updates'], changedAt: '2026-11-22T10:00:00.000Z', changedBy: 'Sara' });
-  assert.equal(h.mine().highestSeen, '2026-11-22T10:00:00.000Z', 'its own value is seen: never applied back');
-  assert.equal((await h.sync.pull()).why, 'not-newer');
-  const mgr = harness({ mine: { share: true }, role: 'manager' });
-  assert.equal((await mgr.sync.publish({ offline: true, network: net })).why, 'role');
+  assert.equal(h.mine().highestSeen, '2026-11-22T10:00:00.000Z');
+  assert.equal((await h.sync.pull()).why, 'not-newer', 'its own value is never applied back');
+  assert.equal((await harness({ mine: { share: true }, role: 'manager' }).sync.publish({ offline: true, network: ON_NOW })).why, 'role');
+  assert.equal((await harness({ mine: { share: true }, mayChange: false }).sync.publish({ offline: true, network: ON_NOW })).why, 'not_permitted');
+  assert.equal((await harness({ mine: { share: true } }).sync.publish({ offline: true, network: Object.assign({}, ON_NOW, { changedAt: '2026-11-22T11:00:00.000Z' }) })).why, 'stamp', 'a stamp an hour away is not this change');
 });
 
-test('publish off: asks first and sends offline:false when a value is published, whatever this computer\'s option', async () => {
-  const net = { offline: false, keep: [], changedAt: '2026-11-22T10:00:00.000Z', changedBy: 'Sara' };
-  const h = harness();
+test('publish off: from the book, never the window; asks first, sends offline:false if published, whatever the option', async () => {
+  const h = harness({ network: { offline: false, keep: [], changedAt: '2026-11-22T10:00:00.000Z', changedBy: 'Sara' } });
   h.publishRemote(plain());
-  const r = await h.sync.publish({ offline: false, network: net });
+  const r = await h.sync.publish({ offline: false, network: { offline: false, changedAt: '2026-11-22T10:00:01.000Z' } });
   assert.equal(r.sent, true);
-  assert.equal(sc.decryptStore(h.server.puts[0].ciphertext, h.dek).offline, false);
+  const sent = sc.decryptStore(h.server.puts[0].ciphertext, h.dek);
+  assert.deepEqual([sent.offline, sent.changedAt], [false, '2026-11-22T10:00:00.000Z']);
   assert.equal(h.server.lastGetPurpose, 'cloud');
-  const none = harness();
-  assert.deepEqual(await none.sync.publish({ offline: false, network: net }), { ok: true, sent: false });
+  // The save was refused: the book is still offline, nothing goes.
+  const refused = harness({ network: { offline: true, changedAt: '2026-11-22T09:00:00.000Z' } });
+  refused.publishRemote(plain());
+  assert.equal((await refused.sync.publish({ offline: false })).why, 'not-saved');
+  assert.equal(refused.server.puts.length, 0);
+  const none = harness({ network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  assert.deepEqual(await none.sync.publish({ offline: false }), { ok: true, sent: false });
 });
 
-test('publish: a 409 is returned and kept for the window, never retried or applied silently; the PUT is capped at 10 s', async () => {
-  const h = harness({ mine: { share: true } });
+test('review M2: an off that could not go is sent again with the same stamp at the next tick', async () => {
+  const h = harness({ network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z', via: 'cloud' } });
+  h.publishRemote(plain());
+  h.server.getFail = true;
+  assert.equal((await h.sync.publish({ offline: false })).later, true);
+  assert.equal(h.sync.state().pendingOff, true);
+  h.server.getFail = false;
+  await h.sync.tick();
+  assert.equal(h.server.puts.length, 1);
+  assert.equal(sc.decryptStore(h.server.puts[0].ciphertext, h.dek).changedAt, '2026-11-22T10:00:00.000Z');
+  assert.equal(h.sync.state().pendingOff, false);
+  // Turned off while Khayt Cloud was locked: sent at the next unlock's tick.
+  const l = harness({ locked: true, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z', via: 'cloud' } });
+  assert.equal((await l.sync.publish({ offline: false })).why, 'locked');
+  l.unlock(); l.publishRemote(plain());
+  await l.sync.tick();
+  assert.equal(l.server.puts.length, 1);
+});
+
+test('rule 3: a 409 is held for the person, never applied by the timer, never retried', async () => {
+  const h = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
   h.server.putStatus = 409;
-  const r = await h.sync.publish({ offline: true, network: { offline: true, changedAt: '2026-11-22T10:00:00.000Z' } });
+  const r = await h.sync.publish({ offline: false });
   assert.equal(r.why, 'stale');
-  assert.deepEqual(r.conflict, { at: '2026-11-22T11:00:00.000Z', mine: '2026-11-22T10:00:00.000Z', offline: true });
-  assert.equal(h.server.puts.length, 1, 'not retried');
-  assert.deepEqual(h.sync.state().lastConflict, r.conflict);
-  assert.equal(h.book().network.offline, undefined, 'nothing applied');
-  assert.equal(require('../lib/main/network-switch-sync.js').PUT_CAP_MS, 10000);
+  assert.equal(h.server.puts.length, 1);
+  h.server.putStatus = null;
+  h.publishRemote(plain({ changedAt: '2026-11-22T10:05:00.000Z' }));
+  assert.equal((await h.sync.pull()).act, 'held');
+  assert.equal(h.book().network.offline, false, 'the person\'s change stands until they choose');
+  assert.deepEqual(h.sync.state().conflict, { at: '2026-11-22T10:05:00.000Z', mine: '2026-11-22T10:00:00.000Z', offline: false, held: true });
+  assert.equal((await h.sync.answerConflict('adopt')).applied, true);
+  assert.equal(h.book().network.offline, true);
+  const k = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  k.server.putStatus = 409;
+  await k.sync.publish({ offline: false });
+  k.server.putStatus = null;
+  k.publishRemote(plain({ changedAt: '2026-11-22T10:05:00.000Z' }));
+  await k.sync.pull();
+  assert.deepEqual(await k.sync.answerConflict('keep'), { ok: true, kept: true });
+  assert.equal((await k.sync.pull()).why, 'not-newer', 'kept here: the newer one is not applied');
+  assert.equal(k.book().network.offline, false);
 });
 
-test('setShare: the owner turns it on; anyone may turn it off; the stamp is never lowered', async () => {
-  const mgr = harness({ role: 'manager' });
-  assert.equal(mgr.sync.setShare(true).why, 'role');
-  assert.equal(mgr.sync.setShare(false).ok, true);
-  const h = harness({ mine: { highestSeen: '2026-11-22T09:00:00.000Z' } });
-  assert.equal(h.sync.setShare(true).share, true);
-  h.publishRemote(plain({ changedAt: '2026-11-22T08:30:00.000Z' }));
-  assert.equal((await h.sync.pull()).why, 'not-newer');
-  assert.equal(h.mine().highestSeen, '2026-11-22T09:00:00.000Z');
+test('per server and shop: another scope\'s stamps and held values never apply; the staff lock gates every answer', async () => {
+  const h = harness({ mine: { share: true, highestSeen: '2026-11-22T09:30:00.000Z' } });
+  const f = h.file();
+  f.scopes['https://evil.example|other'] = { highestSeen: '9999-12-31T23:59:59.999Z', pending: plain() };
+  h.publishRemote(plain({ changedAt: '2026-11-22T09:45:00.000Z' }));
+  assert.equal((await h.sync.pull()).act, 'apply', 'another scope\'s far-future stamp does not block this one');
+  const d = harness(); d.deny();
+  assert.equal(d.sync.setShare(true).why, 'not_permitted');
+  assert.equal((await d.sync.answerPending(true)).why, 'not_permitted');
+  assert.equal((await d.sync.answerConflict('adopt')).why, 'not_permitted');
+  assert.equal(harness({ role: 'manager' }).sync.setShare(true).why, 'role');
+  assert.equal(harness({ locked: true }).sync.setShare(true).why, 'locked');
 });
 
-test('desktop wiring: the gate purpose, the save guard, the window note, start at unlock', () => {
+test('desktop wiring: only the book\'s own cloud, the staff lock, the gate purpose, the save guard, start at unlock', () => {
   const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
   const cc = read('lib/cloud-client.js');
   assert.match(cc, /if \(purpose === 'switch-sync'\) return outboundGate\('switch-sync', url\);/);
-  assert.match(cc, /async function getNetworkSwitch\(/);
   const main = read('main.js');
-  assert.match(main, /keepNewerNetwork\(merged, guardDisk\)/);
+  assert.match(main, /scope !== NSS\.scopeOf\(cloud\.url, cloud\.shopId\)/);
+  assert.match(main, /mayChange: \(\) => PrinterPermission\.mayChangeNetwork\(bookForPrivacyCheck\(\)\)/);
+  assert.match(main, /keepNewerNetwork\(merged, guardDisk, Date\.now\(\)\)/);
   assert.match(main, /networkSwitchSync\.start\(\);\s*\n\s*return \{ ok: true \};/);
-  assert.match(main, /updateStoreOnDiskAllowingLock\([\s\S]{0,400}\['settings\.network'\]\)/);
+  assert.match(main, /catch \(e\) \{ networkSwitchSync\.stop\(\);/);
+  assert.match(read('lib/main/outbound-fetch.js'), /purpose !== 'switch-sync'\) noteAllowedHost/);
   const iu = read('renderer/internet-use.js');
-  assert.match(iu, /networkSwitchPublish\(\{ offline: true, network: next/);
-  assert.match(iu, /onNetworkApplied\(/);
+  assert.match(iu, /networkSwitchPublish\(\{ offline: false \}\)/);
+  assert.match(iu, /filter\(\(k\) => k !== 'switch-sync'\)/);
 });

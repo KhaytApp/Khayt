@@ -2641,8 +2641,16 @@ function guardWindowStore(normalized) {
   }
   // A switch main applied from Khayt Cloud is not moved back by a window
   // still holding the older one (lib/network-switch.js keepNewerNetwork).
-  try { merged = require('./lib/network-switch.js').keepNewerNetwork(merged, guardDisk); }
-  catch (e) { console.error('store guard: network guard failed:', e && e.message); }
+  try {
+    const kept = require('./lib/network-switch.js').keepNewerNetwork(merged, guardDisk, Date.now());
+    if (kept !== merged) {
+      // The window held an older switch: it is told the kept one, so it does
+      // not show what was not saved (correctness review of #2645, L2).
+      const n = kept.settings && kept.settings.network;
+      setImmediate(() => BrowserWindow.getAllWindows().forEach((w) => { try { w.webContents.send('hub:network-applied', n); } catch (_) { /* gone */ } }));
+    }
+    merged = kept;
+  } catch (e) { console.error('store guard: network guard failed:', e && e.message); }
   // What was put back as it is on disk: the window reloads and says so
   // (#2592 review), instead of showing an edit that was never kept.
   return { store: merged, refused };
@@ -6786,12 +6794,22 @@ const NETWORK_SWITCH_FILE = () => path.join(app.getPath('userData'), 'network-sw
 const networkSwitchSync = require('./lib/main/network-switch-sync.js').createNetworkSwitchSync({
   client: cloudClient,
   crypto: require('./lib/sync-crypto.js'),
+  // Only the book's OWN cloud (security review of #2645, MED-2): an unlock the
+  // window pointed at another server or shop never reads or writes the switch.
   session: () => {
     if (!cloudBackend || !cloudDek || !cloudSessionInfo) return null;
-    let role = 'owner';
-    try { const b = readStoreDecryptedFromDisk(); role = (b && b.settings && b.settings.cloud && b.settings.cloud.role) || 'owner'; } catch (_) { /* owner, as the window reads it */ }
-    return Object.assign({}, cloudSessionInfo, { dek: cloudDek, role });
+    let cloud = null;
+    try { const b = readStoreDecryptedFromDisk(); cloud = b && b.settings && b.settings.cloud; } catch (_) { cloud = null; }
+    if (!cloud || typeof cloud !== 'object') return null;
+    const NSS = require('./lib/main/network-switch-sync.js');
+    const scope = NSS.scopeOf(cloudSessionInfo.url, cloudSessionInfo.shopId);
+    if (!scope || scope !== NSS.scopeOf(cloud.url, cloud.shopId)) return null;
+    // The token's role, a hint only: the server refuses a non-owner write.
+    return Object.assign({}, cloudSessionInfo, { dek: cloudDek, role: cloud.role || 'owner', scope });
   },
+  // Who may change the switch here: the staff lock's rule, as for the switch
+  // itself (security review of #2645, MED-1).
+  mayChange: () => PrinterPermission.mayChangeNetwork(bookForPrivacyCheck()),
   getSettings: () => (lanServerStore && lanServerStore.settings) || null,
   // Through the write chain, with `network` the one lock field it may change.
   updateNetwork: (fn) => updateStoreOnDiskAllowingLock((cur) => {
@@ -6807,14 +6825,15 @@ const networkSwitchSync = require('./lib/main/network-switch-sync.js').createNet
 ipcMain.handle('hub:network-switch-state', () => networkSwitchSync.state());
 ipcMain.handle('hub:network-switch-share', (_e, on) => networkSwitchSync.setShare(on === true));
 ipcMain.handle('hub:network-switch-answer', (_e, apply) => networkSwitchSync.answerPending(apply === true));
+ipcMain.handle('hub:network-switch-conflict', (_e, choice) => networkSwitchSync.answerConflict(choice === 'keep' ? 'keep' : 'adopt'));
 // The owner changed the switch here: `on` BEFORE the window saves it (the last
 // call, while still online), `off` AFTER (the first call back). The network
 // sent is the window's; main reads nothing else from it.
-ipcMain.handle('hub:network-switch-publish', async (_e, { offline, network, changedBy } = {}) => {
+ipcMain.handle('hub:network-switch-publish', async (_e, { offline, network } = {}) => {
   try {
     const n = network && typeof network === 'object' && !Array.isArray(network) ? network : null;
-    return await networkSwitchSync.publish({ offline: offline === true, network: n, changedBy: typeof changedBy === 'string' ? changedBy : '' });
-  } catch (e) { return { ok: false, why: 'error', error: String((e && e.message) || e) }; }
+    return await networkSwitchSync.publish({ offline: offline === true, network: n });
+  } catch (e) { return { ok: false, why: 'error' }; }
 });
 
 // The shop's cloud token, for the server it was saved for. Every handler below
@@ -7471,7 +7490,7 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
     // The key exists now: hear the switch at once, then every 15 minutes.
     networkSwitchSync.start();
     return { ok: true };
-  } catch (e) { cloudBackend = null; cloudDek = null; cloudSessionInfo = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
+  } catch (e) { networkSwitchSync.stop(); cloudBackend = null; cloudDek = null; cloudSessionInfo = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
 });
 
 /* ── Organisations (multi-shop) ───────────────────────────────────────────────
