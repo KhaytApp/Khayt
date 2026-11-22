@@ -142,7 +142,7 @@ test('cloud with a book on disk that cannot be read: not held back (it is how su
 test('PR 3 wiring: every cloud request asks the gate', () => {
   const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
   const cc = read('lib/cloud-client.js');
-  assert.match(cc, /return async \(\{ method, path, body \}\) => \{\s*\n\s*await askGate\(base \+ path, opts\.purpose === 'storefront' \? 'storefront' : 'cloud'\);/);
+  assert.match(cc, /return async \(\{ method, path, body \}\) => \{\s*\n\s*await askGate\(base \+ path, opts\.purpose === 'storefront' \|\| opts\.purpose === 'switch-sync' \? opts\.purpose : 'cloud'\);/);
   assert.match(cc, /const base = validateCloudBaseUrl\(baseUrl\);\s*\n\s*await askGate\(base\);\s*\n\s*\/\/ outbound: cloud\s*\n\s*const res = await fetch\(`\$\{base\}\/v1\/shops\/\$\{seg\(shopId\)\}\/intake/);
   const main = read('main.js');
   assert.match(main, /cloudClient\.setOutboundGate\(\(purpose, url\) => outboundGate\.gateFor\(purpose, url\)\);/);

@@ -588,6 +588,12 @@ test('re-review of #2608: lock fields change outside a window save only in main\
   let i = -1;
   while ((i = main.indexOf('updateStoreOnDiskAllowingLock(', i + 1)) !== -1) {
     const head = main.slice(0, i);
+    // The outbound switch's own writer (#2645): `settings.network` and nothing else.
+    if (head.endsWith('updateNetwork: (fn) => ')) {
+      const call = main.slice(i, main.indexOf('\n  notify:', i));
+      assert.match(call, /\}, \['settings\.network'\]\),$/, 'the switch writer may change settings.network only');
+      continue;
+    }
     const at = head.lastIndexOf('\nasync function ');
     fns.push(at >= 0 ? main.slice(at + 16, main.indexOf('(', at + 16)) : '?');
   }
