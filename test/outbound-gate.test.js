@@ -112,3 +112,26 @@ test('the switch going on purges what was saved up before it (D5), once per chan
   g.setLocal({ offline: true });
   assert.equal(purged, 2, 'this computer\'s switch too');
 });
+
+test('round 2 (Nov 22): only the owner changes the switch under the staff lock, the book\'s and this computer\'s', () => {
+  const PP = require('../lib/main/printer-permission.js');
+  const ops = [{ id: 'own', roleKey: 'owner' }, { id: 'mgr', roleKey: 'manager' }, { id: 'op', roleKey: 'operator' }];
+  const book = (lock, who, network) => ({ settings: { operatorLockEnabled: lock, activeOperatorId: who, network }, operators: ops });
+  assert.equal(PP.mayChangeNetwork(book(false, null)), true, 'lock off: anyone, as RBAC has always said');
+  assert.equal(PP.mayChangeNetwork(book(true, 'own')), true);
+  for (const who of ['mgr', 'op', null, 'gone']) assert.equal(PP.mayChangeNetwork(book(true, who)), false, String(who));
+  assert.equal(PP.mayChangeNetwork(null), false, 'no book read: no');
+  // The book: a manager's save that turns the switch off is put back as it is on disk.
+  const disk = book(true, 'mgr', { offline: true, keep: ['storefront'] });
+  const g = PP.guardSave(book(true, 'mgr', { offline: false }), disk);
+  assert.deepEqual(g.store.settings.network, { offline: true, keep: ['storefront'] });
+  assert.ok(g.refused.includes('settings.network'));
+  // The owner's goes through.
+  const go = PP.guardSave(book(true, 'own', { offline: false }), book(true, 'own', { offline: true }));
+  assert.deepEqual(go.store.settings.network, { offline: false });
+  assert.ok(!go.refused.includes('settings.network'));
+  // This computer's own switch: main asks the same rule first.
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const h = main.slice(main.indexOf("ipcMain.handle('hub:outbound-set-local'"));
+  assert.match(h.slice(0, 400), /if \(!PrinterPermission\.mayChangeNetwork\(lanServerStore\)\) return \{ ok: false, error: 'not_permitted' \};/);
+});
