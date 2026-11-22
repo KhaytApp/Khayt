@@ -12,9 +12,11 @@ test('signedOutAtStart: under the lock nobody stays signed in across a restart (
   assert.equal(signedOutAtStart({ settings: { operatorLockEnabled: false, activeOperatorId: 'o' } }).changed, false);
   assert.equal(signedOutAtStart({ settings: { operatorLockEnabled: true, activeOperatorId: null } }).changed, false);
   assert.equal(signedOutAtStart(null).changed, false);
-  // Re-review: someone whose PIN the pad cannot check stays signed in.
+  // Turki, Nov 22: a PIN the pad cannot check is signed out too; the pad
+  // tells them to ask the owner for a new one (op.pin_legacy).
   const legacy = { settings: { operatorLockEnabled: true, activeOperatorId: 'o' }, operators: [{ id: 'o', roleKey: 'owner', pinHash: 'bm90LWEtcGlu!' }] };
-  assert.equal(signedOutAtStart(legacy).changed, false);
+  assert.equal(signedOutAtStart(legacy).changed, true);
+  assert.equal(signedOutAtStart(legacy).store.settings.activeOperatorId, null);
   const managed = { settings: { operatorLockEnabled: true, activeOperatorId: 'o' }, operators: [{ id: 'o', roleKey: 'owner', pinHash: require('../lib/pin-hash.js').hashPin('12345678') }] };
   assert.equal(signedOutAtStart(managed).changed, true);
   const noPin = { settings: { operatorLockEnabled: true, activeOperatorId: 'o' }, operators: [{ id: 'o', roleKey: 'owner' }] };
