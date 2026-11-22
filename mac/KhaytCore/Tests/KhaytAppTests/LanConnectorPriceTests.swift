@@ -43,7 +43,7 @@ struct LanConnectorPriceTests {
     func vectorsAgree() async throws {
         let v = Self.obj(try Self.vectors())
         guard case .array(let cases)? = v["cases"] else { Issue.record("no cases"); return }
-        #expect(cases.count >= 15)
+        #expect(cases.count >= 16)
         let shop = Self.obj(v["shop"])
         let engine = try KhaytEngine()
         for value in cases {
@@ -144,6 +144,79 @@ struct LanConnectorPriceTests {
         #expect(answer["cost"] == f.want["cost"])
         #expect(answer["margin"] == f.want["margin"])
         #expect(try await Self.scopes(bench, peer) == ["slices:send", "queue:read", "price:read", "cost:read"])
+    }
+
+    /// The vector the shop rounds: the first with `rounded: true`.
+    static func roundedFixture() throws -> (facts: Data, context: JSONValue, want: [String: JSONValue]) {
+        let v = Self.obj(try Self.vectors())
+        guard case .array(let cases)? = v["cases"],
+              let hit = cases.map(Self.obj).first(where: { Self.obj($0["want"])["rounded"] == .bool(true) }) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let facts = try JSONEncoder().encode(hit["facts"] ?? .null)
+        return (facts, Self.context(Self.obj(v["shop"]), hit), Self.obj(hit["want"]))
+    }
+
+    @Test("the margin three ways for Price and cost; never for Price")
+    func marginFields() async throws {
+        let f = try Self.fixture()
+        #expect(Self.obj(f.want["margin"]).keys.sorted() == ["amount", "pct", "pctOnCost"], "the vectors carry the three")
+        let (bench, root) = try await Self.bench(prices: true, context: f.context)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let peer = try LanConnectorRoutesTests.enrol(bench)
+        bench.devices.setPriceGrant(peer.id, "cost")
+        let (_, cost) = try await Self.ask(bench, peer, f.facts)
+        #expect(cost["margin"] == f.want["margin"])
+        #expect(cost["round"] == nil, "an unrounded price names no step")
+        bench.devices.setPriceGrant(peer.id, "price")
+        let (_, price) = try await Self.ask(bench, peer, f.facts)
+        #expect(price["margin"] == nil && price["cost"] == nil)
+    }
+
+    @Test("a rounded price names its step, for either grant")
+    func roundStep() async throws {
+        let f = try Self.roundedFixture()
+        let step = try #require(Self.obj(f.want["round"])["step"])
+        let (bench, root) = try await Self.bench(prices: true, context: f.context)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let peer = try LanConnectorRoutesTests.enrol(bench)
+        for grant in ["price", "cost"] {
+            bench.devices.setPriceGrant(peer.id, grant)
+            let (_, answer) = try await Self.ask(bench, peer, f.facts)
+            #expect(answer["rounded"] == .bool(true))
+            #expect(answer["round"] == .object(["step": step]), Comment(rawValue: grant))
+        }
+    }
+
+    @Test("the allow-list is nested: a key the rule adds inside margin, cost or round is not passed on")
+    func nestedAllowList() {
+        let priced: [String: JSONValue] = [
+            "currency": .string("SAR"), "qty": .number(1), "unit": .number(10), "total": .number(10),
+            "rounded": .bool(true), "basis": .string("measured"),
+            "cost": .object(["unit": .number(7), "total": .number(7), "spool": .string("S2")]),
+            "margin": .object(["pct": .number(30), "pctOnCost": .number(42.86), "amount": .number(3),
+                               "default": .number(30), "note": .string("x")]),
+            "round": .object(["step": .number(5), "mode": .string("up")]),
+            "preset": .string("U1")]
+        let cost = LanServer.priceAnswer(priced, grant: "cost")
+        #expect(cost["margin"] == .object(["pct": .number(30), "pctOnCost": .number(42.86), "amount": .number(3)]))
+        #expect(cost["cost"] == .object(["unit": .number(7), "total": .number(7)]))
+        #expect(cost["round"] == .object(["step": .number(5)]))
+        #expect(cost["preset"] == nil)
+        let price = LanServer.priceAnswer(priced, grant: "price")
+        #expect(Set(price.keys) == Set(["prices", "round"] + LanServer.priceKeys))
+        // A margin with no pctOnCost (the cost shows as 0.00) stays without one:
+        // the route never fills a 0 in.
+        var free = priced
+        free["margin"] = .object(["pct": .number(61.28), "amount": .number(0.01)])
+        #expect(LanServer.priceAnswer(free, grant: "cost")["margin"] == .object(["pct": .number(61.28), "amount": .number(0.01)]))
+        // A step with no rounding, a zero step or a text step is not passed on.
+        var plain = priced; plain["rounded"] = .bool(false)
+        #expect(LanServer.priceAnswer(plain, grant: "cost")["round"] == nil)
+        for bad in [JSONValue.object(["step": .number(0)]), .object(["step": .string("5")]), .number(5)] {
+            var p = priced; p["round"] = bad
+            #expect(LanServer.priceAnswer(p, grant: "cost")["round"] == nil)
+        }
     }
 
     @Test("a slice the shop cannot price says why, inside prices:on")
