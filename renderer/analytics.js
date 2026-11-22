@@ -2304,6 +2304,33 @@ function renderMachinePL() {
     return;
   }
 
+  // CAME OUT RIGHT (Figma 136:208, N2): one result per print run, in the
+  // range, by lib/printer-success.js (the Mac's rule). Cancelled runs are
+  // counted but left out of the rate; under five decided runs, no rate.
+  const runsInRange = printLog.filter((o) => o && !o.deleted).map((o) => ({
+    printRuns: (Array.isArray(o.printRuns) ? o.printRuns : []).filter((r) => r && inRange(String(r.at || '').slice(0, 10), analyticsRange, 'analytics')),
+  }));
+  const success = (typeof KhaytPrinterSuccess !== 'undefined')
+    ? new Map(KhaytPrinterSuccess.successRates({ orders: runsInRange, machines }).map((x) => [x.machineId, x]))
+    : new Map();
+  const printsCell = (s) => {
+    if (!s) return '—';
+    const total = s.finished + s.failed + s.cancelled + s.unknown;
+    if (!total) return '—';
+    const bits = [String(total)];
+    if (s.failed) bits.push(t('an.runs_failed', { n: String(s.failed) }));
+    if (s.cancelled) bits.push(t('an.runs_cancelled', { n: String(s.cancelled) }));
+    if (!(s.finished + s.failed) && s.unknown) bits.push(t('an.runs_unmarked'));
+    return bits.join(' · ');
+  };
+  const rateCell = (s) => {
+    if (!s || s.rate === null) return '<span style="color:var(--text-muted);">—</span>';
+    if (!s.enough) return `<span style="color:var(--text-muted);">${escapeHtml(t('an.too_few_prints'))}</span>`;
+    const pct = Math.round(s.rate * 100);
+    const col = pct >= 90 ? 'var(--success)' : pct >= 75 ? 'var(--warning)' : 'var(--danger)';
+    return `<span style="color:${col};">${pct}%</span>`;
+  };
+
   const cur = currencySymbol();
   // A machine with a purchase price set loses value as it prints — the one
   // place its wear is counted. A column only where there is any.
@@ -2317,6 +2344,8 @@ function renderMachinePL() {
           <tr style="color:var(--text-muted);">
             <th style="text-align:start; padding:6px 8px;">${escapeHtml(t('doc.machine'))}</th>
             <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.pnl_orders'))}</th>
+            <th style="text-align:start; padding:6px 8px;">${escapeHtml(t('an.prints_col'))}</th>
+            <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.came_out_right_col'))}</th>
             <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.revenue'))} (${cur})</th>
             <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.mat_cost_col'))} (${cur})</th>
             <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.linked_exp_col'))} (${cur})</th>
@@ -2342,6 +2371,8 @@ function renderMachinePL() {
                 <strong>${escapeHtml(r.name)}</strong>
               </td>
               <td style="text-align:end; padding:6px 8px;">${r.jobs}</td>
+              <td class="mpl-prints" style="text-align:start; padding:6px 8px; white-space:nowrap;">${escapeHtml(printsCell(success.get(r.machineId)))}</td>
+              <td class="mpl-right" style="text-align:end; padding:6px 8px; font-weight:600;">${rateCell(success.get(r.machineId))}</td>
               <td style="text-align:end; padding:6px 8px; font-variant-numeric:tabular-nums;">${fmtMoney(r.revenue)}</td>
               <td style="text-align:end; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.materialCost)}</td>
               <td style="text-align:end; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.linkedExpenses)}</td>

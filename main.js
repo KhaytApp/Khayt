@@ -6036,6 +6036,21 @@ ipcMain.handle('hub:probe-printer', async (_e, machine) => {
 });
 
 ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
+// What each printer needs from a person, for the Machines page (Figma 136:153,
+// N1): the SAME shared rule as /api/machines/live and the cloud snapshot
+// (lib/printer-needs.js), so the window, a paired phone and the Mac say the
+// same thing. Read from main's own copy of the book and its poll cache.
+ipcMain.handle('hub:printer-needs', () => {
+  try {
+    const PN = require('./lib/printer-needs.js');
+    const book = lanServerStore || {};
+    return PN.printerNeeds({
+      machines: Array.isArray(book.machines) ? book.machines : [],
+      cache: printerStatusCache, polled: PN.polledFrom(printerStatusCache),
+      completions: book.printerCompletions || {}, orders: book.printLog || [],
+    }) || {};
+  } catch (e) { return {}; }
+});
 
 /**
  * Pause / resume / cancel the job on a printer.
