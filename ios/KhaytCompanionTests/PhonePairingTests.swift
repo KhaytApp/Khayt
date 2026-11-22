@@ -44,6 +44,81 @@ final class PhonePairingTests: XCTestCase {
         }
     }
 
+    // MARK: The phone's own vectors (#2625, docs/phone-pair.vectors.json)
+
+    private struct PhoneCase: Decodable {
+        let name, pluginPrivateHex, nonceHex, deviceId, identityPublic, serverPublic, pluginPublic, nonce: String
+        let commit, offerMessage, sig, check, derivedKey: String
+    }
+    private struct PhoneRefusal: Decodable {
+        let name, refusedBy, why: String
+        let deviceId, identityPublic, serverPublic, commit, offerMessage, sig: String?
+    }
+    private struct PhoneVectors: Decodable {
+        struct Prefixes: Decodable, Equatable { let commit, offer, check: String }
+        let prefixes: Prefixes
+        let cases: [PhoneCase]
+        let refuse: [PhoneRefusal]
+    }
+
+    private func phoneVectors() throws -> PhoneVectors {
+        try JSONDecoder().decode(PhoneVectors.self, from: Data(contentsOf: root.appending(path: "docs/phone-pair.vectors.json")))
+    }
+
+    /// The HARD-CODED `.phone` variant is held to the file the Mac and the
+    /// desktop are generated from. The variant is never built from the file
+    /// (that would prove nothing): a typo in one of the phone's prefixes fails
+    /// here, not only against a real Mac. The simulated-Mac tests below use
+    /// `.phone` on both sides, so they cannot catch it.
+    func testThePhoneVariantIsTheSharedOne() throws {
+        let v = try phoneVectors()
+        let phone = PairCode.Variant.phone
+        XCTAssertEqual(PhoneVectors.Prefixes(commit: phone.commit, offer: phone.offer, check: phone.check), v.prefixes)
+        XCTAssertNotEqual(phone, PairCode.Variant.connector)
+    }
+
+    func testThePhoneVectorsGiveTheSameMath() throws {
+        let v = try phoneVectors()
+        XCTAssertGreaterThanOrEqual(v.cases.count, 9)
+        for c in v.cases {
+            let pairing = CodePairing(variant: .phone, privateKey: hex(c.pluginPrivateHex), nonce: hex(c.nonceHex))
+            XCTAssertEqual(pairing.publicKey, c.pluginPublic, c.name)
+            XCTAssertEqual(pairing.nonce, c.nonce, c.name)
+            XCTAssertEqual(pairing.commit, c.commit, c.name)
+            XCTAssertEqual(String(decoding: PairCode.offerMessage(.phone, deviceId: c.deviceId, serverPublic: c.serverPublic,
+                                                                  commit: c.commit), as: UTF8.self), c.offerMessage, c.name)
+            let offer = PairOffer(pairId: "pair_SampleOffer01", pollSecret: "poll_SampleSecret01", deviceId: c.deviceId,
+                                  publicKey: c.serverPublic, sig: c.sig, identity: c.identityPublic)
+            XCTAssertEqual(pairing.accept(offer), .success(c.check), c.name)
+            let key = try XCTUnwrap(pairing.privateKey.flatMap {
+                DeviceKey.deriveKey(phonePrivate: $0, macPublic: c.serverPublic, deviceId: c.deviceId)
+            }, c.name)
+            XCTAssertEqual(key.withUnsafeBytes { Data($0) }.base64EncodedString(), c.derivedKey, c.name)
+            XCTAssertEqual(pairing.credential(offer)?.key, c.derivedKey, c.name)
+        }
+    }
+
+    /// Every offer the file says the PHONE must refuse, from the first case's
+    /// phone (its key and nonce), each refused with no number and no
+    /// credential. The `mac` rows are the Mac's to refuse.
+    func testThePhoneRefusesEveryOfferTheFileSaysItMust() throws {
+        let v = try phoneVectors()
+        let first = try XCTUnwrap(v.cases.first { $0.name == "first" })
+        let pairing = CodePairing(variant: .phone, privateKey: hex(first.pluginPrivateHex), nonce: hex(first.nonceHex))
+        let phoneRows = v.refuse.filter { $0.refusedBy == "phone" }
+        XCTAssertEqual(phoneRows.count, 6, "six offers the phone must refuse")
+        XCTAssertEqual(v.refuse.filter { $0.refusedBy == "mac" }.count, 3)
+        for r in phoneRows {
+            let offer = PairOffer(pairId: "pair_SampleOffer01", pollSecret: "poll_SampleSecret01",
+                                  deviceId: try XCTUnwrap(r.deviceId, r.name), publicKey: try XCTUnwrap(r.serverPublic, r.name),
+                                  sig: try XCTUnwrap(r.sig, r.name), identity: try XCTUnwrap(r.identityPublic, r.name))
+            guard case .failure = pairing.accept(offer) else {
+                XCTFail("\(r.name): accepted, but \(r.why)"); continue
+            }
+            XCTAssertNil(pairing.credential(offer), "\(r.name): no credential")
+        }
+    }
+
     // MARK: The phone's variant, against a simulated Mac
 
     private struct Mac {
