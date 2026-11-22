@@ -22,7 +22,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Windows/Linux: the automatic calls home obey the "make no internet calls" switch (not on screen yet).** The update check and download, the anonymous install count, crash reports (Sentry does not even start) and usage statistics now ask `lib/outbound.js` first, through one gate in the main process (`lib/main/outbound-fetch.js`). With the switch off, which is everyone today, nothing changes. Blocked crash and usage events are dropped, not saved up for later. A check pressed by hand is refused the same way: there is no one-time override (D2). This computer can be set stricter than the shop (`network-local.json`). A source test lists every other network call in the desktop code and only lets that list shrink; the next PRs gate cloud and the shop's integrations until it is empty. Tests: `test/outbound-gate.test.js`, `test/outbound-ratchet.test.js`. Under the staff lock only the owner may change the switch (the shop's setting, and this computer's own); anyone else's change is put back.
 
-- **Shared rule (not yet wired): one switch for every internet call Khayt makes.** `lib/outbound.js` answers whether a call may go out, for 19 named purposes: updates, the install count, crash reports, usage statistics, Khayt Cloud, MakerRun, catalogues, and the shop's own storage, messages, webhooks, payments, online store (Medusa, Salla, Zid), AI, ZATCA, exchange rates, lookups and remote tunnel. A shop that turns on "make no internet calls" (kept in the shop's data, so every computer and the phone follow it) can still keep chosen purposes. A computer can be set stricter than the shop, never looser. Printers, cameras and phones on the shop's own network always keep working, but only at a private address or a local name. Crash reports and usage statistics stay opt-in either way. Nothing calls it yet. Tests: `test/outbound-vectors.test.js`, with vectors in `test/fixtures/outbound-vectors.json` for the Mac and iPhone. One more purpose (Turki, Nov 22): **switch updates from Khayt Cloud** (`switch-sync`, every 15 minutes), the one call a computer keeps while offline, and only when the switch reached it through Khayt Cloud (`settings.network.via` is `cloud`). Then it can still hear the switch turned off. A computer offline by its own switch, or by the LAN alone, makes no call. The row can be unticked (`settings.network.dropSwitchSync`), and it is never kept through the keep list.
 - **Shared rule (not yet wired): one switch for every internet call Khayt makes.** `lib/outbound.js` answers whether a call may go out, for 19 named purposes: updates, the install count, crash reports, usage statistics, Khayt Cloud, MakerRun, catalogues, and the shop's own storage, messages, webhooks, payments, online store (Medusa, Salla, Zid), AI, ZATCA, exchange rates, lookups and remote tunnel. A shop that turns on "make no internet calls" (kept in the shop's data, so every computer and the phone follow it) can still keep chosen purposes. A computer can be set stricter than the shop, never looser. Printers, cameras and phones on the shop's own network always keep working, but only at a private address or a local name. Crash reports and usage statistics stay opt-in either way. Nothing calls it yet. Tests: `test/outbound-vectors.test.js`, with vectors in `test/fixtures/outbound-vectors.json` for the Mac and iPhone. One more purpose (Turki, Nov 22): **switch updates from Khayt Cloud** (`switch-sync`, every 15 minutes), the one call a computer keeps while offline, and only when the switch reached it through Khayt Cloud (`settings.network.via` is `cloud`). Then it can still hear the switch turned off. A computer offline by its own switch, or by the LAN alone, makes no call. The row can be unticked (`settings.network.dropSwitchSync`), and it is never kept through the keep list. A person's answer to "Use the newer setting" may let ONE switch-sync call through while the shop's switch is off and nothing keeps it: the app makes a token when they answer (`answerToken`), it is live for 20 seconds, used once (`spend`), only for switch-sync, and never against this computer's own switch. The desktop and the Mac share this rule and its vectors.
 
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
@@ -17023,7 +17022,6 @@ hand back work done away from the desk.
   quotes and bought nothing sat at the top of "lifetime value". And a customer
   whose first two jobs landed on the same day counted as two new customers.
 
-
 ## [4.0.0-alpha.25] - 2026-09-18
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
@@ -19218,7 +19216,6 @@ against them test for test. It becomes the main Khayt on macOS, a native Windows
 app follows, and this Electron build continues as the third option for everyone
 else. Nothing you have to do, and nothing about this release depends on it.
 
-
 ### Before you update
 
 - **Finishing a job now takes off the shelf what the job actually used, not
@@ -19532,7 +19529,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   (`29:12 + 0:00 + 41:50 = 71:02`) and becomes a total over a count beyond that,
   because ten terms is not an arithmetic anybody verifies.
 
-
 - **The tax you pay on a purchase is money you get back, and Khayt can hold it
   now.** A box on an expense for the VAT on the supplier's invoice. It comes off
   the VAT you charged, so the quarterly report shows what you actually owe
@@ -19546,7 +19542,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   workarounds — the VAT column below was written as a squeezed second line
   because a conditional table column needs 14.4.
 
-
 - **The Mac app's tests run on a pull request.** Everything in CI ran on Linux,
   so for as long as the native app has existed none of its 705 tests had run on
   a PR — not the guard that the Quick Look extension carries no Swift entry
@@ -19556,8 +19551,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
 
   It builds the extensions before testing, because the entry-point guard READS
   THE BUILT BINARY and skips when there is nothing to read.
-
-
 
 - **The space bar answers the question too.** Pressing space on a `.3mf` in
   Finder shows the plate render large, with the printer, layer height, nozzle,
@@ -21066,7 +21059,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   It now requires a window big enough to be one somebody reads, and when it
   finds none it says which windows were open instead of failing quietly.
 
-
 - **Two of ten models in one real library were filed under a picture of
   themselves from above.** Importing a 3MF took the largest `Metadata/*.png` in
   the archive, and a slicer writes several: the plate render, a small copy of it,
@@ -21416,7 +21408,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   shop (the daily backup and a named restore point). They are minted on demand,
   so an import re-mints; a shop that migrates by export republishes its portal
   links.
-
 
 - **Your backups before an app update are kept properly.** They were counted
   as ordinary daily backups and survived only by accident of how the filenames
@@ -21945,7 +21936,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   converter's colour dialog, "Delivered", "Done", "Resent", and the hint inside
   the product name box. Every one is written properly now, in all nine
   languages, and Khayt will not build if another one appears.
-
 
 ## [3.7.0-beta.24] - 2026-09-02
 
@@ -22525,7 +22515,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   It always says what it did: converted, resized, recompressed, and from what
   size to what size.
 
-
 - **Khayt can tell a customer when their order would actually be ready.**
   Settings now has **Delivery estimates**: how many printing hours you get
   through on a working day, how many days a week you work, and how long
@@ -22624,7 +22613,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Those protections are now applied to every response the shop's server sends,
   rather than page by page, so a page added later cannot be left out.
 
-
 - **A model measured in inches, centimetres or metres is now the right size in the
   preview.** A 3MF file records the units its numbers are in, and the preview was
   reading every file as though it were in millimetres. A part drawn as 12×12×6
@@ -22686,7 +22674,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   nowhere. Update times sent as `eventTime` are also read now; they were being
   dropped.
 
-
 - **Hardened a text-escaping helper that could have stopped escaping.** Two
   places in Khayt used a short helper to make customer-supplied text safe to
   display, and each was written to fall back to the raw text if the main
@@ -22706,7 +22693,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   The file Khayt generates for a Medusa store also declares its imports the way
   Medusa's own examples do, which keeps it compiling in projects with stricter
   TypeScript settings than the default.
-
 
 ## [3.7.0-beta.9] - 2026-08-27
 
@@ -22813,7 +22799,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Printing something twice as fast as you quoted is not flagged. You will hear
   about overcharging from your customers.
 
-
 - **You can install a design someone else made.** Khayt has had the machinery
   for custom designs for a long time and nobody has ever used it, because there
   was nowhere to put one: designs lived inside the application file, which is
@@ -22836,7 +22821,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   the problem rather than just saying no. Checking again on load matters because
   a file that was fine when you installed it may not be fine tomorrow — if it
   changes on disk it stops loading, and says so instead of quietly applying.
-
 
 ### Fixed
 
@@ -22910,7 +22894,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   utilisation"* — so you can choose on looks and know the price, or choose on the
   numbers you need. A design that costs you nothing says nothing.
 
-
 ### Fixed
 
 - **The Flow board never marked an order late.** Not "rarely" — never, since the
@@ -22922,7 +22905,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
 
   If you use Flow and have wondered why nothing ever looked urgent: it was this,
   and it is fixed.
-
 
 ### Added
 
@@ -22944,7 +22926,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   behaviour is covered by tests end to end, but if you have one, this is the
   release to tell us about it.
 
-
 ### Fixed
 
 - **An order that arrives twice from your online store no longer becomes two
@@ -22964,7 +22945,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Orders that carry no order number are still accepted exactly as before — an
   order Khayt cannot recognise is still an order, and losing it would be worse
   than the duplicate.
-
 
 ### Added
 
@@ -23045,7 +23025,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   accepts the connection and then says nothing at all, which looks identical to a
   dead printer. The message now names it, and the machine dialog says so before
   you spend eight seconds finding out.
-
 
 - **An OctoPrint printer reported the slicer's guess as the measured weight.**
   When a job finishes, Khayt reads what it *actually* used off the printer. On
@@ -23400,7 +23379,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   run branches. If any of them cannot, your shop quietly keeps sending whole
   stores exactly as before, with no error and nothing for you to do. The saving
   starts on its own once they are all updated.
-
 
 ## [3.6.0] - 2026-08-21
 
@@ -24077,7 +24055,6 @@ are unaffected; those were never estimates.
   rather than looking expired. A server that is genuinely misconfigured still
   reports as a failure, because that one will not fix itself by waiting.
 
-
 ## [3.6.0-beta.14] - 2026-08-09
 
 ### Added
@@ -24143,7 +24120,6 @@ are unaffected; those were never estimates.
   spanning two currencies refuses to add them. **Disband** takes the jobs back
   out and leaves the prints untouched.
 
-
 ### Security
 
 - **Khayt no longer has any way to read a message thread without proving the
@@ -24154,7 +24130,6 @@ are unaffected; those were never estimates.
   route can now be closed on the server with nothing left depending on it. If your
   Khayt Cloud server is older than this build, the Messages panel now says so and
   tells you to update it, rather than quietly reading the thread another way.
-
 
 ## [3.6.0-beta.13] - 2026-08-07
 
@@ -24261,13 +24236,11 @@ are unaffected; those were never estimates.
   plaques the same size on the outside can carry different faces, and only you
   can say whether they are the same job.
 
-
 ## [3.6.0-beta.12] - 2026-08-06
 
 Mostly about telling you the truth when something did not work. Signing in to the
 cloud stops asking you to wait for a code the server already failed to send, and
 "Slice for exact quote" stops handing back a time with the weight left blank.
-
 
 ### Fixed
 
@@ -24302,12 +24275,10 @@ cloud stops asking you to wait for a code the server already failed to send, and
   each say plainly when the email could not be sent, instead of sending you to
   wait for it.
 
-
 ## [3.6.0-beta.11] - 2026-08-04
 
 Signing in to the cloud, when it goes wrong, now says what went wrong. Nothing
 about quoting changes on this build.
-
 
 ### Fixed
 
@@ -24327,7 +24298,6 @@ about quoting changes on this build.
   comes from when the server reports one, and offers **Send it again** without
   making you close the dialog and start over.
 
-
 ## [3.6.0-beta.10] - 2026-08-04
 
 The estimator stops pretending it knows one number. Grams-per-hour was learned
@@ -24339,7 +24309,6 @@ disagreed, rather than as something your printer does.
 
 **Quotes for unsliced models move again on this build**, for a different reason
 than they moved in beta.9 — see [docs/BETA-RELEASE.md](./docs/BETA-RELEASE.md).
-
 
 ### Added
 
@@ -24650,7 +24619,6 @@ installs that did not work.
   The board is now what you get, in every theme. If you prefer the list, switch
   once and it stays switched — including for shops that already chose it.
 
-
 ## [3.6.0-beta.6] - 2026-08-02
 
 One change you will see, and it exists because two prints ran back to back —
@@ -24693,7 +24661,6 @@ which is an ordinary day in a shop and something no test had ever imagined.
 
 - The Snapmaker U1 catalogue entry is pinned to what the machine itself reports.
 
-
 ## [3.6.0-beta.5] - 2026-08-02
 
 Two fixes to the files Bed Ready sends a Snapmaker U1, both found by opening a
@@ -24727,7 +24694,6 @@ Two fixes to the files Bed Ready sends a Snapmaker U1, both found by opening a
   rather than an invented shape. `lib/hueforge.js` gained tests in beta.4; its
   mesh geometry proved correct.
 
-
 ## [3.6.0-beta.4] - 2026-08-01
 
 A small one, and only for Bed Ready. Two settings that Khayt would accept
@@ -24756,7 +24722,6 @@ without complaint and then quietly build an unprintable plan from.
   be correct — every test heightfield produces exactly the volume its shape
   implies, checked against Khayt's own STL reader, and the output slices cleanly
   in PrusaSlicer.
-
 
 ## [3.6.0-beta.3] - 2026-08-01
 
@@ -24793,7 +24758,6 @@ without real hardware in front of it.
   checked against hand-written examples, which can agree with a mistake
   forever. Read live, mid-print, from a Snapmaker U1 on stock firmware: every
   field correct. Stock firmware is enough; no custom firmware needed.
-
 
 ## [3.6.0-beta.2] - 2026-08-01
 
@@ -24851,7 +24815,6 @@ is the reason this exists.
 - `npm run verify:estimator` slices a spread of shapes with a real PrusaSlicer
   and prints Khayt's estimate beside the truth. That is where the percentages
   above come from.
-
 
 ## [3.6.0-beta.1] - 2026-07-31
 
@@ -24950,7 +24913,6 @@ becomes the default download.
 - **A part's file reference can be a real link.** The free-text file field is
   still there; alongside it you can now pick from your print library, which is
   what lets a finished job teach the file it printed.
-
 
 ## [3.5.3] - 2026-08-01
 
@@ -25162,7 +25124,6 @@ they first downloaded, with no sign anything was wrong.
 This release is the first to publish that file, which means **3.4.1 still has to
 be installed by hand**; from here on the AppImage will offer updates by itself.
 
-
 ### Fixed
 
 - **Linux never received automatic updates.** Khayt's Linux builds were published
@@ -25176,7 +25137,6 @@ be installed by hand**; from here on the AppImage will offer updates by itself.
   can replace itself, but the check did not know that and reported the same
   answer as a genuine no-update-found. It now says plainly that this install
   cannot update itself, and points at the download page.
-
 
 ## [3.4.0] - 2026-07-29
 
@@ -25727,7 +25687,6 @@ this is what changed for you since 3.1.0.
 - Per-printer camera feed (LAN only).
 - Printer discovery on the local network, including PrusaLink and Moonraker.
 - Keyboard shortcuts shown on the sidebar items they belong to.
-
 
 ## [3.2.0-beta.61] - 2026-07-22
 
