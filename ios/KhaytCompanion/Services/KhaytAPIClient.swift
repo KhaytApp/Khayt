@@ -2343,13 +2343,19 @@ final class KhaytAPIClient: ObservableObject {
             // old address, a spoofer), not a man in the middle. The full fix
             // is the Mac signing the refusal itself, over the device id and
             // this request's nonce (Mac lane). No PIN goes anywhere either way.
+            //
+            // NEVER A WIPE ON UNSIGNED WORDS (Dev Hub, from #2643's review).
+            // Proven, the phone stops showing the book as live and asks to
+            // pair again, as for `.unknown`, and keeps its PIN, enrolment and
+            // key; a good signed request later clears it. Only a refusal the
+            // Mac signs (#2643, handled where the reply MAC can be checked)
+            // forgets the Mac.
             let key = settings.macIdentityKey
             guard !key.isEmpty, await proves(host: settings.host, port: settings.port, key: key) else {
                 throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
             }
-            settings.forgetMac(keepShop: cloud != nil)
-            enrolNotBefore = nil
-            throw KhaytAPIError.server(L10n.tr("pair.signed_out"))
+            settings.needsPairAgain = true
+            throw KhaytAPIError.unauthorized
         case nil:
             return (data, response)
         }
