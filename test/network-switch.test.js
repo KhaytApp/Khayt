@@ -109,7 +109,7 @@ function harness(over = {}) {
   const server = { value: null, puts: [], gets: 0, status: null, blocked: false, putStatus: null, hang: false, getFail: false };
   let book = { network: Object.assign({}, over.network || {}) };
   let file = { v: 2, scopes: { [SCOPE]: Object.assign({}, over.mine || {}) } };
-  let sess = over.locked ? null : { url: 'https://cloud.example', shopId: SHOP, token: 't', role: over.role || 'owner', dek, scope: SCOPE };
+  let sess = over.locked ? null : { url: 'https://cloud.example', shopId: SHOP, token: 't', role: 'role' in over ? over.role : 'owner', dek, scope: SCOPE };
   let may = over.mayChange !== false;
   const notes = [];
   const logs = [];
@@ -420,4 +420,17 @@ test('desktop wiring: only the book\'s own cloud, the staff lock, the gate purpo
   const iu = read('renderer/internet-use.js');
   assert.match(iu, /networkSwitchPublish\(\{ offline: false \}\)/);
   assert.match(iu, /filter\(\(k\) => k !== 'switch-sync'\)/);
+});
+
+test('security review LOW-1: no cloud role recorded is not the owner; the share option greys and nothing is published', async () => {
+  for (const role of [null, undefined, '']) {
+    const h = harness({ mine: { share: true }, role });
+    assert.equal((await h.sync.publish({ offline: true, network: ON_NOW })).why, 'role', String(role));
+    assert.equal(h.server.puts.length, 0, 'nothing sent');
+    assert.equal(harness({ role }).sync.setShare(true).why, 'role', String(role));
+  }
+  // main.js hands the sync the book's role as it is, never a default of owner.
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  assert.doesNotMatch(main, /role: cloud\.role \|\| 'owner'/);
+  assert.match(main, /role: typeof cloud\.role === 'string' && cloud\.role \? cloud\.role : null, scope/);
 });
