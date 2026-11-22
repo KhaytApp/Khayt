@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: "you are signed out" is signed.** A phone that hears `device-revoked` drops its key and its copy of the book, and until now anything on the Wi-Fi could say it. The refusal now carries the same reply signature as the role answers, under the key the phone had, and only when the request itself came from that phone. The Mac keeps a signed-out phone's old key for this alone; it opens nothing.
+
 - **Mac: a paired phone learns the shop's "make no internet calls" switch from `/api/status`.** A phone in a floor role (operator, viewer) has no copy of the book, so it could not know. A status request signed by a paired device now also gets `network: {offline, keep}`, read by the shared rule, and the answer is signed back so nothing on the Wi-Fi can tell the phone the switch is off. Everyone else gets the same public counts as before.
 
 - **Mac: a phone that cancels pairing by code tells the Mac.** `DELETE /api/devices/pair/<pairId>` with the phone's poll secret ends its own request, so the Mac goes back to waiting at once and no longer shows a number nobody is looking at until the window ends. Only the phone that asked can cancel, an approval already given is not undone, and the offer stays counted.

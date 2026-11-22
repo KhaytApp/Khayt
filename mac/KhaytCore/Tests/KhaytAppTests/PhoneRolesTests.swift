@@ -350,6 +350,50 @@ struct PhoneRolesTests {
         #expect(String(decoding: open.body, as: UTF8.self) == expected)
     }
 
+    @Test("device-revoked is signed for the phone that was signed out, and for nobody who only names it")
+    func revokedIsSigned() async throws {
+        let bench = try await Self.bench()
+        let phone = try Self.codePaired(bench.devices, role: "manager", name: "Signed out")
+        let other = try Self.codePaired(bench.devices, role: "manager", name: "Still here")
+        #expect(bench.devices.remove(phone.id))
+        func ask(_ headers: [String: String], _ path: String = "/api/queue") async throws -> LanServerTests.Bench.Reply {
+            try await bench.send("GET", path, headers: headers, timeout: 30)
+        }
+        // Its own request: refused, and the refusal verifies under the key it had.
+        var headers = phone.headers("GET", "/api/queue")
+        var reply = try await ask(headers)
+        #expect(reply.status == 401 && reply.json["reason"] as? String == "device-revoked")
+        #expect(reply.headers["x-khayt-reply-mac"] == LanServer.replyMac(key: phone.key, nonce: headers["x-khayt-nonce"] ?? "",
+                                                                         status: 401, body: reply.body))
+        // The same on the route the phone asks first.
+        headers = phone.headers("GET", "/api/devices/self")
+        reply = try await ask(headers, "/api/devices/self")
+        #expect(reply.status == 401)
+        #expect(reply.headers["x-khayt-reply-mac"] == LanServer.replyMac(key: phone.key, nonce: headers["x-khayt-nonce"] ?? "",
+                                                                         status: 401, body: reply.body))
+        // Somebody who only knows its id: the same words, nothing signed.
+        headers = phone.headers("GET", "/api/queue")
+        headers["x-khayt-mac"] = Data(repeating: 1, count: 32).base64EncodedString()
+        reply = try await ask(headers)
+        #expect(reply.status == 401 && reply.json["reason"] as? String == "device-revoked")
+        #expect(reply.headers["x-khayt-reply-mac"] == nil)
+        // A request signed for another path, played at this one: not signed.
+        reply = try await ask(phone.headers("GET", "/api/store"))
+        #expect(reply.status == 401 && reply.headers["x-khayt-reply-mac"] == nil)
+        // An id nobody ever enrolled: unknown, unsigned.
+        let stranger = LanConnectorRoutesTests.Peer(id: LanDevices.freshId(), key: Data(repeating: 7, count: 32))
+        reply = try await ask(stranger.headers("GET", "/api/queue"))
+        #expect(reply.status == 401 && reply.json["reason"] as? String == "device-unknown" && reply.headers["x-khayt-reply-mac"] == nil)
+        // The old key opens nothing, and the phone that is still paired is untouched.
+        #expect(bench.devices.phoneKey(phone.id) == nil)
+        #expect(try await ask(other.headers("GET", "/api/queue")).status == 200)
+        // The key is held only as long as the sign-out is remembered.
+        #expect(bench.devices.revokedReplyKey(headers: phone.headers("GET", "/api/queue"), method: "GET", target: "/api/queue",
+                                              body: Data(), now: Date(timeIntervalSince1970: TimeInterval(LanConnectorRoutesTests.now))) == phone.key)
+        #expect(bench.devices.revokedReplyKey(headers: phone.headers("GET", "/api/queue"), method: "GET", target: "/api/queue", body: Data(),
+                                              now: Date(timeIntervalSince1970: TimeInterval(LanConnectorRoutesTests.now + 3600))) == nil, "a stale request is not answered with a signature")
+    }
+
     @Test("the role answers are signed back to the phone, and only to a request that verified")
     func replyMacs() async throws {
         let bench = try await Self.bench()
