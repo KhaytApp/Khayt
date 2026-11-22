@@ -6204,6 +6204,8 @@
   "iu.banner": "Khayt hat seit {n} Tagen nicht nach Updates gesucht, daher haben keine Sicherheitskorrekturen diesen Computer erreicht.",
   "iu.banner_shop": "Dein Shop hat Internetverbindungen ausgeschaltet.",
   "iu.banner_here": "Dieser Computer hat Internetverbindungen ausgeschaltet.",
+  "iu.banner_g_ask": "Dein Shop hat an einem anderen Computer die Internetnutzung ausgeschaltet. Khayt wartet darauf, ob du das hier übernimmst.",
+  "iu.banner_g_conflict": "Der Internetschalter wurde an einem anderen Computer nach deiner Änderung hier geändert. Wähle, welche Einstellung bleibt.",
   "iu.keep_updates": "Updates beibehalten",
   "outbound.blocked.offline": "Khayt ist so eingestellt, dass keine Internetverbindungen hergestellt werden. Dies erfordert {purpose}.",
   "outbound.blocked.offline-here": "Dieser Computer ist so eingestellt, dass keine Internetverbindungen hergestellt werden. Dies erfordert {purpose}.",

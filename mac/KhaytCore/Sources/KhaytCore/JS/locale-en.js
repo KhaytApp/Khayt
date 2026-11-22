@@ -6205,6 +6205,8 @@
   "iu.banner": "Khayt has not checked for updates for {n} days, so no security fixes have reached this computer.",
   "iu.banner_shop": "Your shop has turned off internet calls.",
   "iu.banner_here": "This computer has turned off internet calls.",
+  "iu.banner_g_ask": "Your shop turned off internet use at another computer. Khayt is waiting for you to say whether to apply it here.",
+  "iu.banner_g_conflict": "The internet switch was changed at another computer after your change here. Choose which one to keep.",
   "iu.keep_updates": "Keep updates",
   "outbound.blocked.offline": "Khayt is set to make no internet calls. This needs {purpose}.",
   "outbound.blocked.offline-here": "This computer is set to make no internet calls. This needs {purpose}.",

@@ -6204,6 +6204,8 @@
   "iu.banner": "Khayt 已有 {n} 天未检查更新，因此此电脑没有收到任何安全修复。",
   "iu.banner_shop": "你的商店已关闭联网请求。",
   "iu.banner_here": "此电脑已关闭联网请求。",
+  "iu.banner_g_ask": "你的商店在另一台电脑上关闭了联网。Khayt 正在等你决定是否在这里应用。",
+  "iu.banner_g_conflict": "你在这里更改后，另一台电脑又更改了联网开关。请选择保留哪一个。",
   "iu.keep_updates": "保留更新",
   "outbound.blocked.offline": "Khayt 已设置为不进行任何联网请求。此操作需要{purpose}。",
   "outbound.blocked.offline-here": "此电脑已设置为不进行任何联网请求。此操作需要{purpose}。",
