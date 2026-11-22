@@ -78,7 +78,7 @@ try {
   await openLanSettings(window);
   const listed = await window.evaluate(() => document.getElementById('lanPairedPhones').innerText);
   ok(/Workshop iPhone/.test(listed) && /Lost iPhone/.test(listed), 'Settings lists both phones');
-  ok(/Last seen/.test(listed), 'each with when it was last seen');
+  ok(/last seen/i.test(listed), 'each with when it was last seen');
   if (shots) await window.screenshot({ path: shots + '/paired-phones-en.png' });
 
   let asked = '';
