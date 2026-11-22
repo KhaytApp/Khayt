@@ -1014,6 +1014,55 @@ struct NetworkSwitchWiringTests {
         #expect(try #require(NetworkSwitch.date(onStamp)) > (try #require(NetworkSwitch.date(unsent))))
     }
 
+    @Test("a stamp far ahead already in the book is not followed: the change is stamped by the clock, and is sent")
+    func aWrongStampInTheBookIsNotFollowed() async throws {
+        // A book restored from a Mac whose clock was a year ahead, or this Mac's clock wrong once.
+        let wrong = StoreWriter.iso(Date().addingTimeInterval(365 * 86400))
+        let on: JSONValue = .object(["offline": .bool(true), "changedAt": .string(wrong), "via": .string("cloud")])
+        let (shop, server, book) = await Self.shop(option: true, network: on)
+        #expect(shop.stampsToComeAfter(now: Date()).isEmpty, "more than ten minutes ahead: not a stamp to come after")
+        await server.answerGet(200, try Self.published(.init(offline: true, keep: [], changedAt: Self.stamp(3600), changedBy: nil)))
+        let before = Date()
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+        let mine = try #require({ () -> String? in if case .string(let s)? = Self.obj(book.network)["changedAt"] { return s }; return nil }())
+        let mineAt = try #require(NetworkSwitch.date(mine))
+        #expect(mineAt >= before.addingTimeInterval(-1) && mineAt <= Date().addingTimeInterval(1), Comment(rawValue: "stamped by the clock, not in \(wrong)'s year: \(mine)"))
+        let asked = await server.asked
+        #expect(asked.map(\.method) == ["GET", "PUT"])
+        #expect(try Self.sent(asked[1].body, shop).changedAt == mine)
+        // Within the ten minutes a stamp may be ahead, it IS followed (the other computer's clock, a few minutes fast).
+        let near = StoreWriter.iso(Date().addingTimeInterval(540))
+        let (other, _, _) = await Self.shop(option: false, network: .object(["offline": .bool(false), "changedAt": .string(near)]))
+        #expect(other.stampsToComeAfter(now: Date()) == [near])
+        // And one just past the limit is not.
+        let past = StoreWriter.iso(Date().addingTimeInterval(NetworkSwitch.aheadAllowed + 5))
+        let (third, _, _) = await Self.shop(option: false, network: .object(["offline": .bool(false), "changedAt": .string(past)]))
+        #expect(third.stampsToComeAfter(now: Date()).isEmpty)
+    }
+
+    @Test("the rule's stamp reaches the book as text, exactly: one millisecond later for every millisecond ending")
+    func theMillisecondIsNeverLost() async throws {
+        let engine = OperatorLockTests.sharedEngine
+        let now = try #require(NetworkSwitch.date("2026-11-22T10:00:00.000Z"))
+        var lost: [String] = []
+        for ms in 0..<1000 {
+            let seen = "2026-11-22T10:05:00." + String(format: "%03d", ms) + "Z"
+            let stamped = try await engine.networkSwitchStampAfter(now: now, seen: [seen])
+            let written = Shop.network(.object(["offline": .bool(true), "changedAt": .string(seen)]), offline: false, by: nil, stamp: stamped)
+            guard case .string(let inBook)? = Self.obj(written)["changedAt"], inBook == stamped else { lost.append(seen); continue }
+            // As whole milliseconds, compared as numbers: exactly one later.
+            let want = ms == 999 ? "2026-11-22T10:05:01.000Z" : "2026-11-22T10:05:00." + String(format: "%03d", ms + 1) + "Z"
+            if inBook != want { lost.append("\(seen) → \(inBook)") }
+        }
+        #expect(lost.isEmpty, Comment(rawValue: lost.prefix(5).joined(separator: ", ")))
+        // The change is written with the rule's own text, not a date turned back into text.
+        let src = try String(contentsOf: Self.sources.appending(path: "Shop+Outbound.swift"), encoding: .utf8)
+        let body = try #require(src.range(of: "func setOutboundOffline("))
+        let rest = src[body.upperBound...]
+        #expect(rest.contains("Self.network(.object(before), offline: on, by: name, stamp: at)"))
+        #expect(rest.contains("Self.network($0, offline: on, by: name, stamp: at, viaCloud: via)"))
+    }
+
     @Test("the three sentences are said in words, and the question's buttons wait while the answer reads")
     func answerWords() async throws {
         let (shop, _, _) = await Self.shop(option: true)

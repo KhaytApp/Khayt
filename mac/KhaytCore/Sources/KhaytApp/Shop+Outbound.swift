@@ -120,13 +120,23 @@ extension Shop {
     /// when the switch itself changes; `keep` is left as it was.
     nonisolated static func network(_ network: JSONValue?, offline: Bool, by name: String?, at: Date,
                                     viaCloud: Bool? = nil) -> JSONValue {
+        Self.network(network, offline: offline, by: name, stamp: StoreWriter.iso(at), viaCloud: viaCloud)
+    }
+
+    /// The same, with the stamp AS TEXT, written exactly as given. A stamp
+    /// the shared rule made (one millisecond after another) must not pass
+    /// through a `Date` on its way to the book: a thousandth of a second is
+    /// not exact in a Double, and written back it can land one millisecond
+    /// early, on the very stamp it has to be later than.
+    nonisolated static func network(_ network: JSONValue?, offline: Bool, by name: String?, stamp: String,
+                                    viaCloud: Bool? = nil) -> JSONValue {
         var n: [String: JSONValue] = { if case .object(let o)? = network { return o }; return [:] }()
         // Anything stored that is not exactly `false` reads as on (the rule's
         // `onSwitch`), so "was it on" is asked the same way.
         let was: Bool = { guard let v = n["offline"] else { return false }; return v != .bool(false) && v != .null }()
         n["offline"] = .bool(offline)
         if was != offline {
-            n["changedAt"] = .string(StoreWriter.iso(at))
+            n["changedAt"] = .string(stamp)
             n["changedBy"] = name.map(JSONValue.string) ?? .null
         }
         // Whether this change went through Khayt Cloud (nil: not a change).
@@ -169,6 +179,32 @@ extension Shop {
         return await writeNetworkSettings(change, says: true)
     }
 
+    /// The stamps a new change must come after: this Mac's own and the
+    /// highest heard, but ONLY those within what a stamp may be ahead of the
+    /// clock (`NetworkSwitch.aheadAllowed`, ten minutes: the limit a value is
+    /// applied under and the server accepts). A stamp further ahead is a
+    /// mistake already in the book (a clock that was wrong once, a book
+    /// restored from a Mac whose clock was): following it would stamp every
+    /// later change in that future, where the server refuses it and no other
+    /// computer applies it, until the real date caught up.
+    func stampsToComeAfter(now: Date) -> [String] {
+        [networkSwitchOwnStamp, networkSwitchHighestSeen].compactMap { stamp -> String? in
+            guard let stamp, let when = NetworkSwitch.date(stamp), when <= now.addingTimeInterval(NetworkSwitch.aheadAllowed) else { return nil }
+            return stamp
+        }
+    }
+
+    /// The stamp a change made now carries: the shared rule's
+    /// (`lib/network-switch.js stampAfter`), as text. With no engine, or if
+    /// the rule cannot be asked, the clock: no worse than before the rule.
+    func outboundChangeStamp(now: Date) async -> String {
+        let seen = stampsToComeAfter(now: now)
+        if let stamped = try? await engine?.networkSwitchStampAfter(now: now, seen: seen), NetworkSwitch.date(stamped) != nil {
+            return stamped
+        }
+        return StoreWriter.iso(now)
+    }
+
     /// Turn the shop's switch on or off. The owner's alone.
     ///
     /// THIS MAC STOPS AT ONCE: the gate is told as soon as the book is
@@ -193,10 +229,9 @@ extension Shop {
         // has seen (the book's own and the highest heard from Khayt Cloud),
         // so a computer whose clock runs ahead cannot make every change made
         // here lose. The shared rule says when (`stampAfter`, as on the
-        // desktop); without an engine there is only the clock.
-        let stamped = try? await engine?.networkSwitchStampAfter(now: now, seen: [networkSwitchOwnStamp, networkSwitchHighestSeen])
-        let at = stamped.flatMap(NetworkSwitch.date) ?? now
-        let next = Self.network(.object(before), offline: on, by: name, at: at)
+        // desktop), and its answer is written as it came.
+        let at = await outboundChangeStamp(now: now)
+        let next = Self.network(.object(before), offline: on, by: name, stamp: at)
         let changed = Self.offlineOf(.object(before)) != on
         let stamp: String? = { if changed, case .object(let n) = next, case .string(let s)? = n["changedAt"] { return s }; return nil }()
         // What this Mac had seen before this change, for judging what another
@@ -213,7 +248,7 @@ extension Shop {
         // Mac itself published is never taken for another computer's.
         if told, let stamp { sawNetworkSwitchStamp(stamp, now: now) }
         let via: Bool? = changed ? (on && told) : nil
-        guard await writeNetwork({ Self.network($0, offline: on, by: name, at: at, viaCloud: via) }) else { return false }
+        guard await writeNetwork({ Self.network($0, offline: on, by: name, stamp: at, viaCloud: via) }) else { return false }
         if let stamp { sawNetworkSwitchStamp(stamp, now: now) }
         // TURNED OFF: this Mac is online again; its first calls say so to
         // Khayt Cloud if a value is published there (`Shop+NetworkSwitch`).
