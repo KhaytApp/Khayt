@@ -32,10 +32,12 @@ enum OutboundMirror {
         case .none: return try? JSONEncoder().encode(Stored(book: "none"))
         case .unread: return try? JSONEncoder().encode(Stored(book: "unread"))
         case .settings(let s):
+            // Settings that are not an object hold everything in the app's
+            // gate (`lib/outbound.js`: not a plain object is `settings-unknown`),
+            // so they hold everything here too, never read as "no switch".
+            guard case .object(let o) = s else { return try? JSONEncoder().encode(Stored(book: "unread")) }
             var kept: [String: JSONValue] = [:]
-            if case .object(let o) = s {
-                for k in OutboundGate.settingsRead { if let v = o[k] { kept[k] = v } }
-            }
+            for k in OutboundGate.settingsRead { if let v = o[k] { kept[k] = v } }
             return try? JSONEncoder().encode(Stored(book: "settings", settings: .object(kept)))
         }
     }
@@ -48,7 +50,9 @@ enum OutboundMirror {
         guard let data, let s = try? JSONDecoder().decode(Stored.self, from: data) else { return .unread }
         switch s.book {
         case "none": return .none
-        case "settings": return .settings(s.settings ?? .object([:]))
+        case "settings":
+            guard let settings = s.settings, case .object = settings else { return .unread }
+            return .settings(settings)
         default: return .unread
         }
     }

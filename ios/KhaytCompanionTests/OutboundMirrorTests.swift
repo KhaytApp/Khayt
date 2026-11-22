@@ -39,6 +39,19 @@ final class OutboundMirrorTests: XCTestCase {
         }
     }
 
+    /// Settings that are not an object hold everything in the app's gate
+    /// (review of this PR): the extension must hold too, never read "no switch".
+    func testSettingsThatAreNotAnObjectHoldTheFetch() {
+        for odd: JSONValue in [.null, .string("x"), .array([]), .number(1)] {
+            let gate = OutboundGate()
+            gate.update(book: .settings(odd))
+            XCTAssertFalse(gate.verdict(.cloud).allowed, "the app's gate holds \(odd)")
+            XCTAssertEqual(OutboundMirror.decode(OutboundMirror.encode(.settings(odd))), .unread)
+        }
+        let storedNull = Data(#"{"book":"settings","settings":null}"#.utf8)
+        XCTAssertEqual(OutboundMirror.decode(storedNull), .unread)
+    }
+
     /// An extension updated before the app ran again has nothing to read: it
     /// fails closed, and the alert stays Apple's generic one.
     func testNothingStoredOrGarbageHoldsTheFetch() {
@@ -51,6 +64,9 @@ final class OutboundMirrorTests: XCTestCase {
     /// the extension on the same write, and the extension's fetch follows it.
     func testTheExtensionFollowsEveryBookTheAppFollows() {
         OutboundGate.$scoped.withValue(OutboundGate()) {
+            // Online first, so the refusal below can only come from the write.
+            PhoneOutbound.changed(["settings": .object(["network": .object(["offline": .bool(false)])])])
+            XCTAssertNoThrow(try OutboundMirror.gate(from: suite).require(.cloud, url: events))
             PhoneOutbound.changed(["settings": offline])
             XCTAssertThrowsError(try OutboundMirror.gate(from: suite).require(.cloud, url: events),
                                  "the switch on at the Mac stops the extension's fetch")

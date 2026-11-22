@@ -199,7 +199,13 @@ enum PhoneOutbound {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
             ? nil : UserDefaults(suiteName: OutboundMirror.group)
 
+    /// The gate and the mirror change together: two tellers on different
+    /// threads (a book write and a status answer) can never leave the
+    /// extension following one book while the app follows another.
+    private static let telling = NSLock()
+
     private static func tell(_ book: OutboundGate.Book) {
+        telling.lock(); defer { telling.unlock() }
         OutboundGate.shared.update(book: book)
         // The extension runs in its own process and asks a gate of its own:
         // it follows what this one follows.
