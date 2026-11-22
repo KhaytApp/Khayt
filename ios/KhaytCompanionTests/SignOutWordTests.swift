@@ -27,6 +27,10 @@ final class SignOutWordTests: XCTestCase {
                 XCTAssertFalse(t[key]?.lowercased().contains(old[lang]!) == true, "\(lang): \(key) still says the old word")
             }
             XCTAssertFalse((t["settings.count_install.owner_only"] ?? "").isEmpty, "\(lang): owner-only footer")
+            // The dialog says what is signed out of, and that Khayt Cloud goes too (review of #2656).
+            XCTAssertTrue(t["settings.unpair.title"]?.localizedCaseInsensitiveContains(sayIt) == true, "\(lang): title")
+            XCTAssertTrue(t["settings.unpair.footer"]?.contains("Khayt Cloud") == true || t["settings.unpair.footer"]?.contains("سحابة خيط") == true,
+                          "\(lang): the footer says Khayt Cloud is signed out too")
         }
         XCTAssertEqual(try table("en")["settings.count_install.owner_only"], "Only the owner can change this.")
     }

@@ -52,7 +52,8 @@
 "settings.pin" = "رمز المالك";
 "settings.retest" = "إعادة اختبار الاتصال";
 "settings.unpair" = "تسجيل الخروج";
-"settings.unpair.footer" = "يحذف دفتر الورشة من هذا الهاتف، ومعه الرمز ومفاتيح الموصِّلات.";
+"settings.unpair.footer" = "يحذف دفتر الورشة من هذا الهاتف، ومعه الرمز ومفاتيح الموصِّلات. ويسجّل خروج هذا الهاتف من سحابة خيط أيضًا.";
+"settings.unpair.title" = "تسجيل الخروج من هذه الورشة؟";
 "settings.language" = "اللغة";
 "settings.notifications" = "الإشعارات";
 "settings.notify.queue" = "تغييرات الطابور";

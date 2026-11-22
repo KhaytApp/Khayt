@@ -52,7 +52,8 @@
 "settings.pin" = "Sahip LAN PIN’i";
 "settings.retest" = "Eşlemeyi yeniden sına";
 "settings.unpair" = "Oturumu kapat";
-"settings.unpair.footer" = "Dükkânın defterini, PIN’i ve bağlayıcı anahtarlarını bu telefondan siler.";
+"settings.unpair.footer" = "Dükkânın defterini, PIN’i ve bağlayıcı anahtarlarını bu telefondan siler. Bu telefonun Khayt Cloud oturumu da kapatılır.";
+"settings.unpair.title" = "Bu dükkândan oturumu kapatılsın mı?";
 "settings.language" = "Dil";
 "settings.notifications" = "Bildirimler";
 "settings.notify.queue" = "Sıra değişiklikleri";

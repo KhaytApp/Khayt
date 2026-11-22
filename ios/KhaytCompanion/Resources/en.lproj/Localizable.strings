@@ -52,7 +52,8 @@
 "settings.pin" = "Owner LAN PIN";
 "settings.retest" = "Re-test pairing";
 "settings.unpair" = "Sign out";
-"settings.unpair.footer" = "Deletes the shop's book from this phone, along with the PIN and the connectors' keys.";
+"settings.unpair.footer" = "Deletes the shop's book from this phone, along with the PIN and the connectors' keys. It also signs this phone out of Khayt Cloud.";
+"settings.unpair.title" = "Sign out of this shop?";
 "settings.language" = "Language";
 "settings.notifications" = "Notifications";
 "settings.notify.queue" = "Queue changes";

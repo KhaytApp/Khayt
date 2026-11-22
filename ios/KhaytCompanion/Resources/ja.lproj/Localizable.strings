@@ -52,7 +52,8 @@
 "settings.pin" = "オーナー用LAN PIN";
 "settings.retest" = "ペアリングを再テスト";
 "settings.unpair" = "サインアウト";
-"settings.unpair.footer" = "お店の帳簿、PIN、コネクタのキーをこのiPhoneから削除します。";
+"settings.unpair.footer" = "お店の帳簿、PIN、コネクタのキーをこのiPhoneから削除します。このiPhoneは Khayt Cloud からもサインアウトします。";
+"settings.unpair.title" = "このお店からサインアウトしますか？";
 "settings.language" = "言語";
 "settings.notifications" = "通知";
 "settings.notify.queue" = "キューの変更";

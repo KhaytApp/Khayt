@@ -52,7 +52,8 @@
 "settings.pin" = "LAN-PIN des Inhabers";
 "settings.retest" = "Kopplung erneut testen";
 "settings.unpair" = "Abmelden";
-"settings.unpair.footer" = "Löscht das Shop-Buch, die PIN und die Schlüssel der Connectoren von diesem iPhone.";
+"settings.unpair.footer" = "Löscht das Shop-Buch, die PIN und die Schlüssel der Connectoren von diesem iPhone. Dieses iPhone wird auch von Khayt Cloud abgemeldet.";
+"settings.unpair.title" = "Von diesem Shop abmelden?";
 "settings.language" = "Sprache";
 "settings.notifications" = "Mitteilungen";
 "settings.notify.queue" = "Änderungen in der Warteschlange";

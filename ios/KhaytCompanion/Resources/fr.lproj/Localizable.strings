@@ -52,7 +52,8 @@
 "settings.pin" = "Code PIN LAN du propriétaire";
 "settings.retest" = "Retester l’association";
 "settings.unpair" = "Déconnecter";
-"settings.unpair.footer" = "Supprime le registre de l’atelier de cet iPhone, ainsi que le code PIN et les clés des connecteurs.";
+"settings.unpair.footer" = "Supprime le registre de l’atelier de cet iPhone, ainsi que le code PIN et les clés des connecteurs. Cet iPhone est aussi déconnecté de Khayt Cloud.";
+"settings.unpair.title" = "Se déconnecter de cet atelier ?";
 "settings.language" = "Langue";
 "settings.notifications" = "Notifications";
 "settings.notify.queue" = "Modifications de la file";

@@ -52,7 +52,8 @@
 "settings.pin" = "PIN da rede local do proprietário";
 "settings.retest" = "Testar o pareamento novamente";
 "settings.unpair" = "Desconectar";
-"settings.unpair.footer" = "Apaga deste iPhone o livro da oficina, o PIN e as chaves dos conectores.";
+"settings.unpair.footer" = "Apaga deste iPhone o livro da oficina, o PIN e as chaves dos conectores. Este iPhone também sai do Khayt Cloud.";
+"settings.unpair.title" = "Desconectar desta oficina?";
 "settings.language" = "Idioma";
 "settings.notifications" = "Notificações";
 "settings.notify.queue" = "Alterações na fila";

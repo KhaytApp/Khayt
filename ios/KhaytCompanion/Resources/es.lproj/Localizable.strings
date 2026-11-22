@@ -52,7 +52,8 @@
 "settings.pin" = "PIN de red local del propietario";
 "settings.retest" = "Volver a probar el emparejamiento";
 "settings.unpair" = "Cerrar sesión";
-"settings.unpair.footer" = "Elimina de este iPhone el libro del taller, el PIN y las claves de los conectores.";
+"settings.unpair.footer" = "Elimina de este iPhone el libro del taller, el PIN y las claves de los conectores. También cierra la sesión de este iPhone en Khayt Cloud.";
+"settings.unpair.title" = "¿Cerrar sesión en este taller?";
 "settings.language" = "Idioma";
 "settings.notifications" = "Notificaciones";
 "settings.notify.queue" = "Cambios en la cola";

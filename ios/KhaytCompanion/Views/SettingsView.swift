@@ -611,7 +611,7 @@ struct SettingsMacPage: View {
             SettingsPieces.foot(L10n.tr("settings.unpair.footer"))
         }
         .settingsPageTitle(L10n.tr("settings.phones_wifi"))
-        .confirmationDialog(L10n.tr("settings.unpair"), isPresented: $confirmUnpair, titleVisibility: .visible) {
+        .confirmationDialog(L10n.tr("settings.unpair.title"), isPresented: $confirmUnpair, titleVisibility: .visible) {
             Button(L10n.tr("settings.unpair"), role: .destructive) { api.unpair() }
         } message: {
             Text(L10n.tr("settings.unpair.footer"))
