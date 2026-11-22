@@ -158,7 +158,7 @@ enum QuoteFormFile {
         static let unsafeScalars: Set<Unicode.Scalar> = [":", "<", ">", "\"", "|", "?", "*"]
         /// Names Windows keeps for devices, with any extension.
         static let windowsDevices: Set<String> = Set(["CON", "PRN", "AUX", "NUL"]
-            + (1...9).flatMap { ["COM\($0)", "LPT\($0)"] })
+            + (1...9).flatMap { ["COM" + String($0), "LPT" + String($0)] })
     }
 
     /// Why a request with a file was left in the queue.
