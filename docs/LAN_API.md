@@ -1081,7 +1081,7 @@ still lists it, and the phone hides it either way:
 > and `LivePrinters.swift`; Windows/Linux since Nov 2026,
 > `lib/main/live-printer-publisher.js` and `lib/live-snapshot.js`). The route is
 > khayt-cloud's: its `docs/api-contract.md`, "Live channel & live printers", is
-> the source of truth. This is what the two publishers agree on.
+> the source of truth. This is what the two publishers share; where they differ it is said below.
 
 Not a LAN route: the computer sends the `/api/machines/live` rows above to Khayt
 Cloud, so a phone or the PWA away from the shop sees the same printers.
@@ -1101,6 +1101,7 @@ Cloud, so a phone or the PWA away from the shop sees the same printers.
 - **Size.** `JSON.stringify(ciphertext)` at most 65,536 characters. Over it, the
   snapshot is sealed again with `filename` and `error` set to `null` on every
   row; if that is still over, nothing is sent. No printer is dropped.
+- **Who publishes.** Every unlocked computer of the shop may, and the cloud keeps one snapshot, newest wins. On Windows/Linux a computer publishes only while it is hearing from the printers: at least one row answered in the last 3 minutes. The owner's laptop away from the shop, or a computer whose polling stopped, sends nothing rather than replacing the real picture with "not heard". (The Mac does not check this yet.)
 - **When.** On a change, at most every 2 s (the server's per-shop 429 line);
   with nothing changed, a heartbeat every 45 s, so a viewer can tell idle from
   a computer that is off. "Changed" compares the rows without `lastUpdated` and
@@ -1113,10 +1114,11 @@ Cloud, so a phone or the PWA away from the shop sees the same printers.
   and while the "make no internet calls" switch allows Khayt Cloud (purpose
   `cloud`). Locking or signing out stops it; so does quitting.
 - **Answers.** `200 { ok, receivedAt }`: sent. `429 { retryAfter }` (and
-  `Retry-After`): wait that many seconds. `401`: stop until the shop signs in
-  to Khayt Cloud again. `403`: stop for this session. Anything else (`413`, a
-  `5xx`, a deploy): try again 45 s later. No answer at all: try at the next
-  check.
+  `Retry-After`): wait that many seconds; Windows/Linux reads only the body and
+  honours at most 5 minutes. `403`: stop for this session. `401`: the Mac treats
+  it as `403`; Windows/Linux stops until the shop signs in to Khayt Cloud again.
+  Anything else (`413`, a `5xx`, a deploy): try again 45 s later. No answer at
+  all: try at the next check.
 
 ### `POST /api/printer/{machineId}/{pause|resume|stop}`
 

@@ -119,7 +119,7 @@ test('liveRows is the LAN route\'s builder: lan-server.js uses it, not a copy', 
 // ── the publisher, with fakes ────────────────────────────────────────────────
 
 function harness(over = {}) {
-  let t = 1_790_000_000_000;
+  let t = Date.parse('2026-09-25T10:15:02.000Z');
   const calls = [];
   const logs = [];
   let status = 200;
@@ -129,7 +129,9 @@ function harness(over = {}) {
   const timers = [];
   const deps = Object.assign({
     session: () => ({ url: 'https://cloud.example', shopId: 'shop_1', token: 'fake-token', dek: DEK, role: 'owner', scope: 'cloud.example|shop_1' }),
-    rows: () => rows,
+    // A computer that is hearing from its printers: a row without its own
+    // lastOkAt answered just now (the freshness rule, hasFreshPoll).
+    rows: () => rows.map((r) => ('lastOkAt' in r ? r : { ...r, lastOkAt: new Date(t).toISOString() })),
     allowed: () => true,
     put: async (s, body) => {
       if (throwNext) { const e = throwNext; throwNext = null; throw e; }
@@ -320,4 +322,43 @@ test('main wires it: started at unlock, stopped at lock and quit, nudged after e
   assert.match(main, /diagnoseMovedPrinters\(machineList\)[^\n]*\n[\s\S]{0,200}livePrinterPublisher\.tick\(\);/);
   const client = fs.readFileSync(path.join(ROOT, 'lib', 'cloud-client.js'), 'utf8');
   assert.match(client, /method: 'PUT', path: `\/v1\/shops\/\$\{seg\(shopId\)\}\/live\/printers`/);
+});
+
+
+// ── The security review (Nov 22) ─────────────────────────────────────────────
+
+test('only a computer hearing from its printers publishes: the laptop at home, or a stopped poll, sends nothing', async () => {
+  const h = harness();
+  // Every printer unreachable from here: no row answered in the last 3 minutes.
+  h.set({ rows: [Object.assign(row('m1'), { state: null, lastOkAt: null, errorCode: 'unreachable' })] });
+  const r = await h.p.start();
+  assert.deepEqual([r.sent, r.why], [false, 'not-polling']);
+  assert.equal(h.calls.length, 0);
+  // A frozen cache: the last answer was 4 minutes ago.
+  h.set({ rows: [Object.assign(row('m1'), { lastOkAt: new Date(Date.parse('2026-09-25T10:15:02.000Z') - 4 * 60 * 1000).toISOString() })] });
+  assert.equal((await h.p.tick()).why, 'not-polling');
+  // One printer answering is enough to speak for the shop.
+  h.set({ rows: [Object.assign(row('m1'), { lastOkAt: null }), row('m2')] });
+  assert.equal((await h.p.tick()).sent, true);
+  assert.equal(Snap.hasFreshPoll([{ lastOkAt: Date.parse('2026-09-25T10:15:02.000Z') - 1000 }], Date.parse('2026-09-25T10:15:02.000Z')), true, 'epoch ms too');
+  assert.equal(Snap.hasFreshPoll([], Date.now()), false);
+});
+
+test('too large is not sealed again before the next heartbeat; a huge retryAfter is capped at 5 minutes', async () => {
+  let seals = 0;
+  // A seal whose envelope is always over 64 KB, slimmed or not.
+  const h = harness({ seal: () => { seals++; return { v: 1, ct: 'x'.repeat(70000) }; } });
+  const first = await h.p.start();
+  assert.equal(first.why, 'too-large');
+  const n = seals;
+  h.advance(15000); await h.p.tick(); h.advance(15000); await h.p.tick();
+  assert.equal(seals, n, 'not sealed again inside the heartbeat');
+  h.advance(20000); await h.p.tick();
+  assert.ok(seals > n, 'tried again at the heartbeat');
+  const k = harness();
+  k.set({ status: 429, body: { retryAfter: 86400 } });
+  await k.p.start();
+  k.set({ status: 200, body: { ok: true }, rows: [row('m1', { progress: 77 })] });
+  k.advance(5 * 60 * 1000 + 1000);
+  assert.equal((await k.p.tick()).sent, true, 'a day-long retryAfter waits 5 minutes, not a day');
 });
