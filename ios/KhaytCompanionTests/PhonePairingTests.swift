@@ -148,8 +148,10 @@ final class PhonePairingTests: XCTestCase {
                                          from: Data(contentsOf: root.appending(path: "test/fixtures/device-roles-vectors.json")))
         XCTAssertEqual(v.roles, DeviceRole.ladder)
         for role in v.roles {
-            XCTAssertEqual(DeviceRole.mayHoldBook(role), v.scopesFor[role]?.contains("book:read") == true,
-                           "\(role): the book is book:read")
+            // The vectors list the owner by omission: the owner holds every scope.
+            let holds = role == "owner" ? (v.scopesFor[role]?.contains("book:read") ?? true)
+                                        : v.scopesFor[role]?.contains("book:read") == true
+            XCTAssertEqual(DeviceRole.mayHoldBook(role), holds, "\(role): the book is book:read")
         }
         // roleOf for a PHONE record: no kind. A device with a kind (a connector)
         // is not this phone, and a non-object is never a stored role.
@@ -220,9 +222,11 @@ final class PhonePairingTests: XCTestCase {
         }
         XCTAssertEqual(ticket.check, StubPairMac.check, "the phone and the Mac show the same number")
         XCTAssertNil(StubPairMac.sentPin, "no PIN crosses the Wi-Fi")
-        XCTAssertEqual(await api.pollCodePairing(ticket), .waiting)
+        let first = await api.pollCodePairing(ticket)
+        XCTAssertEqual(first, .waiting)
         StubPairMac.approved = true
-        XCTAssertEqual(await api.pollCodePairing(ticket), .approved)
+        let second = await api.pollCodePairing(ticket)
+        XCTAssertEqual(second, .approved)
         let done = await api.finishCodePairing(ticket)
         XCTAssertTrue(done)
         XCTAssertNotNil(s.device)
@@ -253,10 +257,12 @@ final class PhonePairingTests: XCTestCase {
         let s = freshSettings()
         StubPairMac.hasRoute = false
         let api = KhaytAPIClient(settings: s, protocols: [StubPairMac.self], withBook: false)
-        XCTAssertEqual(await api.startCodePairing(name: "x", version: "1"), .unsupported)
+        let older = await api.startCodePairing(name: "x", version: "1")
+        XCTAssertEqual(older, .unsupported)
         StubPairMac.hasRoute = true
         StubPairMac.closed = true
-        XCTAssertEqual(await api.startCodePairing(name: "x", version: "1"), .closed)
+        let shut = await api.startCodePairing(name: "x", version: "1")
+        XCTAssertEqual(shut, .closed)
     }
 
     func testAPinPhoneIsTheOwnerWhateverAReplySays() async {
