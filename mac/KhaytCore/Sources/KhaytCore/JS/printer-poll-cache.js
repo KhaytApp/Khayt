@@ -201,6 +201,13 @@
     const cls = activityClass(status && status.state);
     const keep = p.activityClass === cls && Number.isFinite(p.lastActivityAt);
     const lastActivityAt = keep ? p.lastActivityAt : now;
+    // And when its PROGRESS last moved. A cancelled job keeps its last
+    // progress under an idle word; a print started outside Khayt can climb
+    // under one. Only the second moves, and the dispatcher needs to tell them
+    // apart after a "bed cleared" (correctness review of #2607).
+    const pct = status && Number.isFinite(+status.progress) ? +status.progress : null;
+    const prevPct = p && Number.isFinite(+p.progress) ? +p.progress : null;
+    const progressChangedAt = pct === prevPct && Number.isFinite(p.progressChangedAt) ? p.progressChangedAt : now;
 
     return {
       ...(status || {}),
@@ -212,6 +219,7 @@
       lastUpdated: now,
       activityClass: cls,
       lastActivityAt,
+      progressChangedAt,
     };
   }
 
