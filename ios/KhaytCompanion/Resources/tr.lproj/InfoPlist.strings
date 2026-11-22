@@ -1,0 +1,3 @@
+"NSCameraUsageDescription" = "Khayt, makara etiketlerini ve barkodları okumak, fişleri fotoğraflamak ve biten baskıların fotoğrafını çekmek için kamerayı kullanır.";
+"NFCReaderUsageDescription" = "Khayt, filament makaralarındaki NFC etiketlerini okur ve yazar.";
+"NSLocalNetworkUsageDescription" = "Khayt, sırayı, envanteri ve yazıcı durumunu göstermek için aynı Wi‑Fi’daki Mac’inizde veya PC’nizde çalışan Khayt’a bağlanır.";

@@ -1,0 +1,656 @@
+import SwiftUI
+import AppKit
+import KhaytCore
+
+/// Writing a spool down, or correcting one.
+///
+/// The record and the correction are `lib/spool-edit.js`'s — the same clamps,
+/// the same "a blank optional field is absent", the same price history when the
+/// cost moves, and the same colour added to the shop's library. A shop's shelf
+/// drifts every day (auto-deduction takes grams off, a spool runs out early, a
+/// supplier's price changes), so an app that could show the shelf and not
+/// correct it was an app a shop still had to leave.
+struct SpoolSheet: View {
+    /// How wide this sheet is. A CONSTANT rather than a number in the body,
+    /// because `SnapshotTests` photographs the sheet at a size of its own and
+    /// the two silently disagreed: the sheet grew and the picture kept the old
+    /// width, so the render came back cropped down the middle with no failure.
+    static let width: CGFloat = 440
+
+    let shop: Shop
+    /// The spool being corrected, or nil for one that is not on the shelf yet.
+    let existing: Spool?
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var material = ""
+    /// Delete was pressed and not yet answered: it sat beside Save, one click.
+    @State private var deleting: Spool?
+    /// What this item is counted in. `g` because every item recorded before
+    /// Khayt could ask is filament — see `lib/inventory-units.js`.
+    @State private var unit = "g"
+    @State private var units: [KhaytEngine.InventoryUnit] = []
+    @State private var colourVariant = ""
+    @State private var swatch = Color(nsColor: NSColor(hex: "#888888") ?? .gray)
+    @State private var cost: Double = 0
+    @State private var vatAmount: Double = 0
+    @State private var weight: Double = 1000
+    /// What the spool held when it was bought — the figure a price per kilo is
+    /// worked out from. Asked only when editing: a new spool records it itself.
+    @State private var fullWeight: Double = 0
+    @State private var lot = ""
+    /// Which site the spool is kept at; empty is Unassigned. A new spool
+    /// starts at the site the shop is looking at, as the desktop's does.
+    @State private var locationId = ""
+    @State private var reorderPoint: Double = 200
+    /// Whether the shop has said a reorder point for THIS spool. A new spool
+    /// shows the threshold it would get anyway — the shop's own for grams, the
+    /// unit's otherwise (`KhaytInventoryUnits.lowThreshold`) — and writes none
+    /// until somebody types one: a stored 200 flagged a 10-sheet pack low the
+    /// moment it was added, and overrode a shop threshold of 500 g.
+    @State private var reorderPointSet = false
+    /// What this filament wants to be printed at. Zero means the shop has not
+    /// said, and the rule stores nothing rather than a nought.
+    @State private var printTemp: Double = 0
+    @State private var bedTemp: Double = 0
+    @State private var maxSpeed: Double = 0
+    @State private var openedAt: Date?
+    /// When this spool was bought. Filament takes up moisture from the day it
+    /// is made, so its age is a fact about how it will print.
+    @State private var purchasedAt: Date?
+    /// How much to order when it runs low. Zero means the shop has not said,
+    /// and the drafting rule falls back to a kilo.
+    @State private var reorderQty: Double = 0
+    @State private var colours: [String] = []
+    /// Catalogue matches for whatever has been typed into the material field.
+    @State private var catalogue: [KhaytEngine.FilamentHit] = []
+    @FocusState private var focused: Bool
+
+    private var isNew: Bool { existing == nil }
+
+    /// The materials already on the shelf, once each — a shop restocking types
+    /// a name it has used before far more often than a new one.
+    private var known: [String] {
+        var seen = Set<String>()
+        return shop.spools.map(\.material).filter { seen.insert($0).inserted && !$0.isEmpty }.sorted()
+    }
+
+    var body: some View {
+        // Scrolls, so Delete, Cancel and Save stay reachable however much
+        // history a spool has behind it. See `SheetFrame`.
+        SheetFrame(width: Self.width) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(shop.words.callIt(isNew ? "mac.new_spool" : "mac.edit_spool")).font(.headline)
+                // The lot as it is STORED, not as it is being typed: the
+                // header says which roll this is, the field below edits it.
+                if let stored = existing?.lot?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !stored.isEmpty {
+                    Text(shop.words.callIt("mac.lot_label", ["lot": .string(stored)]))
+                        .font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+            }
+
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    Text(shop.words.callIt("plib.material")).foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        TextField(shop.words.callIt("inv.material_ph"), text: $material)
+                            .textFieldStyle(.roundedBorder).focused($focused)
+                        if !known.isEmpty {
+                            Menu {
+                                ForEach(known, id: \.self) { m in
+                                    Button(m) { material = m }
+                                }
+                            } label: { Image(systemName: "list.bullet") }
+                                .menuStyle(.borderlessButton).fixedSize()
+                        }
+                        // The catalogue: 1,945 filaments somebody else already
+                        // wrote down. Separate from the menu above, which is
+                        // this shop's OWN materials — a shop reaching for what
+                        // it already stocks should not have to scroll past a
+                        // thousand it does not.
+                        // ALWAYS there. It used to appear only once two
+                        // letters had matched something, so a shop that had
+                        // not typed yet had no way to know a catalogue
+                        // existed; empty, it says what to type.
+                        Menu {
+                            if catalogue.isEmpty {
+                                Text(shop.words.callIt(
+                                    material.trimmingCharacters(in: .whitespaces).count < 2
+                                        ? "mac.filament_catalog_hint" : "mac.filament_catalog_none"))
+                            }
+                            ForEach(Self.catalogueGroups(catalogue), id: \.brand) { group in
+                                if group.hits.count > 1 {
+                                    // Several lines of one brand: under the
+                                    // brand, each named without it.
+                                    Menu(group.brand) {
+                                        ForEach(group.hits) { hit in
+                                            Menu(Self.catalogueName(hit, underBrand: true)) { colourItems(hit) }
+                                        }
+                                    }
+                                } else if let hit = group.hits.first {
+                                    Menu(Self.catalogueName(hit, underBrand: false)) { colourItems(hit) }
+                                }
+                            }
+                            if let missed = catalogue.first?.unmatched, !missed.isEmpty {
+                                Divider()
+                                // Say which word found nothing, rather than
+                                // presenting a near-miss as the answer.
+                                Text(missed.joined(separator: ", "))
+                            }
+                        } label: { Image(systemName: "magnifyingglass") }
+                            .menuStyle(.borderlessButton).fixedSize()
+                            .help(shop.words.callIt("mac.filament_catalog"))
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("inv.colour_variant")).foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        TextField("", text: $colourVariant).textFieldStyle(.roundedBorder)
+                        // What the shop has called this material's colours
+                        // before. Typing a new one adds it to the library.
+                        if !colours.isEmpty {
+                            Menu {
+                                ForEach(colours, id: \.self) { c in
+                                    Button(c) { colourVariant = c }
+                                }
+                            } label: { Image(systemName: "list.bullet") }
+                                .menuStyle(.borderlessButton).fixedSize()
+                        }
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.swatch")).foregroundStyle(.secondary)
+                    ColorPicker("", selection: $swatch, supportsOpacity: false).labelsHidden()
+                }
+                // BEFORE the quantity, because it says what the quantity is.
+                // A field labelled "g" that a shop types 500 into meaning
+                // millilitres is a field that records the wrong fact silently.
+                GridRow {
+                    Text(shop.words.callIt("inv.unit")).foregroundStyle(.secondary)
+                    Picker("", selection: $unit) {
+                        ForEach(units) { choice in
+                            Text(shop.words.callIt("inv.unit_\(choice.unit)")).tag(choice.unit)
+                        }
+                    }
+                    .labelsHidden().fixedSize()
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.weight")).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        TextField("", value: $weight, format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                        Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
+                    }
+                }
+                // WHAT IT HELD WHEN BOUGHT. The price per kilo and the spool
+                // drawing both need it, and a spool added before it was
+                // recorded has none — so every one of this shop's spools drew
+                // as the same grey disc and "What materials cost" had nothing
+                // to say. The shop knows it: it bought a 1 kg roll.
+                if !isNew {
+                    GridRow {
+                        Text(shop.words.callIt("mac.full_spool")).foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            TextField("", value: $fullWeight, format: .number.locale(Money.digits).precision(.fractionLength(0)))
+                                .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                            Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.cost")).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        TextField("", value: $cost, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                        Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
+                        // What a kilo costs is the figure that compares two
+                        // suppliers; a price per roll says nothing until you
+                        // know what is on the roll.
+                        if let perKilo = Self.perKilo(cost: cost, isNew: isNew,
+                                                      weight: weight, fullWeight: fullWeight) {
+                            Text(shop.words.callIt("mac.per_kilo") + " "
+                                 + Money.text(perKilo, shop.currency))
+                                .font(.callout).foregroundStyle(.tertiary).monospacedDigit()
+                                .fixedSize()
+                        }
+                    }
+                }
+                // THE TAX INSIDE THAT PRICE. What the roll cost the shop is the
+                // figure above and stays there — it is what left the bank. What
+                // a JOB is costed at is the price without the tax, because a
+                // registered shop gets the tax back and charging it to a print
+                // understates every margin it quotes.
+                if shop.reclaimsTax {
+                    GridRow {
+                        Text(shop.words.callIt("exp.vat_paid")).foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            TextField("", value: $vatAmount,
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
+                                .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                            Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
+                            if vatAmount > 0, cost > vatAmount {
+                                Text(shop.words.callIt("inv.costs_a_job") + " "
+                                     + Money.text(cost - vatAmount, shop.currency))
+                                    .font(.callout).foregroundStyle(.tertiary).monospacedDigit()
+                                    .fixedSize()
+                            }
+                        }
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.spool_reorder_point")).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        TextField("", value: Binding(get: { reorderPoint },
+                                                     set: { reorderPoint = $0; reorderPointSet = true }),
+                                  format: .number.locale(Money.digits).precision(.fractionLength(0)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                        Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
+                    }
+                }
+                // ── WHAT THIS FILAMENT WANTS ──────────────────────────
+                //
+                // `lib/spool-edit.js` has stored these three since it was
+                // written and this app had no field for any of them, so a shop
+                // working here could not write down the one thing it looks up
+                // every time a new spool goes on: what to set the nozzle to.
+                //
+                // Blank rather than zero when unset. A bed temperature of 0°C
+                // is a claim about the filament; an empty box is the truth,
+                // which is that nobody has said. The rule agrees — it stores
+                // nothing for a value that is not above zero.
+                // ── HOW MUCH TO ORDER WHEN IT RUNS LOW ────────────────
+                //
+                // `lib/purchase-orders.js` reads `reorderQty` when it drafts,
+                // and falls back to a KILO when there is none. Nothing could
+                // set it here, so every order this app drafted asked for a
+                // kilo of whatever it was — including for a shop that buys
+                // 250 g spools or 5 kg boxes. That became visible the moment
+                // this app learnt to draft them without being asked.
+                //
+                // Blank rather than zero when unset: the fallback is the
+                // rule's to choose, and a nought written here would be this
+                // app deciding to order nothing.
+                GridRow {
+                    // Not the shared `inv.reorder_qty`: it carries the unit
+                    // in brackets beside the word after the box, and in
+                    // Arabic it says (كغ) over a box counted in grams.
+                    Text(shop.words.callIt("mac.spool_reorder_qty")).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        TextField("", value: Self.blankWhenZero($reorderQty), format: .number.locale(Money.digits).precision(.fractionLength(0)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                        // The unit's WORD, not its code — "g" sat in Latin
+                        // after an Arabic label.
+                        Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.spool_print_temp")).foregroundStyle(.secondary)
+                    degrees($printTemp)
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.spool_bed_temp")).foregroundStyle(.secondary)
+                    degrees($bedTemp)
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.spool_max_speed")).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        TextField("", value: Self.blankWhenZero($maxSpeed), format: .number.locale(Money.digits).precision(.fractionLength(0)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                        Text(shop.words.callIt("mac.mm_s")).foregroundStyle(.secondary)
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("inv.lot")).foregroundStyle(.secondary)
+                    // A lot is a short code; unbounded, the field ran off the sheet.
+                    TextField("", text: $lot).textFieldStyle(.roundedBorder).frame(width: 220)
+                }
+                // WHERE IT IS KEPT — only for a shop with sites, or a spool
+                // still naming one, as the machine sheet asks it. Moving part
+                // of a roll is Transfer, on the card's menu.
+                if !shop.locations.isEmpty || !locationId.isEmpty {
+                    GridRow {
+                        Text(shop.words.callIt("inv.location_branch")).foregroundStyle(.secondary)
+                        Picker("", selection: $locationId) {
+                            Text(shop.words.callIt("inv.location_unassigned")).tag("")
+                            ForEach(shop.locations) { loc in Text(loc.name).tag(loc.id) }
+                            if !locationId.isEmpty && shop.locationName(locationId) == nil {
+                                Text(shop.words.callIt("mac.location_gone")).tag(locationId)
+                            }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                }
+                if !isNew {
+                    // WHEN IT WAS BOUGHT, beside when it was opened. The two
+                    // answer different questions — how long it has been in the
+                    // building, and how long it has been breathing — and a
+                    // spool bought a year ago and opened yesterday is not the
+                    // same spool as the other way round.
+                    GridRow {
+                        Text(shop.words.callIt("inv.purchased_on")).foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            Toggle("", isOn: Binding(
+                                get: { purchasedAt != nil },
+                                set: { purchasedAt = $0 ? (purchasedAt ?? Date()) : nil }))
+                                .labelsHidden()
+                            if let bought = purchasedAt {
+                                DatePicker("", selection: Binding(get: { bought },
+                                                                  set: { purchasedAt = $0 }),
+                                           in: ...Date(), displayedComponents: .date)
+                                    .labelsHidden()
+                            }
+                        }
+                    }
+                    GridRow {
+                        Text(shop.words.callIt("inv.opened_on")).foregroundStyle(.secondary)
+                        // Optional: a sealed spool has not been opened, and a
+                        // date picker that insists on a date would invent one.
+                        HStack(spacing: 8) {
+                            Toggle("", isOn: Binding(
+                                get: { openedAt != nil },
+                                set: { openedAt = $0 ? (openedAt ?? Date()) : nil }))
+                                .labelsHidden()
+                            if let opened = openedAt {
+                                DatePicker("", selection: Binding(get: { opened }, set: { openedAt = $0 }),
+                                           in: ...Date(), displayedComponents: .date)
+                                    .labelsHidden()
+                            }
+                        }
+                    }
+                }
+            }
+
+            // What the cost used to be. A shop checking a supplier's invoice
+            // asks this, and the answer is already on the record.
+            if let history = existing?.priceHistory, !history.isEmpty {
+                DetailSection(shop.words.callIt("inv.price_history")) {
+                    ForEach(history.suffix(4).reversed(), id: \.date) { entry in
+                        DetailLine(entry.date, Money.text(entry.cost, shop.currency), dim: true)
+                    }
+                }
+            }
+
+        } footer: {
+            HStack {
+                if !isNew, shop.canMoveJobs {
+                    Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                        deleting = existing
+                    }
+                }
+                Spacer()
+                Button(shop.words.callIt("common.cancel")) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button(shop.words.callIt("common.save"), action: commit)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(material.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .onAppear(perform: fill)
+        .askFirst($deleting,
+                  title: { shop.words.callIt("mac.delete_product_q", ["name": .string(AskName.spool($0))]) },
+                  message: { _ in shop.words.callIt("mac.undo_after") },
+                  confirm: shop.words.callIt("common.delete"),
+                  cancel: shop.words.callIt("common.cancel")) { chosen in
+            dismiss()
+            Task { await shop.deleteSpool(chosen.id) }
+        }
+        .task { units = await shop.inventoryUnitChoices() }
+        .task(id: unit) {
+            guard isNew, !reorderPointSet else { return }
+            reorderPoint = await shop.lowThreshold(unit: unit)
+        }
+        .task(id: material) { await loadColours() }
+        .task(id: material) { catalogue = await shop.filamentSearch(material, limit: 30) }
+    }
+
+    /// The word after the quantity field, in the unit being chosen. Falls back
+    /// to the gram Khayt already keeps, because `common.grams` is `غ` in Arabic
+    /// and a `g` written here would be an English letter in an Arabic form.
+    private var unitKey: String {
+        units.first { $0.unit == unit }?.unitKey ?? "common.grams"
+    }
+
+    /// What a kilo of this spool cost: the price over what the roll HELD WHEN
+    /// BOUGHT, never over what is left (`lib/material-cost.js` documents the
+    /// trap). This divided by `weight`, which goes down as the shop prints, so
+    /// a half-used roll read as twice the price of the same roll new.
+    ///
+    /// A new spool is a full one, so its weight is what it held. An existing
+    /// spool needs its full-spool weight; without one there is no honest
+    /// figure, and none is shown.
+    static func perKilo(cost: Double, isNew: Bool, weight: Double, fullWeight: Double) -> Double? {
+        let held = isNew ? weight : fullWeight
+        guard held > 0 else { return nil }
+        return cost / held * 1000
+    }
+
+    /// The form's fields, as one value — so opening a spool and saving it
+    /// are one mapping that `Shop.saveSpool` can also run over the stored
+    /// record, to tell what the shop changed from what the form re-spells.
+    struct Form: Equatable {
+        var material = ""
+        var unit = "g"
+        var colourVariant = ""
+        var swatch = Color(nsColor: NSColor(hex: "#888888") ?? .gray)
+        var cost: Double = 0
+        var vatAmount: Double = 0
+        var weight: Double = 1000
+        var fullWeight: Double = 0
+        var lot = ""
+        var locationId = ""
+        var reorderPoint: Double = 200
+        /// False for a new spool nobody typed a reorder point into: see
+        /// `SpoolSheet.reorderPointSet`.
+        var reorderPointSet = false
+        var printTemp: Double = 0
+        var bedTemp: Double = 0
+        var maxSpeed: Double = 0
+        var openedAt: Date?
+        var purchasedAt: Date?
+        var reorderQty: Double = 0
+
+        @MainActor static func opening(_ spool: Spool, unit: String) -> Form {
+            Form(material: spool.material,
+                 unit: unit,
+                 colourVariant: spool.colourVariant ?? "",
+                 swatch: Color(nsColor: NSColor(hex: spool.color ?? "#888888") ?? .gray),
+                 cost: spool.cost ?? 0,
+                 vatAmount: spool.vatAmount ?? 0,
+                 weight: spool.weight ?? 0,
+                 fullWeight: spool.spoolWeight ?? 0,
+                 lot: spool.lot ?? "",
+                 locationId: spool.locationId ?? "",
+                 reorderPoint: spool.reorderPoint ?? 200,
+                 reorderPointSet: true,
+                 printTemp: spool.printTemp ?? 0,
+                 bedTemp: spool.bedTemp ?? 0,
+                 maxSpeed: spool.maxSpeed ?? 0,
+                 openedAt: Order.day(spool.openedAt),
+                 purchasedAt: Order.day(spool.purchasedAt),
+                 reorderQty: spool.reorderQty ?? 0)
+        }
+
+        /// What the shared rule is handed on Save.
+        @MainActor func input(isNew: Bool, reclaimsTax: Bool) -> [String: JSONValue] {
+            var input: [String: JSONValue] = [
+                "material": .string(material),
+                "color": .string(NSColor(swatch).hexString ?? "#888888"),
+                "cost": .number(cost),
+                "vatAmount": .number(reclaimsTax ? min(max(0, vatAmount), cost) : 0),
+                "weight": .number(weight),
+                "unit": .string(unit),
+                "lot": .string(lot),
+                // `spool-edit.js` writes no key for Unassigned.
+                "locationId": .string(locationId),
+                "colourVariant": .string(colourVariant),
+                // Sent even at zero, which is how the rule is told to CLEAR one:
+                // it stores nothing for a value that is not above zero, so a shop
+                // that empties the box empties the field.
+                "reorderQty": .number(reorderQty),
+                "printTemp": .number(printTemp),
+                "bedTemp": .number(bedTemp),
+                "maxSpeed": .number(maxSpeed),
+            ]
+            // A NEW spool writes a reorder point and quantity only when the
+            // shop gave one. Unsaid, the shelf rule falls back to the shop's
+            // threshold and the unit's default, and the drafting rule to its
+            // own quantity — which is what the other app's Add has always done.
+            if !isNew || reorderPointSet { input["reorderPoint"] = .number(reorderPoint) }
+            if isNew, reorderQty <= 0 { input["reorderQty"] = nil }
+            if !isNew, fullWeight > 0 { input["spoolWeight"] = .number(fullWeight) }
+            if !isNew {
+                // Absent means "leave it as it is", so a cleared date has to be
+                // sent as an empty string rather than left out.
+                input["openedAt"] = .string(openedAt.map { Shop.today($0) } ?? "")
+                input["purchasedAt"] = .string(purchasedAt.map { Shop.today($0) } ?? "")
+            }
+            return input
+        }
+    }
+
+    /// The form as it opened, for `Shop.saveSpool` to compare the save with.
+    @State private var opened: Form?
+
+    private var form: Form {
+        Form(material: material, unit: unit, colourVariant: colourVariant, swatch: swatch,
+             cost: cost, vatAmount: vatAmount, weight: weight, fullWeight: fullWeight,
+             lot: lot, locationId: locationId, reorderPoint: reorderPoint, reorderPointSet: reorderPointSet, printTemp: printTemp, bedTemp: bedTemp,
+             maxSpeed: maxSpeed, openedAt: openedAt, purchasedAt: purchasedAt,
+             reorderQty: reorderQty)
+    }
+
+    private func fill() {
+        guard let spool = existing else {
+            locationId = shop.siteFilter ?? ""
+            focused = true
+            return
+        }
+        let f = Form.opening(spool, unit: shop.unit(of: spool)?.unit ?? "g")
+        material = f.material
+        colourVariant = f.colourVariant
+        swatch = f.swatch
+        cost = f.cost
+        vatAmount = f.vatAmount
+        weight = f.weight
+        fullWeight = f.fullWeight
+        unit = f.unit
+        lot = f.lot
+        locationId = f.locationId
+        reorderPoint = f.reorderPoint
+        reorderPointSet = f.reorderPointSet
+        printTemp = f.printTemp
+        bedTemp = f.bedTemp
+        maxSpeed = f.maxSpeed
+        openedAt = f.openedAt
+        purchasedAt = f.purchasedAt
+        reorderQty = f.reorderQty
+        opened = f
+        focused = true
+    }
+
+    /// Take a catalogue entry into the form.
+    ///
+    /// ── WHAT IT DOES NOT TOUCH ─────────────────────────────────────────────
+    ///
+    /// The cost, what the roll weighs today, when it was opened, whether it has
+    /// been dried, the lot number. A manufacturer's page does not know any of
+    /// them, and `toSpool` is written not to invent them — this only writes the
+    /// fields it is actually handed.
+    ///
+    /// The full-spool weight IS taken, and for a new spool so is the current
+    /// weight, because a new spool is a full one. Editing an existing spool
+    /// leaves what is on it alone: a shop correcting the brand of a half-used
+    /// roll has not just refilled it.
+    /// One catalogue line's colours, each with its swatch.
+    @ViewBuilder private func colourItems(_ hit: KhaytEngine.FilamentHit) -> some View {
+        ForEach(hit.colours) { colour in
+            Button { Task { await take(hit, colour) } } label: {
+                if let image = Swatch.menuImage(hex: colour.hex) {
+                    Label { Text(colour.name) } icon: { Image(nsImage: image) }
+                } else {
+                    Text(colour.name)
+                }
+            }
+        }
+    }
+
+    /// The hits by brand, in the order the search ranked them.
+    static func catalogueGroups(_ hits: [KhaytEngine.FilamentHit]) -> [(brand: String, hits: [KhaytEngine.FilamentHit])] {
+        var order: [String] = []
+        var by: [String: [KhaytEngine.FilamentHit]] = [:]
+        for hit in hits {
+            if by[hit.brand] == nil { order.append(hit.brand) }
+            by[hit.brand, default: []].append(hit)
+        }
+        return order.map { ($0, by[$0] ?? []) }
+    }
+
+    /// A line's name as the menu shows it. The catalogue spells some names
+    /// with their brand already in them ("123-3D Filament PLA" from 123-3D),
+    /// which read "123-3D 123-3D Filament PLA" with the brand in front; the
+    /// repeat is dropped. Under its brand's submenu the brand is left out.
+    static func catalogueName(_ hit: KhaytEngine.FilamentHit, underBrand: Bool) -> String {
+        let brand = hit.brand.trimmingCharacters(in: .whitespaces)
+        var name = hit.name.trimmingCharacters(in: .whitespaces)
+        if !brand.isEmpty, name.lowercased().hasPrefix(brand.lowercased()) {
+            let rest = name.dropFirst(brand.count).trimmingCharacters(in: CharacterSet(charactersIn: " -–—·:"))
+            if !rest.isEmpty { name = rest }
+        }
+        if underBrand || brand.isEmpty { return name }
+        return brand + " " + name
+    }
+
+    private func take(_ hit: KhaytEngine.FilamentHit,
+                      _ colour: KhaytEngine.FilamentHit.Colour) async {
+        let fields = await shop.filamentFields(brand: hit.brand, name: hit.name,
+                                               colour: colour.name,
+                                               weight: colour.weights.first)
+        if case .string(let m)? = fields["material"] { material = m }
+        if case .string(let v)? = fields["colourVariant"] { colourVariant = v }
+        if case .string(let hex)? = fields["color"], let c = NSColor(hex: hex) {
+            swatch = Color(nsColor: c)
+        }
+        // Only for a new spool. A shop correcting the brand of a half-used roll
+        // has not just refilled it, and overwriting what is on it would be the
+        // app claiming to know something only the scale does.
+        //
+        // This sheet has no field for the FULL-spool weight — the record keeps
+        // one and nothing here edits it — so the catalogue's figure lands on
+        // `weight`, which for a new spool is the same number.
+        if isNew, case .number(let full)? = fields["weight"] { weight = full }
+    }
+
+    private func loadColours() async {
+        guard let engine = shop.engine, !material.isEmpty else { colours = []; return }
+        colours = (try? await engine.spoolColours(settings: shop.settingsDict, material: material)) ?? []
+    }
+
+    /// A temperature box: the number, then °C. Empty when nobody has said.
+    private func degrees(_ value: Binding<Double>) -> some View {
+        HStack(spacing: 4) {
+            TextField("", value: Self.blankWhenZero(value), format: .number.locale(Money.digits).precision(.fractionLength(0)))
+                .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+            Text(shop.words.callIt("mac.celsius")).foregroundStyle(.secondary)
+        }
+    }
+
+    /// The box's view of a value where zero means "nobody has said": empty
+    /// rather than "0". Display only — the form still holds 0, so what Save
+    /// sends, and what `Shop.saveSpool` compares with the form as it opened,
+    /// is unchanged; emptying the box sets it back to 0, which is how the
+    /// rule is told to clear it.
+    static func blankWhenZero(_ value: Binding<Double>) -> Binding<Double?> {
+        Binding(get: { value.wrappedValue == 0 ? nil : value.wrappedValue },
+                set: { value.wrappedValue = $0 ?? 0 })
+    }
+
+    private func commit() {
+        let tax = shop.reclaimsTax
+        let input = form.input(isNew: isNew, reclaimsTax: tax)
+        let was = opened?.input(isNew: isNew, reclaimsTax: tax)
+        let id = existing?.id
+        dismiss()
+        Task { await shop.saveSpool(input, id: id, opened: was) }
+    }
+}

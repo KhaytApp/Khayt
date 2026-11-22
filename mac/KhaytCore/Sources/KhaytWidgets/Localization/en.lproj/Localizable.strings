@@ -1,0 +1,32 @@
+/* What the widget gallery and an empty widget say. Everything a widget shows
+   about a shop comes from the app, in the book's own language; these are only
+   the words needed before the app has written anything. */
+"widget.printing.name" = "Printing now";
+"widget.printing.description" = "Your printers' progress and when each one finishes.";
+"widget.today.name" = "Today";
+"widget.today.description" = "Jobs due today, jobs running late, and what you are owed.";
+"widget.open_khayt" = "Open Khayt to show your shop here.";
+"widget.word.printingTitle" = "Printing now";
+"widget.word.nothingPrinting" = "Nothing on the beds";
+"widget.word.idleMachines" = "Every printer is free";
+"widget.word.noMachines" = "No printers in the book yet";
+"widget.word.paused" = "Paused";
+"widget.word.todayTitle" = "Today";
+"widget.word.dueToday" = "Due today";
+"widget.word.overdue" = "Late";
+"widget.word.owed" = "Owed";
+"widget.word.updated" = "Updated";
+"widget.word.more" = "+{n} more";
+"widget.filament.name" = "Filament low";
+"widget.filament.description" = "The spools running low, emptiest first.";
+"widget.upnext.name" = "Up next";
+"widget.upnext.description" = "The jobs waiting for a printer, in the board's order.";
+"widget.glance.name" = "Shop at a glance";
+"widget.glance.description" = "What is printing, what is due, and what is running low.";
+"widget.word.filamentTitle" = "Filament low";
+"widget.word.allStocked" = "Every spool is stocked";
+"widget.word.grams" = "{n} g";
+"widget.word.upNextTitle" = "Up next";
+"widget.word.queueEmpty" = "Nothing waiting to print";
+"widget.word.urgent" = "Urgent";
+"widget.word.glanceTitle" = "Shop at a glance";

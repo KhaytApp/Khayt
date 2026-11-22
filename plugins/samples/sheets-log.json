@@ -1,0 +1,60 @@
+{
+  "khayt": {
+    "manifest": 1
+  },
+  "id": "app.khayt.samples.sheets",
+  "name": {
+    "en": "Google Sheets order log",
+    "ar": "سجل الطلبات في Google Sheets"
+  },
+  "description": {
+    "en": "Adds a row to a Google Sheet for every new and paid job, through an Apps Script web app you deploy."
+  },
+  "publisher": "Khayt",
+  "version": "1.0.0",
+  "domains": [
+    "script.google.com"
+  ],
+  "secrets": [
+    {
+      "name": "deploymentId",
+      "label": {
+        "en": "Apps Script deployment ID"
+      },
+      "kind": "url"
+    },
+    {
+      "name": "signingKey",
+      "label": {
+        "en": "Shared signing key"
+      },
+      "kind": "signingKey"
+    }
+  ],
+  "events": [
+    {
+      "event": "order_created",
+      "url": "https://script.google.com/macros/s/{secret.deploymentId}/exec",
+      "send": [
+        "order.number",
+        "order.date",
+        "order.title",
+        "order.total",
+        "order.currency",
+        "customer.name"
+      ],
+      "signWith": "signingKey"
+    },
+    {
+      "event": "payment_received",
+      "url": "https://script.google.com/macros/s/{secret.deploymentId}/exec",
+      "send": [
+        "order.number",
+        "order.total",
+        "order.currency"
+      ],
+      "signWith": "signingKey"
+    }
+  ],
+  "signature": "SxRqiyXzo6fKCnb8QT3FzGouDYVvPRQdW2Z5LDxOOkPKYyA4mvqmNuXYOz/NnMsfo0N0m0AAQB9TLftuQzWFCw=="
+}

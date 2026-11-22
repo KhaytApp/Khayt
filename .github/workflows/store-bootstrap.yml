@@ -1,0 +1,89 @@
+name: Store bootstrap
+
+# One-time (and occasionally repeated) discovery run against Partner Center.
+#
+# The submission JSON's shape belongs to the account and product, not to the CLI —
+# Microsoft's own guidance is to fetch the current submission and edit it rather
+# than to construct one. This workflow fetches it, so scripts/build-store-metadata.mjs
+# can merge our fields into the real shape instead of guessing at one.
+#
+# It also dumps the listing assets, which is how we find out whether screenshots
+# can be driven from CI at all — that is not documented for the CLI. See
+# docs/MICROSOFT-STORE.md.
+#
+# Read-only. It never creates, updates or commits a submission.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    name: Fetch the current submission and listing assets
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fail early if the Store credentials are missing
+        shell: bash
+        env:
+          TENANT_ID:     ${{ secrets.AZURE_AD_TENANT_ID }}
+          CLIENT_ID:     ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          SELLER_ID:     ${{ secrets.SELLER_ID }}
+          PRODUCT_ID:    ${{ vars.STORE_PRODUCT_ID }}
+        run: |
+          missing=""
+          [ -n "$TENANT_ID" ]     || missing="$missing AZURE_AD_TENANT_ID"
+          [ -n "$CLIENT_ID" ]     || missing="$missing AZURE_AD_APPLICATION_CLIENT_ID"
+          [ -n "$CLIENT_SECRET" ] || missing="$missing AZURE_AD_APPLICATION_SECRET"
+          [ -n "$SELLER_ID" ]     || missing="$missing SELLER_ID"
+          [ -n "$PRODUCT_ID" ]    || missing="$missing STORE_PRODUCT_ID(variable)"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing Store configuration:$missing — see docs/MICROSOFT-STORE.md"
+            exit 1
+          fi
+
+      - name: Configure Microsoft Store CLI
+        uses: microsoft/microsoft-store-apppublisher@v1.1
+
+      - name: Sign in to Partner Center
+        run: >
+          msstore reconfigure
+          --tenantId ${{ secrets.AZURE_AD_TENANT_ID }}
+          --sellerId ${{ secrets.SELLER_ID }}
+          --clientId ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          --clientSecret ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+
+      - name: Fetch the current submission JSON
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path bootstrap | Out-Null
+          msstore submission get ${{ vars.STORE_PRODUCT_ID }} |
+            Out-File -Encoding utf8 bootstrap/baseline.json
+          Get-Content bootstrap/baseline.json
+
+      - name: Fetch the listing assets
+        shell: pwsh
+        # Tells us whether screenshots are reachable from CI. Non-fatal —
+        # the baseline above is the part this run exists for.
+        continue-on-error: true
+        run: |
+          msstore submission getListingAssets ${{ vars.STORE_PRODUCT_ID }} |
+            Out-File -Encoding utf8 bootstrap/listing-assets.json
+          Get-Content bootstrap/listing-assets.json
+
+      - name: Upload for committing to store/microsoft/
+        uses: actions/upload-artifact@v7
+        with:
+          name: store-bootstrap
+          path: bootstrap/
+          retention-days: 30
+
+      - name: What to do with this
+        run: |
+          echo "Download the 'store-bootstrap' artifact."
+          echo "Commit baseline.json to store/microsoft/baseline.json."
+          echo "Then build-store-metadata.mjs merges our copy into the real shape."

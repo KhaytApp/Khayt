@@ -1,0 +1,112 @@
+'use strict';
+(function (global) {
+
+/**
+ * Grouping consumables.
+ *
+ * A consumable carries name, stock, cost, minStock, unit, usagePerHour and one
+ * boolean, `isPackaging`. That boolean is the entire taxonomy — so a shop with
+ * screws, magnets, threaded inserts, boxes and labels has packaging, and
+ * everything else. Asked for by a user: categories, and a way to see one at a
+ * time.
+ *
+ * Categories are DERIVED from the items, never stored as their own list. A
+ * stored list goes stale the moment the last item in a category is renamed, and
+ * then the picker offers something that shows nothing — with no way to tell that
+ * from a bug.
+ *
+ * Three decisions with a quiet wrong answer:
+ *
+ *   UNCATEGORISED IS A CATEGORY. Most shops will categorise some things and not
+ *   others. If uncategorised items are only reachable via "All" they are
+ *   invisible the moment anyone filters, and an item you cannot see is an item
+ *   you buy twice.
+ *
+ *   ONE CATEGORY, NOT THREE SPELLINGS. "Screws", "screws " and " SCREWS" are the
+ *   same shelf. Comparing raw strings fills the picker with near-duplicates and
+ *   splits the list between them.
+ *
+ *   A FILTER THAT NO LONGER MATCHES FALLS BACK. Recategorise the last item in a
+ *   category while it is selected and the list would go empty — which reads as
+ *   data loss, not as an empty filter.
+ *
+ * Pure: no DOM, no storage.
+ */
+
+/** The bucket for items with no category of their own. Not a real category. */
+const UNCATEGORISED = '\u0000uncategorised';
+
+const str = (v) => String(v == null ? '' : v).trim();
+
+/** Collapse spelling differences so one shelf is one category. */
+const key = (v) => str(v).toLowerCase().replace(/\s+/g, ' ');
+
+/** The category an item belongs to, or UNCATEGORISED. */
+function categoryOf(item) {
+  const c = str(item && item.category);
+  return c ? c : UNCATEGORISED;
+}
+
+/**
+ * Every category present, in display order, each with its item count.
+ *
+ * Derived from the items, so a category exists exactly as long as something is
+ * in it. Uncategorised sorts last: it is a leftover, not a heading.
+ *
+ * The displayed spelling is the first one encountered, so a shop that typed
+ * "Screws" once and "screws" later sees its own capitalisation rather than a
+ * normalised form it never wrote.
+ */
+function categories(items) {
+  const list = Array.isArray(items) ? items.filter((i) => i && typeof i === 'object') : [];
+  const seen = new Map();
+  let uncategorised = 0;
+  for (const it of list) {
+    const c = categoryOf(it);
+    if (c === UNCATEGORISED) { uncategorised += 1; continue; }
+    const k = key(c);
+    if (seen.has(k)) seen.get(k).count += 1;
+    else seen.set(k, { key: k, label: c, count: 1 });
+  }
+  const out = [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
+  if (uncategorised) out.push({ key: UNCATEGORISED, label: UNCATEGORISED, count: uncategorised });
+  return out;
+}
+
+/**
+ * The items in one category.
+ *
+ * @param selected  a category key, UNCATEGORISED, or '' / null for everything.
+ */
+function filterByCategory(items, selected) {
+  const list = Array.isArray(items) ? items.filter((i) => i && typeof i === 'object') : [];
+  const want = selected === UNCATEGORISED ? UNCATEGORISED : key(selected);
+  if (!want) return list;                       // '' means All, and All means all
+  if (want === UNCATEGORISED) return list.filter((i) => categoryOf(i) === UNCATEGORISED);
+  return list.filter((i) => key(categoryOf(i)) === want);
+}
+
+/**
+ * The selection to actually use, given what exists now.
+ *
+ * Returns '' (All) when the chosen category has nothing in it any more — which
+ * happens the moment the last item in it is recategorised or deleted. Showing an
+ * empty list under a heading that still names the category reads as data loss.
+ */
+function resolveSelection(items, selected) {
+  const want = selected === UNCATEGORISED ? UNCATEGORISED : key(selected);
+  if (!want) return '';
+  return categories(items).some((c) => c.key === want) ? selected : '';
+}
+
+/** Suggestions for the editor's datalist — what this shop already uses. */
+function suggestions(items) {
+  return categories(items).filter((c) => c.key !== UNCATEGORISED).map((c) => c.label);
+}
+
+const api = { categories, filterByCategory, resolveSelection, suggestions, categoryOf, UNCATEGORISED };
+
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+global.KhaytConsumableCategories = api;
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -1,0 +1,529 @@
+import SwiftUI
+import UniformTypeIdentifiers
+import KhaytCore
+
+/// The book as a board: every open job, in the column its stage puts it in.
+///
+/// The table answers "what is the state of this job". The board answers "where
+/// is the work piling up", which is the question a shop asks standing in the
+/// middle of the room — and it is the one a list of forty rows sorted by date
+/// cannot answer at a glance.
+///
+/// A CARD CAN BE MOVED NOW, and what moving it means is not written here. A
+/// status change stamps the completion, deducts the filament and the packaging,
+/// clears a hold and pushes the due date out by the days it waited, and fixes
+/// the cost the job is judged on ever after. Those rules live in
+/// `lib/order-status.js` and `lib/order-deduction.js` — the same JavaScript the
+/// Electron app runs — and `Shop.moveJob` performs them. This file decides what
+/// a person sees and nothing else.
+///
+/// What a move owes outward — a webhook, a Telegram message, an email, the
+/// customer's portal page — is sent by `Shop.moveJob` after the write. A move
+/// is REFUSED rather than half-made only for a channel this app cannot carry,
+/// and says which.
+struct Kanban: View {
+    @Bindable var shop: Shop
+
+    /// ── THE ONE MOMENT THE BOARD EXISTS FOR ──────────────────────────────
+    ///
+    /// A move completed, `shop.board` was rebuilt, and the card disappeared
+    /// from one column and appeared in another between two frames. The thing
+    /// this screen is for — work moving along — was the one thing it did not
+    /// draw. A namespace here and a matched geometry on each card gives the
+    /// card a path between the two.
+    @Namespace private var board
+    @FocusState private var focused: Bool
+    /// In a mirrored window the next column is to the LEFT. The library grid
+    /// makes the same correction, for the same reason: a right arrow that
+    /// walks backwards is worse than no arrow keys at all.
+    @Environment(\.layoutDirection) private var layout
+
+    /// Seven columns, and all seven are here — which they were not. A job in QC
+    /// or on hold had no column and therefore no card: it did not move to the
+    /// end of the board, it vanished from it, and a board that silently omits
+    /// the jobs somebody is waiting on is worse than no board.
+    private var columns: [Stage] { Stage.boardColumns }
+
+    /// Jobs that matched the search but left the board by being delivered or
+    /// cancelled — the ones a shop would otherwise think had vanished.
+    private var finished: Int {
+        shop.matching(shop.orders).filter {
+            guard shop.inSite($0), let stage = Stage.of($0) else { return false }
+            return !Stage.boardColumns.contains(stage)
+        }.count
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // WHERE THE FINISHED WORK WENT. Delivered and cancelled jobs have no
+            // column — see `Stage.boardColumns` — and a shop whose every job
+            // has been handed over opened this screen to eight empty lanes and
+            // no word about its twenty jobs. Said above the lanes, where it is
+            // read first, with the way to them beside it.
+            if finished > 0 {
+                Banner(text: shop.words.counting(finished, "mac.board_finished_elsewhere"),
+                       symbol: "checkmark.circle", tint: .secondary) {
+                    Button(shop.words.callIt("mac.board_open_jobs")) { shop.shelf = .jobs(nil) }
+                }
+            }
+            // Asked once per draw, not per card: it walks every spool's
+            // history. A card found only by its lot says so, as its row in
+            // the orders table does.
+            let lots = shop.lotReasons(shop.orders)
+            // The board once per draw, not once per column: each build sorts
+            // every column's jobs by their dates.
+            let lanes = shop.board
+            ScrollView([.horizontal, .vertical]) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(columns) { stage in
+                        Column(stage: stage, jobs: lanes[stage] ?? [], shop: shop,
+                               board: board, lots: lots)
+                    }
+                }
+                .padding(Metric.screen)
+            }
+            // TOP-ALIGNED. A scroll view on both axes centres content smaller
+            // than itself, so eight short lanes floated in the middle of the
+            // window under 450 points of nothing. `.topLeading` mirrors in
+            // Arabic, so the first lane still sits at the leading edge there.
+            .defaultScrollAnchor(.topLeading, for: .alignment)
+            // Eight lanes do not fit a laptop window, and the sixth was cut at
+            // the window edge with nothing to say the rest were there.
+            .horizontalScrollCue()
+            // ── THE BOARD ANSWERS THE KEYBOARD ────────────────────────────
+            //
+            // It had none. The library was the only screen in this app with
+            // arrow keys, and a board is the screen people use with one hand
+            // while the other is holding a part.
+            //
+            // ARROWS NAVIGATE, ⌘ARROWS MOVE: the Job menu's ⌘→ sends the job
+            // one step along, a bare → only changes which card is selected.
+            // Two verbs, and the modifier is the difference.
+            .focusable()
+            .focused($focused)
+            // No ring round the whole board, for the reason the library gives:
+            // a blue rectangle enclosing the content reads as an error state,
+            // and the selection itself shows where the keyboard is.
+            .focusEffectDisabled()
+            .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
+                // ⌘ belongs to the menu's Move Along / Move Back. Passing it
+                // through here would move the job AND the selection.
+                guard !press.modifiers.contains(.command) else { return .ignored }
+                let mirrored = layout == .rightToLeft
+                let moved: Bool
+                switch press.key {
+                case .leftArrow:  moved = shop.moveBoardSelection(dx: mirrored ? 1 : -1, dy: 0)
+                case .rightArrow: moved = shop.moveBoardSelection(dx: mirrored ? -1 : 1, dy: 0)
+                case .upArrow:    moved = shop.moveBoardSelection(dx: 0, dy: -1)
+                default:          moved = shop.moveBoardSelection(dx: 0, dy: 1)
+                }
+                // Unhandled at the edges, so the system beep still says "there
+                // is nothing that way".
+                return moved ? .handled : .ignored
+            }
+            // Return opens the job, as it does in the library.
+            .onKeyPress(.return) {
+                guard shop.selection != nil else { return .ignored }
+                shop.shelf = .jobs(nil)
+                return .handled
+            }
+            // ⌫ asks to delete the selected card's job, as in the jobs list.
+            .onDeleteCommand { shop.askToDeleteFrontmost() }
+            // Said out loud rather than filtered away. A job whose status has no
+            // column is not on this board, and the board saying so is the
+            // difference between a gap and a lie.
+            if !shop.unplaced.isEmpty {
+                Banner(text: shop.words.counting(shop.unplaced.count, "mac.board_unplaced"),
+                       symbol: "questionmark.circle", tint: .secondary)
+            }
+        }
+        .background(Khayt.ground)
+        .overlay {
+            if shop.orders.isEmpty {
+                EmptyHere(title: shop.words.callIt("mac.no_jobs"), mark: .board)
+            } else if shop.matching(shop.orders).isEmpty {
+                // Seven columns all saying "nothing here" is a board that looks
+                // broken. It is a search that matched nothing, and it should say
+                // which search.
+                NothingMatched(shop: shop, mark: .board)
+            }
+        }
+        // The same primary action the jobs table carries. A shop looking at a
+        // board of work should be able to add to it from there.
+        .screenToolbar { NewJobButton(shop: shop) }
+    }
+}
+
+/// The two moves that ask a question first.
+///
+/// A hold wants to know why; a job leaving inspection wants to know that it
+/// passed. Both answers are optional text and both are worth having — "waiting
+/// on filament" three weeks later, and a pass rate computed over the whole
+/// book rather than whatever happened to be recorded.
+///
+/// Return commits, Escape leaves the job where it is.
+struct AskFirst: View {
+    let shop: Shop
+    let subject: Shop.PendingHold
+    let kind: Kind
+    @State private var answer = ""
+    @FocusState private var focused: Bool
+
+    enum Kind {
+        case hold
+
+        var title: String { self == .hold ? "ord.hold_btn" : "ord.qc_pass" }
+        var prompt: String { self == .hold ? "ord.hold_reason" : "ord.qc_notes" }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(shop.words.callIt(kind.title)).font(.headline)
+            Text(subject.project).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+
+            TextField(shop.words.callIt(kind.prompt), text: $answer)
+                .textFieldStyle(.roundedBorder)
+                .focused($focused)
+                .onSubmit(commit)
+
+            HStack {
+                Spacer()
+                Button(shop.words.callIt("common.cancel")) { shop.clearQuestion() }
+                    .keyboardShortcut(.cancelAction)
+                Button(shop.words.callIt(kind.title), action: commit)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(18)
+        .frame(width: 340)
+        .onAppear { focused = true }
+    }
+
+    private func commit() {
+        let id = subject.id
+        let said = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        shop.clearQuestion()
+        Task {
+            switch kind {
+            case .hold: await shop.moveJob(id, to: .on_hold, holdReason: said)
+            }
+        }
+    }
+}
+
+/// What the last move had to say, above whatever screen you are on.
+///
+/// A job on its way from one column to another.
+///
+/// A typed payload rather than a bare String: a board that accepted any dragged
+/// text would move a job because someone dropped a word on it.
+struct DraggedJob: Codable, Transferable {
+    let id: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .khaytJob)
+    }
+}
+
+extension UTType {
+    /// Declared in the bundle's Info.plist so the drag is this app's own and
+    /// nothing else on the Mac claims to understand it.
+    static let khaytJob = UTType(exportedAs: "app.khayt.mac.job")
+}
+
+// NOT PHOTOGRAPHED, and it was tried both ways. `ImageRenderer` draws nothing
+// inside a `ScrollView` and the columns live in one, so a picture of the board
+// is a picture of the ground colour; rendering one column alone gets
+// `ImageRenderer`'s refusal placeholder instead, because `.lane()` is a
+// material. The window capture loses SwiftUI's own drawing. So the treatment
+// below is the CONSERVATIVE one — a tint outline on what will accept, a recede
+// on what will not — rather than anything whose reading has to be judged by eye.
+private struct Column: View {
+    let stage: Stage
+    let jobs: [Order]
+    let shop: Shop
+    let board: Namespace.ID
+    /// The lot each card matched on, when that is the only reason it is here.
+    var lots: [String: String] = [:]
+    @State private var isTarget = false
+    @Environment(\.accessibilityReduceMotion) private var reduced
+
+    /// Why this column would refuse the card currently in the air, or nil.
+    private var refusal: String? { shop.dragRefusal(stage) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // The redesign's column head: the stage's dot, its name, the count
+            // beside it. The dot is the stage colour the Today pills use, and
+            // only when the column has something in it: a green dot over an
+            // empty Printing column says a machine is working when none is.
+            HStack(spacing: 7) {
+                Circle().fill(jobs.isEmpty ? Color.secondary.opacity(0.5) : stage.dot)
+                    .frame(width: 7, height: 7)
+                Text(shop.words.callIt(stage.key)).font(.system(size: 13, weight: .semibold))
+                Text(verbatim: shop.words.numeral(jobs.count))
+                    .font(.system(size: 12))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 6)
+            }
+            .padding(.horizontal, 6).padding(.top, 2)
+
+            if jobs.isEmpty {
+                // An empty column keeps its width and says so. A board whose
+                // columns collapse as work moves is a board you cannot learn.
+                Text(shop.words.callIt("mac.nothing_here"))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 18)
+            } else {
+                ForEach(jobs) { job in
+                    JobCard(job: job, shop: shop, matchedLot: lots[job.id])
+                        // The card's path from the column it left to the one
+                        // it landed in. Keyed by job id, so the SAME card
+                        // travels rather than one fading out while another
+                        // fades in somewhere else.
+                        .matchedGeometryEffect(id: job.id, in: board)
+                        // For a card entering or leaving the BOARD — a new job,
+                        // or one moving to a column scrolled out of view. Without
+                        // it the matched geometry has nowhere to fly from.
+                        .transition(.opacity)
+                        // A card could only be DRAGGED. Moving a job two
+                        // columns along meant picking it up and carrying it
+                        // past the ones in between, and moving it back meant
+                        // the same journey in reverse — for a decision made
+                        // about the card under the pointer. The same menu the
+                        // orders table has, on the card itself.
+                        .contextMenu { JobActions(shop: shop, job: job) }
+                }
+            }
+        }
+        // `Motion.figure` (0.45), not `progress` (0.9): a card arriving in a
+        // new column is a value arriving at a new reading, and nearly a second
+        // of card flight across seven columns is a shop waiting for the app.
+        //
+        // Keyed on the IDS rather than the array: `Order` moving within a
+        // column (a reorder) is not news, and re-running this on every redraw
+        // is the "animates on redraw" fault the doctrine forbids.
+        .animation(Motion.of(Motion.figure, unless: reduced), value: jobs.map(\.id))
+        // Narrow enough that seven columns are a short scroll rather than a
+        // long one, wide enough for a two-line job name.
+        .frame(width: 212, alignment: .leading)
+        .lane()
+        // WHERE THE CARD IN THE AIR MAY GO — shown positively.
+        //
+        // The columns that would TAKE it outline themselves the moment it is
+        // picked up; the ones that would refuse recede and say why on hover.
+        // Outlining the refusals instead was the first draft and it is the
+        // wrong way round: it puts the eye on what cannot be done and paints a
+        // full column as an alarm, when a full column is a shop working.
+        .opacity(refusal == nil ? 1 : 0.5)
+        .overlay {
+            // Outlined while a card is over it, as before — and now also while
+            // a card is in the air and this column would have it. A permanently
+            // outlined column reads as selected, so neither happens at rest.
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(.tint, lineWidth: 2)
+                .opacity(shop.canMoveJobs && refusal == nil
+                         && (isTarget || shop.draggingJob != nil) ? 1 : 0)
+        }
+        // The reason, on the column it is about, and only while it is under the
+        // pointer. Seven columns each carrying a sentence is a board nobody can
+        // read; one is an answer.
+        .overlay(alignment: .top) {
+            if let refusal, isTarget {
+                Text(refusal)
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
+                    .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(.separator))
+                    .padding(6)
+                    .transition(.opacity)
+            }
+        }
+        .dropDestination(for: DraggedJob.self) { dropped, _ in
+            guard let job = dropped.first else { return false }
+            // A card dropped back where it started is not a move. Performing it
+            // would stamp a status history entry and a revision for nothing.
+            guard Stage.of(job: job.id, in: shop) != stage else { return false }
+            // Refused BEFORE the move is attempted, now that the answer is
+            // already here. `moveJob` asks the rules again and refuses again —
+            // this does not replace that, it stops the drop looking accepted.
+            // SHIPPED IS NOT A STATUS, so it is not a move — and it is asked
+            // BEFORE the gate, because the gate refuses it for exactly that
+            // reason. It is a date stamped on a job that stays `completed`. A
+            // column is a drop target, though, and a card dragged onto this one
+            // plainly means "this went in the post", so it is performed the only
+            // way it can be. `markShipped` refuses a job that is not finished.
+            if stage == .shipped {
+                Task { await shop.markShipped(job.id) }
+                return true
+            }
+            guard shop.dragRefusal(stage) == nil else { return false }
+            // A hold asks why first — it is the one move whose reason a shop
+            // will want three weeks later. Every other move just happens.
+            if let ask = shop.questionFor(job.id, moving: stage) { ask(); return true }
+            Task { await shop.moveJob(job.id, to: stage) }
+            return true
+        } isTargeted: { isTarget = $0 }
+        // BOTH through the token. This line was a hand-written `.easeOut(
+        // duration: 0.12)` — the same number `Motion.hover` holds, sitting
+        // directly above a line that asks for it properly. It did not go to
+        // zero under Reduce Motion, and the one below it did: two answers to
+        // one question, two lines apart, which is how a motion system stops
+        // being one.
+        .animation(Motion.of(Motion.hover, unless: reduced), value: isTarget)
+        .animation(Motion.of(Motion.hover, unless: reduced), value: refusal == nil)
+    }
+}
+
+private extension Stage {
+    /// The stage a job is in right now, by id.
+    @MainActor
+    static func of(job id: String, in shop: Shop) -> Stage? {
+        shop.orders.first { $0.id == id }.flatMap(Stage.of)
+    }
+}
+
+private struct JobCard: View {
+    let job: Order
+    let shop: Shop
+    /// A lot search found this job by its lot alone (`Shop.lotReasons`).
+    var matchedLot: String? = nil
+    /// The board is the screen a shop stands in front of, and nothing on it
+    /// answered the pointer. `Dashboard`'s machine tile has the same job and
+    /// says why it does it: "A tile that looks pressable has to be." This card
+    /// opens the job, so it lifts — and `liftsOnHover` brings the pointing
+    /// hand with it, which is the half a shop actually reads.
+    @State private var hovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 10) {
+                // The board is the screen people stand in front of, and a
+                // column of cards is scanned rather than read. A picture of the
+                // thing is found faster than its name — and the picture is
+                // already in the library, on a job that says which model it is.
+                // A job with no model keeps the tile, so every card's title
+                // starts at the same place.
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Khayt.recessed)
+                    if let thumb = shop.modelThumbnail(for: job) {
+                        Thumbnail(source: thumb).padding(3)
+                    } else {
+                        Image(systemName: "cube").font(.system(size: 15)).foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    // Baseline-aligned, so the flag sits beside the first word
+                    // rather than floating at the middle of a title that wrapped.
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        if job.priority {
+                            Image(systemName: "flag.fill").font(.caption2)
+                                .foregroundStyle(Khayt.attention)
+                        }
+                        Text(shop.shownTitle(of: job)).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if !job.client.isEmpty {
+                        Text(job.client).font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    if let matchedLot {
+                        Label(shop.words.callIt("mac.lot_label", ["lot": .string(matchedLot)]),
+                              systemImage: "magnifyingglass")
+                            .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    // Who it is on, as the other app's card says it — the
+                    // question a shop with staff asks of every card.
+                    if let who = shop.operatorLabel(job.operatorId) {
+                        Label(who, systemImage: "person.badge.clock")
+                            .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+            }
+            // A job on a machine that is printing it: the amber thread, then
+            // which machine and how long is left.
+            if let live = shop.livePrint(for: job), let machineId = job.machineId {
+                VStack(alignment: .leading, spacing: 5) {
+                    ThreadBar(progress: Double(live.progress) / 100)
+                    HStack(spacing: 4) {
+                        Image(systemName: "printer").foregroundStyle(Khayt.live)
+                        Text(verbatim: shop.machineName(forId: machineId)
+                             + ((live.timeRemaining ?? 0) > 0
+                                ? " · " + PrinterWatch.spell(live.timeRemaining ?? 0, shop.words) : ""))
+                            .lineLimit(1).truncationMode(.middle)
+                    }
+                    .font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
+                }
+            }
+            HStack(spacing: 6) {
+                if let due = Order.day(job.dueDate) {
+                    let date = shop.words.say(due, .dateTime.day().month(.abbreviated))
+                    // Said in words as well as colour — this is the line that
+                    // decides whether someone gets a phone call today.
+                    if job.isOverdue() {
+                        StatusPill(label: date, stage: .late)
+                            .help(shop.words.callIt("mac.late_tile"))
+                    } else {
+                        Label(date, systemImage: "clock")
+                            .font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 4)
+                if !job.isSettled {
+                    Text(Money.figure(job.owedInOwnCurrency, currency: job.currency, shop: shop.currency))
+                        .font(.system(size: 12, weight: .medium))
+                        .monospacedDigit()
+                }
+            }
+        }
+        // Late is said by the pill on the date and flagged by the flag, so
+        // the card itself carries no rail.
+        .todayCard(padding: 11)
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .liftsOnHover(hovering)
+        .onHover { hovering = $0 }
+        .onTapGesture {
+            // The board is for seeing; the table is for reading one job. A tap
+            // takes you there rather than opening a panel the board has no room
+            // for.
+            shop.selection = job.id
+            shop.shelf = .jobs(nil)
+        }
+        .help(job.id)
+        // A read-only book is not draggable at all. Offering the gesture and
+        // then refusing every drop teaches nothing except that the app is
+        // unreliable.
+        .modifier(Draggable(enabled: shop.canMoveJobs, id: job.id, shop: shop))
+    }
+}
+
+/// `.draggable` applied only where the book can actually be changed.
+private struct Draggable: ViewModifier {
+    let enabled: Bool
+    let id: String
+    let shop: Shop
+
+    /// Evaluated at the START of a drag, not at draw time. Anything here that
+    /// ran per-frame would ask the engine on every redraw of the board.
+    private func payload() -> DraggedJob {
+        shop.beganDragging(id)
+        return DraggedJob(id: id)
+    }
+
+    func body(content: Content) -> some View {
+        if enabled {
+            // `draggable` takes an AUTOCLOSURE, so `payload()` runs when the
+            // drag begins rather than when the card is drawn — which is the
+            // only hook SwiftUI offers for "a card was picked up", and the
+            // moment the columns need to know which job is in the air.
+            content.draggable(payload())
+        } else {
+            content
+        }
+    }
+}

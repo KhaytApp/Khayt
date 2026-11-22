@@ -1,0 +1,95 @@
+/* ==========================================================================
+   Flow — tokens
+
+   A board you work, not a dashboard you read. The palette stays quiet on
+   purpose: on this design colour carries state (a blocked column, a job past
+   due, a printer down), so the surfaces underneath it must not compete. Cards
+   are near-white on a cool grey field, and every saturated colour on screen
+   means something.
+   ========================================================================== */
+
+/* Both blocks must sit on the SAME element. Custom properties declared directly
+   on <body> beat ones inherited from <html> no matter how specific the html
+   selector is, so a light block on body.khayt-flow made the dark block on
+   html[data-theme="dark"] unreachable — dark mode rendered identical to light.
+   Every other theme scopes its tokens to html[data-design]; this now matches. */
+html[data-design="flow"] {
+  --font-sans: 'Plus Jakarta Sans', 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --bg:          hsl(220 20% 96%);
+  --bg-2:        hsl(220 22% 93%);
+  --bg-elev:     hsl(0 0% 100%);
+  --surface:     hsl(0 0% 100%);
+  --panel:       hsl(0 0% 100%);
+  --panel-2:     hsl(220 22% 97%);
+
+  --text:        hsl(222 30% 14%);
+  --text-dim:    hsl(220 12% 38%);
+  /* 4.62:1 on --bg, 5.31:1 on --surface — clears AA on both. */
+  --text-muted:  hsl(220 10% 43%);
+
+  --line:        hsl(220 16% 86%);
+  --border:      hsl(220 16% 86%);
+  --border-soft: hsl(220 18% 91%);
+
+  --radius:      12px;
+  --radius-sm:   8px;
+
+  /* Column accent stripes. Deliberately desaturated: they label a lane, they
+     are not status signals. Real signals get --danger / --warn below. */
+  --flow-lane-1: hsl(220 14% 62%);
+  --flow-lane-2: hsl(199 60% 52%);
+  --flow-lane-3: hsl(258 46% 60%);
+  --flow-lane-4: hsl(38  72% 54%);
+  --flow-lane-5: hsl(158 44% 44%);
+
+  --success:     hsl(158 52% 32%);
+  --success-soft:hsl(158 46% 92%);
+  --warn:        hsl(35 82% 44%);
+  --warn-soft:   hsl(38 88% 93%);
+  --danger:      hsl(354 62% 47%);
+  --danger-soft: hsl(354 70% 95%);
+
+  --shadow-card: 0 1px 2px hsl(220 24% 20% / .07), 0 1px 1px hsl(220 24% 20% / .04);
+  --shadow-drag: 0 10px 26px hsl(220 30% 18% / .20);
+
+  --flow-col-w:  272px;
+  --flow-head-h: 44px;
+}
+
+/* data-theme lives on <html>, not <body> — scoping the dark block to the body
+   made it never match, so dark mode rendered identical to light. */
+html[data-design="flow"][data-theme="dark"] {
+  --bg:          hsl(222 24% 11%);
+  --bg-2:        hsl(222 22% 14%);
+  --bg-elev:     hsl(222 20% 17%);
+  --surface:     hsl(222 20% 17%);
+  --panel:       hsl(222 20% 17%);
+  --panel-2:     hsl(222 20% 20%);
+
+  --text:        hsl(220 24% 94%);
+  --text-dim:    hsl(220 12% 72%);
+  /* 4.71:1 on --bg, 4.53:1 on --surface. */
+  --text-muted:  hsl(220 12% 68%);
+
+  --line:        hsl(222 16% 26%);
+  --border:      hsl(222 16% 26%);
+  --border-soft: hsl(222 16% 22%);
+
+  --flow-lane-1: hsl(220 12% 52%);
+  --flow-lane-2: hsl(199 58% 56%);
+  --flow-lane-3: hsl(258 48% 66%);
+  --flow-lane-4: hsl(38  70% 58%);
+  --flow-lane-5: hsl(158 40% 50%);
+
+  --success:     hsl(158 44% 52%);
+  --success-soft:hsl(158 40% 18%);
+  --warn:        hsl(38 78% 60%);
+  --warn-soft:   hsl(38 60% 19%);
+  --danger:      hsl(354 66% 65%);
+  --danger-soft: hsl(354 46% 20%);
+
+  --shadow-card: 0 1px 2px hsl(0 0% 0% / .34);
+  --shadow-drag: 0 12px 28px hsl(0 0% 0% / .52);
+}

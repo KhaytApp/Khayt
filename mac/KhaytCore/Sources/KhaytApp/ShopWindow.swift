@@ -1,0 +1,1048 @@
+import SwiftUI
+import QuickLook
+
+struct ShopWindow: View {
+    @Bindable var shop: Shop
+    // Both restored on relaunch. Reopening an app onto a different screen from
+    // the one you left is a small thing that makes it feel like a web page.
+    @SceneStorage("inspector.showing") private var showInspector = true
+    /// Whether the panel is on screen RIGHT NOW, which is not the same question
+    /// as whether this screen wants one.
+    ///
+    /// ── WHY THIS IS STATE AND NOT A COMPUTED VALUE ────────────────────────
+    ///
+    /// It was computed inline from the shelf, so changing screen resized the
+    /// detail pane AND replaced its contents in one state update. AppKit then
+    /// collapses an `NSSplitViewItem` while SwiftUI is rebuilding the view
+    /// inside it, and somewhere in that overlap SwiftUI's own bridging changes
+    /// a layout constraint from inside the window's constraint pass:
+    ///
+    ///     NSHostingView._willUpdateConstraintsForSubtree
+    ///     NSLayoutConstraint.setConstant
+    ///     AppKitPlatformViewHost._layoutMetricsInvalidatedForHostedView
+    ///     NSHostingView.setNeedsUpdate
+    ///     -[NSWindow _postWindowNeedsUpdateConstraints]   → throw → abort
+    ///
+    /// AppKit will not forgive an invalidation raised during its own pass, and
+    /// the exception escapes the display-cycle observer uncaught, so the app
+    /// dies rather than glitches. It came in from a real morning's use and
+    /// reproduced 4 times in 6 under `KHAYT_CHURN`, which changes shelf on
+    /// consecutive runloop turns.
+    ///
+    /// Splitting it in two fixes it: the shelf changes now, and the panel
+    /// follows on the NEXT turn, by which time the pane has settled. Nobody
+    /// can see one frame, and the two layout passes no longer overlap.
+    ///
+    /// A capture-only or timing-only explanation was wrong twice before on
+    /// this same assertion. This one has a driver that reproduces it and a
+    /// driver that proves the fix — `ChurnTests` runs both.
+    @State private var panelIsOpen = true
+    /// A request from the menu bar to put the caret in the search field.
+    @State private var searchWanted = false
+    @SceneStorage("shelf") private var storedShelf = ""
+    /// Board or List for Jobs, remembered per window like the shelf is.
+    @SceneStorage("jobs.layout") private var storedJobsLayout = Shop.JobsLayout.list.rawValue
+    // A new key: under the old one every window remembered "Khayt's order",
+    // and the new default (newest first) would never have been seen.
+    @SceneStorage("library.sort.v2") private var storedSort = LibrarySort.added.rawValue
+    @SceneStorage("library.flat") private var storedFlat = true
+    /// Nil where a context has no undo, which the documentation says to expect
+    /// and which every registration in `Shop` is guarded for.
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
+
+
+    /// Does the screen you are on have a panel at all?
+    ///
+    /// Closed on the dashboard, not filled with a placeholder: that screen is
+    /// already a summary, and a panel beside it has nothing to say. Closed on
+    /// the screens that carry their own detail — a card, or a table wide
+    /// enough to read — because a panel there would repeat.
+    private var wantsPanel: Bool {
+        showInspector && !shop.needsSignIn && !shop.showingDashboard && !shop.showingBoard
+            && !shop.showingMachines && !shop.showingInventory
+            && !shop.showingExpenses && !shop.showingWaste && !shop.showingReports
+            && !shop.showingCatalogue && !shop.showingColour && !shop.showingPortfolio
+            && !shop.showingCalculator
+            && !shop.showingGiftCards
+    }
+
+    /// Which window the shop is looking at.
+    ///
+    /// The redesign is a whole new shell — its own title bar, its own sidebar,
+    /// its own Dashboard — so it cannot be grafted into the existing
+    /// `NavigationSplitView` a screen at a time without the app briefly having
+    /// two sidebars. It goes behind a switch instead: the new one can be built,
+    /// looked at and lived with while the old one keeps working, and the screens
+    /// underneath are shared by both.
+    ///
+    /// ON as of 4.0.0-alpha.12. The shell, the sidebar and the Dashboard are
+    /// drawn to the spec; the other screens are unchanged and sit inside it,
+    /// which is a mixed state and the point of an alpha. Settings → General →
+    /// Appearance switches back in one click, and the preference is a
+    /// preference — nothing about the book changes either way.
+    @AppStorage(ShellChoice.key) private var newShell = ShellChoice.byDefault
+
+    var body: some View {
+        if newShell {
+            // AROUND THE CONTENT, not around the shell: an `.inspector` on the
+            // shell's root splits the navy strip too, and the panel comes up
+            // beside the title bar rather than beside the table.
+            Shell(shop: shop, searchWanted: $searchWanted,
+                  showingPanel: wantsPanel && !InspectorPane.hasOwnDetail(shop)) { screen }
+                // The panel itself is drawn by the shell; this is the rest of
+                // `WindowPanels` — the menu bar's reach into the window.
+                .modifier(Reachable(shop: shop, showInspector: $showInspector,
+                                    searchWanted: $searchWanted))
+                // The screens inside still declare toolbars; this is what tells
+                // them there is no window title bar to put one in. See
+                // `ScreenActions`.
+                .environment(\.classicShell, false)
+                .modifier(WindowSheets(shop: shop))
+                .overlay { goTo }
+                .overlay { jump }
+        } else {
+            classic
+                .environment(\.classicShell, true)
+                .windowTitleBar(hidden: false)
+                .modifier(WindowSheets(shop: shop))
+                .overlay { goTo }
+                .overlay { jump }
+        }
+    }
+
+    /// ⌘K's palette, over either shell. Never over the sign-in screen: the
+    /// Go menu is disabled then, and a palette left open when the lock came
+    /// down is closed by `dismissEverySheet`.
+    @ViewBuilder private var goTo: some View {
+        if shop.goingTo && shop.canGoToAnything {
+            GoToPalette(shop: shop)
+        }
+    }
+
+    /// ⌘J's palette, the library only — over either shell, on the same terms
+    /// as ⌘K's: never over the sign-in screen, and closed when the lock comes
+    /// down (`dismissEverySheet`).
+    @ViewBuilder private var jump: some View {
+        if shop.jumping && shop.canJumpInLibrary {
+            LibraryJumpPalette(shop: shop)
+        }
+    }
+
+    /// The detail panel, the search field and the menu-bar plumbing, built
+    /// once and applied by both shells — see `WindowPanels`.
+    private var panels: WindowPanels {
+        WindowPanels(shop: shop, showInspector: $showInspector,
+                     panelIsOpen: $panelIsOpen, searchWanted: $searchWanted,
+                     wantsPanel: wantsPanel, searchPrompt: searchPrompt)
+    }
+
+    /// The content region, with no chrome of its own — shared by both shells,
+    /// which is what stops this being a fork of the app.
+    @ViewBuilder private var screen: some View {
+        lockedOr {
+            // The one-time ask about crash reports (#1789), over every screen,
+            // the home one included, until it is answered. Never a sheet.
+            TelemetryCard(shop: shop)
+            if shop.showingDashboard {
+                Triage(shop: shop)
+            } else {
+                EngineBanner(shop: shop)
+                MoveBanners(shop: shop)
+                SpendBanner(shop: shop)
+                classicScreens
+            }
+        }
+    }
+
+    /// THE LOCK, in front of every screen, in BOTH shells — the sign-in
+    /// screen while nobody is signed in, "not allowed" for a screen the
+    /// person's level does not open, and only otherwise the content. What
+    /// it picks is `ShopWindow.gate(for:)`, which a test asks directly.
+    @ViewBuilder private func lockedOr<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        switch Self.gate(for: shop) {
+        case .signIn: LockScreen(shop: shop)
+        case .notAllowed: NotAllowed(shop: shop)
+        case .content: VStack(spacing: 0) { content() }
+        }
+    }
+
+    /// What either shell's detail column draws for the shop as it is.
+    enum Gate: Equatable { case signIn, notAllowed, content }
+    static func gate(for shop: Shop) -> Gate {
+        if shop.needsSignIn { return .signIn }
+        return shop.canShow(shop.shelf) ? .content : .notAllowed
+    }
+
+    /// Every screen but the Dashboard, shared by both shells.
+    @ViewBuilder private var classicScreens: some View {
+            // A NARROWED SCREEN SAYS SO. Each of the five the site filter
+            // narrows carries the banner (SiteFilter.swift); it draws nothing
+            // when no site is chosen.
+            if shop.showingDashboard {
+                // Triage draws Today (with its site banner) and puts the
+                // Today/Ledger switch and Record a payment in the toolbar.
+                Triage(shop: shop)
+            } else if shop.showingLibrary {
+                LibraryGrid(shop: shop)
+            } else if shop.showingBoard {
+                VStack(spacing: 0) {
+                    SiteScopeBanner(shop: shop, counting: .jobs)
+                    Kanban(shop: shop)
+                }
+            } else if shop.showingMachines {
+                VStack(spacing: 0) {
+                    SiteScopeBanner(shop: shop, counting: .machines)
+                    Machines(shop: shop).environment(shop.cameras)
+                }
+            } else if shop.showingInventory {
+                VStack(spacing: 0) {
+                    SiteScopeBanner(shop: shop, counting: .spools)
+                    Inventory(shop: shop)
+                }
+            } else if shop.showingExpenses {
+                Expenses(shop: shop)
+            } else if shop.showingWaste {
+                Waste(shop: shop)
+            } else if shop.showingReports {
+                Reports(shop: shop)
+            } else if shop.showingCatalogue {
+                Catalogue(shop: shop)
+            } else if shop.showingCalculator {
+                Calculator(shop: shop)
+            } else if shop.showingColour {
+                ColourStudio(shop: shop)
+            } else if shop.showingPortfolio {
+                Portfolio(shop: shop)
+            } else if shop.showingGiftCards {
+                GiftCards(shop: shop)
+            } else if shop.showingCustomers {
+                CustomersTable(shop: shop)
+            } else {
+                // The kits above the book they group. Nothing at all when
+                // the shop has never made one — a band explaining an empty
+                // feature is furniture on the screen people live in.
+                VStack(spacing: 0) {
+                    SiteScopeBanner(shop: shop, counting: .jobs)
+                    KitBand(shop: shop)
+                    OrdersTable(shop: shop)
+                }
+            }
+    }
+
+    @ToolbarContentBuilder private var classicToolbar: some ToolbarContent {
+            // WHICH BOOK IS OPEN lives at the top of the sidebar now (the shop
+            // card, `ShopCard`), where the shop's name already is, so the
+            // toolbar no longer carries a second copy of the switcher.
+            // THE SCREEN'S NAME, on every screen. The system title collapsed
+            // on six of thirteen screens with nothing to say why; drawn here it
+            // is the same everywhere: the title, and under it the shop and what
+            // this session may do.
+            ToolbarItem(placement: .navigation) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(shop.shelfTitle).font(.system(size: 13, weight: .semibold))
+                    Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                .lineLimit(1)
+                .padding(.leading, 4)
+                .accessibilityElement(children: .combine)
+            }
+            .sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .principal) {
+                // Two menus in one item rather than two items: the three axes
+                // belong together, and a toolbar that collapses them apart when
+                // the window narrows would separate "which set" from "what it
+                // is" at exactly the size where the sidebar is already gone.
+                if shop.showingLibrary {
+                    HStack(spacing: 6) {
+                        GroupMenu(shop: shop)
+                        CategoryMenu(shop: shop)
+                        // Where it came from is the FOURTH thing a library row
+                        // can say, and the only one that decides whether a
+                        // print may be sold. It sits here rather than in the
+                        // inspector because it is set on a selection — twenty
+                        // models downloaded from one site share one answer.
+                        ProvenanceMenu(shop: shop)
+                    }
+                } else if shop.lockAllows("analytics", "view") {
+                    // What is owed is the shop's money (`analytics`).
+                    OwedSummary(shop: shop)
+                }
+            }
+            // ONE GROUP FOR THE SCREEN'S OWN CONTROLS, so macOS 26 draws them
+            // as a single glass capsule: the view of Jobs, Import on the
+            // library, and the switch for the details panel.
+            ToolbarItemGroup(placement: .primaryAction) {
+                if shop.showingJobs {
+                    JobsLayoutPicker(shop: shop)
+                    if !shop.showingBoard { JobsStageMenu(shop: shop) }
+                }
+                // IMPORT, ON THE SCREEN IT IMPORTS INTO.
+                //
+                // It existed only as "Add model" in the Book menu — the wrong name
+                // in the wrong menu — and the library itself offered nothing, so a
+                // shop with a folder of models had no way in that it could see.
+                if shop.showingLibrary {
+                    Button {
+                        Task { await shop.addModelToLibrary() }
+                    } label: {
+                        Label(shop.words.callIt("mac.import_models"),
+                              systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(!shop.canMoveJobs || shop.importing)
+                    .help(shop.words.callIt("mac.import_models_hint"))
+                }
+                Button {
+                    showInspector.toggle()
+                } label: {
+                    Label(shop.words.callIt("mac.details"), systemImage: "sidebar.trailing")
+                }
+                .help(shop.words.callIt("mac.details_toggle"))
+                // The label above is the button's title; VoiceOver reads this.
+                // "Don't include text that repeats information users already
+                // have" — it is already a button, so this does not say so.
+                .accessibilityLabel(shop.words.callIt(showInspector ? "mac.hide_details" : "mac.show_details"))
+            }
+    }
+
+    private var classic: some View {
+        NavigationSplitView {
+            Sidebar(shop: shop)
+                // 190 was under every published minimum for a Mac source list
+                // (225-275), and the app was paying for it: `SidebarLayoutTests`
+                // caps every sidebar label at 22 characters because they
+                // truncate, which is a test managing the symptom of a column
+                // too narrow to hold its own words. Arabic is the tighter of
+                // the two languages and set the cap.
+                //
+                // The extra 25 points come out of a detail pane that is
+                // hundreds wide and, on the dashboard, capped anyway.
+                .navigationSplitViewColumnWidth(min: 225, ideal: 240, max: 340)
+        } detail: {
+            VStack(spacing: 0) {
+                // What the last move said, above whatever screen you are on.
+                //
+                // It used to live inside the board, which is where a drag
+                // starts — but ⇧⌘H and the Job menu move a job from the table
+                // too, and there a refusal appeared nowhere at all. A move that
+                // did not happen and said nothing is the worst of the three
+                // possible outcomes.
+                // THE LOCK, here too. The classic shell drew its screens
+                // straight from `classicScreens` and never passed through
+                // `screen`, so with the lock on and nobody signed in it showed
+                // the whole book (alpha.62 re-check). `lockedOr` is the one
+                // gate both shells draw through.
+                lockedOr {
+                    TelemetryCard(shop: shop)
+                    EngineBanner(shop: shop)
+                    MoveBanners(shop: shop)
+                    SpendBanner(shop: shop)
+                    classicScreens
+                }
+            }
+        }
+        // The detail panel, the search field and the menu-bar plumbing —
+        // here rather than inside `detail`, for the reason `WindowPanels`
+        // gives. Both shells apply it.
+        .modifier(panels)
+        // On the window rather than the board, because ⇧⌘H and the Job menu
+        // reach a job from the table too, and the sheet has to be somewhere all
+        // of them can raise it.
+        .toolbar {
+            // NOTHING in the classic toolbar while nobody is signed in: the
+            // book switcher, Import and the money summary sat live above the
+            // sign-in screen (alpha.62 re-check).
+            if !shop.needsSignIn { classicToolbar }
+        }
+        // No `.environment(\.layoutDirection, …)` here on purpose: that line
+        // loops SwiftUI's split view until AppKit aborts. The window is mirrored
+        // before it exists instead — see `Direction`.
+        // Handed over rather than reached for: `Shop` is not a view and has no
+        // environment of its own. Re-run when it changes, because SwiftUI may
+        // hand out a different manager than the one at first launch.
+        .task(id: ObjectIdentifier(undoManager ?? UndoManager())) { shop.undoManager = undoManager }
+        .task(id: shop.shelf) { storedShelf = Shelves.name(shop.shelf) }
+        .task(id: shop.jobsLayout) { storedJobsLayout = shop.jobsLayout.rawValue }
+        .task(id: shop.librarySort) { storedSort = shop.librarySort.rawValue }
+        .task { shop.librarySort = LibrarySort(rawValue: storedSort) ?? .added }
+        .task(id: shop.libraryFlat) { storedFlat = shop.libraryFlat }
+        .task { shop.libraryFlat = storedFlat }
+        // Kept for the app delegate, which has no environment: a widget's link
+        // or a Dock drop arriving with this window closed reopens it through
+        // this (`ShopWindowOpener`).
+        .task { ShopWindowOpener.openWindow = openWindow }
+        .task {
+            // Only after the book has loaded: a group shelf means nothing until
+            // the groups are known, and restoring one that no longer exists
+            // would open on an empty screen with no way to tell why.
+            // The view first, then the shelf: a window saved on the old Board
+            // screen restores to "board", which sets the layout itself.
+            shop.jobsLayout = Shop.JobsLayout(rawValue: storedJobsLayout) ?? .list
+            if let restored = Shelves.shelf(storedShelf, in: shop) { shop.shelf = restored }
+        }
+        // Kept for the Window menu, Mission Control and VoiceOver; the toolbar
+        // draws its own copy (`ScreenTitle`) because the system's came and went
+        // by screen — Library, Catalogue, Customers, Expenses, Calculator and
+        // Gift cards had none in beta.19, the other seven did.
+        .navigationTitle(shop.shelfTitle)
+        .navigationSubtitle(subtitle)
+        .toolbar(removing: .title)
+    }
+
+
+    /// Says which book is open before it says anything else. The sample must
+    /// never be mistaken for the shop's real position.
+    private var subtitle: String {
+        // Says what this session can actually do. It said "read-only" for a
+        // while after the app could write, which is the kind of stale label
+        // people stop trusting the rest of the window over.
+        let provenance = shop.source.isReal
+            ? shop.words.callIt(shop.canWrite ? "mac.yours" : "mac.read_only")
+            : shop.words.callIt("mac.not_real_shop")
+        // The title names the screen (or the folder, or the stage); the shop's
+        // name moved to the subtitle, as it is also on the sidebar's card.
+        return shop.shopName + " \u{00B7} " + screenSubtitle(provenance)
+    }
+
+    private func screenSubtitle(_ provenance: String) -> String {
+        if shop.showingLibrary {
+            let n = shop.shownFiles.count
+            return shop.words.counting(n, "mac.models_count") + " · " + provenance
+        }
+        if shop.showingCustomers {
+            let n = shop.shownCustomers.count
+            return shop.words.counting(n, "mac.customers_count") + " · " + provenance
+        }
+        if shop.showingDashboard || shop.showingBoard { return provenance }
+        if shop.showingMachines {
+            return shop.words.counting(shop.machinesInUse.count, "mac.machines_count") + " · " + provenance
+        }
+        if shop.showingInventory {
+            return shop.words.counting(shop.spools.count, "mac.spools_count") + " · " + provenance
+        }
+        return provenance
+    }
+
+    /// What this screen's search box looks for — on the shop, because both
+    /// shells ask: the old one for its toolbar field, the new one for the strip.
+    private var searchPrompt: String { shop.searchPrompt }
+}
+
+/// The three things the menu bar reaches into this window for, in a
+/// modifier of their own.
+///
+/// Not tidiness: with these on the end of the body's chain the type-checker
+/// gave up on the whole expression, which is the same wall `LibraryGrid`
+/// hit. A `ViewModifier` is a separate expression, so it costs nothing to
+/// check.
+private struct Reachable: ViewModifier {
+    let shop: Shop
+    @Binding var showInspector: Bool
+    @Binding var searchWanted: Bool
+
+    func body(content: Content) -> some View {
+        @Bindable var shop = shop
+        return content
+            .focusSearchWhenAsked($searchWanted)
+            // On the window, not the grid: ⌘Y reaches a model from the menu
+            // bar too, and the panel has to be somewhere both can raise it.
+            .quickLookPreview($shop.previewing)
+            // Published from the window so the commands act on whichever
+            // one is frontmost.
+            .focusedSceneValue(\.inspectorShowing, $showInspector)
+            .focusedSceneValue(\.searchWanted, $searchWanted)
+    }
+}
+
+/// `.searchable`, but only on a screen that has something to search.
+///
+/// A modifier rather than an `if` around the window's body: the branch is kept
+/// as small as it can be, so moving to a screen without search rebuilds the
+/// search field and nothing else.
+private struct SearchWhereItWorks: ViewModifier {
+    @Bindable var shop: Shop
+    let prompt: String
+    /// `.searchable(placement: .toolbar)` does not merely go unplaced without a
+    /// toolbar — it MAKES one, and a toolbar brings the window's title bar back
+    /// above the navy strip. The new shell's strip carries its own field; see
+    /// `CommandField`.
+    @Environment(\.classicShell) private var classic
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if shop.canSearch {
+            if classic {
+                content
+                    .searchable(text: $shop.search, placement: .toolbar, prompt: prompt)
+            } else {
+                // The new shell's field is in the strip, and the term is the
+                // same `shop.search` — so nothing here, and NOT the clearing
+                // branch below, which would wipe what the strip just typed.
+                content
+            }
+        } else {
+            // No field at all, and the term dropped on the way out — a search
+            // left running on the library must not silently narrow the jobs
+            // table when the shop comes back to it.
+            content.onAppear { shop.search = "" }
+        }
+    }
+}
+
+/// What the shop is owed, in the title bar.
+///
+/// The number an owner opens the app to find. It is not a card halfway down a
+/// dashboard here — it is on screen whatever else you are looking at, because
+/// it is the only figure that is true of the whole book at once.
+private struct OwedSummary: View {
+    let shop: Shop
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .trailing, spacing: 0) {
+                Text(shop.words.callIt("mac.owed_caps"))
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .textCase(.uppercase)
+                    .tracking(0.6)
+                Text(Money.text(shop.owed, shop.currency))
+                    .font(.system(size: 13, weight: .medium))
+                    .monospacedDigit()
+            }
+            if shop.overdueCount > 0 {
+                Label("\(shop.overdueCount) \(shop.words.callIt("mac.late"))",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Khayt.attention)
+                    .labelStyle(.titleAndIcon)
+                    .help(shop.words.callIt("mac.overdue_jobs",
+                                    ["n": .number(Double(shop.overdueCount))]))
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
+
+/// Which shelf was open, as something that survives a relaunch.
+///
+/// A string rather than the enum: `SceneStorage` takes only simple values, and a
+/// shelf that names a group has to be checked against the book before it is
+/// restored — the group may have been renamed or emptied since.
+@MainActor enum Shelves {
+    static func name(_ shelf: Shop.Shelf) -> String {
+        switch shelf {
+        case .jobs(nil): "jobs"
+        case .jobs(let stage?): "jobs:\(stage.rawValue)"
+        case .customers: "customers"
+        case .dashboard: "dashboard"
+        case .machines: "machines"
+        case .inventory: "inventory"
+        case .board: "board"
+        case .expenses: "expenses"
+        case .waste: "waste"
+        case .reports: "reports"
+        case .catalogue: "catalogue"
+        case .colour: "colour"
+        case .calculator: "calculator"
+        case .portfolio: "portfolio"
+        case .giftCards: "gift-cards"
+        case .library(nil): "library"
+        case .library(let group?): "library:\(group)"
+        }
+    }
+
+    static func shelf(_ name: String, in shop: Shop) -> Shop.Shelf? {
+        guard !name.isEmpty else { return nil }
+        let parts = name.split(separator: ":", maxSplits: 1).map(String.init)
+        switch parts.first {
+        case "jobs":
+            guard parts.count == 2 else { return .jobs(nil) }
+            return Stage(rawValue: parts[1]).map(Shop.Shelf.jobs)
+        case "customers":
+            return .customers
+        case "dashboard":
+            return .dashboard
+        case "machines":
+            return .machines
+        case "inventory":
+            return .inventory
+        case "board":
+            return .board
+        case "expenses":
+            // Same reasoning as the catalogue below: a window reopened onto a
+            // screen whose row is gone has no way back to it.
+            return shop.canShow(.expenses) ? .expenses : nil
+        case "waste":
+            return .waste
+        case "reports":
+            return shop.canShow(.reports) ? .reports : nil
+        case "catalogue":
+            // Only if the shop still has one — a catalogue that was emptied
+            // since would restore to a screen with nothing on it and no way
+            // back, because the sidebar row is gone too.
+            return shop.catalogueRows.isEmpty ? nil : .catalogue
+        case "colour":
+            return .colour
+        case "calculator":
+            // Unconditional, unlike the catalogue above: this screen holds
+            // nothing, so there is no state it could restore into that has
+            // since gone away.
+            return .calculator
+        case "gift-cards":
+            // Unlike the catalogue and the portfolio, this restores even when
+            // empty: a shop with no cards issued still has an Issue button to
+            // reach, so the screen is not a dead end the way an empty grid is.
+            return .giftCards
+        case "portfolio":
+            // Only if there is still a photograph. Restoring to an empty grid
+            // with no sidebar row to leave by is a corner nobody can get out of.
+            return shop.snapshots.isEmpty ? nil : .portfolio
+        case "library":
+            guard parts.count == 2 else { return .library(nil) }
+            // Only if it is still a group this shop has.
+            return shop.groups.contains(parts[1]) ? .library(parts[1]) : .library(nil)
+        default:
+            return nil
+        }
+    }
+}
+
+
+/// Every sheet, dialog and confirmation the window can raise.
+///
+/// ── A MODIFIER BECAUSE THERE ARE TWO WINDOWS NOW ─────────────────────────
+///
+/// This was chained straight onto the `NavigationSplitView`, which was fine
+/// while that was the only shell. It is not any more: the redesigned shell is
+/// a different view, and a `.sheet` attached to the old one does not exist in
+/// the new one.
+///
+/// That shipped, on by default. Every editor in the app — take a job, edit a
+/// product, record a payment, add a spool — did nothing at all, because the
+/// thing that presents them was attached to a view no longer being drawn.
+/// Nothing errored. The buttons simply had no effect, which is the worst way
+/// for this to fail: a shop concludes the app is broken and cannot say how.
+///
+/// So the chain lives here and both shells apply it. Adding a sheet to one
+/// window and not the other is the same bug again, and there is now exactly
+/// one place to add one.
+struct WindowSheets: ViewModifier {
+    @Bindable var shop: Shop
+    @Bindable var webInbox = WebSaveInbox.shared
+
+    /// What the delete question says under the names, once the plan is in.
+    private var planLines: [String] {
+        guard let plan = shop.deletePlan else { return [shop.words.callIt("mac.delete_checking")] }
+        var lines = Shop.deletePlanLines(plan, words: shop.words)
+        // ASKED FIRST: a model the shop said to keep on this Mac is named
+        // before Remove from This Mac takes its copy (and its keep) away.
+        if let kept = shop.keptModelsNotice(plan) { lines.append(kept) }
+        return lines
+    }
+
+    /// The question's first sentence. "…and its files? This cannot be
+    /// undone" is true only when every model is only on this Mac; otherwise
+    /// the default choice keeps them online or keeps the shop's own file, and
+    /// the question asks what should happen instead.
+    private var oneLead: String {
+        let title = shop.pendingLibraryDelete?.title ?? ""
+        guard let plan = shop.deletePlan, plan.onlyHere.count != plan.ids.count else {
+            return shop.words.callIt("plib.delete_confirm", ["name": .string(title)])
+        }
+        return shop.words.callIt("mac.delete_choose_one", ["name": .string(title)])
+    }
+
+    private var manyLines: String {
+        var lines = Shop.libraryDeleteLines(shop.pendingLibraryDeletes, words: shop.words)
+        if let plan = shop.deletePlan, plan.onlyHere.count != plan.ids.count, !lines.isEmpty {
+            lines[0] = Shop.say(shop.words, "mac.delete_choose_many", shop.pendingLibraryDeletes.count)
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// The delete question's choices, from the plan.
+    ///
+    /// * Remove from This Mac — the default, and not destructive-styled:
+    ///   nothing it does loses the only copy of anything.
+    /// * Delete the ones only on this Mac too — destructive, and only offered
+    ///   when there are some, with the count on the button. When EVERY model
+    ///   is only here it is the delete there always was (`fullDelete`).
+    /// * Delete Completely — destructive, only when there is an online copy.
+    @ViewBuilder
+    private func deleteChoices(fullDelete: @escaping () -> Void) -> some View {
+        if let plan = shop.deletePlan {
+            // What "Remove from This Mac" acts on. A model already online only
+            // is not counted: the button would do nothing to it, and a
+            // question offering a button that does nothing is a question that
+            // looks broken (Oct 2026 review).
+            let local = plan.keptOnline.count + plan.inPlace.count
+            if local > 0 {
+                Button(shop.words.callIt("mac.delete_from_mac")) {
+                    guard shop.stillTheQuestion(plan) else { return }
+                    Task { await shop.removeFromThisMac(plan, includingOnlyHere: false) }
+                }
+            }
+            if !plan.onlyHere.isEmpty {
+                if local + plan.cloudOnly.count > 0 {
+                    Button(Shop.say(shop.words, "mac.delete_only_here_too", plan.onlyHere.count), role: .destructive) {
+                        guard shop.stillTheQuestion(plan) else { return }
+                        Task { await shop.removeFromThisMac(plan, includingOnlyHere: true) }
+                    }
+                } else {
+                    Button(shop.words.callIt("common.delete"), role: .destructive, action: fullDelete)
+                }
+            }
+            // These buttons are only ever drawn as the actions of the two
+            // delete `confirmationDialog(`s below — the question IS the ask.
+            if plan.onlineCount > 0 {
+                Button(shop.words.callIt("mac.delete_completely"), role: .destructive) {
+                    guard shop.stillTheQuestion(plan) else { return }
+                    Task { await shop.deleteCompletely(plan) }
+                }
+            }
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            // On the split view, not inside `detail`. Inside it, the detail content
+            // is laid out against the window minus the inspector — the sidebar's
+            // width is not taken off — so a Table stretches its columns across a
+            // width it does not have and the right-hand ones are clipped away
+            // rather than compressed. The Owed column disappeared twice that way.
+            // Closed on the dashboard, not filled with a placeholder: that screen is
+            // already a summary, and a panel beside it has nothing to say. The
+            // binding is read-only there so the toolbar button cannot open an empty
+            // one either.
+            // The panel follows the shelf, one runloop turn behind — see the note
+            // on `panelIsOpen`. `wantsPanel` is still the single place that says
+            // WHICH screens have one; this only defers WHEN it moves.
+            // Two things, and BOTH were needed. Deferring alone took the churn
+            // driver from 4 crashes in 6 to 2 in 8 — better, and still a crash.
+            // The surviving two came through a different frame,
+            // `+[NSAnimationManager performAnimations:]`, which is the collapse
+            // ANIMATING: AppKit drives `displayIfNeeded` from a display link and
+            // lays the whole window out again inside it.
+            //
+            // A panel that slides is not worth an app that dies. Without the
+            // animation the collapse is one layout pass, on a settled pane, on a
+            // turn of its own.
+            .shopSheet(item: $shop.pendingHold) { AskFirst(shop: shop, subject: $0, kind: .hold) }
+            .shopSheet(item: $shop.pendingCompletion) { CompletionSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingPayment) { PaymentSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingBnpl) { BnplLinkSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingShipment) { ShipSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingSend) { SendToPrinterSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingConvert) { ConvertSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingBatchConvert) { BatchConvertSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }
+            // The desktop's order tools (`Shop+OrderTools.swift`), as one
+            // modifier so this chain does not grow by eight.
+            .modifier(OrderToolSheets(shop: shop))
+            .shopSheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.settingUpShop) { ShopSetupSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.planningBatch) { BatchSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.reviewingDeposits) { DepositAuditSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.reviewingSyncLosses) { SyncLossesSheet(shop: shop) }
+            // What a slicer sent (`SlicerInboxSheet`). A job asked for from it
+            // opens once this sheet has gone.
+            .shopSheet(isPresented: $shop.showingSlicerInbox,
+                       onDismiss: { Task { await shop.openSlicerJobAfterSheet() } }) { SlicerInboxSheet(shop: shop) }
+            // Reached from a banner on every screen, so it is the window's —
+            // not the catalogue's, where it used to be the only way in.
+            .shopSheet(isPresented: $shop.showingSpoolRepair) { SpoolRepairSheet(shop: shop) }
+            .shopSheet(item: $shop.receivingGoods) { ReceiveSheet(shop: shop, order: $0) }
+            .shopSheet(item: $shop.editingCustomer) { CustomerSheet(shop: shop, existing: $0) }
+            .shopSheet(item: $shop.editingProduct) { ProductSheet(shop: shop, existing: $0) }
+            .shopSheet(item: $shop.droppingFrom) { DropObjectSheet(shop: shop, machine: $0) }
+            .shopSheet(isPresented: $shop.findingPrinters) { FindPrintersSheet(shop: shop) }
+            .shopSheet(item: $shop.ratingFor) { RatingSheet(shop: shop, job: $0) }
+            .shopSheet(item: $shop.planFor) { PaymentPlanSheet(shop: shop, job: $0) }
+            .shopSheet(isPresented: $shop.pausingProduction) { PauseSheet(shop: shop) }
+            .shopSheet(item: $shop.movingGroups) { GroupMoveSheet(shop: shop, request: $0) }
+            // Cancelling throws away every hour already in the plate, and no
+            // printer asks twice. Pause and resume are each other's undo and are
+            // not confirmed.
+            .confirmationDialog(
+                shop.words.callIt("mac.cancel_ask",
+                                  ["machine": .string(shop.confirmingCancel?.name ?? "")]),
+                isPresented: Binding(get: { shop.confirmingCancel != nil },
+                                     set: { if !$0 { shop.confirmingCancel = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button(shop.words.callIt("mac.printer_cancel"), role: .destructive) {
+                    guard let machine = shop.confirmingCancel else { return }
+                    shop.confirmingCancel = nil
+                    Task { await shop.tell(machine, .cancel) }
+                }
+                Button(shop.words.callIt("common.cancel"), role: .cancel) {
+                    shop.confirmingCancel = nil
+                }
+            } message: {
+                Text(shop.words.callIt("mac.cancel_why"))
+            }
+            // A Bambu speed preset on a running print: confirmed, naming the
+            // machine and the preset.
+            .confirmationDialog(
+                shop.words.callIt("mac.speed_ask", [
+                    "machine": .string(shop.confirmingSpeed?.machine.name ?? ""),
+                    "speed": .string(shop.words.callIt("mac.printer_speed_\(shop.confirmingSpeed?.level ?? 2)")),
+                ]),
+                isPresented: Binding(get: { shop.confirmingSpeed != nil },
+                                     set: { if !$0 { shop.confirmingSpeed = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button(shop.words.callIt("mac.speed_set")) {
+                    guard let change = shop.confirmingSpeed else { return }
+                    shop.confirmingSpeed = nil
+                    Task { await shop.control(change.machine, .speed(change.level)) }
+                }
+                Button(shop.words.callIt("common.cancel"), role: .cancel) {
+                    shop.confirmingSpeed = nil
+                }
+            } message: {
+                Text(shop.words.callIt("mac.speed_why"))
+            }
+            // Signing out, in the other app's words. Nothing is deleted, so it
+            // is not the destructive role; it still asks, because sync stops.
+            .confirmationDialog(
+                shop.words.callIt("mac.cloud_sign_out_q"),
+                isPresented: $shop.confirmingSignOut,
+                titleVisibility: .visible
+            ) {
+                Button(shop.words.callIt("mac.cloud_sign_out_do")) {
+                    Task { await shop.signOutOfCloud() }
+                }
+                Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+            }
+            // Deleting a model is the one library action that cannot be
+            // undone — the files go — so it asks, in the words the Electron
+            // app asks in, and the destructive button says what it does.
+            .confirmationDialog(
+                shop.words.callIt("plib.delete_title"),
+                // Once the plan is in: a macOS dialog is never redrawn (see `planDeletes`).
+                isPresented: Binding(get: { shop.pendingLibraryDelete != nil && shop.deletePlan != nil },
+                                     set: { if !$0 { shop.pendingLibraryDelete = nil; shop.deletePlan = nil } }),
+                titleVisibility: .visible
+            ) {
+                // FROM THIS MAC by default, COMPLETELY when asked — see
+                // `LibraryDelete`. The plan is worked out as the question opens.
+                deleteChoices {
+                    guard let file = shop.pendingLibraryDelete else { return }
+                    Task { await shop.deleteLibraryFile(file) }
+                }
+                Button(shop.words.callIt("common.cancel"), role: .cancel) {
+                    shop.pendingLibraryDelete = nil
+                }
+            } message: {
+                Text(verbatim: ([oneLead] + planLines).joined(separator: "\n\n"))
+            }
+            .task(id: shop.pendingLibraryDelete?.id) {
+                if let file = shop.pendingLibraryDelete { await shop.planDeletes([file]) }
+            }
+            // Several at once: one question naming how many, and which.
+            .confirmationDialog(
+                // Counted: the one-model title ("Delete print file") headed a
+                // question about ten (alpha.57 snapshot).
+                shop.words.counting(shop.pendingLibraryDeletes.count, "mac.delete_many_title"),
+                // Once the plan is in — see the single question above.
+                isPresented: Binding(get: { !shop.pendingLibraryDeletes.isEmpty && shop.deletePlan != nil },
+                                     set: { if !$0 { shop.pendingLibraryDeletes = []; shop.deletePlan = nil } }),
+                titleVisibility: .visible
+            ) {
+                deleteChoices {
+                    // Taken here, not in the Task: the dialog empties the
+                    // list as it closes, before the Task runs.
+                    let chosen = shop.pendingLibraryDeletes
+                    guard !chosen.isEmpty, let plan = shop.deletePlan, shop.stillTheQuestion(plan) else { return }
+                    Task { await shop.confirmLibraryDeletes(chosen) }
+                }
+                Button(shop.words.callIt("common.cancel"), role: .cancel) {
+                    shop.pendingLibraryDeletes = []
+                }
+            } message: {
+                // WHICH models, not just how many — see `libraryDeleteMessage`
+                // — and what each choice does to them.
+                Text(verbatim: ([manyLines] + planLines).joined(separator: "\n\n"))
+            }
+            .task(id: shop.pendingLibraryDeletes.map(\.id)) {
+                if !shop.pendingLibraryDeletes.isEmpty { await shop.planDeletes(shop.pendingLibraryDeletes) }
+            }
+            // Jobs and customers: one question naming what goes and what was
+            // left out (`Shop+Delete.swift`). Undo brings them back.
+            .askFirst($shop.pendingJobDelete,
+                      title: { $0.title }, message: { $0.message },
+                      confirm: shop.words.callIt("common.delete"),
+                      cancel: shop.words.callIt("common.cancel")) { asked in
+                Task { await shop.deleteJobs(asked.ids) }
+            }
+            .askFirst($shop.pendingCustomerDelete,
+                      title: { $0.title }, message: { $0.message },
+                      confirm: shop.words.callIt("common.delete"),
+                      cancel: shop.words.callIt("common.cancel")) { asked in
+                Task { await shop.deleteCustomers(asked.ids) }
+            }
+            // A printer under service, retired or deleted — asked from the
+            // machine card's menu (`MachineLifeDialogs`).
+            .machineLifeDialogs(shop: shop, ask: $shop.pendingMachineAsk)
+            // A customer with work erased, Unlink or Full (`Shop+Privacy.swift`).
+            .shopSheet(item: $shop.erasingCustomer) { CustomerEraseSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingPaper) { PaperSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingRevisions) { QuoteRevisionsSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingMilestones) { MilestonesSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingDayReport) { DayReportSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingPrintedPage) { PrintedPageSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingShoppingList) { ShoppingListSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingPartsList) { PartsBuyListSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.testPrintLogFor) { TestPrintLogSheet(shop: shop, spool: $0) }
+            .shopSheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }
+            .shopSheet(isPresented: $shop.addingSpool) { SpoolSheet(shop: shop, existing: nil) }
+            .shopSheet(isPresented: $shop.importingSpoolman) { SpoolmanSheet(shop: shop) }
+            .shopSheet(item: $shop.editingConsumable) { ConsumableSheet(shop: shop, existing: $0) }
+            .shopSheet(isPresented: $shop.addingConsumable) { ConsumableSheet(shop: shop, existing: nil) }
+            .shopSheet(isPresented: $shop.issuingGiftCard) { GiftCardSheet(shop: shop) }
+            .shopSheet(item: $shop.editingMachine) { MachineSheet(shop: shop, existing: $0) }
+            .shopSheet(item: $shop.editingSupplier) { SupplierSheet(shop: shop, supplier: $0) }
+            .shopSheet(item: $shop.loggingPurchaseFor) { PurchaseLogSheet(shop: shop, supplier: $0) }
+            .shopSheet(item: $shop.showingHistoryFor) { PurchaseHistorySheet(shop: shop, supplier: $0) }
+            .shopSheet(item: $shop.spoolHistoryFor) { SpoolHistorySheet(shop: shop, spool: $0) }
+            .shopSheet(item: $shop.adjustingSpool) { StockAdjustSheet(shop: shop, spool: $0) }
+            .shopSheet(item: $shop.dryingLogFor) { DryingLogSheet(shop: shop, spool: $0) }
+            .shopSheet(item: $shop.transferringSpool) { TransferStockSheet(shop: shop, spool: $0) }
+            .shopSheet(isPresented: $shop.showingActivityLog) { ActivityLogSheet(shop: shop) }
+            .shopSheet(item: $shop.billingOrder) { BillSheet(shop: shop, order: $0) }
+            .shopSheet(item: $shop.restoring) { RestoreSheet(shop: shop, subject: $0) }
+            .shopSheet(isPresented: $shop.checkingCloud) { CloudCheckSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.scanning) { ScanSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.planningCampaign) { CampaignSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.signingIntoCloud) { CloudSignInSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.sendingFeedback) { FeedbackSheet(shop: shop) }
+            .shopSheet(item: $shop.draftingFor) { job in
+                DraftMessageSheet(shop: shop, job: job)
+            }
+            .shopSheet(item: $shop.messagingFor) { job in
+                MessageSheet(shop: shop, job: job)
+            }
+            .shopSheet(item: $shop.sharingByLink) { VaultShareSheet(shop: shop, request: $0) }
+            .shopSheet(isPresented: $shop.showingVaultLinks) { VaultLinksSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.showingVaultProducts) { VaultProductsSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.askingTheBook) {
+                VStack(spacing: 0) {
+                    AskTheBook(shop: shop)
+                    Divider()
+                    HStack {
+                        Spacer()
+                        Button(shop.words.callIt("common.close")) { shop.askingTheBook = false }
+                            .keyboardShortcut(.cancelAction)
+                    }
+                    .padding(14)
+                }
+            }
+            .shopSheet(isPresented: $shop.addingMachine) { MachineSheet(shop: shop, existing: nil) }
+            // A model downloaded from a page saved with Save to Khayt: asked,
+            // never added on its own (`WebAttachPrompt`).
+            // Not on `Shop`, so `dismissEverySheet` cannot close it: it is
+            // held back instead while the person at the Mac may not edit the
+            // library (the lock came down), and asked again once one may.
+            .shopSheet(item: Binding(get: { shop.lockAllows("inventory", "edit") ? webInbox.offer : nil },
+                                     set: { webInbox.offer = $0 })) { WebAttachPrompt(shop: shop, offer: $0) }
+    }
+}
+
+
+/// The detail panel, the search field and the menu-bar plumbing.
+///
+/// ── THE SAME BUG AS `WindowSheets`, ONE LAYER IN ─────────────────────────
+///
+/// All three were chained onto the `NavigationSplitView`, so with the new
+/// shell on — which is the default — selecting a model in the library
+/// highlighted the tile and opened nothing, and the menu items that read a
+/// focused value had nothing to read. The panel is where a job's dates, a
+/// model's risk and a customer's history live; without it those are gone.
+///
+/// Unlike the sheets this is NOT applied to the whole window. A `.inspector`
+/// on the shell's root would split the navy strip too, putting a panel beside
+/// the title bar; it goes around the content region instead. The old shell
+/// applies it exactly where it was — the note below about the split view
+/// rather than `detail` is the reason, and it still holds.
+///
+/// The state stays in `ShopWindow` and arrives here as bindings, deliberately:
+/// two shells with two copies of `panelIsOpen` is the same class of bug one
+/// layer further down, and the deferral this chain performs was written
+/// against a documented crash.
+struct WindowPanels: ViewModifier {
+    @Bindable var shop: Shop
+    @Binding var showInspector: Bool
+    @Binding var panelIsOpen: Bool
+    @Binding var searchWanted: Bool
+    /// Whether the screen in front of the shop has a panel at all.
+    let wantsPanel: Bool
+    let searchPrompt: String
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: wantsPanel, initial: true) { _, wanted in
+                guard panelIsOpen != wanted else { return }
+                Task { @MainActor in
+                    var quietly = Transaction()
+                    quietly.disablesAnimations = true
+                    withTransaction(quietly) { panelIsOpen = wanted }
+                }
+            }
+            .inspector(isPresented: Binding(
+                get: { panelIsOpen && wantsPanel },
+                set: { showInspector = $0; panelIsOpen = $0 && wantsPanel }
+            )) {
+                InspectorPane(shop: shop)
+                    .inspectorColumnWidth(min: 260, ideal: 310, max: 420)
+            }
+            // ONLY WHERE IT NARROWS SOMETHING — see `Shop.canSearch`. This was
+            // unconditional, so the calculator and the reports carried a search
+            // field that could be typed into and did nothing.
+            .modifier(SearchWhereItWorks(shop: shop, prompt: searchPrompt))
+            .modifier(Reachable(shop: shop, showInspector: $showInspector,
+                                searchWanted: $searchWanted))
+    }
+}
+
+
+/// What the detail panel shows, whichever shell is holding it.
+///
+/// The two shells hold it differently and cannot share the holding: the old one
+/// uses `.inspector`, which is a `NavigationSplitView` column and resizes the
+/// WINDOW when it is applied anywhere else — tried, and the window came back
+/// 310pt narrower with no panel in it. The new shell draws a trailing column of
+/// its own, which is what §10's `Wide.inspector` describes anyway.
+///
+/// What they do share is this: the decision about which panel a screen gets,
+/// and the screens that get none. A second copy of that list is how one shell
+/// ends up showing a job's panel over a library.
+struct InspectorPane: View {
+    @Bindable var shop: Shop
+
+    var body: some View {
+        if shop.showingLibrary {
+            LibraryInspector(shop: shop)
+        } else if shop.showingCustomers {
+            CustomerInspector(shop: shop)
+        } else if Self.hasOwnDetail(shop) {
+            // Both screens carry their own detail — a card and a table wide
+            // enough to read. A panel beside them would repeat.
+            EmptyView()
+        } else {
+            OrderInspector(shop: shop)
+        }
+    }
+
+    /// The screens that carry their own detail and want no panel.
+    static func hasOwnDetail(_ shop: Shop) -> Bool {
+        shop.showingMachines || shop.showingInventory || shop.showingBoard
+            || shop.showingExpenses || shop.showingWaste || shop.showingReports
+            || shop.showingCatalogue || shop.showingColour || shop.showingPortfolio
+            || shop.showingCalculator || shop.showingGiftCards
+    }
+}

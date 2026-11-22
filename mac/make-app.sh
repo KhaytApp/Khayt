@@ -1,0 +1,1043 @@
+#!/usr/bin/env bash
+# Build Khayt.app — a real, double-clickable Mac application.
+#
+# `swift run` is fine for working on the app and useless for testing it: no
+# bundle, so no icon, no name in the menu bar, no Dock entry that survives a
+# relaunch, and an activation policy the code has to set by hand. This assembles
+# the same binary into the bundle macOS expects, signed so it opens.
+#
+#   ./mac/make-app.sh            # build, put it in mac/dist/Khayt.app
+#   ./mac/make-app.sh --open     # …and launch it
+#   ./mac/make-app.sh --install  # …and copy it to /Applications
+#
+# NOT the shipping build. It signs with whatever stable identity this Mac has
+# (see the signing block below) and falls back to ad hoc, but it is not
+# notarised and has no hardened runtime — those are what make it something a
+# shop can download, and neither is here yet.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+REPO="$PWD"
+PKG="$REPO/mac/KhaytCore"
+DIST="$REPO/mac/dist"
+APP="$DIST/Khayt.app"
+
+# ── WHAT THE ARGUMENTS DO, BEFORE ANY WORK HAPPENS ───────────────────────
+#
+# `--notarize` operates on the bundle that is ALREADY in mac/dist. It used to
+# fall through the whole script first, which rebuilt the app — and the release
+# workflow runs it as a second step, without the environment the first step
+# had. So the rebuild replaced a bundle carrying SUFeedURL with one that did
+# not, and then notarised THAT. v4.0.0-alpha.1 shipped unable to check for
+# updates: signed, notarised, stapled, and with the updater switched off by a
+# missing key nobody looks at.
+#
+# Everything below this branch is the BUILD. Anything that must happen for a
+# notarise-only run belongs above it.
+
+
+# SIGN WITH A STABLE IDENTITY IF THIS MAC HAS ONE.
+#
+# An ad-hoc signature — `--sign -` — carries no identity: what macOS remembers
+# about the app is its own content hash, so every rebuild is a DIFFERENT
+# APPLICATION and everything granted to the last one is granted to nothing.
+#
+# The bill is the Keychain. Khayt keeps the cloud token and the printer API keys
+# there, and the first read by an unrecognised application raises a permission
+# dialog. Ad hoc means every single build raises it again — the app sat at 0%
+# CPU behind one for twenty minutes, twice in a day, before this was understood.
+#
+# A real certificate fixes the identity. Signed with a Developer ID the
+# requirement becomes the Team ID:
+#
+#   designated => identifier "Khayt" and anchor apple generic
+#                 and certificate leaf[subject.OU] = "<team>"
+#
+# — which is the same on the next build, and the next. A grant given once holds.
+#
+# Order: an explicit override, then Developer ID (also valid on other Macs, and
+# the identity a notarised build would use), then Apple Development, then ad hoc.
+# `find-identity -v` lists only identities whose certificate is valid and whose
+# private key is present, so anything it prints can actually sign.
+#
+# Matched by SHA-1, not by name: the names contain parentheses and a substring
+# match on two identities is an error rather than a choice.
+pick_identity() {
+  if [ -n "${KHAYT_SIGN_IDENTITY:-}" ]; then echo "$KHAYT_SIGN_IDENTITY"; return; fi
+  local list; list="$(security find-identity -v 2>/dev/null || true)"
+  local kind
+  for kind in "Developer ID Application:" "Apple Development:"; do
+    local line; line="$(printf '%s\n' "$list" | grep -F "$kind" | head -1)"
+    [ -n "$line" ] && { printf '%s\n' "$line" | awk '{print $2}'; return; }
+  done
+  echo "-"
+}
+
+notarize_app() {
+  # A notarytool keychain profile (`xcrun notarytool store-credentials`) is how
+  # a person releases from their own Mac: the app-specific password stays in
+  # the Keychain instead of an environment variable. CI passes the three below.
+  local auth
+  if [ -n "${NOTARY_PROFILE:-}" ]; then
+    auth=(--keychain-profile "$NOTARY_PROFILE")
+  else
+    auth=(--apple-id "${APPLE_ID:-}" --password "${APPLE_APP_SPECIFIC_PASSWORD:-}" --team-id "${APPLE_TEAM_ID:-}")
+  fi
+  local missing=""
+  if [ -z "${NOTARY_PROFILE:-}" ]; then
+    [ -n "${APPLE_ID:-}" ]                    || missing="$missing APPLE_ID"
+    [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] || missing="$missing APPLE_APP_SPECIFIC_PASSWORD"
+    [ -n "${APPLE_TEAM_ID:-}" ]               || missing="$missing APPLE_TEAM_ID"
+  fi
+  if [ -n "$missing" ]; then
+    echo "cannot notarise — missing:$missing" >&2
+    echo "  These are the same credentials the Electron release uses." >&2
+    echo "  Or set NOTARY_PROFILE to a profile saved with notarytool store-credentials." >&2
+    return 1
+  fi
+  if [ "$IDENTITY" = "-" ]; then
+    echo "cannot notarise an ad-hoc signed build — Apple requires a Developer ID." >&2
+    return 1
+  fi
+
+  local zip="$DIST/Khayt-notarize.zip"
+  rm -f "$zip"
+  # `ditto`, not `zip`: a zip built by the shell tool loses the symlinks a
+  # versioned framework is made of, and the notary service rejects what it is
+  # handed rather than what was built.
+  ditto -c -k --keepParent "$APP" "$zip"
+
+  echo "  notarising (this waits on Apple, usually a few minutes)…"
+  if ! xcrun notarytool submit "$zip" "${auth[@]}" --wait --timeout 30m; then
+    echo "notarisation FAILED. The log above names the offending binary." >&2
+    echo "  xcrun notarytool log <submission-id> --apple-id … for the detail." >&2
+    rm -f "$zip"
+    return 1
+  fi
+  rm -f "$zip"
+
+  xcrun stapler staple "$APP" || { echo "stapling failed" >&2; return 1; }
+  # And prove it took, rather than trusting that stapler said nothing.
+  if ! xcrun stapler validate "$APP" >/dev/null 2>&1; then
+    echo "the ticket did not staple — the app would fail on an offline Mac." >&2
+    return 1
+  fi
+  # The real question, asked the way Gatekeeper asks it.
+  spctl --assess --type execute --verbose=2 "$APP" 2>&1 | sed 's/^/  /'
+  echo "  notarised and stapled"
+}
+
+if [ "${1:-}" = "--notarize" ]; then
+  [ -d "$APP" ] || { echo "no app at $APP — build it before notarising it." >&2; exit 1; }
+  IDENTITY="$(pick_identity)"
+  notarize_app
+  exit $?
+fi
+
+
+# ── THE MAC APP'S OWN VERSION, NOT ELECTRON'S ────────────────────────────
+#
+# This read `package.json`, which numbers the ELECTRON app. The two ship on
+# their own schedules now, and a Mac build calling itself `3.7.0` because that
+# is where Electron happened to be was lying about which app it is.
+# `mac/version.json` is the one source; see mac/VERSION.md.
+VERSION="$(node -p "require('$REPO/mac/version.json').version" 2>/dev/null || echo "")"
+BUILD_VERSION="$(node -p "require('$REPO/mac/version.json').build" 2>/dev/null || echo "")"
+if [ -z "$VERSION" ] || [ -z "$BUILD_VERSION" ]; then
+  echo "cannot read mac/version.json — refusing to build an app with no version." >&2
+  exit 1
+fi
+
+# ── CFBundleVersion IS AN INTEGER THAT ONLY GOES UP ──────────────────────
+#
+# It used to be the marketing string with the suffix stripped, which is fine
+# until two releases share a prefix:
+#
+#     4.0.0-alpha.1 → 4.0.0
+#     4.0.0-alpha.2 → 4.0.0     ← the same number
+#
+# SPARKLE COMPARES THIS FIELD. Two consecutive alphas carrying the same
+# CFBundleVersion means every tester is told they are up to date, and nothing
+# anywhere reports an error — the build is fine and the feed is fine. So the
+# build number is its own integer, bumped by scripts/bump-mac-version.js, and
+# a release that forgot to move it fails test/mac-version.test.js.
+
+# ── APP INTENTS ───────────────────────────────────────────────────────────
+#
+# Xcode discovers `AppIntent` types by running two steps SwiftPM does not: the
+# compiler emits per-file CONST VALUES describing which types conform to which
+# protocols, and `appintentsmetadataprocessor` turns those into the
+# `Metadata.appintents` bundle the system reads. Without that bundle the intents
+# compile, link, and are never seen by Shortcuts, Spotlight or Siri — the app
+# would ship a verb nothing can call.
+#
+# So the const values are asked for here, and the processor is run below. The
+# protocol list is ours because the SDK does not ship one; anything App Intents
+# looks for has to be named in it or the type is not gathered.
+AI_PROTOCOLS="$PKG/.build/appintents-protocols.json"
+mkdir -p "$PKG/.build"
+cat > "$AI_PROTOCOLS" <<'AIP'
+["AppIntent","AppShortcutsProvider","AppEntity","AppEnum","EntityQuery",
+ "EntityStringQuery","DynamicOptionsProvider","TransientAppEntity",
+ "PersistentlyIdentifiable","SetValueIntent","AppIntentsPackage"]
+AIP
+
+swift build -c release --product KhaytThumbnail --package-path "$PKG"
+swift build -c release --product KhaytPreview --package-path "$PKG"
+swift build -c release --product KhaytWidgets --package-path "$PKG"
+swift build -c release --product KhaytSafari --package-path "$PKG"
+swift build -c release --product khayt-browser-host --package-path "$PKG"
+swift build -c release --product khayt-mcp --package-path "$PKG"
+echo "Building Khayt $VERSION (release)…"
+swift build -c release --product Khayt --package-path "$PKG" \
+  -Xswiftc -emit-const-values \
+  -Xswiftc -Xfrontend -Xswiftc -const-gather-protocols-file \
+  -Xswiftc -Xfrontend -Xswiftc "$AI_PROTOCOLS"
+BIN="$PKG/.build/release/Khayt"
+[ -x "$BIN" ] || { echo "no binary at $BIN"; exit 1; }
+
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp "$BIN" "$APP/Contents/MacOS/Khayt"
+
+# SwiftPM's resource bundles, into Contents/Resources, which is the only place
+# they may go: codesign seals what is inside Contents/ and refuses a bundle with
+# anything loose at its root.
+#
+# THE COMMENT THAT USED TO BE HERE SAID `Bundle.module` LOOKS IN
+# Bundle.main.resourceURL FIRST. IT DOES NOT, AND BELIEVING IT SHIPPED TWO
+# ALPHAS THAT COULD NOT LAUNCH. SwiftPM compiles that accessor down to exactly
+# two paths — the app bundle's ROOT, and the absolute path of the .build
+# directory on the machine that compiled it. Locally the second one is sitting
+# right there, so every build made here ran; on CI it is /Users/runner/work/…,
+# so every build a shop downloaded died on its first line. See
+# `KhaytCore/BundledResources.swift`, which is what the code asks now.
+for b in "$PKG"/.build/release/*.bundle; do
+  [ -e "$b" ] && cp -R "$b" "$APP/Contents/Resources/"
+done
+
+cp "$REPO/assets/icon.icns" "$APP/Contents/Resources/Khayt.icns"
+
+# ── THE QUICK LOOK EXTENSION ──────────────────────────────────────────────
+#
+# What Finder shows for a .3mf. A .appex is a bundle like the .app is a bundle,
+# so it is assembled the same way: a binary, an Info.plist and a signature of
+# its own, signed before the app so the app's signature seals it in.
+#
+# TWO THINGS ARE LOAD-BEARING AND NEITHER IS OBVIOUS.
+#
+# The binary must have no Swift entry point. macOS 14+ launches a thumbnail
+# extension through ExtensionKit, which looks for one in the binary FIRST and
+# only falls back to NSExtensionPrincipalClass when it finds none. See
+# `Package.swift`, which is where that is arranged, and `EntryPointTests`.
+#
+# The extension must be sandboxed. The extension point declares
+# `EXSandboxProfileName = quicklook-thumbnail` (visible in `lsregister -dump`),
+# and an .appex signed without `com.apple.security.app-sandbox` is registered,
+# is matched, and then fails every request with QLThumbnailErrorDomain 102.
+# The read entitlement is what lets it open the file it was handed.
+EXT="$APP/Contents/PlugIns/KhaytThumbnail.appex"
+mkdir -p "$EXT/Contents/MacOS"
+cp "$PKG/.build/release/KhaytThumbnail" "$EXT/Contents/MacOS/KhaytThumbnail"
+cat > "$EXT/Contents/Info.plist" <<EXTPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>KhaytThumbnail</string>
+  <key>CFBundleDisplayName</key><string>Khayt 3MF previews</string>
+  <key>CFBundleExecutable</key><string>KhaytThumbnail</string>
+  <key>CFBundleIdentifier</key><string>app.khayt.mac.thumbnail</string>
+  <key>CFBundlePackageType</key><string>XPC!</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key><string>com.apple.quicklook.thumbnail</string>
+    <key>NSExtensionPrincipalClass</key><string>KhaytThumbnailProvider</string>
+    <key>NSExtensionAttributes</key>
+    <dict>
+      <key>QLSupportedContentTypes</key>
+      <array><string>app.khayt.mac.three-mf</string></array>
+      <key>QLThumbnailMinimumDimension</key><integer>32</integer>
+    </dict>
+  </dict>
+</dict>
+</plist>
+EXTPLIST
+# OUTSIDE the bundle. Written into it — even into the bundle root — codesign
+# refuses the whole appex with "unsealed contents present in the bundle root",
+# because anything inside a bundle has to be part of what is sealed.
+EXT_ENTS="$PKG/.build/thumbnail.entitlements"
+
+# ── THE APP'S OWN ENTITLEMENTS, AND WHY THERE IS EXACTLY ONE ──────────────
+#
+# The app is NOT sandboxed — it reads a shop's print library from wherever the
+# shop keeps it, spawns the slicer the shop chose, and polls printers on the
+# LAN. Sandboxing it is a real piece of work (security-scoped bookmarks for
+# every library folder) and is not what this entitlement is for.
+#
+# `allow-jit` is, and it is not optional for this app. Apple's own
+# documentation for `com.apple.security.cs.allow-jit` lists, as its FIRST
+# example of something that needs it, "the fast-path of the JavaScriptCore
+# framework" — and says that without it "frameworks that rely on just-in-time
+# (JIT) compilation may fall back to an interpreter".
+#
+# Khayt's Mac app runs 29,000 lines of tax, pricing, payment-plan and estimator
+# rules in JavaScriptCore, unchanged, because reimplementing them in Swift
+# would earn the right to be wrong a second way. Dropping all of that to the
+# interpreter to save one line is not a trade worth making.
+APP_ENTS="$PKG/.build/khayt.entitlements"
+cat > "$APP_ENTS" <<'APPENTS'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key><true/>
+  <!-- Reaching a printer on the LAN, and asking mDNSResponder what it has
+       seen. Required for local network access even unsandboxed. -->
+  <key>com.apple.security.network.client</key><true/>
+</dict>
+</plist>
+APPENTS
+# ── THE QUICK LOOK PREVIEW ────────────────────────────────────────────────
+#
+# What the SPACE BAR shows, as opposed to what the icon shows. Assembled exactly
+# like the thumbnail extension above and subject to both of the same rules: no
+# Swift entry point in the binary, and sandboxed. One extension point per .appex
+# is why this is a second bundle rather than a second class in the first.
+PRV="$APP/Contents/PlugIns/KhaytPreview.appex"
+mkdir -p "$PRV/Contents/MacOS" "$PRV/Contents/Resources"
+cp "$PKG/.build/release/KhaytPreview" "$PRV/Contents/MacOS/KhaytPreview"
+
+# IT NEEDS ITS OWN COPY OF THE RULES. This extension reads the print settings
+# through the shared engine, and an extension is its own bundle — the .appex,
+# not the app around it — so `Bundle.main` here is the .appex and the resources
+# have to be inside it.
+# Without this it launches, finds its extension point, and dies on
+# `Fatal error: could not load resource bundle` the moment a preview is asked
+# for; Quick Look then falls back to scaling the thumbnail, so what a person
+# sees is a preview that looks almost right and has no facts under it.
+#
+# The thumbnail extension does NOT need this and does not get it: it reads the
+# zip and picks a member, and never builds an engine. 1.4 MB is worth carrying
+# once, not twice.
+for b in "$PKG"/.build/release/*.bundle; do
+  [ -e "$b" ] && cp -R "$b" "$PRV/Contents/Resources/"
+done
+cat > "$PRV/Contents/Info.plist" <<PRVPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>KhaytPreview</string>
+  <key>CFBundleDisplayName</key><string>Khayt 3MF preview</string>
+  <key>CFBundleExecutable</key><string>KhaytPreview</string>
+  <key>CFBundleIdentifier</key><string>app.khayt.mac.preview</string>
+  <key>CFBundlePackageType</key><string>XPC!</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key><string>com.apple.quicklook.preview</string>
+    <key>NSExtensionPrincipalClass</key><string>KhaytPreviewController</string>
+    <key>NSExtensionAttributes</key>
+    <dict>
+      <key>QLSupportedContentTypes</key>
+      <array><string>app.khayt.mac.three-mf</string></array>
+      <key>QLSupportsSearchableItems</key><false/>
+    </dict>
+  </dict>
+</dict>
+</plist>
+PRVPLIST
+
+# ── THE DESKTOP WIDGETS ───────────────────────────────────────────────────
+#
+# Printing now, and Today. A third .appex, on `com.apple.widgetkit-extension`,
+# and shaped differently from the two Quick Look ones in the two ways that
+# matter:
+#
+# * It HAS a Swift entry point. Its extension point prohibits a principal
+#   class; the `WidgetBundle`'s `@main` is what WidgetKit starts (Apple's own
+#   Calculator widget: LC_MAIN, `__swift5_entry`, NSExtension holding nothing
+#   but the point's identifier).
+# * It reads what the APP writes, from a container both may open: an App
+#   Group. On macOS a group named `<team id>.<name>` needs no registration and
+#   no provisioning profile (Apple's documentation for
+#   com.apple.security.application-groups), and a non-sandboxed app signed by
+#   that team opens it without the "access data from other apps" prompt. So
+#   the group is the TEAM of whoever signs this build — read off the signing
+#   certificate — plus `app.khayt.mac`, and it is written into both
+#   Info.plists for the code to find. An ad-hoc build has no team: it gets no
+#   group, the app writes nothing, and the widget says "Open Khayt".
+#
+# Sandboxed, as every widget extension must be; the app around it is not.
+WIDGET_TEAM=""
+WIDGET_IDENTITY="$(pick_identity)"
+if [ "$WIDGET_IDENTITY" != "-" ]; then
+  WIDGET_CERT="$(security find-identity -v 2>/dev/null | grep -F "$WIDGET_IDENTITY" | head -1 | sed 's/.*"\(.*\)"/\1/')"
+  if [ -n "$WIDGET_CERT" ]; then
+    WIDGET_TEAM="$(security find-certificate -c "$WIDGET_CERT" -p 2>/dev/null \
+      | openssl x509 -noout -subject -nameopt multiline 2>/dev/null \
+      | awk -F'= ' '/organizationalUnitName/ {print $2; exit}' | tr -d ' ')"
+  fi
+fi
+APP_GROUP=""
+[ -n "$WIDGET_TEAM" ] && APP_GROUP="$WIDGET_TEAM.app.khayt.mac"
+GROUP_KEY=""
+[ -n "$APP_GROUP" ] && GROUP_KEY="  <key>KhaytAppGroup</key><string>$APP_GROUP</string>"
+if [ -n "$APP_GROUP" ]; then echo "  widgets: app group $APP_GROUP"
+else echo "  widgets: no team to name an app group after — the widgets will say Open Khayt"; fi
+
+WID="$APP/Contents/PlugIns/KhaytWidgets.appex"
+mkdir -p "$WID/Contents/MacOS" "$WID/Contents/Resources"
+cp "$PKG/.build/release/KhaytWidgets" "$WID/Contents/MacOS/KhaytWidgets"
+# The words an EMPTY widget and the gallery need, in the Mac's own language.
+# Everything about a shop arrives already in the book's language from the app.
+cp -R "$PKG/Sources/KhaytWidgets/Localization/"*.lproj "$WID/Contents/Resources/"
+cat > "$WID/Contents/Info.plist" <<WIDPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>KhaytWidgets</string>
+  <key>CFBundleDisplayName</key><string>Khayt</string>
+  <key>CFBundleExecutable</key><string>KhaytWidgets</string>
+  <key>CFBundleIdentifier</key><string>app.khayt.mac.widgets</string>
+  <key>CFBundlePackageType</key><string>XPC!</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>ar</string></array>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
+$GROUP_KEY
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key><string>com.apple.widgetkit-extension</string>
+  </dict>
+</dict>
+</plist>
+WIDPLIST
+WID_ENTS="$PKG/.build/widgets.entitlements"
+GROUP_ENT=""
+[ -n "$APP_GROUP" ] && GROUP_ENT="  <key>com.apple.security.application-groups</key>
+  <array><string>$APP_GROUP</string></array>"
+cat > "$WID_ENTS" <<WIDENTS
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+$GROUP_ENT
+</dict>
+</plist>
+WIDENTS
+# ── SAVE TO KHAYT, IN SAFARI ──────────────────────────────────────────────
+#
+# A fourth .appex, on `com.apple.Safari.web-extension`: the browser
+# extension's native end. Safari reads the extension itself — manifest, popup,
+# scripts, `_locales` — out of this bundle's Resources, and hands every
+# `runtime.sendNativeMessage` to `SafariWebExtensionHandler`, which writes the
+# save into the app group's inbox (`WebInbox`) for the app to file.
+#
+# Built like the Quick Look ones: no Swift entry point (`Entry.swift`,
+# `-parse-as-library`, `ThumbnailExtensionTests` checks the binary), signed
+# inside out, sandboxed — and in the group, which is the only place a
+# sandboxed extension can leave something for the app. Safari only lists it
+# once Khayt has been opened from a scanned place (pluginkit's rule); then it
+# is switched on in Safari ▸ Settings ▸ Extensions, never by the app.
+#
+# The web extension is staged by `extension-khayt/pack.mjs` — the same source
+# the Chrome and Firefox packages are made from — straight into Resources.
+SAF="$APP/Contents/PlugIns/KhaytSafari.appex"
+mkdir -p "$SAF/Contents/MacOS" "$SAF/Contents/Resources"
+cp "$PKG/.build/release/KhaytSafari" "$SAF/Contents/MacOS/KhaytSafari"
+node "$REPO/extension-khayt/pack.mjs" safari "$SAF/Contents/Resources" \
+  || { echo "could not stage the Safari web extension"; exit 1; }
+cat > "$SAF/Contents/Info.plist" <<SAFPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>KhaytSafari</string>
+  <key>CFBundleDisplayName</key><string>Save to Khayt</string>
+  <key>CFBundleExecutable</key><string>KhaytSafari</string>
+  <key>CFBundleIdentifier</key><string>app.khayt.mac.safari</string>
+  <key>CFBundlePackageType</key><string>XPC!</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>ar</string></array>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
+  <key>NSHumanReadableDescription</key><string>Save a 3D model page into your Khayt library, with its link.</string>
+$GROUP_KEY
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key><string>com.apple.Safari.web-extension</string>
+    <key>NSExtensionPrincipalClass</key><string>SafariWebExtensionHandler</string>
+  </dict>
+</dict>
+</plist>
+SAFPLIST
+SAF_ENTS="$PKG/.build/safari.entitlements"
+cat > "$SAF_ENTS" <<SAFENTS
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+$GROUP_ENT
+</dict>
+</plist>
+SAFENTS
+
+# ── SAVE TO KHAYT, IN CHROME, EDGE, BRAVE, VIVALDI AND FIREFOX ───────────
+#
+# Those browsers reach a native program through native messaging: they start
+# it, write the extension's message to its standard input and read the answer
+# from its standard output. `khayt-browser-host` is that program — a plain
+# executable beside the app's own in Contents/MacOS (so `Bundle.main` is the app
+# and its Info.plist names the group), NOT sandboxed, hardened, and in the app
+# group, which is the one place it writes (`WebInbox`). Nothing points a browser
+# at it until the shop presses Install in Settings ▸ Preferences ▸ Browser
+# extension (`BrowserHosts`). Signed before the app, which seals it in.
+HOST_BIN="$APP/Contents/MacOS/khayt-browser-host"
+cp "$PKG/.build/release/khayt-browser-host" "$HOST_BIN"
+
+# ── KHAYT-MCP: THE BOOK, READ-ONLY, FOR AN ASSISTANT ────────────────────────
+#
+# An MCP server over stdio that an assistant (Claude Desktop and others) starts
+# itself. Settings ▸ Assistant has had its "share customer names" switch since
+# it was written, but the program was never put in the app — the switch
+# governed nothing a shop could run (website review, Nov 2026). Beside the app's
+# own executable, like the browser host, so `Bundle.main` is the app and the
+# rules bundle in Contents/Resources is found. Not sandboxed, hardened, no
+# entitlements: it only reads the book. Settings shows its path to paste into
+# the assistant.
+MCP_BIN="$APP/Contents/MacOS/khayt-mcp"
+cp "$PKG/.build/release/khayt-mcp" "$MCP_BIN"
+HOST_ENTS="$PKG/.build/browser-host.entitlements"
+cat > "$HOST_ENTS" <<HOSTENTS
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+$GROUP_ENT
+</dict>
+</plist>
+HOSTENTS
+
+# And the APP joins the same group, or macOS asks the shop whether Khayt may
+# "access data from other apps" the first time it writes the snapshot.
+# PlistBuddy, not plutil: plutil reads the dots in the key as a key PATH.
+if [ -n "$APP_GROUP" ]; then
+  /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" \
+    -c "Add :com.apple.security.application-groups:0 string $APP_GROUP" "$APP_ENTS"
+fi
+
+cat > "$EXT_ENTS" <<'EXTENTS'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+  <key>com.apple.security.files.user-selected.read-only</key><true/>
+</dict>
+</plist>
+EXTENTS
+
+# The App Intents metadata, into Resources BEFORE signing — it is part of what
+# is signed, and a bundle whose metadata arrives afterwards fails verification.
+#
+# ── A BUILD WITHOUT INTENTS FAILS ─────────────────────────────────────────
+#
+# This used to print a warning and carry on, and nobody read the warning:
+# every release from 4.0.0-alpha.40 on shipped with NO `Metadata.appintents`,
+# so Shortcuts, Spotlight and Siri could not see one of Khayt's actions. The
+# app built, launched and passed every test; nothing on screen says an intent
+# is missing. So a missing or empty bundle now stops the build. A dev build
+# that has no use for intents can opt out, and only explicitly:
+#
+#   KHAYT_ALLOW_NO_INTENTS=1 ./mac/make-app.sh
+ai_fail() {
+  echo "  app intents: $1" >&2
+  shift
+  for line in "$@"; do echo "    $line" >&2; done
+  if [ "${KHAYT_ALLOW_NO_INTENTS:-}" = "1" ]; then
+    echo "    KHAYT_ALLOW_NO_INTENTS=1 — continuing WITHOUT App Intents." >&2
+    echo "    Never ship this build: Shortcuts, Spotlight and Siri will not see Khayt." >&2
+    return 0
+  fi
+  echo "    Refusing to build an app Shortcuts and Siri cannot see." >&2
+  echo "    (A dev build may opt out with KHAYT_ALLOW_NO_INTENTS=1.)" >&2
+  exit 1
+}
+
+AI_TOOL="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor"
+if [ -x "$AI_TOOL" ]; then
+  find "$PKG/Sources/KhaytApp" -name '*.swift' > "$PKG/.build/ai-sources.txt"
+  # ── WHERE THE CONST VALUES ACTUALLY ARE ──────────────────────────────────
+  #
+  # They have moved twice, and both times this went quiet instead of failing.
+  #
+  # 1. (#1343) It looked under the `.build/release` symlink, which `find` does
+  #    not descend and which holds products, not intermediates. They were in
+  #    `.build/<triple>/release/KhaytApp.swiftconstvalues`.
+  #
+  # 2. (alpha.40, the first release built on a Mac with Xcode 27 / Swift 6.4.)
+  #    SwiftPM now builds through Swift Build (`.build/manifest.pif`,
+  #    `.build/out/`). The KhaytApp module is compiled inside the PRODUCT's
+  #    target, whole-module, so the file is
+  #      .build/out/Intermediates.noindex/KhaytCore.build/Release/
+  #        Khayt-p.build/Objects-normal/arm64/Khayt-primary.swiftconstvalues
+  #    — a different NAME, under the one directory the old `find` excluded.
+  #    The flags did not change and the compiler still emits the values.
+  #
+  # So neither the name nor the path is trusted now. A const-values file is
+  # JSON whose entries carry `"typeName": "Module.Type"`; the files wanted are
+  # the ones naming a `KhaytApp.` type. When more than one build layout is
+  # lying around in .build, only the directory holding the NEWEST such file is
+  # used, so a stale file from an old layout cannot add a second copy.
+  : > "$PKG/.build/ai-const.txt"
+  ai_newest="$(find "$PKG/.build" -name '*.swiftconstvalues' -type f \
+                 -exec grep -l '"KhaytApp\.' {} + 2>/dev/null \
+               | while IFS= read -r f; do stat -f '%m %N' "$f"; done \
+               | sort -rn | head -1 | cut -d' ' -f2- || true)"
+  if [ -n "$ai_newest" ]; then
+    find "$(dirname "$ai_newest")" -maxdepth 1 -name '*.swiftconstvalues' -type f \
+      -exec grep -l '"KhaytApp\.' {} + > "$PKG/.build/ai-const.txt" 2>/dev/null || true
+  fi
+  if [ ! -s "$PKG/.build/ai-const.txt" ]; then
+    ai_fail "NO CONST VALUES FOUND for KhaytApp under $PKG/.build" \
+      "The build asks for them with -emit-const-values. If this is empty," \
+      "SwiftPM has moved or renamed them again. Find them with:" \
+      "  find $PKG/.build -name '*.swiftconstvalues'"
+  else
+    sed 's/^/  app intents: const values from /' "$PKG/.build/ai-const.txt"
+    rm -rf "$APP/Contents/Resources/Metadata.appintents"
+    AI_LOG="$PKG/.build/appintentsmetadataprocessor.log"
+    if ! "$AI_TOOL" \
+      --output "$APP/Contents/Resources" \
+      --toolchain-dir "$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain" \
+      --module-name KhaytApp \
+      --sdk-root "$(xcrun --show-sdk-path)" \
+      --xcode-version "$(xcodebuild -version | tail -1 | awk '{print $3}')" \
+      --platform-family macOS --deployment-target 14.0 \
+      --target-triple arm64-apple-macosx14.0 \
+      --source-file-list "$PKG/.build/ai-sources.txt" \
+      --swift-const-vals-list "$PKG/.build/ai-const.txt" > "$AI_LOG" 2>&1; then
+      tail -20 "$AI_LOG" >&2
+      ai_fail "appintentsmetadataprocessor FAILED (full log: $AI_LOG)"
+    else
+      # Count what it wrote rather than trusting its exit code: an empty
+      # actions table is the same silent loss as no bundle at all.
+      ai_actions="$(python3 -c "import json;d=json.load(open('$APP/Contents/Resources/Metadata.appintents/extract.actionsdata'));print(' '.join(sorted(d.get('actions',{}))))" 2>/dev/null || true)"
+      if [ -z "$ai_actions" ]; then
+        ai_fail "Metadata.appintents is missing or lists NO actions (log: $AI_LOG)"
+      else
+        echo "  app intents: $(echo "$ai_actions" | wc -w | tr -d ' ') actions — $ai_actions"
+      fi
+    fi
+  fi
+else
+  ai_fail "no Xcode toolchain (no appintentsmetadataprocessor at $AI_TOOL)"
+fi
+
+# ── SPARKLE, EMBEDDED AND POINTED AT ──────────────────────────────────────
+#
+# SwiftPM links `@rpath/Sparkle.framework/Versions/B/Sparkle` and gives the
+# binary one rpath: `@loader_path`. Inside a bundle the executable is at
+# `Contents/MacOS/Khayt` and the framework at `Contents/Frameworks/`, so
+# without the rpath below the app links fine, builds fine, and dies at launch
+# with "Library not loaded" — the failure arrives at the one moment nothing is
+# watching.
+SPARKLE_FW="$(find "$PKG/.build/artifacts/sparkle" -maxdepth 5 -name Sparkle.framework -path '*macos*' 2>/dev/null | head -1)"
+if [ -n "$SPARKLE_FW" ] && [ -d "$SPARKLE_FW" ]; then
+  mkdir -p "$APP/Contents/Frameworks"
+  # -R keeps the symlink farm a versioned framework is made of. Flattening it
+  # gives a bundle codesign rejects.
+  rm -rf "$APP/Contents/Frameworks/Sparkle.framework"
+  cp -R "$SPARKLE_FW" "$APP/Contents/Frameworks/"
+  install_name_tool -add_rpath "@executable_path/../Frameworks" \
+    "$APP/Contents/MacOS/Khayt" 2>/dev/null || true
+  SPARKLE_EMBEDDED=1
+else
+  # Not fatal: the app checks for a feed before starting the updater, so a
+  # build without Sparkle is one whose Check for Updates is greyed out.
+  echo "  sparkle: framework not found — this build cannot update itself"
+  SPARKLE_EMBEDDED=0
+fi
+
+# ── THE FEED, AND WHY IT IS NOT ALWAYS WRITTEN ────────────────────────────
+#
+# `SUFeedURL` only goes in when this build is one that will actually be
+# published — `KHAYT_APPCAST` is set by the release workflow. A local build
+# with a feed URL would check for updates against releases it is not, and
+# offer to "update" a developer's working copy to the last published alpha.
+#
+# `SUPublicEDKey` is the PUBLIC half of the EdDSA key pair. Public: it is in
+# every shipped copy of the app by design. The private half signs the archive
+# and lives in a Keychain and in one CI secret; an attacker who replaces the
+# download cannot produce a signature this key accepts.
+SPARKLE_KEYS=""
+if [ -n "${KHAYT_APPCAST:-}" ] && [ "$SPARKLE_EMBEDDED" = "1" ]; then
+  SPARKLE_KEYS="  <key>SUFeedURL</key><string>${KHAYT_APPCAST}</string>
+  <key>SUPublicEDKey</key><string>iXX6JdzKwbQCUdCd2kLwvUUVHNIE51LR01dYZa1uA6c=</string>
+  <!-- ON, and checked hourly. This was <false/> under a comment saying Sparkle
+       would ASK on first launch — but Sparkle only asks when the key is ABSENT;
+       NO turns checking off without asking (sparkle-project.org, Customization).
+       So no copy of this app ever looked for an update on its own. An alpha
+       line ships several builds a day, so the interval is Sparkle's minimum,
+       one hour, and the app also looks once at every launch (Updates.swift).
+       A shop can turn it off in Settings → App Preferences → On this Mac. -->
+  <key>SUEnableAutomaticChecks</key><true/>
+  <key>SUScheduledCheckInterval</key><integer>3600</integer>
+  <!-- NEVER installed without asking (the shop, Sep 2026). NO here makes
+       Sparkle refuse automatic installs whatever this Mac's defaults say. -->
+  <key>SUAllowsAutomaticUpdates</key><false/>
+  <!-- The archive's EdDSA signature is checked BEFORE it is unpacked, not
+       after: a tampered download is refused without ever being extracted.
+       Every archive is already signed (mac-publish.yml, sign_update), and
+       Sparkle 2.9.6 supports it. SURequireSignedFeed is deliberately NOT here
+       yet: it needs the appcast itself signed first, and an app that demands
+       a signed feed from an unsigned one can never update again. -->
+  <key>SUVerifyUpdateBeforeExtraction</key><true/>"
+fi
+
+# KHAYT'S OWN GOOGLE SIGN-IN, so a shop connects Google Drive with one click
+# instead of creating an OAuth client in Google Cloud. The client is Khayt's,
+# verified with Google once, and is NOT in the repository: it comes from the
+# environment or from ~/.khayt/google-oauth.json ({"clientId": "...",
+# "clientSecret": "..."}). A Desktop-app client's secret is not confidential by
+# Google's own definition; PKCE protects the sign-in. A build without one
+# falls back to asking the shop for its own client, exactly as before.
+GOOGLE_ID="${KHAYT_GOOGLE_CLIENT_ID:-}"; GOOGLE_SECRET="${KHAYT_GOOGLE_CLIENT_SECRET:-}"
+if [ -z "$GOOGLE_ID" ] && [ -f "$HOME/.khayt/google-oauth.json" ]; then
+  GOOGLE_ID=$(/usr/bin/python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.khayt/google-oauth.json"))).get("clientId",""))')
+  GOOGLE_SECRET=$(/usr/bin/python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.khayt/google-oauth.json"))).get("clientSecret",""))')
+fi
+GOOGLE_KEYS=""
+if [ -n "$GOOGLE_ID" ]; then
+  GOOGLE_KEYS="  <key>KhaytGoogleClientID</key><string>${GOOGLE_ID}</string>
+  <key>KhaytGoogleClientSecret</key><string>${GOOGLE_SECRET}</string>"
+  echo "  google: Khayt's own Drive client built in"
+fi
+
+cat > "$APP/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>Khayt</string>
+  <key>CFBundleDisplayName</key><string>Khayt</string>
+  <key>CFBundleExecutable</key><string>Khayt</string>
+  <!-- NOT app.khayt.hub. That is the Electron app, and two applications
+       sharing an identifier confuses Launch Services, the defaults domain and
+       the Keychain's idea of who is asking. -->
+  <key>CFBundleIdentifier</key><string>app.khayt.mac</string>
+$GOOGLE_KEYS
+$GROUP_KEY
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
+  <key>CFBundleIconFile</key><string>Khayt</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSHumanReadableCopyright</key><string>Khayt</string>
+  <key>NSSupportsAutomaticTermination</key><false/>
+  <!-- ── FINDING A PRINTER ON THE WORKSHOP NETWORK ────────────────────────
+       macOS asks the shop's permission the first time this app looks, and the
+       system shows this sentence in that prompt. Without the key the prompt is
+       Apple's own generic wording, which does not say why a bookkeeping app
+       wants the network — and a prompt somebody cannot make sense of is a
+       prompt they decline.
+
+       The Bonjour list is required too: the system only browses the service
+       types an app has declared, and an undeclared one silently finds nothing.
+       The five are \`lib/printer-discovery.js\`'s SERVICES, and adding a
+       protocol there means adding it here — \`PrinterFinderTests\` says so.
+
+       THE BACKTICKS ARE ESCAPED because this heredoc is UNQUOTED — it has to
+       be, it substitutes \$VERSION and \$SPARKLE_KEYS. Unescaped, the shell ran
+       these two as commands ("Permission denied", "command not found") and
+       replaced them with their empty output, so the shipped comment read "The
+       five are 's SERVICES". Harmless in a comment and not harmless in
+       general: anything backticked in here executes, and any \$NAME expands. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Khayt looks for 3D printers on this network so you do not have to type their addresses.</string>
+  <!-- SAVE TO KHAYT IN SAFARI. Safari tells an extension nothing about its
+       downloads, so for ten minutes after a page is saved from Safari the app
+       looks in Downloads for the model downloaded from it, and ASKS before
+       adding it (SafariDownloadsWatch). macOS shows this sentence the first
+       time; Khayt never looks there at any other time. English only: the app
+       has no InfoPlist.strings, so every usage sentence here is English. -->
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>For a few minutes after you save a model page from Safari, Khayt looks in Downloads for the model you download from it, and asks before adding it to your library.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_prusalink._tcp</string>
+    <string>_octoprint._tcp</string>
+    <string>_moonraker._tcp</string>
+    <string>_snapmaker._tcp</string>
+    <string>_bambulab._tcp</string>
+    <!-- THIS APP'S OWN SERVICE, which the list above forgot. LanServer
+         advertises _khayt._tcp whenever it listens on the shop's network, and
+         mDNSResponder refuses a type the app did not declare — "App
+         Info.plist(NSBonjourServices) does not allow '_khayt._tcp'" — and
+         that refusal took the whole listener down with it (DNS Error:
+         NoAuth). alpha.37 on the shop's own Mac: LAN switched on, nothing
+         listening, no error anywhere. LanBonjourDeclaredTests holds this. -->
+    <string>_khayt._tcp</string>
+  </array>
+  <!-- ── A WIDGET ROW OPENS THE APP AT ITSELF ──────────────────────────────
+       khayt://machine/ID, job/ID, spool/ID and screen/NAME, from the desktop
+       widgets (ShopWidgetSnapshot.Link). The app reads those four and
+       nothing else: DeepLinkTests holds the handler to refusing the rest. -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key><string>app.khayt.mac.link</string>
+      <key>CFBundleURLSchemes</key><array><string>khayt</string></array>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+    </dict>
+  </array>
+$SPARKLE_KEYS
+  <!-- ── A MODEL DROPPED ON THE DOCK ICON OPENS NEW JOB ON IT ─────────────
+       The Dock only accepts a drop on an app that says it can open the file,
+       so the four kinds Shop.droppableModelKinds takes are declared here.
+       ALTERNATE, never Owner or Default: Khayt opens these for a job, it is
+       not the shop's slicer, and a double-click on a model in the Finder must
+       still go to whatever opened it before. Extensions rather than types:
+       nobody declares a type for gcode, and 3mf's is this app's own (below). -->
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>3D print file</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>CFBundleTypeExtensions</key>
+      <array>
+        <string>3mf</string>
+        <string>stl</string>
+        <string>obj</string>
+        <string>gcode</string>
+      </array>
+    </dict>
+  </array>
+  <!-- A job being dragged across the board. Declared so the drag is this app's
+       own: a board that accepted any dragged text would move a job because
+       someone dropped a word on it. -->
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key><string>app.khayt.mac.job</string>
+      <key>UTTypeDescription</key><string>Khayt job</string>
+      <key>UTTypeConformsTo</key><array><string>public.data</string></array>
+    </dict>
+    <!-- WHAT A .3mf IS. macOS does not know: mdls on one of this shop's
+         models reports a dyn.* placeholder, which is what a type nobody has
+         declared looks like. No icon, no preview, no kind.
+
+         NO BACKTICKS IN THIS HEREDOC. It is unquoted so that $VERSION expands,
+         which means the shell also runs anything in backticks — a prose comment
+         mentioning a command substituted that command's help text into the
+         plist, silently, and it took a lint to notice.
+
+         EXPORTED rather than imported, which is the uncomfortable half. An
+         imported declaration says "somebody else owns this type and here is
+         what I know about it", and that would be the honest shape — except
+         nobody has declared one. The 3MF Consortium publishes the format and
+         not a UTI, and neither OrcaSlicer nor Bambu Studio declares one, which
+         is why a Mac with both installed still shows a blank page. So this
+         declares its own, in this app's namespace rather than in Microsoft's
+         or the consortium's, and it will sit quietly beside a real one if a
+         real one ever arrives. -->
+    <dict>
+      <key>UTTypeIdentifier</key><string>app.khayt.mac.three-mf</string>
+      <key>UTTypeDescription</key><string>3D Manufacturing Format</string>
+      <key>UTTypeConformsTo</key><array><string>public.data</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>3mf</string></array>
+        <key>public.mime-type</key><array><string>model/3mf</string></array>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>
+PLIST
+IDENTITY="$(pick_identity)"
+
+# INSIDE OUT: a bundle's signature covers what is within it, so the extension is
+# signed first and the app's signature seals that in.
+# The output is captured rather than thrown away, because codesign's refusals
+# are specific and the reason is the whole message: an entitlements file written
+# INSIDE the bundle gets "unsealed contents present in the bundle root", which
+# says exactly what is wrong and says nothing at all down /dev/null.
+# ── HARDENED RUNTIME, AND A REAL TIMESTAMP ───────────────────────────────
+#
+# Both are REQUIRED for notarisation, and notarisation is what lets this app
+# open on a Mac that did not build it. Without them the notary service refuses
+# the submission outright, so an unnotarised build is not "a build that warns
+# on first launch" — on any other Mac it is a build Gatekeeper will not run.
+#
+# It was `--timestamp=none` and no `--options runtime`, and the signature said
+# so: `codesign -dvvv` printed `flags=0x0(none)` where a hardened build prints
+# `flags=0x10000(runtime)`. That was correct while this was a local build
+# nobody else ran; it is the first thing in the way of shipping one.
+#
+# A timestamp needs the network (Apple's TSA). `KHAYT_NO_TIMESTAMP=1` drops it
+# for an offline build — which then cannot be notarised, and says so below
+# rather than failing three steps later at `notarytool`.
+STAMP="--timestamp"
+[ -n "${KHAYT_NO_TIMESTAMP:-}" ] && STAMP="--timestamp=none"
+# Ad-hoc signing and the hardened runtime do not go together: an ad-hoc
+# signature cannot carry restricted entitlements, and `allow-jit` is one.
+RUNTIME="--options runtime"
+if [ "$IDENTITY" = "-" ]; then RUNTIME=""; fi
+
+# ── SPARKLE'S OWN BINARIES, EACH ONE SIGNED ──────────────────────────────
+#
+# A framework is not one binary. Sparkle ships an updater app, a background
+# installer and two XPC services inside itself, and every one is code that has
+# to carry a signature — `codesign --deep` on the app does NOT reach them in a
+# way notarisation accepts, which is why they are listed rather than swept.
+#
+# INNERMOST FIRST, for the reason the extensions are signed before the app: a
+# signature covers what is inside it, so anything signed afterwards invalidates
+# the thing that sealed it.
+if [ "$SPARKLE_EMBEDDED" = "1" ]; then
+  SPARKLE_IN_APP="$APP/Contents/Frameworks/Sparkle.framework"
+  for PART in \
+    "$SPARKLE_IN_APP/Versions/B/XPCServices/Downloader.xpc" \
+    "$SPARKLE_IN_APP/Versions/B/XPCServices/Installer.xpc" \
+    "$SPARKLE_IN_APP/Versions/B/Updater.app" \
+    "$SPARKLE_IN_APP/Versions/B/Autoupdate" \
+    "$SPARKLE_IN_APP"; do
+    [ -e "$PART" ] || continue
+    if ! SP_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME "$PART" 2>&1)"; then
+      echo "codesign failed for $(basename "$PART"):"
+      echo "$SP_ERR" | sed 's/^/  /'
+      exit 1
+    fi
+  done
+fi
+
+for BUNDLE in "$EXT" "$PRV"; do
+  if ! EXT_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+        --entitlements "$EXT_ENTS" "$BUNDLE" 2>&1)"; then
+    echo "codesign failed for $(basename "$BUNDLE"):"
+    echo "$EXT_SIGN_ERR" | sed 's/^/  /'
+    exit 1
+  fi
+done
+# The widgets with their OWN entitlements: the sandbox, and the group.
+if ! WID_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+      --entitlements "$WID_ENTS" "$WID" 2>&1)"; then
+  echo "codesign failed for KhaytWidgets.appex:"
+  echo "$WID_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
+
+# Save to Khayt's Safari half: the sandbox and the group, like the widgets.
+if ! SAF_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+      --entitlements "$SAF_ENTS" "$SAF" 2>&1)"; then
+  echo "codesign failed for KhaytSafari.appex:"
+  echo "$SAF_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
+
+# The browser host: its own identifier, the group, the hardened runtime.
+if ! HOST_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+      --identifier app.khayt.mac.browser-host --entitlements "$HOST_ENTS" "$HOST_BIN" 2>&1)"; then
+  echo "codesign failed for khayt-browser-host:"
+  echo "$HOST_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
+
+# khayt-mcp: its own identifier and the hardened runtime, nothing else.
+if ! MCP_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+      --identifier app.khayt.mac.mcp "$MCP_BIN" 2>&1)"; then
+  echo "codesign failed for khayt-mcp:"
+  echo "$MCP_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
+
+# The app LAST and with its own entitlements — `--entitlements` was missing
+# here entirely, so whatever the app needed it did not get.
+if ! APP_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+      --entitlements "$APP_ENTS" "$APP" 2>&1)"; then
+  echo "codesign failed (identity: $IDENTITY):"
+  echo "$APP_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
+codesign --verify --deep --strict "$APP" 2>&1 | sed 's/^/  /' || true
+
+# Print what it was signed as, because the difference is invisible in the bundle
+# and it is the thing that decides whether the Keychain asks again.
+if [ "$IDENTITY" = "-" ]; then
+  echo "  signed: ad hoc — no stable identity on this Mac, so the Keychain will"
+  echo "          ask again after every build. A Developer ID or an Apple"
+  echo "          Development certificate in the login keychain stops that."
+else
+  echo "  signed: $(codesign -dvv "$APP" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+fi
+
+echo "Built $APP"
+du -sh "$APP" | sed 's/^/  /'
+
+# Installing over a RUNNING app is not safe, and it is quiet about it.
+#
+# `rm -rf` deletes the bundle a running process is still reading from. The
+# executable itself survives — the kernel holds the inode — so the app carries
+# on, and every resource it has not paged in yet is simply gone: the bundled
+# business rules, the locale catalogues, the sample shop, the invoice
+# stylesheet. What that produces is not a clean failure, it is whatever the
+# first missing file happens to break, and it looks exactly like a bug in
+# whatever the shop was doing at the time.
+#
+# It also does not do what the person running it thinks. A running app keeps
+# the build it launched with; replacing the bundle changes what the NEXT launch
+# gets and nothing about the one on screen.
+installed="/Applications/Khayt Native.app"
+install_app() {
+  if pgrep -f "Khayt Native.app/Contents/MacOS/Khayt" >/dev/null 2>&1; then
+    if [ "${2:-}" = "--force" ]; then
+      echo "Khayt Native is running — installing over it anyway, as asked." >&2
+    else
+      echo "Khayt Native is RUNNING. Not installing over it." >&2
+      echo "  Quit it first, then run this again. The running app would keep the" >&2
+      echo "  build it launched with in any case, and replacing the bundle under" >&2
+      echo "  it can break it in ways that look like something else." >&2
+      echo "  ./mac/make-app.sh --install --force  overrides this." >&2
+      exit 1
+    fi
+  fi
+  rm -rf "$installed"
+  cp -R "$APP" "$installed"
+  echo "Installed to $installed"
+  echo "If it was open, quit and reopen it — a running app keeps the build it started with."
+}
+
+# ── NOTARISATION ──────────────────────────────────────────────────────────
+#
+# The step between "signed" and "a shop can open it". Gatekeeper on any Mac
+# that did not build this app asks Apple whether Apple has seen it; without a
+# notarisation ticket the answer is no and the app does not run.
+#
+# THE TICKET IS STAPLED INTO THE BUNDLE, which is what makes it work on a Mac
+# that is offline or behind a filter that blocks Apple's check. Submitting and
+# not stapling passes here and fails at a customer's desk, which is the worst
+# place to find out.
+#
+# Credentials are the same three the Electron lane already uses. They are read
+# from the environment, never written to disk, and never echoed.
+
+case "${1:-}" in
+  --open)    open "$APP" ;;
+  --install) install_app "$@" ;;
+  # --notarize is handled at the TOP, before the build — see the note there.
+esac

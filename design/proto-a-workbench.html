@@ -1,0 +1,1030 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Khayt — Workbench</title>
+<style>
+/* ============================================================
+   Khayt · Direction A "WORKBENCH"
+   Native macOS-style productivity app prototype.
+   Single file, inline CSS+JS, mock data, no deps.
+   ============================================================ */
+
+/* ---------- Design tokens ---------- */
+:root{
+  --bg:        #f7f8fa;   /* warm soft off-white window backdrop */
+  --bg-2:      #eef0f4;   /* sidebar wash */
+  --panel:     #ffffff;
+  --panel-2:   #fbfbfd;
+  --ink:       #1c1f26;
+  --ink-2:     #5b6473;
+  --ink-3:     #8a92a3;
+  --line:      #e6e8ee;
+  --line-2:    #eef0f4;
+  --accent:    #4f5bf2;   /* confident indigo */
+  --accent-ink:#ffffff;
+  --accent-soft:#eceefe;
+  --shadow-1:  0 1px 0 rgba(20,24,38,.04), 0 1px 2px rgba(20,24,38,.05);
+  --shadow-2:  0 8px 30px rgba(20,24,38,.10), 0 1px 2px rgba(20,24,38,.05);
+  --radius:    12px;
+  --radius-sm: 9px;
+
+  /* status palette */
+  --blue:#2f6bff; --blue-bg:#e7f0ff;
+  --green:#19a463; --green-bg:#e3f6ec;
+  --red:#e0453a;  --red-bg:#fdeae8;
+  --amber:#cf8a00; --amber-bg:#fdf3da;
+  --purple:#8a4fe6; --purple-bg:#f1e9fd;
+  --teal:#0fb5ba; --teal-bg:#e0f7f7;
+  --pink:#e0518e; --pink-bg:#fde9f1;
+
+  --font: -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+html[data-theme="dark"]{
+  --bg:#15171c; --bg-2:#1b1e25; --panel:#22262f; --panel-2:#1d2027;
+  --ink:#eef0f5; --ink-2:#a4adbd; --ink-3:#7a8398;
+  --line:#2d323d; --line-2:#262b34;
+  --accent:#7a85ff; --accent-soft:#2a2e57;
+  --shadow-1:0 1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.35);
+  --shadow-2:0 10px 34px rgba(0,0,0,.5);
+  --blue-bg:#16294d; --green-bg:#143226; --red-bg:#3a1c1a; --amber-bg:#352b12;
+  --purple-bg:#2a1f44; --teal-bg:#0e3133; --pink-bg:#3a1f2e;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; font-family:var(--font); color:var(--ink);
+  background:var(--bg);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  font-size:13.5px; line-height:1.45;
+  overflow:hidden;
+}
+button{font-family:inherit}
+::selection{background:var(--accent-soft)}
+
+/* ---------- App window shell ---------- */
+.window{
+  height:100vh; display:grid;
+  grid-template-columns:248px 1fr;
+  grid-template-rows:38px 1fr 30px;
+  grid-template-areas:
+    "titlebar titlebar"
+    "sidebar  main"
+    "sidebar  statusbar";
+  background:var(--bg);
+}
+
+/* ---------- Title bar (traffic lights) ---------- */
+.titlebar{
+  grid-area:titlebar; -webkit-app-region:drag;
+  display:flex; align-items:center; gap:10px;
+  padding:0 14px; background:linear-gradient(var(--bg-2),var(--bg));
+  border-bottom:1px solid var(--line);
+}
+.lights{display:flex; gap:8px}
+.light{width:12px;height:12px;border-radius:50%}
+.light.r{background:#ff5f57} .light.y{background:#febc2e} .light.g{background:#28c840}
+.titlebar .ttl{font-weight:600;font-size:12.5px;color:var(--ink-2);letter-spacing:.2px}
+.titlebar .spacer{flex:1}
+.titlebar .crumb{color:var(--ink-3);font-size:12px}
+.titlebar .crumb b{color:var(--ink-2);font-weight:600}
+
+/* ---------- Sidebar ---------- */
+.sidebar{
+  grid-area:sidebar; background:var(--bg-2);
+  border-right:1px solid var(--line);
+  display:flex; flex-direction:column;
+  padding:10px 10px 8px;
+  overflow:auto;
+}
+.brand{
+  display:flex; align-items:center; gap:10px;
+  padding:6px 8px 12px;
+}
+.brand .logo{
+  width:30px;height:30px;border-radius:8px;
+  background:linear-gradient(135deg,var(--accent),#7c6bff);
+  display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px;
+  box-shadow:0 2px 6px rgba(79,91,242,.4);
+}
+.brand .name{font-weight:700;font-size:14px}
+.brand .sub{font-size:11px;color:var(--ink-3);margin-top:-2px}
+
+.search{
+  display:flex;align-items:center;gap:7px;margin:0 4px 10px;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:6px 9px;color:var(--ink-3);font-size:12.5px;
+  box-shadow:var(--shadow-1);cursor:pointer;
+}
+.search input{border:0;background:transparent;outline:none;flex:1;color:var(--ink);font-size:12.5px;cursor:pointer}
+.search kbd{font-family:var(--font);font-size:10.5px;color:var(--ink-3);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;background:var(--bg-2)}
+
+.nav-group{margin:4px 0 2px}
+.nav-group .label{
+  font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--ink-3);padding:8px 10px 4px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:6px 9px;border:0;background:transparent;border-radius:8px;
+  color:var(--ink);font-size:13px;cursor:pointer;text-align:left;
+  position:relative;
+}
+.nav-item:hover{background:rgba(120,130,150,.10)}
+.nav-item.active{background:var(--panel);box-shadow:var(--shadow-1);font-weight:600}
+.nav-item.active::before{
+  content:"";position:absolute;left:-10px;top:50%;transform:translateY(-50%);
+  width:3px;height:18px;border-radius:3px;background:var(--accent);
+}
+.glyph{
+  width:24px;height:24px;border-radius:7px;flex:none;
+  display:grid;place-items:center;color:#fff;
+  box-shadow:0 1px 2px rgba(0,0,0,.15);
+}
+.glyph svg{width:14px;height:14px}
+.nav-item .count{margin-left:auto;font-size:11px;color:var(--ink-3);
+  background:rgba(120,130,150,.14);border-radius:20px;padding:1px 7px;font-weight:600}
+.nav-item.active .count{background:var(--accent-soft);color:var(--accent)}
+
+.sidebar .grow{flex:1}
+.sidebar .acct{
+  display:flex;align-items:center;gap:9px;padding:8px;border-radius:9px;
+  border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow-1);
+}
+.avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#ffb86b,#ff7a90);
+  display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px}
+.acct .who{font-size:12px;font-weight:600;line-height:1.1}
+.acct .biz{font-size:10.5px;color:var(--ink-3)}
+
+/* ---------- Main column ---------- */
+.main{grid-area:main; display:flex; flex-direction:column; overflow:hidden; background:var(--bg)}
+
+/* Toolbar */
+.toolbar{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 16px; border-bottom:1px solid var(--line);
+  background:linear-gradient(var(--panel),var(--panel-2));
+  min-height:50px;
+}
+.toolbar h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.2px}
+.toolbar .tb-spacer{flex:1}
+.tbtn{
+  display:inline-flex;align-items:center;gap:6px;
+  border:1px solid var(--line);background:var(--panel);
+  border-radius:8px;padding:6px 11px;font-size:12.5px;color:var(--ink);
+  cursor:pointer;box-shadow:var(--shadow-1);
+}
+.tbtn:hover{background:var(--bg-2)}
+.tbtn svg{width:14px;height:14px;opacity:.8}
+.tbtn.primary{
+  background:var(--accent);color:#fff;border-color:transparent;font-weight:600;
+  box-shadow:0 2px 8px rgba(79,91,242,.35);
+}
+.tbtn.primary:hover{filter:brightness(1.06)}
+.tbtn.primary svg{opacity:1}
+
+/* Segmented control */
+.seg{display:inline-flex;background:var(--bg-2);border:1px solid var(--line);
+  border-radius:8px;padding:2px;gap:2px}
+.seg button{border:0;background:transparent;border-radius:6px;padding:4px 11px;
+  font-size:12px;color:var(--ink-2);cursor:pointer;font-weight:500}
+.seg button.on{background:var(--panel);color:var(--ink);box-shadow:var(--shadow-1);font-weight:600}
+
+/* Scroll body */
+.body{flex:1;overflow:auto;padding:18px 20px 26px}
+.screen{display:none;animation:fade .18s ease}
+.screen.show{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ---------- Status bar ---------- */
+.statusbar{
+  grid-area:statusbar;display:flex;align-items:center;gap:14px;
+  padding:0 16px;background:linear-gradient(var(--bg),var(--bg-2));
+  border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-2);
+}
+.statusbar .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.statusbar .sepr{color:var(--ink-3);opacity:.5}
+.statusbar .ok{color:var(--green);font-weight:600}
+.statusbar .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+
+/* ---------- Generic native panel ---------- */
+.panel{
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow-1);
+}
+.panel-h{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line-2)}
+.panel-h h3{margin:0;font-size:13px;font-weight:700}
+.panel-h .meta{margin-left:auto;font-size:11.5px;color:var(--ink-3)}
+
+/* Grouped inset list (native) */
+.glist{list-style:none;margin:0;padding:0}
+.glist li{display:flex;align-items:center;gap:11px;padding:10px 14px;border-bottom:1px solid var(--line-2)}
+.glist li:last-child{border-bottom:0}
+.glist li:hover{background:var(--panel-2)}
+.glist .ttl{font-weight:600;font-size:13px}
+.glist .sub{font-size:11.5px;color:var(--ink-3)}
+.glist .tail{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+/* Chips */
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+  padding:2px 9px;border-radius:20px;line-height:1.6;white-space:nowrap}
+.chip .cd{width:6px;height:6px;border-radius:50%}
+.chip.blue{color:var(--blue);background:var(--blue-bg)}
+.chip.green{color:var(--green);background:var(--green-bg)}
+.chip.red{color:var(--red);background:var(--red-bg)}
+.chip.amber{color:var(--amber);background:var(--amber-bg)}
+.chip.purple{color:var(--purple);background:var(--purple-bg)}
+.chip.teal{color:var(--teal);background:var(--teal-bg)}
+.chip.gray{color:var(--ink-2);background:rgba(120,130,150,.14)}
+
+/* Stat row (tight native KPIs) */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:13px 14px;box-shadow:var(--shadow-1);position:relative;overflow:hidden}
+.stat .k{font-size:11px;color:var(--ink-3);font-weight:600;letter-spacing:.2px;display:flex;align-items:center;gap:7px}
+.stat .v{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-top:4px}
+.stat .d{font-size:11px;margin-top:2px;font-weight:600}
+.stat .d.up{color:var(--green)} .stat .d.dn{color:var(--red)} .stat .d.mut{color:var(--ink-3)}
+.stat .badge{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:9px;
+  display:grid;place-items:center}
+.stat .badge svg{width:16px;height:16px}
+
+/* Two-column grids */
+.grid2{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:1080px){.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:repeat(2,1fr)}}
+
+/* Progress */
+.bar{height:7px;border-radius:6px;background:var(--line-2);overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--accent),#7c6bff)}
+.bar.green>i{background:linear-gradient(90deg,#19a463,#3ad487)}
+.bar.amber>i{background:linear-gradient(90deg,#cf8a00,#f4b53b)}
+
+/* Fleet mini */
+.fleet-mini{display:grid;gap:10px;padding:12px 14px}
+.fm-row{display:grid;grid-template-columns:78px 1fr 56px;align-items:center;gap:10px;font-size:12px}
+.fm-row .nm{font-weight:600}
+
+/* Printer cards */
+.printers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:1080px){.printers{grid-template-columns:repeat(2,1fr)}}
+.pcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow-1);overflow:hidden}
+.pcard .top{display:flex;align-items:center;gap:10px;padding:13px 14px 6px}
+.pcard .pico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#fff}
+.pcard .pname{font-weight:700;font-size:13.5px}
+.pcard .pmod{font-size:11px;color:var(--ink-3)}
+.pcard .pbody{padding:8px 14px 14px}
+.pcard .job{font-size:12px;color:var(--ink-2);margin:6px 0 9px}
+.pcard .job b{color:var(--ink)}
+.pcard .stat-row{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);margin-top:8px}
+.pcard .stat-row b{color:var(--ink);font-weight:700;font-size:12px}
+
+/* Kanban */
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start}
+@media(max-width:1080px){.kanban{grid-template-columns:repeat(2,1fr)}}
+.kcol{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius);padding:10px}
+.kcol .kh{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;padding:2px 4px 10px}
+.kcol .kh .n{margin-left:auto;font-size:11px;color:var(--ink-3);background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:0 7px}
+.kcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 11px;
+  box-shadow:var(--shadow-1);margin-bottom:9px;cursor:grab}
+.kcard:hover{box-shadow:var(--shadow-2)}
+.kcard .kt{font-weight:600;font-size:12.5px}
+.kcard .km{font-size:11px;color:var(--ink-3);margin-top:2px;display:flex;gap:8px;align-items:center}
+.kcard .kf{display:flex;align-items:center;gap:6px;margin-top:8px}
+.kcard .who{font-size:10.5px;color:var(--ink-3);margin-left:auto}
+
+/* Calculator layout */
+.calc{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
+@media(max-width:980px){.calc{grid-template-columns:1fr}}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11.5px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
+.field input,.field select,.field textarea{
+  width:100%;border:1px solid var(--line);background:var(--panel-2);border-radius:8px;
+  padding:8px 10px;font-size:13px;color:var(--ink);outline:none;font-family:inherit}
+.field input:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);background:var(--panel)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.summary{position:sticky;top:0}
+.sum-line{display:flex;justify-content:space-between;font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line-2);color:var(--ink-2)}
+.sum-line b{color:var(--ink);font-weight:600}
+.sum-total{display:flex;justify-content:space-between;align-items:baseline;padding:12px 0 4px}
+.sum-total .t{font-size:12px;color:var(--ink-3);font-weight:600}
+.sum-total .a{font-size:28px;font-weight:800;letter-spacing:-.5px}
+.btn-block{width:100%;justify-content:center;margin-top:4px;padding:9px}
+.btn-ghost{width:100%;justify-content:center;margin-top:8px;padding:8px;
+  background:transparent;border:1px solid var(--line);border-radius:8px;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.btn-ghost:hover{background:var(--bg-2)}
+
+/* Table (inventory/clients/invoices) */
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{text-align:left;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-3);
+  font-weight:700;padding:9px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+.tbl td{padding:9px 14px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover{background:var(--panel-2)}
+.tbl .nm{font-weight:600}
+.tbl .muted{color:var(--ink-3)}
+.swatch{width:14px;height:14px;border-radius:4px;display:inline-block;vertical-align:-2px;margin-right:7px;border:1px solid rgba(0,0,0,.08)}
+.dots{position:relative}
+.dots .menu-btn{border:0;background:transparent;color:var(--ink-3);cursor:pointer;border-radius:6px;padding:2px 8px;font-size:16px;line-height:1}
+.dots .menu-btn:hover{background:var(--bg-2);color:var(--ink)}
+.menu{position:absolute;right:0;top:26px;z-index:30;background:var(--panel);border:1px solid var(--line);
+  border-radius:9px;box-shadow:var(--shadow-2);min-width:170px;padding:5px;display:none}
+.menu.open{display:block}
+.menu button{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;
+  text-align:left;padding:7px 9px;border-radius:6px;font-size:12.5px;color:var(--ink);cursor:pointer}
+.menu button:hover{background:var(--bg-2)}
+.menu button.danger{color:var(--red)}
+.menu .sep{height:1px;background:var(--line-2);margin:4px 0}
+
+/* loc chips group */
+.locs{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Analytics bars */
+.chart{display:flex;align-items:flex-end;gap:10px;height:160px;padding:10px 14px 0}
+.chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+.chart .col .b{width:100%;max-width:34px;border-radius:6px 6px 3px 3px;
+  background:linear-gradient(180deg,var(--accent),#7c6bff)}
+.chart .col .lab{font-size:10.5px;color:var(--ink-3)}
+.legend{display:flex;gap:14px;font-size:11.5px;color:var(--ink-2);padding:0 14px 12px}
+.legend .li{display:flex;align-items:center;gap:6px}
+
+/* Settings */
+.set-row{display:flex;align-items:center;gap:14px;padding:12px 14px;border-bottom:1px solid var(--line-2)}
+.set-row:last-child{border-bottom:0}
+.set-row .info{flex:1}
+.set-row .info .t{font-weight:600;font-size:13px}
+.set-row .info .d{font-size:11.5px;color:var(--ink-3);margin-top:1px}
+.toggle{width:42px;height:25px;border-radius:20px;background:var(--line);position:relative;cursor:pointer;border:0;flex:none;transition:.15s}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:.15s}
+.toggle.on{background:var(--accent)}
+.toggle.on::after{left:19px}
+.saved{font-size:11.5px;color:var(--green);font-weight:600;opacity:0;transition:.2s;display:inline-flex;gap:5px;align-items:center}
+.saved.show{opacity:1}
+
+.attn-ico{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex:none}
+.section-title{font-size:12px;font-weight:700;color:var(--ink-2);margin:18px 2px 9px;letter-spacing:.2px}
+
+/* command palette */
+.cmd-overlay{position:fixed;inset:0;background:rgba(20,24,38,.28);backdrop-filter:blur(2px);
+  display:none;align-items:flex-start;justify-content:center;z-index:100;padding-top:14vh}
+.cmd-overlay.show{display:flex}
+.cmd{width:540px;max-width:90vw;background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;box-shadow:var(--shadow-2);overflow:hidden}
+.cmd input{width:100%;border:0;outline:none;background:transparent;padding:15px 17px;font-size:15px;color:var(--ink);
+  border-bottom:1px solid var(--line-2)}
+.cmd .res{max-height:320px;overflow:auto;padding:6px}
+.cmd .res button{display:flex;align-items:center;gap:11px;width:100%;border:0;background:transparent;
+  padding:9px 11px;border-radius:8px;cursor:pointer;text-align:left;color:var(--ink);font-size:13px}
+.cmd .res button.sel,.cmd .res button:hover{background:var(--accent-soft)}
+.cmd .res .hint{margin-left:auto;font-size:11px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="window">
+
+  <!-- ===== Title bar ===== -->
+  <div class="titlebar">
+    <div class="lights"><span class="light r"></span><span class="light y"></span><span class="light g"></span></div>
+    <span class="ttl">Khayt</span>
+    <div class="spacer"></div>
+    <span class="crumb">Workbench · <b id="crumb">Dashboard</b></span>
+  </div>
+
+  <!-- ===== Sidebar ===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">K</div>
+      <div>
+        <div class="name">Khayt</div>
+        <div class="sub">3D Print Shop</div>
+      </div>
+    </div>
+
+    <div class="search" onclick="openCmd()">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input placeholder="Search or jump…" readonly>
+      <kbd>⌘K</kbd>
+    </div>
+
+    <nav id="nav"></nav>
+
+    <div class="grow"></div>
+    <div class="acct">
+      <div class="avatar">AB</div>
+      <div>
+        <div class="who">Ali Ballaa</div>
+        <div class="biz">Khayt Studio · Pro</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== Main ===== -->
+  <main class="main">
+    <div class="toolbar" id="toolbar"><!-- per-screen toolbar injected --></div>
+    <div class="body" id="body"><!-- screens injected --></div>
+  </main>
+
+  <!-- ===== Status bar ===== -->
+  <div class="statusbar">
+    <span class="dot" style="background:var(--green)"></span>
+    <span><b style="color:var(--ink)">12</b> orders</span>
+    <span class="sepr">·</span>
+    <span><b style="color:var(--blue)">3</b> printing</span>
+    <span class="sepr">·</span>
+    <span><b style="color:var(--ink)">1.9 kg</b> today</span>
+    <span class="sepr">·</span>
+    <span class="ok">synced ✓</span>
+    <div class="right">
+      <span>Last sync 12:04</span>
+      <span class="sepr">·</span>
+      <span>v4.0 beta</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Command palette ===== -->
+<div class="cmd-overlay" id="cmdOverlay" onclick="if(event.target===this)closeCmd()">
+  <div class="cmd">
+    <input id="cmdInput" placeholder="Jump to a screen…" oninput="filterCmd()" onkeydown="cmdKey(event)">
+    <div class="res" id="cmdRes"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   Mock data + icons
+   ========================================================= */
+const ICON = {
+  dash:'<path d="M3 13h8V3H3zM13 21h8V3h-8zM3 21h8v-6H3z"/>',
+  calc:'<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h2M8 14h2M8 18h2M14 10h2v8h-2z"/>',
+  queue:'<rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/>',
+  fleet:'<rect x="4" y="3" width="16" height="13" rx="2"/><path d="M7 16v3M17 16v3M4 19h16"/>',
+  inv:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>',
+  client:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="9" r="2.4"/><path d="M16 14.4c2.6.3 4.5 2.4 4.5 5.6"/>',
+  inv$:'<path d="M3 6h18v12H3z"/><path d="M3 10h18M7 14h4"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  set:'<circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5l1.5.9-2 3.4-1.7-.6a6.8 6.8 0 0 1-1.6.9l-.3 1.8h-3.9l-.3-1.8a6.8 6.8 0 0 1-1.6-.9l-1.7.6-2-3.4 1.5-.9a6.9 6.9 0 0 1 0-1.9l-1.5-.9 2-3.4 1.7.6a6.8 6.8 0 0 1 1.6-.9l.3-1.8h3.9l.3 1.8c.6.2 1.1.5 1.6.9l1.7-.6 2 3.4-1.5.9a6.9 6.9 0 0 1 0 1.9z"/>',
+  bolt:'<path d="M13 2L4 14h6l-1 8 9-12h-6z"/>',
+  warn:'<path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/>',
+  printer:'<rect x="6" y="3" width="12" height="6" rx="1"/><path d="M6 14H4a2 2 0 0 1-2-2v-1a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2"/><rect x="6" y="13" width="12" height="8" rx="1"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  filter:'<path d="M3 5h18l-7 8v6l-4-2v-4z"/>',
+  export:'<path d="M12 16V4M8 8l4-4 4 4M4 20h16"/>',
+  refresh:'<path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/>',
+};
+function svg(p,w=14){return `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`}
+
+const NAV = [
+  {g:null, items:[{id:'dash',name:'Dashboard',ic:ICON.dash,c:'var(--accent)',count:null}]},
+  {g:'Work', items:[
+    {id:'calc',name:'Calculator',ic:ICON.calc,c:'var(--purple)'},
+    {id:'queue',name:'Queue',ic:ICON.queue,c:'var(--blue)',count:8},
+    {id:'fleet',name:'Fleet',ic:ICON.fleet,c:'var(--teal)',count:'3'},
+  ]},
+  {g:'Catalog', items:[
+    {id:'inv',name:'Inventory',ic:ICON.inv,c:'var(--amber)'},
+    {id:'clients',name:'Clients',ic:ICON.client,c:'var(--pink)'},
+  ]},
+  {g:'Money', items:[
+    {id:'invoices',name:'Invoices & Orders',ic:ICON['inv$'],c:'var(--green)',count:12},
+    {id:'analytics',name:'Analytics',ic:ICON.chart,c:'var(--accent)'},
+  ]},
+  {g:null, items:[{id:'set',name:'Settings',ic:ICON.set,c:'var(--ink-3)'}]},
+];
+const TITLES={dash:'Dashboard',calc:'Build Calculator',queue:'Print Queue',fleet:'Fleet',
+  inv:'Inventory',clients:'Clients',invoices:'Invoices & Orders',analytics:'Analytics',set:'Settings'};
+
+/* =========================================================
+   Render sidebar
+   ========================================================= */
+function renderNav(){
+  const nav=document.getElementById('nav'); nav.innerHTML='';
+  NAV.forEach(grp=>{
+    const wrap=document.createElement('div'); wrap.className='nav-group';
+    if(grp.g) wrap.innerHTML=`<div class="label">${grp.g}</div>`;
+    grp.items.forEach(it=>{
+      const b=document.createElement('button');
+      b.className='nav-item'+(it.id===current?' active':'');
+      b.dataset.id=it.id;
+      b.innerHTML=`<span class="glyph" style="background:${it.c}">${svg(it.ic)}</span>
+        <span>${it.name}</span>${it.count!=null?`<span class="count">${it.count}</span>`:''}`;
+      b.onclick=()=>go(it.id);
+      wrap.appendChild(b);
+    });
+    nav.appendChild(wrap);
+  });
+}
+
+/* =========================================================
+   Navigation
+   ========================================================= */
+let current='dash';
+function go(id){
+  current=id;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.id===id));
+  document.getElementById('crumb').textContent=TITLES[id];
+  document.getElementById('toolbar').innerHTML=toolbars[id]();
+  document.getElementById('body').innerHTML=`<div class="screen show">${screens[id]()}</div>`;
+  document.getElementById('body').scrollTop=0;
+}
+
+/* =========================================================
+   Reusable toolbar builder
+   ========================================================= */
+function tbar(title,{seg=null,primary=null,extras=''}={}){
+  let h=`<h1>${title}</h1>`;
+  if(seg){
+    h+=`<div class="seg" style="margin-left:10px">`+
+      seg.map((s,i)=>`<button class="${i===0?'on':''}" onclick="segPick(this)">${s}</button>`).join('')+`</div>`;
+  }
+  h+=`<div class="tb-spacer"></div>`+extras;
+  if(primary) h+=`<button class="tbtn primary">${svg(ICON[primary.ic])}${primary.label}</button>`;
+  return h;
+}
+function segPick(el){el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));el.classList.add('on')}
+
+const toolbars={
+  dash:()=>tbar('Today',{extras:`<button class="tbtn">${svg(ICON.refresh)}Refresh</button>`,primary:{ic:'plus',label:'New build'}}),
+  calc:()=>tbar('Build Calculator',{extras:`<button class="tbtn">${svg(ICON.clock)}Recent</button>`,primary:{ic:'plus',label:'New estimate'}}),
+  queue:()=>tbar('Print Queue',{seg:['Kanban','List','Timeline'],extras:`<button class="tbtn">${svg(ICON.filter)}Filter</button>`,primary:{ic:'plus',label:'Add job'}}),
+  fleet:()=>tbar('Fleet',{seg:['Cards','Grid'],extras:`<button class="tbtn">${svg(ICON.refresh)}Sync</button>`,primary:{ic:'plus',label:'Add printer'}}),
+  inv:()=>tbar('Inventory',{seg:['Filaments','Hardware','Resin'],extras:`<button class="tbtn">${svg(ICON.filter)}Location</button>`,primary:{ic:'plus',label:'Add stock'}}),
+  clients:()=>tbar('Clients',{extras:`<button class="tbtn">${svg(ICON.export)}Export</button>`,primary:{ic:'plus',label:'New client'}}),
+  invoices:()=>tbar('Invoices & Orders',{seg:['All','Unpaid','Paid','Quotes'],extras:`<button class="tbtn">${svg(ICON.export)}Export</button>`,primary:{ic:'plus',label:'New invoice'}}),
+  analytics:()=>tbar('Analytics',{seg:['Week','Month','Quarter','Year'],extras:`<button class="tbtn">${svg(ICON.export)}Export</button>`}),
+  set:()=>tbar('Settings',{extras:`<span class="saved" id="setSaved">${svg(ICON.check)}Saved</span>`}),
+};
+
+/* =========================================================
+   Screen builders
+   ========================================================= */
+function statTile(k,v,d,dCls,ic,c){
+  return `<div class="stat">
+    <div class="badge" style="background:${c}1f;color:${c}">${svg(ic,16)}</div>
+    <div class="k">${k}</div><div class="v">${v}</div>
+    <div class="d ${dCls}">${d}</div></div>`;
+}
+
+const screens={
+
+/* ---------- DASHBOARD ---------- */
+dash:()=>`
+  <div class="stats">
+    ${statTile('Revenue today','SAR 1,420','▲ 18% vs yest','up',ICON['inv$'],'#19a463')}
+    ${statTile('Active prints','3','2 finishing < 1h','mut',ICON.printer,'#2f6bff')}
+    ${statTile('Filament today','1.9 kg','0.4 kg remaining','mut',ICON.inv,'#cf8a00')}
+    ${statTile('Open orders','12','3 due today','dn',ICON.queue,'#8a4fe6')}
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="panel">
+        <div class="panel-h"><h3>Today's work</h3><span class="meta">6 jobs · 4h 12m est.</span></div>
+        <ul class="glist">
+          ${jobRow('Cosplay helmet — PLA+','Sara M. · due 4:00 PM','blue','Printing','#2f6bff','62%')}
+          ${jobRow('Drone frame x4 — PETG','Maker Lab · due today','amber','Queued','#cf8a00')}
+          ${jobRow('Architectural model','Studio Ten · due 6:00 PM','blue','Printing','#2f6bff','30%')}
+          ${jobRow('Phone stand batch','Etsy order #220','green','Ready','#19a463')}
+          ${jobRow('Gear set — Nylon','Auto Works · due tmrw','purple','Slicing','#8a4fe6')}
+          ${jobRow('Resin miniatures','Tabletop Guild','green','Ready','#19a463')}
+        </ul>
+      </div>
+
+      <div class="section-title">Fleet at a glance</div>
+      <div class="panel">
+        <div class="fleet-mini">
+          ${fmRow('Prusa MK4','Helmet shell','blue',62)}
+          ${fmRow('Bambu X1C','Arch model','blue',30)}
+          ${fmRow('Voron 2.4','Gear set','purple',8)}
+          ${fmRow('Ender S1','— idle —','gray',0)}
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="panel-h"><h3>Needs attention</h3><span class="meta">3</span></div>
+        <ul class="glist">
+          <li><span class="attn-ico" style="background:var(--red-bg);color:var(--red)">${svg(ICON.warn)}</span>
+            <div><div class="ttl">Ender S1 — nozzle clog</div><div class="sub">Print failed at 41% · 2h ago</div></div>
+            <span class="tail"><span class="chip red"><span class="cd" style="background:var(--red)"></span>Error</span></span></li>
+          <li><span class="attn-ico" style="background:var(--amber-bg);color:var(--amber)">${svg(ICON.inv)}</span>
+            <div><div class="ttl">PETG Black low</div><div class="sub">0.4 kg left · reorder point</div></div>
+            <span class="tail"><span class="chip amber"><span class="cd" style="background:var(--amber)"></span>Low</span></span></li>
+          <li><span class="attn-ico" style="background:var(--blue-bg);color:var(--blue)">${svg(ICON['inv$'])}</span>
+            <div><div class="ttl">Invoice #1042 overdue</div><div class="sub">SAR 380 · Studio Ten · 3 days</div></div>
+            <span class="tail"><span class="chip blue"><span class="cd" style="background:var(--blue)"></span>Due</span></span></li>
+        </ul>
+      </div>
+
+      <div class="section-title">Quick actions</div>
+      <div class="panel" style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        ${qa('calc','Estimate','var(--purple)',ICON.calc)}
+        ${qa('queue','Add job','var(--blue)',ICON.plus)}
+        ${qa('invoices','New invoice','var(--green)',ICON['inv$'])}
+        ${qa('inv','Add stock','var(--amber)',ICON.inv)}
+      </div>
+    </div>
+  </div>`,
+
+/* ---------- CALCULATOR ---------- */
+calc:()=>`
+  <div class="calc">
+    <div class="panel" style="padding:18px">
+      <h3 style="margin:0 0 16px;font-size:14px">New build estimate</h3>
+      <div class="field"><label>Project name</label><input value="Cosplay helmet — visor mount"></div>
+      <div class="frow">
+        <div class="field"><label>Material</label><select><option>PLA+ · Polymaker</option><option>PETG</option><option>ABS</option><option>Nylon</option><option>Resin (Standard)</option></select></div>
+        <div class="field"><label>Color</label><select><option>Galaxy Black</option><option>White</option><option>Red</option><option>Custom</option></select></div>
+      </div>
+      <div class="frow3">
+        <div class="field"><label>Weight (g)</label><input type="number" value="180" oninput="recalc()" id="cWeight"></div>
+        <div class="field"><label>Print time (h)</label><input type="number" value="6.5" step="0.5" oninput="recalc()" id="cTime"></div>
+        <div class="field"><label>Quantity</label><input type="number" value="1" oninput="recalc()" id="cQty"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Infill</label><select><option>20%</option><option>15%</option><option>40%</option><option>100%</option></select></div>
+        <div class="field"><label>Layer height</label><select><option>0.20 mm</option><option>0.12 mm</option><option>0.28 mm</option></select></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Post-processing</label><select><option>Sanding + primer</option><option>None</option><option>Acetone smooth</option></select></div>
+        <div class="field"><label>Margin</label><select id="cMargin" onchange="recalc()"><option value="0.45">45% (Standard)</option><option value="0.30">30%</option><option value="0.60">60% (Rush)</option></select></div>
+      </div>
+      <div class="field"><label>Notes</label><textarea rows="2" placeholder="Client requirements, finish, deadline…"></textarea></div>
+    </div>
+
+    <div class="panel summary" style="padding:16px">
+      <div class="panel-h" style="padding:0 0 10px;border-color:var(--line-2)"><h3>Price summary</h3></div>
+      <div class="sum-line"><span>Material (180 g)</span><b id="sMat">SAR 27.00</b></div>
+      <div class="sum-line"><span>Machine time (6.5 h)</span><b id="sTime">SAR 65.00</b></div>
+      <div class="sum-line"><span>Post-processing</span><b>SAR 25.00</b></div>
+      <div class="sum-line"><span>Electricity + wear</span><b>SAR 9.00</b></div>
+      <div class="sum-line"><span>Margin</span><b id="sMargin">SAR 56.70</b></div>
+      <div class="sum-line"><span>VAT (15%)</span><b id="sVat">SAR 27.41</b></div>
+      <div class="sum-total"><span class="t">Total per order</span><span class="a" id="sTotal">SAR 210.11</span></div>
+      <div style="font-size:11px;color:var(--ink-3);margin:2px 0 12px">≈ SAR 1.17 / g · est. machine cost SAR 10/h</div>
+      <button class="tbtn primary btn-block">${svg(ICON.check)}Create order</button>
+      <button class="btn-ghost">Save as quote</button>
+    </div>
+  </div>`,
+
+/* ---------- QUEUE (kanban) ---------- */
+queue:()=>`
+  <div class="kanban">
+    ${kcol('Queued','var(--ink-3)',[
+      kcard('Drone frame x4','PETG · 220 g','amber','Due today','MK'),
+      kcard('Gear set — Nylon','Nylon · 90 g','purple','Tomorrow','AW'),
+      kcard('Vase pack','PLA · 140 g','gray','Fri','ET'),
+    ])}
+    ${kcol('Printing','var(--blue)',[
+      kcard('Cosplay helmet','PLA+ · 180 g · 62%','blue','4:00 PM','SM',62),
+      kcard('Arch model','PLA · 310 g · 30%','blue','6:00 PM','ST',30),
+    ])}
+    ${kcol('Post-process','var(--purple)',[
+      kcard('Phone stand batch','PLA · sanding','purple','Today','ET'),
+      kcard('Bracket set','ABS · acetone','purple','Today','AW'),
+    ])}
+    ${kcol('Ready / Done','var(--green)',[
+      kcard('Resin miniatures','Resin · cured','green','Pickup','TG'),
+      kcard('Keychain bulk','PLA · QC ✓','green','Shipped','SH'),
+    ])}
+  </div>`,
+
+/* ---------- FLEET ---------- */
+fleet:()=>`
+  <div class="printers">
+    ${pcard('Prusa MK4','MK4 · 0.4 nozzle','blue','Printing',ICON.printer,'Cosplay helmet — visor','62%',62,'2h 14m','215°/60°')}
+    ${pcard('Bambu X1C','X1 Carbon · AMS','blue','Printing',ICON.printer,'Architectural model','30%',30,'4h 02m','220°/65°')}
+    ${pcard('Voron 2.4','Voron · 350³','purple','Slicing',ICON.printer,'Gear set — Nylon','8%',8,'—','—')}
+    ${pcard('Ender S1','Ender · stock','red','Error',ICON.warn,'Nozzle clog @ 41%','Failed',41,'stopped','—',true)}
+    ${pcard('Bambu A1 mini','A1 mini','green','Idle',ICON.printer,'— no job —','Ready',0,'—','24°/—')}
+    ${pcard('Saturn 4','Resin · 12K','teal','Curing',ICON.printer,'Miniatures batch','94%',94,'06m','—')}
+  </div>`,
+
+/* ---------- INVENTORY ---------- */
+inv:()=>`
+  <div class="panel" style="overflow:visible">
+    <div class="panel-h"><h3>Filaments</h3><span class="meta">14 spools · 3 locations · 2 low</span></div>
+    <div style="overflow:auto">
+    <table class="tbl">
+      <thead><tr><th>Material</th><th>Per-location stock</th><th>Total</th><th>Status</th><th style="width:40px"></th></tr></thead>
+      <tbody>
+        ${invRow('PLA+ Galaxy Black','#1c1f26','Polymaker',[['Shelf A','1.8 kg','teal'],['Drawer','0.6 kg','blue']],'2.4 kg','green','In stock')}
+        ${invRow('PETG Black','#222','eSun',[['Shelf A','0.4 kg','red']],'0.4 kg','amber','Low — reorder')}
+        ${invRow('ABS White','#f3f4f6','Hatchbox',[['Shelf B','1.0 kg','blue'],['Backup','1.0 kg','teal']],'2.0 kg','green','In stock')}
+        ${invRow('Nylon Natural','#e8e2d2','Polymaker',[['Dry box','0.9 kg','purple']],'0.9 kg','green','In stock')}
+        ${invRow('PLA Silk Red','#c0392b','SUNLU',[['Shelf A','0.0 kg','red']],'0.0 kg','red','Out of stock')}
+        ${invRow('TPU 95A Clear','#dfe6ee','Overture',[['Shelf B','0.7 kg','blue'],['Drawer','0.3 kg','teal']],'1.0 kg','green','In stock')}
+      </tbody>
+    </table>
+    </div>
+  </div>`,
+
+/* ---------- CLIENTS ---------- */
+clients:()=>`
+  <div class="panel">
+    <div class="panel-h"><h3>All clients</h3><span class="meta">28 · 6 active this week</span></div>
+    <div style="overflow:auto">
+    <table class="tbl">
+      <thead><tr><th>Client</th><th>Type</th><th>Orders</th><th>Lifetime</th><th>Last order</th><th>Status</th></tr></thead>
+      <tbody>
+        ${clientRow('Sara Mansour','SM','#ff7a90','Individual',7,'SAR 2,140','2 days','green','Active')}
+        ${clientRow('Maker Lab','ML','#2f6bff','Business',23,'SAR 9,860','Today','blue','VIP')}
+        ${clientRow('Studio Ten','ST','#8a4fe6','Business',12,'SAR 5,310','5 days','amber','Overdue')}
+        ${clientRow('Auto Works','AW','#19a463','Business',9,'SAR 3,420','1 day','green','Active')}
+        ${clientRow('Tabletop Guild','TG','#cf8a00','Community',15,'SAR 4,090','Today','green','Active')}
+        ${clientRow('Etsy Storefront','ET','#e0518e','Marketplace',41,'SAR 7,720','Today','blue','VIP')}
+      </tbody>
+    </table>
+    </div>
+  </div>`,
+
+/* ---------- INVOICES & ORDERS ---------- */
+invoices:()=>`
+  <div class="stats" style="grid-template-columns:repeat(4,1fr)">
+    ${statTile('Outstanding','SAR 1,240','4 invoices','dn',ICON['inv$'],'#cf8a00')}
+    ${statTile('Paid (mo)','SAR 8,610','▲ 12%','up',ICON.check,'#19a463')}
+    ${statTile('Open orders','12','3 due today','mut',ICON.queue,'#2f6bff')}
+    ${statTile('Quotes pending','5','SAR 2,300','mut',ICON.calc,'#8a4fe6')}
+  </div>
+  <div class="panel">
+    <div class="panel-h"><h3>Recent</h3><span class="meta">Showing 7 of 124</span></div>
+    <div style="overflow:auto">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Client</th><th>Items</th><th>Amount</th><th>Issued</th><th>Status</th></tr></thead>
+      <tbody>
+        ${invoiceRow('1048','Maker Lab','Drone frame x4','SAR 640','Today','blue','Order')}
+        ${invoiceRow('1047','Sara Mansour','Cosplay helmet','SAR 210','Today','amber','Unpaid')}
+        ${invoiceRow('1046','Etsy Storefront','Phone stand x10','SAR 320','Yesterday','green','Paid')}
+        ${invoiceRow('1045','Tabletop Guild','Miniatures batch','SAR 480','Yesterday','green','Paid')}
+        ${invoiceRow('1044','Auto Works','Bracket set','SAR 290','2 days','purple','Quote')}
+        ${invoiceRow('1043','Studio Ten','Architectural model','SAR 380','3 days','red','Overdue')}
+        ${invoiceRow('1042','Studio Ten','Sign panels','SAR 380','6 days','red','Overdue')}
+      </tbody>
+    </table>
+    </div>
+  </div>`,
+
+/* ---------- ANALYTICS ---------- */
+analytics:()=>`
+  <div class="stats">
+    ${statTile('Revenue (mo)','SAR 9,850','▲ 14%','up',ICON['inv$'],'#19a463')}
+    ${statTile('Jobs printed','86','▲ 9','up',ICON.printer,'#2f6bff')}
+    ${statTile('Filament used','24.6 kg','this month','mut',ICON.inv,'#cf8a00')}
+    ${statTile('Avg margin','46%','▲ 2pt','up',ICON.chart,'#8a4fe6')}
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-h"><h3>Revenue by week</h3><span class="meta">SAR · last 8 weeks</span></div>
+      <div class="chart">
+        ${[42,55,48,63,58,72,69,84].map((h,i)=>`<div class="col"><div class="b" style="height:${h*1.6}px"></div><div class="lab">W${i+1}</div></div>`).join('')}
+      </div>
+      <div class="legend"><span class="li"><span class="swatch" style="background:var(--accent)"></span>Weekly revenue</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>Material mix</h3><span class="meta">by weight</span></div>
+      <ul class="glist">
+        ${matBar('PLA / PLA+','#2f6bff',58)}
+        ${matBar('PETG','#19a463',22)}
+        ${matBar('Resin','#0fb5ba',11)}
+        ${matBar('ABS / Nylon','#8a4fe6',9)}
+      </ul>
+    </div>
+  </div>
+  <div class="section-title">Top clients this month</div>
+  <div class="panel"><ul class="glist">
+    ${topClient('Maker Lab','23 orders','SAR 2,610',1)}
+    ${topClient('Etsy Storefront','41 orders','SAR 1,940',2)}
+    ${topClient('Tabletop Guild','15 orders','SAR 1,180',3)}
+  </ul></div>`,
+
+/* ---------- SETTINGS ---------- */
+set:()=>`
+  <div style="max-width:760px">
+    <div class="section-title">Appearance</div>
+    <div class="panel">
+      <div class="set-row">
+        <div class="info"><div class="t">Theme</div><div class="d">Light is the native default. Toggle dark anytime (⌘D).</div></div>
+        <div class="seg"><button class="${theme==='light'?'on':''}" onclick="setTheme('light')">Light</button><button class="${theme==='dark'?'on':''}" onclick="setTheme('dark')">Dark</button></div>
+      </div>
+      <div class="set-row">
+        <div class="info"><div class="t">Accent color</div><div class="d">Used for primary actions and highlights.</div></div>
+        <div style="display:flex;gap:8px">
+          ${['#4f5bf2','#2f6bff','#8a4fe6','#19a463','#e0518e'].map(c=>`<button onclick="setAccent('${c}')" style="width:24px;height:24px;border-radius:7px;border:2px solid ${c===accent?'var(--ink)':'transparent'};background:${c};cursor:pointer"></button>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Pricing defaults</div>
+    <div class="panel">
+      ${setToggle('Auto-add VAT (15%)','Apply tax to all new estimates and invoices.',true)}
+      ${setToggle('Round prices to nearest SAR 5','Cleaner quote totals.',false)}
+      ${setToggle('Show cost breakdown to clients','Include material/time lines on PDFs.',false)}
+    </div>
+
+    <div class="section-title">Notifications</div>
+    <div class="panel">
+      ${setToggle('Print finished alerts','Desktop notification when a job completes.',true)}
+      ${setToggle('Low stock warnings','Notify at filament reorder point.',true)}
+      ${setToggle('Overdue invoice reminders','Daily summary of unpaid invoices.',true)}
+    </div>
+
+    <div class="section-title">Sync & data</div>
+    <div class="panel">
+      ${setToggle('Sync over LAN','Companion devices on local network.',true)}
+      ${setToggle('Cloud backup','Encrypted nightly backup.',false)}
+    </div>
+    <p style="font-size:11.5px;color:var(--ink-3);margin:12px 2px">Changes save automatically. <span style="color:var(--green);font-weight:600">All settings synced ✓</span></p>
+  </div>`,
+};
+
+/* =========================================================
+   Row helpers
+   ========================================================= */
+function jobRow(t,s,cls,label,col,pct){
+  return `<li>
+    <span class="attn-ico" style="background:${col}1f;color:${col}">${svg(ICON.printer)}</span>
+    <div><div class="ttl">${t}</div><div class="sub">${s}</div></div>
+    <span class="tail">${pct?`<span style="font-size:11px;color:var(--ink-3);font-weight:600">${pct}</span>`:''}
+    <span class="chip ${cls}"><span class="cd" style="background:${col}"></span>${label}</span></span></li>`;
+}
+function fmRow(nm,job,cls,pct){
+  const fill = cls==='purple' ? 'background:linear-gradient(90deg,#8a4fe6,#b487f5)'
+    : cls==='gray' ? 'background:var(--line)' : '';
+  return `<div class="fm-row"><span class="nm">${nm}</span>
+    <div class="bar"><i style="width:${pct||3}%;${fill}"></i></div>
+    <span style="text-align:right;font-size:11px;color:var(--ink-3)">${pct?pct+'%':'idle'}</span></div>`;
+}
+function qa(id,label,c,ic){
+  return `<button class="tbtn" style="justify-content:flex-start;padding:11px 12px" onclick="go('${id}')">
+    <span class="glyph" style="background:${c};width:26px;height:26px">${svg(ic)}</span>${label}</button>`;
+}
+function kcol(title,col,cards){
+  return `<div class="kcol"><div class="kh"><span class="cd" style="width:8px;height:8px;border-radius:50%;background:${col}"></span>${title}<span class="n">${cards.length}</span></div>${cards.join('')}</div>`;
+}
+function kcard(t,m,cls,due,who,pct){
+  const col={blue:'var(--blue)',amber:'var(--amber)',purple:'var(--purple)',green:'var(--green)',gray:'var(--ink-3)'}[cls];
+  return `<div class="kcard"><div class="kt">${t}</div><div class="km">${m}</div>
+    ${pct?`<div class="bar" style="margin-top:8px"><i style="width:${pct}%"></i></div>`:''}
+    <div class="kf"><span class="chip ${cls}"><span class="cd" style="background:${col}"></span>${due}</span>
+    <span class="who">${who}</span></div></div>`;
+}
+function pcard(name,mod,cls,status,ic,job,pctTxt,pct,eta,temp,err){
+  const map={blue:'var(--blue)',purple:'var(--purple)',green:'var(--green)',teal:'var(--teal)',red:'var(--red)'};
+  const col=map[cls];
+  const fill = err ? 'background:linear-gradient(90deg,#e0453a,#f47a72)'
+    : cls==='purple' ? 'background:linear-gradient(90deg,#8a4fe6,#b487f5)'
+    : cls==='teal' ? 'background:linear-gradient(90deg,#0fb5ba,#5fdfe2)'
+    : cls==='green' ? 'background:linear-gradient(90deg,#19a463,#3ad487)' : '';
+  return `<div class="pcard">
+    <div class="top"><span class="pico" style="background:${col}">${svg(ic,16)}</span>
+      <div><div class="pname">${name}</div><div class="pmod">${mod}</div></div>
+      <span class="chip ${cls}" style="margin-left:auto"><span class="cd" style="background:${col}"></span>${status}</span></div>
+    <div class="pbody">
+      <div class="job">${err?'⚠ ':''}<b>${job}</b></div>
+      <div class="bar"><i style="width:${pct}%;${fill}"></i></div>
+      <div class="stat-row"><span>Progress <b>${pctTxt}</b></span><span>ETA <b>${eta}</b></span><span>Temp <b>${temp}</b></span></div>
+    </div></div>`;
+}
+function invRow(name,sw,brand,locs,total,cls,status){
+  const col={green:'var(--green)',amber:'var(--amber)',red:'var(--red)'}[cls];
+  const locChips=locs.map(l=>`<span class="chip ${l[2]}">${l[0]} · ${l[1]}</span>`).join('');
+  return `<tr>
+    <td><span class="swatch" style="background:${sw}"></span><span class="nm">${name}</span><div class="muted" style="margin-left:21px;font-size:11px">${brand}</div></td>
+    <td><div class="locs">${locChips}</div></td>
+    <td class="nm">${total}</td>
+    <td><span class="chip ${cls}"><span class="cd" style="background:${col}"></span>${status}</span></td>
+    <td class="dots">${rowMenu()}</td></tr>`;
+}
+function rowMenu(){
+  return `<button class="menu-btn" onclick="toggleMenu(this)">⋯</button>
+    <div class="menu">
+      <button>${svg(ICON.plus,13)} Adjust stock</button>
+      <button>${svg(ICON['inv$'],13)} Set reorder point</button>
+      <button>${svg(ICON.refresh,13)} Move location</button>
+      <div class="sep"></div>
+      <button class="danger">${svg(ICON.warn,13)} Mark depleted</button>
+    </div>`;
+}
+function clientRow(name,ini,c,type,orders,ltv,last,cls,status){
+  const col={green:'var(--green)',blue:'var(--blue)',amber:'var(--amber)'}[cls];
+  return `<tr>
+    <td><div style="display:flex;align-items:center;gap:10px"><span class="avatar" style="background:${c};width:28px;height:28px">${ini}</span><span class="nm">${name}</span></div></td>
+    <td class="muted">${type}</td><td class="nm">${orders}</td><td class="nm">${ltv}</td><td class="muted">${last}</td>
+    <td><span class="chip ${cls}"><span class="cd" style="background:${col}"></span>${status}</span></td></tr>`;
+}
+function invoiceRow(num,client,items,amt,date,cls,status){
+  const col={blue:'var(--blue)',amber:'var(--amber)',green:'var(--green)',purple:'var(--purple)',red:'var(--red)'}[cls];
+  return `<tr><td class="nm">#${num}</td><td>${client}</td><td class="muted">${items}</td><td class="nm">${amt}</td><td class="muted">${date}</td>
+    <td><span class="chip ${cls}"><span class="cd" style="background:${col}"></span>${status}</span></td></tr>`;
+}
+function matBar(name,c,pct){
+  return `<li><div style="width:120px" class="ttl">${name}</div>
+    <div class="bar" style="flex:1"><i style="width:${pct}%;background:${c}"></i></div>
+    <span class="tail" style="font-size:12px;font-weight:700">${pct}%</span></li>`;
+}
+function topClient(name,sub,amt,rank){
+  return `<li><span class="attn-ico" style="background:var(--accent-soft);color:var(--accent);font-weight:800">${rank}</span>
+    <div><div class="ttl">${name}</div><div class="sub">${sub}</div></div>
+    <span class="tail nm" style="font-weight:700">${amt}</span></li>`;
+}
+function setToggle(t,d,on){
+  return `<div class="set-row"><div class="info"><div class="t">${t}</div><div class="d">${d}</div></div>
+    <button class="toggle ${on?'on':''}" onclick="this.classList.toggle('on');flashSaved()"></button></div>`;
+}
+
+/* =========================================================
+   Calculator live recalc
+   ========================================================= */
+function recalc(){
+  const w=+document.getElementById('cWeight').value||0;
+  const t=+document.getElementById('cTime').value||0;
+  const qty=+document.getElementById('cQty').value||1;
+  const m=+document.getElementById('cMargin').value||0.45;
+  const mat=w*0.15, time=t*10, post=25, elec=9;
+  const base=mat+time+post+elec;
+  const margin=base*m;
+  const sub=base+margin;
+  const vat=sub*0.15;
+  const total=(sub+vat)*qty;
+  const f=n=>'SAR '+n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('sMat').textContent=f(mat);
+  document.getElementById('sTime').textContent=f(time);
+  document.getElementById('sMargin').textContent=f(margin);
+  document.getElementById('sVat').textContent=f(vat*qty);
+  document.getElementById('sTotal').textContent=f(total);
+}
+
+/* =========================================================
+   Theme + accent
+   ========================================================= */
+let theme='light', accent='#4f5bf2';
+function setTheme(t){theme=t;document.documentElement.setAttribute('data-theme',t);if(current==='set')go('set');flashSaved()}
+function toggleTheme(){setTheme(theme==='light'?'dark':'light')}
+function setAccent(c){accent=c;document.documentElement.style.setProperty('--accent',c);if(current==='set')go('set');flashSaved()}
+function flashSaved(){const s=document.getElementById('setSaved');if(!s)return;s.classList.add('show');clearTimeout(window._sv);window._sv=setTimeout(()=>s.classList.remove('show'),1600)}
+
+/* =========================================================
+   Row ⋯ menu
+   ========================================================= */
+function toggleMenu(btn){
+  const m=btn.nextElementSibling;const wasOpen=m.classList.contains('open');
+  document.querySelectorAll('.menu.open').forEach(x=>x.classList.remove('open'));
+  if(!wasOpen)m.classList.add('open');
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.dots'))document.querySelectorAll('.menu.open').forEach(x=>x.classList.remove('open'))});
+
+/* =========================================================
+   Command palette
+   ========================================================= */
+const CMD=[].concat(...NAV.map(g=>g.items)).map(i=>({id:i.id,name:i.name,ic:i.ic,c:i.c}));
+let cmdSel=0;
+function openCmd(){document.getElementById('cmdOverlay').classList.add('show');const i=document.getElementById('cmdInput');i.value='';filterCmd();setTimeout(()=>i.focus(),20)}
+function closeCmd(){document.getElementById('cmdOverlay').classList.remove('show')}
+function filterCmd(){
+  const q=document.getElementById('cmdInput').value.toLowerCase();
+  const list=CMD.filter(c=>c.name.toLowerCase().includes(q));cmdSel=0;
+  document.getElementById('cmdRes').innerHTML=list.map((c,i)=>
+    `<button class="${i===0?'sel':''}" data-id="${c.id}" onclick="go('${c.id}');closeCmd()">
+      <span class="glyph" style="background:${c.c};width:22px;height:22px">${svg(c.ic)}</span>${c.name}<span class="hint">↵</span></button>`).join('')
+    ||'<div style="padding:14px;color:var(--ink-3);font-size:13px">No matches</div>';
+}
+function cmdKey(e){
+  const items=[...document.querySelectorAll('#cmdRes button')];if(!items.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();cmdSel=Math.min(cmdSel+1,items.length-1)}
+  else if(e.key==='ArrowUp'){e.preventDefault();cmdSel=Math.max(cmdSel-1,0)}
+  else if(e.key==='Enter'){e.preventDefault();go(items[cmdSel].dataset.id);closeCmd();return}
+  else if(e.key==='Escape'){closeCmd();return}
+  items.forEach((b,i)=>b.classList.toggle('sel',i===cmdSel));
+  items[cmdSel].scrollIntoView({block:'nearest'});
+}
+
+/* =========================================================
+   Global keyboard niceties
+   ========================================================= */
+const SEQ=['dash','calc','queue','fleet','inv','clients','invoices','analytics','set'];
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openCmd();return}
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='d'){e.preventDefault();toggleTheme();return}
+  if(e.target.matches('input,textarea,select'))return;
+  if(e.key==='Escape')closeCmd();
+  if(/^[1-9]$/.test(e.key)){const i=+e.key-1;if(SEQ[i])go(SEQ[i])}
+  if(e.key===']'||e.key==='['){const i=SEQ.indexOf(current);const n=e.key===']'?(i+1)%SEQ.length:(i-1+SEQ.length)%SEQ.length;go(SEQ[n])}
+});
+
+/* =========================================================
+   Boot
+   ========================================================= */
+renderNav();
+go('dash');
+</script>
+</body>
+</html>

@@ -1,0 +1,4157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Khayt Companion — iOS Prototype</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; -webkit-font-smoothing: antialiased; background: #0A0A0F; }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" data-presets="react">
+
+// ======================= ios-frame.jsx =======================
+// @ds-adherence-ignore -- omelette starter scaffold (raw elements/hex/px by design)
+
+/* BEGIN USAGE */
+// iOS.jsx — Simplified iOS 26 (Liquid Glass) device frame
+// Based on the iOS 26 UI Kit + Figma status bar spec. No assets, no deps.
+// Exports (to window): IOSDevice, IOSStatusBar, IOSNavBar, IOSGlassPill, IOSList, IOSListRow, IOSKeyboard
+//
+// Usage — wrap your screen content in <IOSDevice> to get the bezel, status bar
+// and home indicator (props: title, dark, keyboard):
+//
+//   <IOSDevice title="Settings">
+//     ...your screen content...
+//   </IOSDevice>
+//   <IOSDevice dark title="Search" keyboard>…</IOSDevice>
+/* END USAGE */
+
+// ─────────────────────────────────────────────────────────────
+// Status bar
+// ─────────────────────────────────────────────────────────────
+function IOSStatusBar({ dark = false, time = '9:41' }) {
+  const c = dark ? '#fff' : '#000';
+  return (
+    <div style={{
+      display: 'flex', gap: 154, alignItems: 'center', justifyContent: 'center',
+      padding: '21px 24px 19px', boxSizing: 'border-box',
+      position: 'relative', zIndex: 20, width: '100%',
+    }}>
+      <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 1.5 }}>
+        <span style={{
+          fontFamily: '-apple-system, "SF Pro", system-ui', fontWeight: 590,
+          fontSize: 17, lineHeight: '22px', color: c,
+        }}>{time}</span>
+      </div>
+      <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, paddingTop: 1, paddingRight: 1 }}>
+        <svg width="19" height="12" viewBox="0 0 19 12">
+          <rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill={c}/>
+          <rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill={c}/>
+          <rect x="9.6" y="2.5" width="3.2" height="9.5" rx="0.7" fill={c}/>
+          <rect x="14.4" y="0" width="3.2" height="12" rx="0.7" fill={c}/>
+        </svg>
+        <svg width="17" height="12" viewBox="0 0 17 12">
+          <path d="M8.5 3.2C10.8 3.2 12.9 4.1 14.4 5.6L15.5 4.5C13.7 2.7 11.2 1.5 8.5 1.5C5.8 1.5 3.3 2.7 1.5 4.5L2.6 5.6C4.1 4.1 6.2 3.2 8.5 3.2Z" fill={c}/>
+          <path d="M8.5 6.8C9.9 6.8 11.1 7.3 12 8.2L13.1 7.1C11.8 5.9 10.2 5.1 8.5 5.1C6.8 5.1 5.2 5.9 3.9 7.1L5 8.2C5.9 7.3 7.1 6.8 8.5 6.8Z" fill={c}/>
+          <circle cx="8.5" cy="10.5" r="1.5" fill={c}/>
+        </svg>
+        <svg width="27" height="13" viewBox="0 0 27 13">
+          <rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke={c} strokeOpacity="0.35" fill="none"/>
+          <rect x="2" y="2" width="20" height="9" rx="2" fill={c}/>
+          <path d="M25 4.5V8.5C25.8 8.2 26.5 7.2 26.5 6.5C26.5 5.8 25.8 4.8 25 4.5Z" fill={c} fillOpacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Liquid glass pill — blur + tint + shine
+// ─────────────────────────────────────────────────────────────
+function IOSGlassPill({ children, dark = false, style = {} }) {
+  return (
+    <div style={{
+      height: 44, minWidth: 44, borderRadius: 9999,
+      position: 'relative', overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: dark
+        ? '0 2px 6px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.2)'
+        : '0 1px 3px rgba(0,0,0,0.07), 0 3px 10px rgba(0,0,0,0.06)',
+      ...style,
+    }}>
+      {/* blur + tint */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 9999,
+        backdropFilter: 'blur(12px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+        background: dark ? 'rgba(120,120,128,0.28)' : 'rgba(255,255,255,0.5)',
+      }} />
+      {/* shine */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 9999,
+        boxShadow: dark
+          ? 'inset 1.5px 1.5px 1px rgba(255,255,255,0.15), inset -1px -1px 1px rgba(255,255,255,0.08)'
+          : 'inset 1.5px 1.5px 1px rgba(255,255,255,0.7), inset -1px -1px 1px rgba(255,255,255,0.4)',
+        border: dark ? '0.5px solid rgba(255,255,255,0.15)' : '0.5px solid rgba(0,0,0,0.06)',
+      }} />
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Navigation bar — glass pills + large title
+// ─────────────────────────────────────────────────────────────
+function IOSNavBar({ title = 'Title', dark = false, trailingIcon = true }) {
+  const muted = dark ? 'rgba(255,255,255,0.6)' : '#404040';
+  const text = dark ? '#fff' : '#000';
+  const pillIcon = (content) => (
+    <IOSGlassPill dark={dark}>
+      <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {content}
+      </div>
+    </IOSGlassPill>
+  );
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 10,
+      paddingTop: 62, paddingBottom: 10, position: 'relative', zIndex: 5,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px',
+      }}>
+        {/* back chevron */}
+        {pillIcon(
+          <svg width="12" height="20" viewBox="0 0 12 20" fill="none" style={{ marginLeft: -1 }}>
+            <path d="M10 2L2 10l8 8" stroke={muted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+        {/* trailing ellipsis */}
+        {trailingIcon && pillIcon(
+          <svg width="22" height="6" viewBox="0 0 22 6">
+            <circle cx="3" cy="3" r="2.5" fill={muted}/>
+            <circle cx="11" cy="3" r="2.5" fill={muted}/>
+            <circle cx="19" cy="3" r="2.5" fill={muted}/>
+          </svg>
+        )}
+      </div>
+      {/* large title */}
+      <div style={{
+        padding: '0 16px',
+        fontFamily: '-apple-system, system-ui',
+        fontSize: 34, fontWeight: 700, lineHeight: '41px',
+        color: text, letterSpacing: 0.4,
+      }}>{title}</div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Grouped list (inset card, r:26) + row (52px)
+// ─────────────────────────────────────────────────────────────
+function IOSListRow({ title, detail, icon, chevron = true, isLast = false, dark = false }) {
+  const text = dark ? '#fff' : '#000';
+  const sec = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const ter = dark ? 'rgba(235,235,245,0.3)' : 'rgba(60,60,67,0.3)';
+  const sep = dark ? 'rgba(84,84,88,0.65)' : 'rgba(60,60,67,0.12)';
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', minHeight: 52,
+      padding: '0 16px', position: 'relative',
+      fontFamily: '-apple-system, system-ui', fontSize: 17,
+      letterSpacing: -0.43,
+    }}>
+      {icon && (
+        <div style={{
+          width: 30, height: 30, borderRadius: 7, background: icon,
+          marginRight: 12, flexShrink: 0,
+        }} />
+      )}
+      <div style={{ flex: 1, color: text }}>{title}</div>
+      {detail && <span style={{ color: sec, marginRight: 6 }}>{detail}</span>}
+      {chevron && (
+        <svg width="8" height="14" viewBox="0 0 8 14" style={{ flexShrink: 0 }}>
+          <path d="M1 1l6 6-6 6" stroke={ter} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+      {!isLast && (
+        <div style={{
+          position: 'absolute', bottom: 0, right: 0,
+          left: icon ? 58 : 16, height: 0.5, background: sep,
+        }} />
+      )}
+    </div>
+  );
+}
+
+function IOSList({ header, children, dark = false }) {
+  const hc = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const bg = dark ? '#1C1C1E' : '#fff';
+  return (
+    <div>
+      {header && (
+        <div style={{
+          fontFamily: '-apple-system, system-ui', fontSize: 13,
+          color: hc, textTransform: 'uppercase',
+          padding: '8px 36px 6px', letterSpacing: -0.08,
+        }}>{header}</div>
+      )}
+      <div style={{
+        background: bg, borderRadius: 26,
+        margin: '0 16px', overflow: 'hidden',
+      }}>{children}</div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Device frame
+// ─────────────────────────────────────────────────────────────
+function IOSDevice({
+  children, width = 402, height = 874, dark = false,
+  title, keyboard = false,
+}) {
+  return (
+    <div style={{
+      width, height, borderRadius: 48, overflow: 'hidden',
+      position: 'relative', background: dark ? '#000' : '#F2F2F7',
+      boxShadow: '0 40px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.12)',
+      fontFamily: '-apple-system, system-ui, sans-serif',
+      WebkitFontSmoothing: 'antialiased',
+    }}>
+      {/* dynamic island */}
+      <div style={{
+        position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)',
+        width: 126, height: 37, borderRadius: 24, background: '#000', zIndex: 50,
+      }} />
+      {/* status bar (absolute) */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+        <IOSStatusBar dark={dark} />
+      </div>
+      {/* nav + content */}
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {title !== undefined && <IOSNavBar title={title} dark={dark} />}
+        <div style={{ flex: 1, overflow: 'auto' }}>{children}</div>
+        {keyboard && <IOSKeyboard dark={dark} />}
+      </div>
+      {/* home indicator — always on top */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 60,
+        height: 34, display: 'flex', justifyContent: 'center', alignItems: 'flex-end',
+        paddingBottom: 8, pointerEvents: 'none',
+      }}>
+        <div style={{
+          width: 139, height: 5, borderRadius: 100,
+          background: dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.25)',
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Keyboard — iOS 26 liquid glass
+// ─────────────────────────────────────────────────────────────
+function IOSKeyboard({ dark = false }) {
+  const glyph = dark ? 'rgba(255,255,255,0.7)' : '#595959';
+  const sugg = dark ? 'rgba(255,255,255,0.6)' : '#333';
+  const keyBg = dark ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.85)';
+
+  // special-key icons
+  const icons = {
+    shift: <svg width="19" height="17" viewBox="0 0 19 17"><path d="M9.5 1L1 9.5h4.5V16h8V9.5H18L9.5 1z" fill={glyph}/></svg>,
+    del: <svg width="23" height="17" viewBox="0 0 23 17"><path d="M7 1h13a2 2 0 012 2v11a2 2 0 01-2 2H7l-6-7.5L7 1z" fill="none" stroke={glyph} strokeWidth="1.6" strokeLinejoin="round"/><path d="M10 5l7 7M17 5l-7 7" stroke={glyph} strokeWidth="1.6" strokeLinecap="round"/></svg>,
+    ret: <svg width="20" height="14" viewBox="0 0 20 14"><path d="M18 1v6H4m0 0l4-4M4 7l4 4" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  };
+
+  const key = (content, { w, flex, ret, fs = 25, k } = {}) => (
+    <div key={k} style={{
+      height: 42, borderRadius: 8.5,
+      flex: flex ? 1 : undefined, width: w, minWidth: 0,
+      background: ret ? '#08f' : keyBg,
+      boxShadow: '0 1px 0 rgba(0,0,0,0.075)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: '-apple-system, "SF Compact", system-ui',
+      fontSize: fs, fontWeight: 458, color: ret ? '#fff' : glyph,
+    }}>{content}</div>
+  );
+
+  const row = (keys, pad = 0) => (
+    <div style={{ display: 'flex', gap: 6.5, justifyContent: 'center', padding: `0 ${pad}px` }}>
+      {keys.map(l => key(l, { flex: true, k: l }))}
+    </div>
+  );
+
+  return (
+    <div style={{
+      position: 'relative', zIndex: 15, borderRadius: 27, overflow: 'hidden',
+      padding: '11px 0 2px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      boxShadow: dark
+        ? '0 -2px 20px rgba(0,0,0,0.09)'
+        : '0 -1px 6px rgba(0,0,0,0.018), 0 -3px 20px rgba(0,0,0,0.012)',
+    }}>
+      {/* liquid glass bg — same recipe as nav pills */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 27,
+        backdropFilter: 'blur(12px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+        background: dark ? 'rgba(120,120,128,0.14)' : 'rgba(255,255,255,0.25)',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 27,
+        boxShadow: dark
+          ? 'inset 1.5px 1.5px 1px rgba(255,255,255,0.15)'
+          : 'inset 1.5px 1.5px 1px rgba(255,255,255,0.7), inset -1px -1px 1px rgba(255,255,255,0.4)',
+        border: dark ? '0.5px solid rgba(255,255,255,0.15)' : '0.5px solid rgba(0,0,0,0.06)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* autocorrect bar */}
+      <div style={{
+        display: 'flex', gap: 20, alignItems: 'center',
+        padding: '8px 22px 13px', width: '100%', boxSizing: 'border-box',
+        position: 'relative',
+      }}>
+        {['"The"', 'the', 'to'].map((w, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && <div style={{ width: 1, height: 25, background: '#ccc', opacity: 0.3 }} />}
+            <div style={{
+              flex: 1, textAlign: 'center',
+              fontFamily: '-apple-system, system-ui', fontSize: 17,
+              color: sugg, letterSpacing: -0.43, lineHeight: '22px',
+            }}>{w}</div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* key layout */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 13,
+        padding: '0 6.5px', width: '100%', boxSizing: 'border-box',
+        position: 'relative',
+      }}>
+        {row(['q','w','e','r','t','y','u','i','o','p'])}
+        {row(['a','s','d','f','g','h','j','k','l'], 20)}
+        <div style={{ display: 'flex', gap: 14.25, alignItems: 'center' }}>
+          {key(icons.shift, { w: 45, k: 'shift' })}
+          <div style={{ display: 'flex', gap: 6.5, flex: 1 }}>
+            {['z','x','c','v','b','n','m'].map(l => key(l, { flex: true, k: l }))}
+          </div>
+          {key(icons.del, { w: 45, k: 'del' })}
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {key('ABC', { w: 92.25, fs: 18, k: 'abc' })}
+          {key('', { flex: true, k: 'space' })}
+          {key(icons.ret, { w: 92.25, ret: true, k: 'ret' })}
+        </div>
+      </div>
+
+      {/* bottom spacer (emoji+mic area, icons omitted) */}
+      <div style={{ height: 56, width: '100%', position: 'relative' }} />
+    </div>
+  );
+}
+
+Object.assign(window, {
+  IOSDevice, IOSStatusBar, IOSNavBar, IOSGlassPill, IOSList, IOSListRow, IOSKeyboard,
+});
+
+
+// ======================= tweaks-panel.jsx =======================
+// @ds-adherence-ignore -- omelette starter scaffold (raw elements/hex/px by design)
+
+/* BEGIN USAGE */
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+// Exports (to window): useTweaks, TweaksPanel, TweakSection, TweakRow, TweakSlider,
+//   TweakToggle, TweakRadio, TweakSelect, TweakText, TweakNumber, TweakColor, TweakButton.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// TweakRadio is the segmented control for 2–3 short options (auto-falls-back to
+// TweakSelect past ~16/~10 chars per label); reach for TweakSelect directly when
+// options are many or long. For color tweaks always curate 3-4 options rather than
+// a free picker; an option can also be a whole 2–5 color palette (the stored value
+// is the array). The Tweak* controls are a floor, not a ceiling — build custom
+// controls inside the panel if a tweak calls for UI they don't cover.
+/* END USAGE */
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;box-sizing:border-box;width:100%;min-width:0;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;box-sizing:border-box;min-width:0;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    // Same-window signal so in-page listeners (deck-stage rail thumbnails)
+    // can react — the parent message only reaches the host, not peers.
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-omelette-chrome=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">
+          {children}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  // Segments wrap mid-word once per-segment width runs out. The track is
+  // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
+  // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
+  // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
+  // back to a dropdown rather than wrap.
+  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  if (!fitsAsSegments) {
+    // <select> emits strings — map back to the original option value so the
+    // fallback stays type-preserving (numbers, booleans) like the segment path.
+    const resolve = (s) => {
+      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+      return m === undefined ? s : typeof m === 'object' ? m.value : m;
+    };
+    return <TweakSelect label={label} value={value} options={options}
+                        onChange={(s) => onChange(resolve(s))} />;
+  }
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+// Relative-luminance contrast pick — checkmarks drawn over a swatch need to
+// read on both #111 and #fafafa without per-option configuration. Hex input
+// only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
+function __twkIsLight(hex) {
+  const h = String(hex).replace('#', '');
+  const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
+  const n = parseInt(x.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return r * 299 + g * 587 + b * 114 > 148000;
+}
+
+const __TwkCheck = ({ light }) => (
+  <svg viewBox="0 0 14 14" aria-hidden="true">
+    <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          stroke={light ? 'rgba(0,0,0,.78)' : '#fff'} />
+  </svg>
+);
+
+// TweakColor — curated color/palette picker. Each option is either a single
+// hex string or an array of 1-5 hex strings; the card adapts — a lone color
+// renders solid, a palette renders colors[0] as the hero (left ~2/3) with the
+// rest stacked in a sharp column on the right. onChange emits the
+// option in the shape it was passed (string stays string, array stays array).
+// Without options it falls back to the native color input for back-compat.
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl"><span>{label}</span></div>
+        <input type="color" className="twk-swatch" value={value}
+               onChange={(e) => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // Native <input type=color> emits lowercase hex per the HTML spec, so
+  // compare case-insensitively. String() guards JSON.stringify(undefined),
+  // which returns the primitive undefined (no .toLowerCase).
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero, ...rest] = colors;
+          const sup = rest.slice(0, 4);
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" role="radio"
+                    aria-checked={on} data-on={on ? '1' : '0'}
+                    aria-label={colors.join(', ')} title={colors.join(' · ')}
+                    style={{ background: hero }}
+                    onClick={() => onChange(o)}>
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((c, j) => <i key={j} style={{ background: c }} />)}
+                </span>
+              )}
+              {on && <__TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          );
+        })}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+
+// ======================= khayt-i18n.jsx =======================
+// khayt-i18n.jsx — Bilingual strings (English + Arabic) and RTL helper
+// Exports: makeS, STR, STAGE_LABELS_AR
+// NOTE: React hooks are destructured ONCE here for the whole app — every other
+// khayt file shares this scope (single bundle), so they must NOT re-declare these.
+var { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } = React;
+
+const STR = {
+  en: {
+    appName: 'KHAYT COMPANION',
+    shopPulse: 'Shop Pulse',
+    connected: 'Connected',
+    offline: 'Offline',
+    // stats
+    inQueue: 'In Queue',
+    printingStat: 'Printing',
+    doneToday: 'Done Today',
+    activeJobs: 'active jobs',
+    noJobs: 'no jobs',
+    // sections
+    pipeline: 'Pipeline',
+    allOrders: 'All Orders',
+    activeOrders: 'Active Orders',
+    seeAll: 'See all',
+    allClear: 'All clear',
+    noActiveNow: 'No active orders right now',
+    lowStock: 'Low stock',
+    spool: 'spool',
+    spools: 'spools',
+    // tabs
+    tab_home: 'Home',
+    tab_orders: 'Orders',
+    tab_inventory: 'Inventory',
+    tab_machines: 'Machines',
+    tab_settings: 'Settings',
+    // orders
+    active: 'Active',
+    history: 'History',
+    f_all: 'All',
+    queueClear: 'Queue is clear',
+    allCaughtUp: 'All caught up — no active orders',
+    noCompleted: 'No completed orders',
+    completedAppear: 'Completed orders will appear here',
+    advance: 'ADVANCE',
+    late: 'LATE',
+    low: 'LOW',
+    moveTo: 'Move to',
+    orderComplete: 'Order Complete',
+    printProgress: 'Print Progress',
+    dueDate: 'Due date',
+    filament: 'Filament',
+    printer: 'Printer',
+    quantity: 'Quantity',
+    notes: 'Notes',
+    // inventory
+    searchPlaceholder: 'Search brand, material, color…',
+    lowStockFilter: 'Low Stock',
+    noSpoolsYet: 'No spools yet',
+    addFirstSpool: 'Add your first spool to get started',
+    noResults: 'No results',
+    tryDiffSearch: 'Try a different search',
+    addSpool: 'Add Spool',
+    remaining: 'remaining',
+    ofTotal: 'of',
+    lowStockWarn: 'Low stock — consider ordering a replacement',
+    spoolInfo: 'Spool Info',
+    scanLabel: 'Scan Label',
+    photoOcr: 'Photo OCR',
+    nfcTap: 'NFC Tap',
+    tapSpoolTag: 'Tap spool tag',
+    manualEntry: 'Manual Entry',
+    typeDetails: 'Type details',
+    alignLabel: 'Align label within frame',
+    captureLabel: 'Capture Label',
+    readyToScan: 'Ready to scan',
+    holdNearTag: 'Hold phone near the NFC tag on the spool',
+    simulateNfc: 'Simulate NFC read',
+    back: 'Back',
+    brand: 'BRAND',
+    material: 'MATERIAL',
+    color: 'COLOR',
+    printTemp: 'PRINT TEMP',
+    bedTemp: 'BED TEMP',
+    weightRemaining: 'WEIGHT REMAINING (g)',
+    // machines
+    printersCount: 'printers',
+    idle: 'Idle',
+    error: 'Error',
+    readyForJob: 'Ready for next job',
+    notConnected: 'Not connected',
+    job: 'Job',
+    // settings
+    connectedToDesktop: 'Connected to Khayt Desktop',
+    tapTestRetry: 'Tap Test Connection to retry',
+    lanConnection: 'LAN Connection',
+    lanFooter: 'All data stays on your local network. No cloud account required.',
+    desktopIp: 'Desktop IP',
+    ipDetail: 'IPv4 address of the Khayt desktop',
+    port: 'Port',
+    lanPin: 'LAN PIN',
+    pinDetail: '4-digit pairing code',
+    testConnection: 'Test Connection',
+    simulateConn: 'Simulate Connection',
+    demoToggle: 'Demo toggle — not in production',
+    device: 'Device',
+    rerunPairing: 'Re-run Pairing Wizard',
+    pairDifferent: 'Pair with a different desktop',
+    unpairDevice: 'Unpair Device',
+    about: 'About',
+    appVersion: 'App Version',
+    protocol: 'Protocol',
+    language: 'Language',
+    // connection banner
+    desktopOffline: 'Desktop offline',
+    checkDesktop: 'Check Khayt desktop app is running on your LAN',
+    retry: 'Retry',
+    // widget
+    widgetTitle: 'Home Screen Widgets',
+    widgetSub: 'Glanceable queue + connection at a tap',
+  },
+  ar: {
+    appName: 'خيط كومبانيون',
+    shopPulse: 'نبض الورشة',
+    connected: 'متصل',
+    offline: 'غير متصل',
+    inQueue: 'في الانتظار',
+    printingStat: 'قيد الطباعة',
+    doneToday: 'اكتمل اليوم',
+    activeJobs: 'مهام نشطة',
+    noJobs: 'لا مهام',
+    pipeline: 'المسار',
+    allOrders: 'كل الطلبات',
+    activeOrders: 'الطلبات النشطة',
+    seeAll: 'عرض الكل',
+    allClear: 'كل شيء جاهز',
+    noActiveNow: 'لا توجد طلبات نشطة حالياً',
+    lowStock: 'مخزون منخفض',
+    spool: 'بكرة',
+    spools: 'بكرات',
+    tab_home: 'الرئيسية',
+    tab_orders: 'الطلبات',
+    tab_inventory: 'المخزون',
+    tab_machines: 'الآلات',
+    tab_settings: 'الإعدادات',
+    active: 'نشط',
+    history: 'السجل',
+    f_all: 'الكل',
+    queueClear: 'الطابور فارغ',
+    allCaughtUp: 'كل شيء منجز — لا طلبات نشطة',
+    noCompleted: 'لا طلبات مكتملة',
+    completedAppear: 'ستظهر الطلبات المكتملة هنا',
+    advance: 'تقديم',
+    late: 'متأخر',
+    low: 'منخفض',
+    moveTo: 'انقل إلى',
+    orderComplete: 'الطلب مكتمل',
+    printProgress: 'تقدّم الطباعة',
+    dueDate: 'تاريخ التسليم',
+    filament: 'الخيط',
+    printer: 'الطابعة',
+    quantity: 'الكمية',
+    notes: 'ملاحظات',
+    searchPlaceholder: 'ابحث بالعلامة أو المادة أو اللون…',
+    lowStockFilter: 'مخزون منخفض',
+    noSpoolsYet: 'لا توجد بكرات بعد',
+    addFirstSpool: 'أضف أول بكرة للبدء',
+    noResults: 'لا نتائج',
+    tryDiffSearch: 'جرّب بحثاً مختلفاً',
+    addSpool: 'إضافة بكرة',
+    remaining: 'متبقّي',
+    ofTotal: 'من',
+    lowStockWarn: 'مخزون منخفض — فكّر في طلب بديل',
+    spoolInfo: 'معلومات البكرة',
+    scanLabel: 'مسح الملصق',
+    photoOcr: 'تصوير وقراءة',
+    nfcTap: 'لمس NFC',
+    tapSpoolTag: 'المس بطاقة البكرة',
+    manualEntry: 'إدخال يدوي',
+    typeDetails: 'اكتب التفاصيل',
+    alignLabel: 'حاذِ الملصق داخل الإطار',
+    captureLabel: 'التقاط الملصق',
+    readyToScan: 'جاهز للمسح',
+    holdNearTag: 'قرّب الهاتف من بطاقة NFC على البكرة',
+    simulateNfc: 'محاكاة قراءة NFC',
+    back: 'رجوع',
+    brand: 'العلامة',
+    material: 'المادة',
+    color: 'اللون',
+    printTemp: 'حرارة الطباعة',
+    bedTemp: 'حرارة المنصّة',
+    weightRemaining: 'الوزن المتبقّي (غ)',
+    printersCount: 'طابعات',
+    idle: 'خامل',
+    error: 'خطأ',
+    readyForJob: 'جاهز للمهمة التالية',
+    notConnected: 'غير متصل',
+    job: 'مهمة',
+    connectedToDesktop: 'متصل بسطح مكتب خيط',
+    tapTestRetry: 'اضغط اختبار الاتصال للمحاولة',
+    lanConnection: 'اتصال الشبكة المحلية',
+    lanFooter: 'تبقى كل البيانات على شبكتك المحلية. لا حاجة لحساب سحابي.',
+    desktopIp: 'عنوان IP للسطح',
+    ipDetail: 'عنوان IPv4 لسطح مكتب خيط',
+    port: 'المنفذ',
+    lanPin: 'رمز الشبكة',
+    pinDetail: 'رمز اقتران من 4 أرقام',
+    testConnection: 'اختبار الاتصال',
+    simulateConn: 'محاكاة الاتصال',
+    demoToggle: 'مفتاح تجريبي — ليس للإنتاج',
+    device: 'الجهاز',
+    rerunPairing: 'إعادة معالج الاقتران',
+    pairDifferent: 'الاقتران بسطح مكتب آخر',
+    unpairDevice: 'فصل الجهاز',
+    about: 'حول',
+    appVersion: 'إصدار التطبيق',
+    protocol: 'البروتوكول',
+    language: 'اللغة',
+    desktopOffline: 'سطح المكتب غير متصل',
+    checkDesktop: 'تأكّد أن تطبيق خيط يعمل على شبكتك',
+    retry: 'إعادة',
+    widgetTitle: 'عناصر الشاشة الرئيسية',
+    widgetSub: 'نظرة سريعة على الطابور والاتصال',
+  },
+};
+
+// Arabic stage labels (status chips). Kept short; chips are forced LTR layout.
+const STAGE_LABELS_AR = {
+  pending: 'معلّق',
+  printing: 'طباعة',
+  post: 'معالجة',
+  qc: 'فحص',
+  completed: 'مكتمل',
+};
+
+function makeS(lang) {
+  const dict = STR[lang] || STR.en;
+  return (key) => (dict[key] !== undefined ? dict[key] : (STR.en[key] !== undefined ? STR.en[key] : key));
+}
+
+Object.assign(window, { STR, makeS, STAGE_LABELS_AR });
+
+
+// ======================= khayt-design.jsx =======================
+// khayt-design.jsx — Design tokens, theme context, base UI components
+// Exports: ThemeContext, useTheme, AppContext, useApp, NavContext, useNav,
+//          DARK_TOKENS, LIGHT_TOKENS, STAGES, STAGE_SEQUENCE,
+//          StatusPill, SectionLabel, Card, ProgressBar, EmptyState, Skeleton
+
+// React hooks come from khayt-i18n.jsx (shared scope) — do not re-declare here.
+
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+
+const DARK_TOKENS = {
+  bg:         '#0C0C0F',
+  bg2:        '#141418',
+  surface:    '#1C1C26',
+  surface2:   '#25252F',
+  surface3:   '#2E2E3B',
+  label:      '#FFFFFF',
+  label2:     'rgba(235,235,245,0.60)',
+  label3:     'rgba(235,235,245,0.32)',
+  label4:     'rgba(235,235,245,0.16)',
+  sep:        'rgba(255,255,255,0.08)',
+  brand:      '#8183FF',
+  brandDim:   'rgba(129,131,255,0.16)',
+  brandText:  '#A5A8FF',
+  success:    '#32D74B',
+  successDim: 'rgba(50,215,75,0.16)',
+  warning:    '#FFD60A',
+  warningDim: 'rgba(255,214,10,0.16)',
+  error:      '#FF453A',
+  errorDim:   'rgba(255,69,58,0.16)',
+  orange:     '#FF9F0A',
+  orangeDim:  'rgba(255,159,10,0.16)',
+  purple:     '#BF5AF2',
+  purpleDim:  'rgba(191,90,242,0.16)',
+  tabBg:      'rgba(10,10,14,0.94)',
+  navBg:      'rgba(12,12,16,0.92)',
+};
+
+const LIGHT_TOKENS = {
+  bg:         '#F2F2F7',
+  bg2:        '#E9E9EF',
+  surface:    '#FFFFFF',
+  surface2:   '#F2F2F7',
+  surface3:   '#E5E5EA',
+  label:      '#000000',
+  label2:     'rgba(60,60,67,0.60)',
+  label3:     'rgba(60,60,67,0.32)',
+  label4:     'rgba(60,60,67,0.16)',
+  sep:        'rgba(60,60,67,0.12)',
+  brand:      '#5856D6',
+  brandDim:   'rgba(88,86,214,0.10)',
+  brandText:  '#4B49C4',
+  success:    '#34C759',
+  successDim: 'rgba(52,199,89,0.12)',
+  warning:    '#FF9500',
+  warningDim: 'rgba(255,149,0,0.12)',
+  error:      '#FF3B30',
+  errorDim:   'rgba(255,59,48,0.12)',
+  orange:     '#FF9500',
+  orangeDim:  'rgba(255,149,0,0.12)',
+  purple:     '#AF52DE',
+  purpleDim:  'rgba(175,82,222,0.12)',
+  tabBg:      'rgba(248,248,252,0.94)',
+  navBg:      'rgba(242,242,247,0.94)',
+};
+
+// Kanban stage specs — consistent across the app
+const STAGES = {
+  pending:   { label: 'Pending',  dot: '#8E8E93', bg: 'rgba(142,142,147,0.16)', order: 0 },
+  printing:  { label: 'Printing', dot: '#8183FF', bg: 'rgba(129,131,255,0.16)', order: 1 },
+  post:      { label: 'Post',     dot: '#BF5AF2', bg: 'rgba(191,90,242,0.16)',  order: 2 },
+  qc:        { label: 'QC',       dot: '#FFD60A', bg: 'rgba(255,214,10,0.16)',  order: 3 },
+  completed: { label: 'Done',     dot: '#32D74B', bg: 'rgba(50,215,75,0.16)',   order: 4 },
+};
+const STAGE_SEQUENCE = ['pending', 'printing', 'post', 'qc', 'completed'];
+
+// ─── Contexts ──────────────────────────────────────────────────────────────────
+
+const ThemeContext = createContext({ dark: true, t: DARK_TOKENS });
+const useTheme = () => useContext(ThemeContext);
+
+const AppContext = createContext({});
+const useApp = () => useContext(AppContext);
+
+const NavContext = createContext({});
+const useNav = () => useContext(NavContext);
+
+// ─── Base Components ───────────────────────────────────────────────────────────
+
+function StatusPill({ status, size = 'sm' }) {
+  const { lang } = useTheme();
+  const stage = STAGES[status] || STAGES.pending;
+  const label = (lang === 'ar' && typeof STAGE_LABELS_AR !== 'undefined') ? STAGE_LABELS_AR[status] : stage.label;
+  const lg = size === 'lg';
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: lg ? 6 : 5,
+      padding: lg ? '5px 11px' : '3px 8px',
+      borderRadius: 100,
+      background: stage.bg,
+      fontSize: lg ? 13 : 11,
+      fontWeight: 600,
+      color: stage.dot,
+      letterSpacing: 0.2,
+      whiteSpace: 'nowrap',
+      flexShrink: 0,
+      direction: 'ltr',
+    }}>
+      <span style={{
+        width: lg ? 7 : 6, height: lg ? 7 : 6,
+        borderRadius: '50%', background: stage.dot, flexShrink: 0,
+      }} />
+      {label}
+    </span>
+  );
+}
+
+function SectionLabel({ text, action, onAction, style: extraStyle = {} }) {
+  const { t } = useTheme();
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '0 16px', marginBottom: 6, ...extraStyle,
+    }}>
+      <span style={{
+        fontSize: 12, fontWeight: 600, color: t.label2,
+        letterSpacing: 0.7, textTransform: 'uppercase',
+      }}>{text}</span>
+      {action && (
+        <button onClick={onAction} style={{
+          background: 'none', border: 'none',
+          fontSize: 14, fontWeight: 500, color: t.brand,
+          cursor: 'pointer', padding: '2px 0',
+        }}>{action}</button>
+      )}
+    </div>
+  );
+}
+
+function Card({ children, style: extraStyle = {}, onClick }) {
+  const { t } = useTheme();
+  return (
+    <div onClick={onClick} style={{
+      background: t.surface,
+      borderRadius: 16,
+      overflow: 'hidden',
+      cursor: onClick ? 'pointer' : undefined,
+      ...extraStyle,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function ProgressBar({ value, color, height = 4, style: extraStyle = {} }) {
+  const { t } = useTheme();
+  return (
+    <div style={{
+      height, borderRadius: height,
+      background: t.surface3, overflow: 'hidden', ...extraStyle,
+    }}>
+      <div style={{
+        height: '100%', width: `${Math.min(100, Math.max(0, value))}%`,
+        background: color, borderRadius: height,
+        transition: 'width 0.4s ease',
+      }} />
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, subtitle, action, onAction }) {
+  const { t } = useTheme();
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', padding: '52px 32px', gap: 10, textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 44, opacity: 0.3, marginBottom: 4, lineHeight: 1 }}>{icon}</div>
+      <div style={{ fontSize: 17, fontWeight: 600, color: t.label }}>{title}</div>
+      {subtitle && (
+        <div style={{ fontSize: 14, color: t.label2, lineHeight: 1.5, maxWidth: 260 }}>{subtitle}</div>
+      )}
+      {action && (
+        <button onClick={onAction} style={{
+          marginTop: 8, padding: '10px 24px',
+          borderRadius: 12, background: t.brand,
+          color: '#fff', border: 'none',
+          fontSize: 15, fontWeight: 600, cursor: 'pointer',
+        }}>{action}</button>
+      )}
+    </div>
+  );
+}
+
+function Skeleton({ width = '100%', height = 16, radius = 8, style: extraStyle = {} }) {
+  const { dark } = useTheme();
+  return (
+    <div style={{
+      width, height, borderRadius: radius,
+      background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+      ...extraStyle,
+    }} />
+  );
+}
+
+function Divider({ inset = 16 }) {
+  const { t } = useTheme();
+  return (
+    <div style={{
+      height: 0.5,
+      background: t.sep,
+      margin: `0 ${inset}px`,
+    }} />
+  );
+}
+
+// ─── Global styles injected once ──────────────────────────────────────────────
+(function injectStyles() {
+  const style = document.createElement('style');
+  style.textContent = `
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    button { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; }
+    input, textarea { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; }
+    ::-webkit-scrollbar { display: none; }
+    @keyframes khayt-pulse {
+      0%, 100% { opacity: 0.4; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+    @keyframes khayt-spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes khayt-slide-up {
+      from { transform: translateY(12px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes khayt-nfc-ping {
+      0% { transform: scale(0.8); opacity: 0.8; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+Object.assign(window, {
+  ThemeContext, useTheme,
+  AppContext, useApp,
+  NavContext, useNav,
+  DARK_TOKENS, LIGHT_TOKENS,
+  STAGES, STAGE_SEQUENCE,
+  StatusPill, SectionLabel, Card, ProgressBar,
+  EmptyState, Skeleton, Divider,
+});
+
+
+// ======================= khayt-nav.jsx =======================
+// khayt-nav.jsx — NavBar, TabBar, BottomSheet, ConnectionBanner
+// Exports: NavBar, LargeNavBar, TabBar, BottomSheet, ConnectionBanner
+
+// React hooks come from khayt-i18n.jsx (shared scope).
+
+// ─── NavBar ────────────────────────────────────────────────────────────────────
+
+function NavBar({ title, subtitle, back, onBack, right, onRight, children }) {
+  const { t, dark, rtl } = useTheme();
+  return (
+    <div style={{
+      flexShrink: 0,
+      paddingTop: 62,
+      background: dark ? t.navBg : t.navBg,
+      backdropFilter: 'blur(20px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+      borderBottom: `0.5px solid ${t.sep}`,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center',
+        padding: '6px 16px 10px', gap: 6, minHeight: 44,
+      }}>
+        {back && (
+          <button onClick={onBack} style={{
+            display: 'flex', alignItems: 'center', gap: 3,
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: t.brand, padding: '4px 8px 4px 0', flexShrink: 0,
+            fontSize: 17, fontWeight: 400,
+          }}>
+            <svg width="9" height="16" viewBox="0 0 9 16" fill="none" style={{ transform: rtl ? 'scaleX(-1)' : 'none' }}>
+              <path d="M7.5 1.5L1 8l6.5 6.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {typeof back === 'string' ? <span>{back}</span> : null}
+          </button>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 17, fontWeight: 600, color: t.label,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            lineHeight: 1.3,
+          }}>{title}</div>
+          {subtitle && (
+            <div style={{ fontSize: 11, color: t.label2, marginTop: 1 }}>{subtitle}</div>
+          )}
+        </div>
+        {children}
+        {right && (
+          <button onClick={onRight} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 32, height: 32, borderRadius: 10,
+            background: t.brandDim, border: 'none', cursor: 'pointer',
+            color: t.brand, flexShrink: 0,
+          }}>
+            {right}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LargeNavBar({ title, badge, right, onRight }) {
+  const { t, dark } = useTheme();
+  return (
+    <div style={{
+      flexShrink: 0,
+      paddingTop: 62,
+      background: dark ? t.navBg : t.navBg,
+      backdropFilter: 'blur(20px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+        padding: '2px 16px 12px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            fontSize: 30, fontWeight: 700, color: t.label,
+            letterSpacing: -0.6, lineHeight: 1,
+          }}>{title}</div>
+          {badge}
+        </div>
+        {right && (
+          <button onClick={onRight} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 32, height: 32, borderRadius: 10,
+            background: t.brandDim, border: 'none', cursor: 'pointer',
+            color: t.brand,
+          }}>
+            {right}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab Bar ──────────────────────────────────────────────────────────────────
+
+const TAB_DEFS = [
+  {
+    id: 'home', label: 'Home',
+    icon: (fill, stroke) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M3 10.182L12 3l9 7.182V20a1 1 0 01-1 1H5a1 1 0 01-1-1v-9.818z" stroke={stroke} strokeWidth="1.7" fill={fill}/>
+        <path d="M9 21V14h6v7" stroke={stroke} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'orders', label: 'Orders',
+    icon: (fill, stroke) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <rect x="4" y="2.5" width="16" height="19" rx="2.5" stroke={stroke} strokeWidth="1.7" fill={fill}/>
+        <path d="M8 8.5h8M8 12.5h8M8 16.5h5" stroke={stroke} strokeWidth="1.7" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'inventory', label: 'Inventory',
+    icon: (fill, stroke) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M21 7.5L12 3 3 7.5v9L12 21l9-4.5v-9z" stroke={stroke} strokeWidth="1.7" strokeLinejoin="round" fill={fill}/>
+        <path d="M3 7.5l9 4.5 9-4.5M12 12v9" stroke={stroke} strokeWidth="1.7" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'machines', label: 'Machines',
+    icon: (fill, stroke) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <rect x="2" y="7" width="20" height="13" rx="2.5" stroke={stroke} strokeWidth="1.7" fill={fill}/>
+        <path d="M7 4h10" stroke={stroke} strokeWidth="1.7" strokeLinecap="round"/>
+        <circle cx="12" cy="13.5" r="2.5" stroke={stroke} strokeWidth="1.7"/>
+        <path d="M7 13.5h2.5M14.5 13.5H17" stroke={stroke} strokeWidth="1.7" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'settings', label: 'Settings',
+    icon: (fill, stroke) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="3" stroke={stroke} strokeWidth="1.7" fill={fill}/>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke={stroke} strokeWidth="1.5"/>
+      </svg>
+    ),
+  },
+];
+
+function TabBar({ activeTab, onTabChange }) {
+  const { t, dark, s } = useTheme();
+  return (
+    <div style={{
+      flexShrink: 0,
+      background: dark ? t.tabBg : t.tabBg,
+      backdropFilter: 'blur(24px) saturate(200%)',
+      WebkitBackdropFilter: 'blur(24px) saturate(200%)',
+      borderTop: `0.5px solid ${t.sep}`,
+      display: 'flex',
+      paddingBottom: 22,
+    }}>
+      {TAB_DEFS.map(tab => {
+        const active = activeTab === tab.id;
+        const color = active ? t.brand : t.label3;
+        const fill = active ? t.brandDim : 'none';
+        return (
+          <button key={tab.id} onClick={() => onTabChange(tab.id)} style={{
+            flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', gap: 3,
+            padding: '9px 4px 0',
+            background: 'none', border: 'none', cursor: 'pointer',
+            minHeight: 49, WebkitTapHighlightColor: 'transparent',
+          }}>
+            {tab.icon(fill, color)}
+            <span style={{
+              fontSize: 10, fontWeight: active ? 600 : 400,
+              color, lineHeight: 1, letterSpacing: 0.1,
+            }}>{s('tab_' + tab.id)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Bottom Sheet ──────────────────────────────────────────────────────────────
+
+function BottomSheet({ visible, onDismiss, title, children, minHeight }) {
+  const { t, dark } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      requestAnimationFrame(() => requestAnimationFrame(() => setOpen(true)));
+    } else {
+      setOpen(false);
+      const timer = setTimeout(() => setMounted(false), 340);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
+
+  if (!mounted) return null;
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 200,
+      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+      pointerEvents: open ? 'all' : 'none',
+    }}>
+      <div onClick={onDismiss} style={{
+        position: 'absolute', inset: 0,
+        background: 'rgba(0,0,0,0.55)',
+        opacity: open ? 1 : 0,
+        transition: 'opacity 0.28s ease',
+      }} />
+      <div style={{
+        position: 'relative', zIndex: 1,
+        background: dark ? '#1E1E28' : '#FFFFFF',
+        borderRadius: '22px 22px 0 0',
+        transform: open ? 'translateY(0)' : 'translateY(105%)',
+        transition: 'transform 0.34s cubic-bezier(0.32,0.72,0,1)',
+        maxHeight: '88%',
+        display: 'flex', flexDirection: 'column',
+        minHeight: minHeight,
+        boxShadow: '0 -4px 32px rgba(0,0,0,0.4)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 6px', flexShrink: 0 }}>
+          <div style={{ width: 38, height: 4, borderRadius: 2, background: t.label4 }} />
+        </div>
+        {title && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '0 16px 12px', flexShrink: 0,
+            borderBottom: `0.5px solid ${t.sep}`,
+          }}>
+            <div style={{ fontSize: 17, fontWeight: 600, color: t.label }}>{title}</div>
+            <button onClick={onDismiss} style={{
+              width: 28, height: 28, borderRadius: 14,
+              background: t.surface3, border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: t.label2, fontSize: 15, fontWeight: 600,
+            }}>✕</button>
+          </div>
+        )}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Connection Banner ─────────────────────────────────────────────────────────
+
+function ConnectionBanner({ onRetry }) {
+  const { t, s } = useTheme();
+  return (
+    <div style={{
+      flexShrink: 0,
+      background: t.errorDim,
+      borderBottom: `1px solid ${t.error}33`,
+      padding: '7px 16px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ width: 7, height: 7, borderRadius: '50%', background: t.error, flexShrink: 0 }} />
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: t.error }}>{s('desktopOffline')}</div>
+          <div style={{ fontSize: 11, color: t.label2, marginTop: 1 }}>{s('checkDesktop')}</div>
+        </div>
+      </div>
+      <button onClick={onRetry} style={{
+        background: t.error, color: '#fff', border: 'none',
+        borderRadius: 8, padding: '5px 11px', fontSize: 12, fontWeight: 600,
+        cursor: 'pointer', flexShrink: 0,
+      }}>{s('retry')}</button>
+    </div>
+  );
+}
+
+// ─── Scroll container ─────────────────────────────────────────────────────────
+
+function ScrollView({ children, style: extraStyle = {} }) {
+  return (
+    <div style={{
+      flex: 1, overflowY: 'auto', overflowX: 'hidden',
+      WebkitOverflowScrolling: 'touch',
+      ...extraStyle,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+Object.assign(window, {
+  NavBar, LargeNavBar, TabBar, BottomSheet, ConnectionBanner, ScrollView, TAB_DEFS,
+});
+
+
+// ======================= khayt-home.jsx =======================
+// khayt-home.jsx — Home / Dashboard screen
+// Exports: HomeScreen
+
+// React hooks come from khayt-i18n.jsx (shared scope).
+
+// ─── Stat Block ───────────────────────────────────────────────────────────────
+
+function StatBlock({ value, label, color, sub }) {
+  const { t } = useTheme();
+  return (
+    <div style={{
+      flex: 1, background: t.surface, borderRadius: 16,
+      padding: '14px 14px 12px', display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
+      <div style={{
+        fontSize: 42, fontWeight: 700, color,
+        lineHeight: 1, letterSpacing: -1, fontVariantNumeric: 'tabular-nums',
+      }}>{value}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: t.label2, letterSpacing: 0.2 }}>{label}</div>
+      {sub && (
+        <div style={{ fontSize: 10, color: t.label3, marginTop: 1 }}>{sub}</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Kanban Flow Strip ─────────────────────────────────────────────────────────
+
+function KanbanStrip({ counts, onStageClick }) {
+  const { t, lang } = useTheme();
+  const stages = STAGE_SEQUENCE;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center',
+      padding: '12px 16px', gap: 0, overflowX: 'auto',
+    }}>
+      {stages.map((stage, i) => {
+        const s = STAGES[stage];
+        const count = counts[stage] || 0;
+        const active = count > 0;
+        return (
+          <React.Fragment key={stage}>
+            <button
+              onClick={() => onStageClick && onStageClick(stage)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                background: active ? s.bg : 'rgba(255,255,255,0.04)',
+                border: `1.5px solid ${active ? s.dot + '40' : t.sep}`,
+                borderRadius: 12,
+                padding: '8px 10px',
+                cursor: 'pointer', flexShrink: 0, minWidth: 52,
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <div style={{
+                fontSize: 20, fontWeight: 700,
+                color: active ? s.dot : t.label3,
+                letterSpacing: -0.5, lineHeight: 1,
+                fontVariantNumeric: 'tabular-nums',
+              }}>{count}</div>
+              <div style={{
+                fontSize: 9, fontWeight: 600,
+                color: active ? s.dot : t.label3,
+                letterSpacing: 0.5, textTransform: lang === 'ar' ? 'none' : 'uppercase',
+              }}>{lang === 'ar' && typeof STAGE_LABELS_AR !== 'undefined' ? STAGE_LABELS_AR[stage] : s.label}</div>
+            </button>
+            {i < stages.length - 1 && (
+              <div style={{
+                width: 16, display: 'flex', alignItems: 'center',
+                justifyContent: 'center', flexShrink: 0,
+              }}>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M1 5h8M5.5 1.5L9 5l-3.5 3.5" stroke={t.label4} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Mini Order Card ──────────────────────────────────────────────────────────
+
+function MiniOrderCard({ order, onTap }) {
+  const { t } = useTheme();
+  const stage = STAGES[order.status] || STAGES.pending;
+  const overdue = order.overdue;
+  return (
+    <div
+      onClick={() => onTap(order)}
+      style={{
+        padding: '12px 16px',
+        cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 12,
+        borderLeft: `3px solid ${stage.dot}`,
+        marginLeft: 16, marginRight: 16,
+        background: t.surface,
+        borderRadius: 14,
+        marginBottom: 8,
+        transition: 'opacity 0.15s',
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: t.label, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {order.name}
+          </span>
+          {overdue && (
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#FF453A', background: 'rgba(255,69,58,0.16)', padding: '1px 6px', borderRadius: 6, flexShrink: 0 }}>
+              OVERDUE
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 12, color: t.label2, marginBottom: 4 }}>{order.customer}</div>
+        {order.status === 'printing' && order.progress !== undefined && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ProgressBar value={order.progress} color={stage.dot} height={3} style={{ flex: 1 }} />
+            <span style={{ fontSize: 10, fontWeight: 600, color: stage.dot, flexShrink: 0 }}>{order.progress}%</span>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+        <StatusPill status={order.status} />
+        <div style={{ fontSize: 11, color: t.label3 }}>{order.id}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Low Stock Banner ─────────────────────────────────────────────────────────
+
+function LowStockBanner({ spools, onTap }) {
+  const { t, s } = useTheme();
+  if (!spools || spools.length === 0) return null;
+  return (
+    <div
+      onClick={onTap}
+      style={{
+        margin: '0 16px',
+        background: t.warningDim,
+        border: `1px solid ${t.warning}33`,
+        borderRadius: 14, padding: '11px 14px',
+        display: 'flex', alignItems: 'center', gap: 12,
+        cursor: 'pointer',
+      }}
+    >
+      <div style={{
+        width: 36, height: 36, borderRadius: 10,
+        background: t.warningDim,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 18, flexShrink: 0,
+      }}>⚠️</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: t.warning }}>
+          {s('lowStock')} — {spools.length} {spools.length > 1 ? s('spools') : s('spool')}
+        </div>
+        <div style={{ fontSize: 12, color: t.label2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {spools.map(s => `${s.brand} ${s.color}`).join(', ')}
+        </div>
+      </div>
+      <svg width="7" height="13" viewBox="0 0 7 13" fill="none" style={{ flexShrink: 0 }}>
+        <path d="M1 1l5 5.5L1 12" stroke={t.label3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </div>
+  );
+}
+
+// ─── Quick Actions ─────────────────────────────────────────────────────────────
+
+function QuickActions({ onAddSpool, onNewOrder }) {
+  const { t } = useTheme();
+  const actions = [
+    { label: 'Add Spool', color: t.brand, icon: '📦', onPress: onAddSpool },
+    { label: 'New Order', color: t.success, icon: '📋', onPress: onNewOrder },
+  ];
+  return (
+    <div style={{ display: 'flex', gap: 10, padding: '0 16px' }}>
+      {actions.map(a => (
+        <button key={a.label} onClick={a.onPress} style={{
+          flex: 1, padding: '12px 8px',
+          background: t.surface, borderRadius: 14,
+          border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ fontSize: 20 }}>{a.icon}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: t.label }}>{a.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Connection Dot Badge ──────────────────────────────────────────────────────
+
+function ConnDot({ connected }) {
+  const { t, s } = useTheme();
+  const color = connected ? t.success : t.error;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 5,
+      background: connected ? t.successDim : t.errorDim,
+      border: `1px solid ${color}33`,
+      borderRadius: 100, padding: '3px 9px',
+    }}>
+      <div style={{
+        width: 6, height: 6, borderRadius: '50%', background: color,
+        animation: connected ? 'none' : 'khayt-pulse 2s ease-in-out infinite',
+      }} />
+      <span style={{ fontSize: 11, fontWeight: 600, color }}>{connected ? s('connected') : s('offline')}</span>
+    </div>
+  );
+}
+
+// ─── Home Screen ─────────────────────────────────────────────────────────────
+
+function HomeScreen({ onOrderTap, onGoToInventory, onGoToOrders }) {
+  const { t, dark, s } = useTheme();
+  const { orders, spools, connected } = useApp();
+
+  const activeOrders = orders.filter(o => o.status !== 'completed');
+  const doneToday = orders.filter(o => o.status === 'completed').length;
+  const printing = orders.filter(o => o.status === 'printing').length;
+  const queued = orders.filter(o => o.status === 'pending').length;
+  const lowSpools = spools.filter(sp => sp.lowStock);
+
+  const counts = STAGE_SEQUENCE.reduce((acc, st) => {
+    acc[st] = orders.filter(o => o.status === st).length;
+    return acc;
+  }, {});
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Nav */}
+      <div style={{
+        flexShrink: 0,
+        paddingTop: 62,
+        background: dark ? t.navBg : t.navBg,
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', padding: '2px 16px 10px' }}>
+          <div>
+            <div style={{ fontSize: 11, color: t.label3, marginBottom: 2, letterSpacing: 0.4 }}>{s('appName')}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: t.label, letterSpacing: -0.5, lineHeight: 1 }}>{s('shopPulse')}</div>
+          </div>
+          <ConnDot connected={connected} />
+        </div>
+      </div>
+
+      <ScrollView>
+        {/* Stats row */}
+        <div style={{ display: 'flex', gap: 10, padding: '14px 16px 0' }}>
+          <StatBlock value={queued} label={s('inQueue')} color={STAGES.pending.dot} />
+          <StatBlock value={printing} label={s('printingStat')} color={STAGES.printing.dot} sub={printing > 0 ? s('activeJobs') : s('noJobs')} />
+          <StatBlock value={doneToday} label={s('doneToday')} color={STAGES.completed.dot} />
+        </div>
+
+        {/* Kanban strip */}
+        <div style={{ marginTop: 14 }}>
+          <SectionLabel text={s('pipeline')} action={s('allOrders')} onAction={onGoToOrders} style={{ marginBottom: 4 }} />
+          <div style={{
+            marginLeft: 16, marginRight: 16,
+            background: t.surface, borderRadius: 16, overflow: 'hidden',
+          }}>
+            <KanbanStrip counts={counts} onStageClick={(stage) => onGoToOrders && onGoToOrders(stage)} />
+          </div>
+        </div>
+
+        {/* Low stock alert */}
+        {lowSpools.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <LowStockBanner spools={lowSpools} onTap={onGoToInventory} />
+          </div>
+        )}
+
+        {/* Active orders */}
+        <div style={{ marginTop: 14 }}>
+          <SectionLabel text={s('activeOrders')} action={s('seeAll')} onAction={onGoToOrders} />
+          {activeOrders.length === 0 ? (
+            <EmptyState icon="✓" title={s('allClear')} subtitle={s('noActiveNow')} />
+          ) : (
+            activeOrders.slice(0, 4).map(order => (
+              <MiniOrderCard key={order.id} order={order} onTap={onOrderTap} />
+            ))
+          )}
+        </div>
+
+        <div style={{ height: 24 }} />
+      </ScrollView>
+    </div>
+  );
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+Object.assign(window, { HomeScreen });
+
+
+// ======================= khayt-orders.jsx =======================
+// khayt-orders.jsx — Orders list, Order Detail sheet
+// Exports: OrdersScreen
+
+// React hooks come from khayt-i18n.jsx (shared scope).
+
+// ─── Swipeable Row ────────────────────────────────────────────────────────────
+
+function SwipeRow({ children, onAdvance, canAdvance }) {
+  const { t, s } = useTheme();
+  const [offset, setOffset] = useState(0);
+  const [open, setOpen] = useState(false);
+  const startX = useRef(null);
+  const ACTION_W = 80;
+
+  const onStart = (x) => { startX.current = x; };
+  const onMove = (x) => {
+    if (startX.current === null) return;
+    const d = x - startX.current;
+    if (d < 0 && canAdvance) setOffset(Math.max(d, -ACTION_W - 10));
+  };
+  const onEnd = () => {
+    startX.current = null;
+    if (offset < -ACTION_W * 0.55) { setOffset(-ACTION_W); setOpen(true); }
+    else { setOffset(0); setOpen(false); }
+  };
+  const doAdvance = () => { setOffset(0); setOpen(false); onAdvance(); };
+
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden' }}>
+      {canAdvance && (
+        <div style={{
+          position: 'absolute', right: 0, top: 0, bottom: 0, width: ACTION_W,
+          background: STAGES.printing.dot,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexDirection: 'column', gap: 3, cursor: 'pointer',
+        }} onClick={doAdvance}>
+          <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+            <path d="M1 7h14M10 1l6 6-6 6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span style={{ color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>{s('advance')}</span>
+        </div>
+      )}
+      <div
+        style={{
+          transform: `translateX(${offset}px)`,
+          transition: startX.current !== null ? 'none' : 'transform 0.25s ease',
+          background: t.surface,
+        }}
+        onMouseDown={e => onStart(e.clientX)}
+        onMouseMove={e => startX.current !== null && onMove(e.clientX)}
+        onMouseUp={onEnd}
+        onMouseLeave={onEnd}
+        onTouchStart={e => onStart(e.touches[0].clientX)}
+        onTouchMove={e => onMove(e.touches[0].clientX)}
+        onTouchEnd={onEnd}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── Order Row ────────────────────────────────────────────────────────────────
+
+function OrderRow({ order, onTap, onAdvance, isLast }) {
+  const { t, s } = useTheme();
+  const stage = STAGES[order.status] || STAGES.pending;
+  const canAdvance = order.status !== 'completed';
+
+  return (
+    <SwipeRow onAdvance={() => onAdvance(order)} canAdvance={canAdvance}>
+      <div
+        onClick={() => onTap(order)}
+        style={{
+          padding: '12px 16px', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 12,
+          position: 'relative',
+        }}
+      >
+        {/* Left status strip */}
+        <div style={{
+          width: 3, alignSelf: 'stretch', borderRadius: 2,
+          background: stage.dot, flexShrink: 0,
+        }} />
+
+        {/* Content */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <span style={{
+              fontSize: 14, fontWeight: 600, color: t.label,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+            }}>{order.name}</span>
+            {order.overdue && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, color: '#FF453A',
+                background: 'rgba(255,69,58,0.15)', padding: '1px 5px', borderRadius: 4,
+                flexShrink: 0, letterSpacing: 0.4,
+              }}>{s('late')}</span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: t.label2, marginBottom: order.status === 'printing' ? 5 : 0 }}>
+            {order.customer} · {order.id}
+          </div>
+          {order.status === 'printing' && order.progress !== undefined && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ProgressBar value={order.progress} color={stage.dot} height={3} style={{ flex: 1 }} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: stage.dot, flexShrink: 0, width: 28 }}>{order.progress}%</span>
+            </div>
+          )}
+        </div>
+
+        {/* Right */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+          <StatusPill status={order.status} />
+          <span style={{ fontSize: 11, color: t.label3 }}>{order.dueDate}</span>
+        </div>
+      </div>
+      {!isLast && <Divider inset={48} />}
+    </SwipeRow>
+  );
+}
+
+// ─── Filter Chips ──────────────────────────────────────────────────────────────
+
+function FilterChips({ options, active, onChange }) {
+  const { t } = useTheme();
+  return (
+    <div style={{
+      display: 'flex', gap: 8, padding: '10px 16px',
+      overflowX: 'auto', flexShrink: 0,
+    }}>
+      {options.map(opt => {
+        const isActive = active === opt.id;
+        const stage = opt.id !== 'all' ? STAGES[opt.id] : null;
+        return (
+          <button key={opt.id} onClick={() => onChange(opt.id)} style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '6px 12px', borderRadius: 100, flexShrink: 0,
+            background: isActive
+              ? (stage ? stage.bg : t.brandDim)
+              : t.surface,
+            border: `1.5px solid ${isActive ? (stage ? stage.dot + '50' : t.brand + '50') : t.sep}`,
+            color: isActive ? (stage ? stage.dot : t.brand) : t.label2,
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            transition: 'all 0.18s ease',
+          }}>
+            {isActive && stage && (
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: stage.dot, flexShrink: 0 }} />
+            )}
+            {opt.label}
+            {opt.count > 0 && (
+              <span style={{
+                background: isActive ? (stage ? stage.dot : t.brand) : t.surface3,
+                color: isActive ? '#fff' : t.label3,
+                fontSize: 10, fontWeight: 700,
+                borderRadius: 100, padding: '0 5px', minWidth: 16, textAlign: 'center',
+              }}>{opt.count}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Order Detail Sheet ────────────────────────────────────────────────────────
+
+function OrderDetailContent({ order, onAdvance, onClose }) {
+  const { t, s, lang } = useTheme();
+  if (!order) return null;
+
+  const stage = STAGES[order.status];
+  const nextStage = STAGE_SEQUENCE[STAGE_SEQUENCE.indexOf(order.status) + 1];
+  const nextStageInfo = nextStage ? STAGES[nextStage] : null;
+  const canAdvance = order.status !== 'completed';
+  const stageLabel = (id) => (lang === 'ar' && typeof STAGE_LABELS_AR !== 'undefined') ? STAGE_LABELS_AR[id] : STAGES[id].label;
+
+  const InfoRow = ({ label, value, valueColor }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
+      <span style={{ fontSize: 14, color: t.label2 }}>{label}</span>
+      <span style={{ fontSize: 14, fontWeight: 500, color: valueColor || t.label }}>{value}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: '16px 16px 32px' }}>
+      {/* Order header */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: t.label, flex: 1 }}>{order.name}</div>
+          <StatusPill status={order.status} size="lg" />
+        </div>
+        <div style={{ fontSize: 13, color: t.label2 }}>{order.customer}</div>
+        <div style={{ fontSize: 12, color: t.label3, marginTop: 2 }}>{order.id}</div>
+      </div>
+
+      {/* Printing progress */}
+      {order.status === 'printing' && order.progress !== undefined && (
+        <div style={{
+          background: t.surface2, borderRadius: 14,
+          padding: '14px', marginBottom: 16,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: t.label }}>{s('printProgress')}</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: stage.dot, fontVariantNumeric: 'tabular-nums' }}>{order.progress}%</span>
+          </div>
+          <ProgressBar value={order.progress} color={stage.dot} height={7} />
+          {order.eta && (
+            <div style={{ fontSize: 12, color: t.label2, marginTop: 8 }}>ETA: {order.eta} · {order.printer}</div>
+          )}
+        </div>
+      )}
+
+      {/* Status timeline */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+          {STAGE_SEQUENCE.map((stageKey, i) => {
+            const info = STAGES[stageKey];
+            const done = info.order < stage.order;
+            const current = stageKey === order.status;
+            const future = info.order > stage.order;
+            return (
+              <React.Fragment key={stageKey}>
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                }}>
+                  <div style={{
+                    width: current ? 14 : 10,
+                    height: current ? 14 : 10,
+                    borderRadius: '50%',
+                    background: done ? info.dot : current ? info.dot : t.surface3,
+                    border: current ? `2px solid ${info.dot}` : 'none',
+                    boxShadow: current ? `0 0 0 4px ${info.bg}` : 'none',
+                    transition: 'all 0.2s',
+                    flexShrink: 0,
+                  }} />
+                  <span style={{
+                    fontSize: 9, fontWeight: current ? 700 : 500,
+                    color: done || current ? info.dot : t.label3,
+                    letterSpacing: 0.3,
+                  }}>{stageLabel(stageKey)}</span>
+                </div>
+                {i < STAGE_SEQUENCE.length - 1 && (
+                  <div style={{
+                    flex: 1, height: 2, marginBottom: 16,
+                    background: done ? STAGES[STAGE_SEQUENCE[i]].dot + '60' : t.surface3,
+                  }} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+
+      <Divider inset={0} />
+
+      {/* Details */}
+      <div style={{ marginTop: 4 }}>
+        <InfoRow label={s('dueDate')} value={order.dueDate} valueColor={order.overdue ? '#FF453A' : undefined} />
+        <Divider />
+        <InfoRow label={s('filament')} value={order.filament} />
+        <Divider />
+        <InfoRow label={s('printer')} value={order.printer || '—'} />
+        {order.qty && <><Divider /><InfoRow label={s('quantity')} value={`×${order.qty}`} /></>}
+        {order.notes && <><Divider /><InfoRow label={s('notes')} value={order.notes} /></>}
+      </div>
+
+      {/* Advance button */}
+      {canAdvance && nextStageInfo && (
+        <button onClick={() => { onAdvance(order); onClose(); }} style={{
+          width: '100%', marginTop: 20,
+          padding: '15px 0',
+          background: nextStageInfo.dot,
+          border: 'none', borderRadius: 14,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          cursor: 'pointer',
+          boxShadow: `0 4px 16px ${nextStageInfo.dot}40`,
+        }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>
+            {s('moveTo')} {stageLabel(nextStage)}
+          </span>
+          <svg width="16" height="14" viewBox="0 0 16 14" fill="none">
+            <path d="M1 7h12M8 1l6 6-6 6" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      )}
+      {order.status === 'completed' && (
+        <div style={{
+          width: '100%', marginTop: 20, padding: '15px 0',
+          background: STAGES.completed.bg, borderRadius: 14,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}>
+          <span style={{ fontSize: 18 }}>✓</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: STAGES.completed.dot }}>{s('orderComplete')}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Recent History Row ────────────────────────────────────────────────────────
+
+function RecentRow({ order, isLast }) {
+  const { t } = useTheme();
+  return (
+    <>
+      <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+          background: STAGES.completed.bg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16,
+        }}>✓</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: t.label, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.name}</div>
+          <div style={{ fontSize: 12, color: t.label2 }}>{order.customer} · {order.id}</div>
+        </div>
+        <div style={{ fontSize: 12, color: t.label3, textAlign: 'right' }}>
+          <div>{order.dueDate}</div>
+        </div>
+      </div>
+      {!isLast && <Divider inset={64} />}
+    </>
+  );
+}
+
+// ─── Orders Screen ────────────────────────────────────────────────────────────
+
+function OrdersScreen({ initialFilter }) {
+  const { t, s, lang } = useTheme();
+  const { orders, advanceOrder } = useApp();
+  const [tab, setTab] = useState('active');
+  const [filter, setFilter] = useState(initialFilter || 'all');
+  const [detailOrder, setDetailOrder] = useState(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const openDetail = (order) => { setDetailOrder(order); setSheetOpen(true); };
+  const closeDetail = () => setSheetOpen(false);
+
+  const activeOrders = orders.filter(o => o.status !== 'completed');
+  const recentOrders = orders.filter(o => o.status === 'completed');
+
+  const stageLabel = (id) => (lang === 'ar' && typeof STAGE_LABELS_AR !== 'undefined') ? STAGE_LABELS_AR[id] : STAGES[id].label;
+  const filterOpts = [
+    { id: 'all',      label: s('f_all'),         count: activeOrders.length },
+    { id: 'pending',  label: stageLabel('pending'),  count: activeOrders.filter(o => o.status === 'pending').length },
+    { id: 'printing', label: stageLabel('printing'), count: activeOrders.filter(o => o.status === 'printing').length },
+    { id: 'post',     label: stageLabel('post'),     count: activeOrders.filter(o => o.status === 'post').length },
+    { id: 'qc',       label: stageLabel('qc'),       count: activeOrders.filter(o => o.status === 'qc').length },
+  ];
+
+  const displayed = tab === 'active'
+    ? (filter === 'all' ? activeOrders : activeOrders.filter(o => o.status === filter))
+    : recentOrders;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      {/* Nav */}
+      <LargeNavBar
+        title={s('tab_orders')}
+        right={<span style={{ fontSize: 22, fontWeight: 300, lineHeight: 1 }}>+</span>}
+      />
+
+      {/* Segmented control */}
+      <div style={{
+        display: 'flex', padding: '8px 16px',
+        background: t.navBg, backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        flexShrink: 0, gap: 0,
+      }}>
+        {[{ id: 'active', label: s('active') }, { id: 'recent', label: s('history') }].map(seg => (
+          <button key={seg.id} onClick={() => setTab(seg.id)} style={{
+            flex: 1, padding: '7px 0',
+            background: tab === seg.id ? t.brand : t.surface2,
+            color: tab === seg.id ? '#fff' : t.label2,
+            border: 'none', cursor: 'pointer',
+            fontSize: 14, fontWeight: 600,
+            borderRadius: seg.id === 'active' ? '10px 0 0 10px' : '0 10px 10px 0',
+            transition: 'all 0.18s ease',
+          }}>{seg.label}</button>
+        ))}
+      </div>
+
+      {/* Filter chips — active only */}
+      {tab === 'active' && (
+        <div style={{
+          background: t.navBg,
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          flexShrink: 0,
+          borderBottom: `0.5px solid ${t.sep}`,
+        }}>
+          <FilterChips options={filterOpts} active={filter} onChange={setFilter} />
+        </div>
+      )}
+
+      {/* List */}
+      <ScrollView>
+        {displayed.length === 0 ? (
+          <EmptyState
+            icon={tab === 'active' ? '📋' : '📦'}
+            title={tab === 'active' ? s('queueClear') : s('noCompleted')}
+            subtitle={tab === 'active' ? s('allCaughtUp') : s('completedAppear')}
+          />
+        ) : (
+          <div style={{ paddingTop: 8 }}>
+            <div style={{ background: t.surface, borderRadius: 16, margin: '0 16px', overflow: 'hidden' }}>
+              {displayed.map((order, i) =>
+                tab === 'active' ? (
+                  <OrderRow
+                    key={order.id}
+                    order={order}
+                    onTap={openDetail}
+                    onAdvance={advanceOrder}
+                    isLast={i === displayed.length - 1}
+                  />
+                ) : (
+                  <RecentRow key={order.id} order={order} isLast={i === displayed.length - 1} />
+                )
+              )}
+            </div>
+            <div style={{ height: 24 }} />
+          </div>
+        )}
+      </ScrollView>
+
+      {/* Detail Sheet */}
+      <BottomSheet
+        visible={sheetOpen}
+        onDismiss={closeDetail}
+        title={detailOrder?.id}
+      >
+        <OrderDetailContent
+          order={detailOrder}
+          onAdvance={advanceOrder}
+          onClose={closeDetail}
+        />
+      </BottomSheet>
+    </div>
+  );
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+Object.assign(window, { OrdersScreen });
+
+
+// ======================= khayt-inventory.jsx =======================
+// khayt-inventory.jsx — Inventory list, Spool detail, Add spool flow
+// Exports: InventoryScreen
+
+// React hooks come from khayt-i18n.jsx (shared scope).
+
+// ─── Remaining bar helper ──────────────────────────────────────────────────────
+
+function remainingColor(pct) {
+  if (pct < 15) return '#FF453A';
+  if (pct < 30) return '#FFD60A';
+  return '#32D74B';
+}
+
+// ─── Spool Row ────────────────────────────────────────────────────────────────
+
+function SpoolRow({ spool, onTap, isLast }) {
+  const { t, s } = useTheme();
+  const pct = Math.round((spool.weightRemaining / spool.weightTotal) * 100);
+  const barColor = remainingColor(pct);
+
+  return (
+    <>
+      <div onClick={() => onTap(spool)} style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Color swatch */}
+        <div style={{
+          width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+          background: spool.colorHex,
+          border: `2px solid ${spool.colorHex === '#FFFFFF' || spool.colorHex === '#FEFEFE' ? 'rgba(0,0,0,0.1)' : 'transparent'}`,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {spool.lowStock && (
+            <div style={{
+              width: 12, height: 12, borderRadius: '50%',
+              background: '#FF453A', border: '2px solid ' + t.surface,
+              position: 'absolute', marginTop: -28, marginLeft: 28,
+            }} />
+          )}
+        </div>
+
+        {/* Info */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: t.label, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {spool.brand} {spool.material} {spool.color}
+            </span>
+            {spool.lowStock && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, color: '#FF453A',
+                background: 'rgba(255,69,58,0.15)', padding: '1px 5px', borderRadius: 4,
+                flexShrink: 0, letterSpacing: 0.4,
+              }}>{s('low')}</span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: t.label2, marginBottom: 6 }}>
+            {spool.sku}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ProgressBar value={pct} color={barColor} height={4} style={{ flex: 1 }} />
+            <span style={{ fontSize: 11, fontWeight: 600, color: barColor, flexShrink: 0, width: 36, textAlign: 'right' }}>
+              {spool.weightRemaining}g
+            </span>
+          </div>
+        </div>
+
+        {/* Chevron */}
+        <svg width="7" height="13" viewBox="0 0 7 13" fill="none" style={{ flexShrink: 0 }}>
+          <path d="M1 1l5 5.5L1 12" stroke={t.label3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      {!isLast && <Divider inset={68} />}
+    </>
+  );
+}
+
+// ─── Spool Detail Screen ──────────────────────────────────────────────────────
+
+function SpoolDetailScreen({ spool, onBack }) {
+  const { t, dark, s } = useTheme();
+  const pct = Math.round((spool.weightRemaining / spool.weightTotal) * 100);
+  const barColor = remainingColor(pct);
+
+  const DetailRow = ({ label, value }) => (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px' }}>
+        <span style={{ fontSize: 15, color: t.label2 }}>{label}</span>
+        <span style={{ fontSize: 15, fontWeight: 500, color: t.label }}>{value}</span>
+      </div>
+      <Divider inset={16} />
+    </>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <NavBar title={`${spool.brand} ${spool.material}`} back={s('tab_inventory')} onBack={onBack} />
+
+      <ScrollView>
+        {/* Hero color block */}
+        <div style={{
+          margin: '16px 16px 0',
+          borderRadius: 20,
+          background: spool.colorHex,
+          height: 140,
+          display: 'flex', alignItems: 'flex-end',
+          padding: '14px 16px',
+          boxShadow: `0 4px 24px ${spool.colorHex}60`,
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontSize: 22, fontWeight: 700,
+              color: parseInt(spool.colorHex.slice(1), 16) > 0xAAAAAA ? '#000' : '#fff',
+              textShadow: 'none',
+            }}>{spool.color}</div>
+            <div style={{
+              fontSize: 13,
+              color: parseInt(spool.colorHex.slice(1), 16) > 0xAAAAAA ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)',
+            }}>{spool.brand} · {spool.material}</div>
+          </div>
+        </div>
+
+        {/* Weight gauge */}
+        <div style={{
+          margin: '12px 16px 0',
+          background: t.surface, borderRadius: 16,
+          padding: '16px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+            <div>
+              <span style={{ fontSize: 36, fontWeight: 700, color: barColor, fontVariantNumeric: 'tabular-nums' }}>
+                {spool.weightRemaining}
+              </span>
+              <span style={{ fontSize: 14, color: t.label2, marginLeft: 4 }}>{`g ${s('remaining')}`}</span>
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: barColor }}>{pct}%</span>
+          </div>
+          <ProgressBar value={pct} color={barColor} height={8} />
+          <div style={{ fontSize: 12, color: t.label3, marginTop: 8 }}>
+            {s('ofTotal')} {spool.weightTotal}g
+          </div>
+          {spool.lowStock && (
+            <div style={{
+              marginTop: 10, padding: '8px 12px',
+              background: 'rgba(255,69,58,0.12)', borderRadius: 10,
+              fontSize: 12, fontWeight: 600, color: '#FF453A',
+            }}>
+              ⚠ {s('lowStockWarn')}
+            </div>
+          )}
+        </div>
+
+        {/* Details */}
+        <div style={{ margin: '12px 16px 0', background: t.surface, borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ padding: '10px 16px 0', fontSize: 12, fontWeight: 600, color: t.label2, letterSpacing: 0.6, textTransform: 'uppercase' }}>{s('spoolInfo')}</div>
+          <DetailRow label="SKU" value={spool.sku} />
+          <DetailRow label="Lot #" value={spool.lot} />
+          <DetailRow label={s('printTemp')} value={spool.printTemp} />
+          <DetailRow label={s('bedTemp')} value={spool.bedTemp} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px' }}>
+            <span style={{ fontSize: 15, color: t.label2 }}>Spool ID</span>
+            <span style={{ fontSize: 12, fontWeight: 500, color: t.label3 }}>{spool.id}</span>
+          </div>
+        </div>
+
+        <div style={{ height: 32 }} />
+      </ScrollView>
+    </div>
+  );
+}
+
+// ─── Add Spool Flow ────────────────────────────────────────────────────────────
+
+function AddSpoolSheet({ visible, onDismiss, onAdd }) {
+  const { t, dark, s } = useTheme();
+  const [step, setStep] = useState('method'); // method | camera | nfc | manual
+  const [nfcWaiting, setNfcWaiting] = useState(false);
+  const [form, setForm] = useState({
+    brand: '', material: 'PLA+', color: '', colorHex: '#6366F1',
+    weightTotal: '1000', weightRemaining: '1000',
+    sku: '', lot: '', printTemp: '', bedTemp: '',
+  });
+
+  const reset = () => { setStep('method'); setNfcWaiting(false); };
+  const handleDismiss = () => { reset(); onDismiss(); };
+
+  const methodCards = [
+    {
+      id: 'camera', label: s('scanLabel'), sub: s('photoOcr'),
+      icon: (
+        <svg width="28" height="24" viewBox="0 0 28 24" fill="none">
+          <path d="M10 2H4a2 2 0 00-2 2v16a2 2 0 002 2h20a2 2 0 002-2V8l-4-6H10z" stroke={t.brand} strokeWidth="1.8" strokeLinejoin="round"/>
+          <circle cx="14" cy="14" r="5" stroke={t.brand} strokeWidth="1.8"/>
+          <circle cx="14" cy="14" r="2.5" fill={t.brandDim}/>
+        </svg>
+      ),
+    },
+    {
+      id: 'nfc', label: s('nfcTap'), sub: s('tapSpoolTag'),
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <path d="M6 14a8 8 0 008 8" stroke={t.brand} strokeWidth="1.8" strokeLinecap="round"/>
+          <path d="M4 14a10 10 0 0010 10" stroke={t.brand} strokeWidth="1.8" strokeLinecap="round" opacity="0.6"/>
+          <path d="M2 14a12 12 0 0012 12" stroke={t.brand} strokeWidth="1.8" strokeLinecap="round" opacity="0.3"/>
+          <path d="M14 6a8 8 0 010 16" stroke={t.brand} strokeWidth="1.8" strokeLinecap="round"/>
+          <circle cx="14" cy="14" r="2.5" fill={t.brand}/>
+        </svg>
+      ),
+    },
+    {
+      id: 'manual', label: s('manualEntry'), sub: s('typeDetails'),
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect x="4" y="4" width="20" height="20" rx="4" stroke={t.brand} strokeWidth="1.8"/>
+          <path d="M9 11h10M9 15h7M9 19h5" stroke={t.brand} strokeWidth="1.8" strokeLinecap="round"/>
+        </svg>
+      ),
+    },
+  ];
+
+  const MATERIALS = ['PLA', 'PLA+', 'PLA Matte', 'PETG', 'ABS', 'ASA', 'TPU', 'Nylon', 'PA-CF'];
+  const PRESET_COLORS = [
+    { label: 'Black', hex: '#1A1A1A' }, { label: 'White', hex: '#F5F5F0' },
+    { label: 'Grey', hex: '#8A8A8A' }, { label: 'Red', hex: '#D13131' },
+    { label: 'Blue', hex: '#2563EB' }, { label: 'Green', hex: '#16A34A' },
+    { label: 'Orange', hex: '#EA580C' }, { label: 'Yellow', hex: '#CA8A04' },
+    { label: 'Purple', hex: '#7C3AED' }, { label: 'Cyan', hex: '#0891B2' },
+  ];
+
+  const inputStyle = {
+    width: '100%', padding: '11px 14px',
+    background: t.surface2, border: `1.5px solid ${t.sep}`,
+    borderRadius: 12, fontSize: 15, color: t.label,
+    outline: 'none', boxSizing: 'border-box',
+  };
+
+  const sheetTitle = step === 'method' ? s('addSpool')
+    : step === 'camera' ? s('scanLabel')
+    : step === 'nfc' ? s('nfcTap')
+    : s('manualEntry');
+
+  return (
+    <BottomSheet visible={visible} onDismiss={handleDismiss} title={sheetTitle} minHeight={360}>
+
+      {/* Method picker */}
+      {step === 'method' && (
+        <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {methodCards.map(m => (
+            <button key={m.id} onClick={() => { setStep(m.id); if (m.id === 'nfc') setNfcWaiting(true); }} style={{
+              display: 'flex', alignItems: 'center', gap: 16,
+              padding: '16px', background: t.surface2,
+              border: `1.5px solid ${t.sep}`, borderRadius: 16,
+              cursor: 'pointer', width: '100%', textAlign: 'left',
+            }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: 14,
+                background: t.brandDim,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>{m.icon}</div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: t.label }}>{m.label}</div>
+                <div style={{ fontSize: 13, color: t.label2, marginTop: 2 }}>{m.sub}</div>
+              </div>
+              <svg width="7" height="13" viewBox="0 0 7 13" fill="none" style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                <path d="M1 1l5 5.5L1 12" stroke={t.label3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Camera mode */}
+      {step === 'camera' && (
+        <div style={{ padding: '0 16px 32px' }}>
+          <div style={{
+            background: '#000', borderRadius: 20, overflow: 'hidden',
+            height: 220, position: 'relative', marginBottom: 16,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {/* Simulated live view */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            }} />
+            <div style={{
+              position: 'absolute',
+              width: '70%', height: '55%',
+              border: '2px solid rgba(129,131,255,0.8)',
+              borderRadius: 12,
+              boxShadow: '0 0 0 2000px rgba(0,0,0,0.5)',
+            }} />
+            <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 100 }}>
+                {s('alignLabel')}
+              </div>
+            </div>
+            {/* Corner guides */}
+            {[[0,0],[1,0],[0,1],[1,1]].map(([r,c],i) => (
+              <div key={i} style={{
+                position: 'absolute',
+                top: r === 0 ? '23%' : '62%',
+                left: c === 0 ? '15%' : '77%',
+                width: 16, height: 16,
+                borderTop: r === 0 ? '2.5px solid #8183FF' : 'none',
+                borderBottom: r === 1 ? '2.5px solid #8183FF' : 'none',
+                borderLeft: c === 0 ? '2.5px solid #8183FF' : 'none',
+                borderRight: c === 1 ? '2.5px solid #8183FF' : 'none',
+                borderRadius: r === 0 && c === 0 ? '4px 0 0 0' : r === 0 ? '0 4px 0 0' : c === 0 ? '0 0 0 4px' : '0 0 4px 0',
+              }} />
+            ))}
+          </div>
+          <button style={{
+            width: '100%', padding: '15px',
+            background: t.brand, border: 'none',
+            borderRadius: 14, fontSize: 16, fontWeight: 700, color: '#fff',
+            cursor: 'pointer',
+          }} onClick={() => {
+            // Simulate scan result → pre-fill and go to manual
+            setForm(f => ({ ...f, brand: 'eSUN', material: 'PLA+', color: 'Black', colorHex: '#1A1A1A', sku: 'ESUN-PLA+-BK-1KG', printTemp: '210-230°C', bedTemp: '60-80°C' }));
+            setStep('manual');
+          }}>
+            {s('captureLabel')}
+          </button>
+          <button onClick={() => setStep('method')} style={{
+            width: '100%', marginTop: 10, padding: '12px',
+            background: 'none', border: 'none',
+            fontSize: 15, color: t.label2, cursor: 'pointer',
+          }}>← {s('back')}</button>
+        </div>
+      )}
+
+      {/* NFC mode */}
+      {step === 'nfc' && (
+        <div style={{ padding: '24px 16px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <div style={{ position: 'relative', width: 120, height: 120 }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{
+                position: 'absolute',
+                inset: -(i * 16),
+                borderRadius: '50%',
+                border: `1.5px solid ${t.brand}`,
+                opacity: 0.3 / i,
+                animation: `khayt-nfc-ping ${1 + i * 0.4}s ease-out ${i * 0.3}s infinite`,
+              }} />
+            ))}
+            <div style={{
+              width: 120, height: 120, borderRadius: '50%',
+              background: t.brandDim,
+              border: `2px solid ${t.brand}30`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <path d="M10 24a14 14 0 0014 14" stroke={t.brand} strokeWidth="2.5" strokeLinecap="round"/>
+                <path d="M6 24a18 18 0 0018 18" stroke={t.brand} strokeWidth="2.5" strokeLinecap="round" opacity="0.6"/>
+                <path d="M2 24a22 22 0 0022 22" stroke={t.brand} strokeWidth="2.5" strokeLinecap="round" opacity="0.3"/>
+                <path d="M24 10a14 14 0 010 28" stroke={t.brand} strokeWidth="2.5" strokeLinecap="round"/>
+                <circle cx="24" cy="24" r="5" fill={t.brand}/>
+              </svg>
+            </div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 17, fontWeight: 600, color: t.label }}>{s('readyToScan')}</div>
+            <div style={{ fontSize: 14, color: t.label2, marginTop: 6 }}>{s('holdNearTag')}</div>
+          </div>
+          <button onClick={() => {
+            setForm(f => ({ ...f, brand: 'Bambu', material: 'PLA Matte', color: 'Grey', colorHex: '#8A8A8A', sku: 'BL-PLA-M-GY', printTemp: '190-220°C', bedTemp: '35-45°C' }));
+            setStep('manual');
+          }} style={{
+            padding: '12px 28px', background: t.surface2,
+            border: `1.5px solid ${t.sep}`, borderRadius: 14,
+            fontSize: 14, color: t.label2, cursor: 'pointer',
+          }}>{s('simulateNfc')}</button>
+          <button onClick={() => setStep('method')} style={{
+            background: 'none', border: 'none', fontSize: 15, color: t.label2, cursor: 'pointer',
+          }}>← {s('back')}</button>
+        </div>
+      )}
+
+      {/* Manual form */}
+      {step === 'manual' && (
+        <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: t.label2, marginBottom: 5, letterSpacing: 0.4 }}>{s('brand')}</div>
+              <input style={inputStyle} value={form.brand} placeholder="e.g. eSUN" onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: t.label2, marginBottom: 5, letterSpacing: 0.4 }}>{s('material')}</div>
+              <select style={{ ...inputStyle, appearance: 'none' }} value={form.material} onChange={e => setForm(f => ({ ...f, material: e.target.value }))}>
+                {MATERIALS.map(m => <option key={m}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: t.label2, marginBottom: 8, letterSpacing: 0.4 }}>{s('color')}</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {PRESET_COLORS.map(c => (
+                <button key={c.hex} onClick={() => setForm(f => ({ ...f, color: c.label, colorHex: c.hex }))} style={{
+                  width: 32, height: 32, borderRadius: 10,
+                  background: c.hex,
+                  border: `2.5px solid ${form.colorHex === c.hex ? t.brand : 'transparent'}`,
+                  cursor: 'pointer', flexShrink: 0,
+                }} title={c.label} />
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: t.label2, marginBottom: 5, letterSpacing: 0.4 }}>{s('printTemp')}</div>
+              <input style={inputStyle} value={form.printTemp} placeholder="210-230°C" onChange={e => setForm(f => ({ ...f, printTemp: e.target.value }))} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: t.label2, marginBottom: 5, letterSpacing: 0.4 }}>{s('bedTemp')}</div>
+              <input style={inputStyle} value={form.bedTemp} placeholder="60-80°C" onChange={e => setForm(f => ({ ...f, bedTemp: e.target.value }))} />
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: t.label2, marginBottom: 5, letterSpacing: 0.4 }}>{s('weightRemaining')}</div>
+            <input style={inputStyle} type="number" value={form.weightRemaining} onChange={e => setForm(f => ({ ...f, weightRemaining: e.target.value }))} />
+          </div>
+
+          <button onClick={() => {
+            onAdd({
+              id: `SP-${Date.now()}`, ...form,
+              weightTotal: parseInt(form.weightTotal) || 1000,
+              weightRemaining: parseInt(form.weightRemaining) || 1000,
+              lowStock: (parseInt(form.weightRemaining) || 1000) < 200,
+            });
+            handleDismiss();
+          }} style={{
+            width: '100%', marginTop: 4,
+            padding: '15px', background: t.brand,
+            border: 'none', borderRadius: 14,
+            fontSize: 16, fontWeight: 700, color: '#fff', cursor: 'pointer',
+          }}>{s('addSpool')}</button>
+          <button onClick={() => setStep('method')} style={{
+            background: 'none', border: 'none', fontSize: 15, color: t.label2, cursor: 'pointer', padding: '4px',
+          }}>← {s('back')}</button>
+        </div>
+      )}
+    </BottomSheet>
+  );
+}
+
+// ─── Inventory Screen ─────────────────────────────────────────────────────────
+
+function InventoryScreen() {
+  const { t, s } = useTheme();
+  const { spools, addSpool } = useApp();
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [detailSpool, setDetailSpool] = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const filtered = spools.filter(sp => {
+    const matchSearch = !search || `${sp.brand} ${sp.material} ${sp.color} ${sp.sku}`.toLowerCase().includes(search.toLowerCase());
+    const matchFilter = filter === 'all' || (filter === 'low' && sp.lowStock);
+    return matchSearch && matchFilter;
+  });
+
+  if (detailSpool) {
+    return <SpoolDetailScreen spool={detailSpool} onBack={() => setDetailSpool(null)} />;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      {/* Nav */}
+      <LargeNavBar
+        title={s('tab_inventory')}
+        right={<span style={{ fontSize: 22, fontWeight: 300, lineHeight: 1 }}>+</span>}
+        onRight={() => setAddOpen(true)}
+      />
+
+      {/* Search + filters */}
+      <div style={{
+        flexShrink: 0, padding: '8px 16px',
+        background: t.navBg, backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: `0.5px solid ${t.sep}`,
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: t.surface2, borderRadius: 12,
+          padding: '9px 14px', marginBottom: 8,
+        }}>
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <circle cx="6.5" cy="6.5" r="5" stroke={t.label3} strokeWidth="1.6"/>
+            <path d="M10 10l3.5 3.5" stroke={t.label3} strokeWidth="1.6" strokeLinecap="round"/>
+          </svg>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={s('searchPlaceholder')}
+            style={{
+              flex: 1, background: 'none', border: 'none', outline: 'none',
+              fontSize: 15, color: t.label,
+            }}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.label3, fontSize: 16 }}>✕</button>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[
+            { id: 'all', label: `${s('f_all')} (${spools.length})` },
+            { id: 'low', label: `${s('lowStockFilter')} (${spools.filter(sp => sp.lowStock).length})` },
+          ].map(opt => (
+            <button key={opt.id} onClick={() => setFilter(opt.id)} style={{
+              padding: '5px 12px', borderRadius: 100,
+              background: filter === opt.id ? t.brandDim : t.surface2,
+              border: `1.5px solid ${filter === opt.id ? t.brand + '50' : t.sep}`,
+              color: filter === opt.id ? t.brand : t.label2,
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              transition: 'all 0.18s',
+            }}>{opt.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* List */}
+      <ScrollView>
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon="📦"
+            title={search ? s('noResults') : s('noSpoolsYet')}
+            subtitle={search ? s('tryDiffSearch') : s('addFirstSpool')}
+            action={!search ? s('addSpool') : undefined}
+            onAction={() => setAddOpen(true)}
+          />
+        ) : (
+          <div style={{ paddingTop: 10 }}>
+            <div style={{ background: t.surface, borderRadius: 16, margin: '0 16px', overflow: 'hidden' }}>
+              {filtered.map((spool, i) => (
+                <SpoolRow
+                  key={spool.id}
+                  spool={spool}
+                  onTap={setDetailSpool}
+                  isLast={i === filtered.length - 1}
+                />
+              ))}
+            </div>
+            <div style={{ height: 24 }} />
+          </div>
+        )}
+      </ScrollView>
+
+      {/* Add spool sheet */}
+      <AddSpoolSheet visible={addOpen} onDismiss={() => setAddOpen(false)} onAdd={addSpool} />
+    </div>
+  );
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+Object.assign(window, { InventoryScreen });
+
+
+// ======================= khayt-machines.jsx =======================
+// khayt-machines.jsx — Machines screen
+// Exports: MachinesScreen
+
+// ─── Machine Card ──────────────────────────────────────────────────────────────
+
+function MachineCard({ machine }) {
+  const { t, s } = useTheme();
+
+  const statusConfig = {
+    idle:     { label: s('idle'),         color: t.label3,     bg: t.surface3 },
+    printing: { label: s('printingStat'), color: STAGES.printing.dot, bg: STAGES.printing.bg },
+    error:    { label: s('error'),        color: '#FF453A',    bg: 'rgba(255,69,58,0.14)' },
+    offline:  { label: s('offline'),      color: t.label3,     bg: t.surface3 },
+  };
+  const cfg = statusConfig[machine.status] || statusConfig.offline;
+
+  return (
+    <div style={{ padding: '14px 16px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+      {/* Icon */}
+      <div style={{
+        width: 46, height: 46, borderRadius: 14, flexShrink: 0,
+        background: machine.status === 'printing' ? STAGES.printing.bg : t.surface3,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: machine.status === 'error' ? '1.5px solid rgba(255,69,58,0.4)' : 'none',
+      }}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="7" width="20" height="13" rx="2.5" stroke={cfg.color} strokeWidth="1.7"/>
+          <path d="M7 4h10" stroke={cfg.color} strokeWidth="1.7" strokeLinecap="round"/>
+          <circle cx="12" cy="13.5" r="2.5" stroke={cfg.color} strokeWidth="1.6"/>
+          <path d="M7 13.5h2.5M14.5 13.5H17" stroke={cfg.color} strokeWidth="1.6" strokeLinecap="round"/>
+        </svg>
+      </div>
+
+      {/* Info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: t.label, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {machine.name}
+          </span>
+          {/* Status pill */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '3px 9px', borderRadius: 100,
+            background: cfg.bg, fontSize: 11, fontWeight: 600, color: cfg.color,
+            flexShrink: 0,
+          }}>
+            <span style={{
+              width: 5, height: 5, borderRadius: '50%', background: cfg.color, flexShrink: 0,
+              animation: machine.status === 'printing' ? 'khayt-pulse 2s ease-in-out infinite' : 'none',
+            }} />
+            {cfg.label}
+          </span>
+        </div>
+
+        {/* Printing details */}
+        {machine.status === 'printing' && (
+          <>
+            <div style={{ fontSize: 12, color: t.label2, marginBottom: 6 }}>
+              {machine.material} · {s('job')} {machine.currentJob}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ProgressBar value={machine.progress} color={STAGES.printing.dot} height={4} style={{ flex: 1 }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: STAGES.printing.dot, flexShrink: 0 }}>
+                {machine.progress}%
+              </span>
+            </div>
+            {machine.eta && (
+              <div style={{ fontSize: 11, color: t.label3, marginTop: 5 }}>ETA: {machine.eta}</div>
+            )}
+          </>
+        )}
+
+        {/* Error state */}
+        {machine.status === 'error' && machine.error && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '6px 10px', borderRadius: 9,
+            background: 'rgba(255,69,58,0.12)', marginTop: 4,
+          }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="5" stroke="#FF453A" strokeWidth="1.5"/>
+              <path d="M6 3.5v3M6 8.5v.5" stroke="#FF453A" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span style={{ fontSize: 12, color: '#FF453A', fontWeight: 500 }}>{machine.error}</span>
+          </div>
+        )}
+
+        {/* Idle state */}
+        {machine.status === 'idle' && (
+          <div style={{ fontSize: 12, color: t.label3, marginTop: 1 }}>{s('readyForJob')}</div>
+        )}
+
+        {/* Offline state */}
+        {machine.status === 'offline' && (
+          <div style={{ fontSize: 12, color: t.label3, marginTop: 1 }}>{s('notConnected')}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Machines Summary Bar ─────────────────────────────────────────────────────
+
+function MachinesSummary({ machines }) {
+  const { t, s } = useTheme();
+  const printing = machines.filter(m => m.status === 'printing').length;
+  const idle = machines.filter(m => m.status === 'idle').length;
+  const errors = machines.filter(m => m.status === 'error').length;
+
+  return (
+    <div style={{ display: 'flex', gap: 10, padding: '14px 16px 0' }}>
+      {[
+        { label: s('printingStat'), count: printing, color: STAGES.printing.dot, bg: STAGES.printing.bg },
+        { label: s('idle'),     count: idle,     color: t.label3,            bg: t.surface3 },
+        { label: s('error'),    count: errors,   color: '#FF453A',           bg: 'rgba(255,69,58,0.14)' },
+      ].map(item => (
+        <div key={item.label} style={{
+          flex: 1, background: item.bg,
+          borderRadius: 14, padding: '10px 12px',
+          display: 'flex', flexDirection: 'column', gap: 3,
+        }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: item.color, fontVariantNumeric: 'tabular-nums' }}>
+            {item.count}
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: item.color, opacity: 0.85 }}>{item.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Machines Screen ──────────────────────────────────────────────────────────
+
+function MachinesScreen() {
+  const { t, s } = useTheme();
+  const { machines } = useApp();
+
+  // Sort: errors first, then printing, then idle, then offline
+  const sorted = [...machines].sort((a, b) => {
+    const order = { error: 0, printing: 1, idle: 2, offline: 3 };
+    return (order[a.status] ?? 4) - (order[b.status] ?? 4);
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <LargeNavBar title={s('tab_machines')} />
+
+      <ScrollView>
+        {/* Summary */}
+        <MachinesSummary machines={machines} />
+
+        {/* Machine list */}
+        <div style={{ marginTop: 16 }}>
+          <SectionLabel text={`${machines.length} ${s('printersCount')}`} />
+          <div style={{ background: t.surface, borderRadius: 16, margin: '0 16px', overflow: 'hidden' }}>
+            {sorted.map((machine, i) => (
+              <React.Fragment key={machine.id}>
+                <MachineCard machine={machine} />
+                {i < sorted.length - 1 && <Divider inset={76} />}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ height: 24 }} />
+      </ScrollView>
+    </div>
+  );
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+Object.assign(window, { MachinesScreen });
+
+
+// ======================= khayt-settings.jsx =======================
+// khayt-settings.jsx — Settings screen + Pairing wizard
+// Exports: SettingsScreen, PairingWizard
+
+// React hooks come from khayt-i18n.jsx (shared scope).
+
+// ─── Setting Row ──────────────────────────────────────────────────────────────
+
+function SettingRow({ label, value, detail, onPress, danger, icon, toggle, onToggle, isLast }) {
+  const { t } = useTheme();
+  return (
+    <>
+      <div
+        onClick={onPress}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '13px 16px', cursor: onPress ? 'pointer' : undefined,
+          minHeight: 50,
+        }}
+      >
+        {icon && (
+          <div style={{
+            width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+            background: danger ? 'rgba(255,69,58,0.14)' : t.brandDim,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>{icon}</div>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, color: danger ? '#FF453A' : t.label, fontWeight: 500 }}>{label}</div>
+          {detail && <div style={{ fontSize: 12, color: t.label2, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{detail}</div>}
+        </div>
+        {value && <span style={{ fontSize: 14, color: t.label2, flexShrink: 0 }}>{value}</span>}
+        {toggle !== undefined && (
+          <div
+            onClick={e => { e.stopPropagation(); onToggle(!toggle); }}
+            style={{
+              width: 50, height: 30, borderRadius: 15,
+              background: toggle ? t.brand : t.surface3,
+              position: 'relative', cursor: 'pointer', flexShrink: 0,
+              transition: 'background 0.2s ease',
+            }}
+          >
+            <div style={{
+              position: 'absolute', top: 3, left: toggle ? 22 : 3,
+              width: 24, height: 24, borderRadius: 12,
+              background: '#fff',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+              transition: 'left 0.2s ease',
+            }} />
+          </div>
+        )}
+        {onPress && toggle === undefined && (
+          <svg width="7" height="13" viewBox="0 0 7 13" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M1 1l5 5.5L1 12" stroke={t.label3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </div>
+      {!isLast && <Divider inset={icon ? 60 : 16} />}
+    </>
+  );
+}
+
+function SettingsGroup({ header, footer, children }) {
+  const { t } = useTheme();
+  return (
+    <div style={{ marginBottom: 20 }}>
+      {header && (
+        <div style={{ fontSize: 12, fontWeight: 600, color: t.label2, letterSpacing: 0.6, textTransform: 'uppercase', padding: '0 16px', marginBottom: 6 }}>
+          {header}
+        </div>
+      )}
+      <div style={{ background: t.surface, borderRadius: 16, margin: '0 16px', overflow: 'hidden' }}>
+        {children}
+      </div>
+      {footer && (
+        <div style={{ fontSize: 12, color: t.label3, padding: '6px 20px 0', lineHeight: 1.5 }}>{footer}</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Connection Test Result ────────────────────────────────────────────────────
+
+function TestResult({ state }) {
+  const { t, s, lang } = useTheme();
+  if (!state) return null;
+  const configs = {
+    loading: { color: t.brand, label: lang === 'ar' ? 'جارٍ الاختبار…' : 'Testing connection…', icon: '⟳' },
+    success: { color: t.success, label: s('connectedToDesktop'), icon: '✓' },
+    error:   { color: '#FF453A', label: lang === 'ar' ? 'فشل الاتصال — تحقق من IP والرمز' : 'Connection failed — check IP and PIN', icon: '✕' },
+  };
+  const c = configs[state] || configs.error;
+  return (
+    <div style={{
+      margin: '8px 16px', padding: '10px 14px', borderRadius: 12,
+      background: state === 'loading' ? t.brandDim : state === 'success' ? t.successDim : t.errorDim,
+      display: 'flex', alignItems: 'center', gap: 10,
+    }}>
+      <span style={{ fontSize: 16, color: c.color, animation: state === 'loading' ? 'khayt-spin 1s linear infinite' : 'none', display: 'inline-block' }}>{c.icon}</span>
+      <span style={{ fontSize: 13, fontWeight: 500, color: c.color }}>{c.label}</span>
+    </div>
+  );
+}
+
+// ─── Settings Screen ──────────────────────────────────────────────────────────
+
+function SettingsScreen({ onShowPairing }) {
+  const { t, s, lang } = useTheme();
+  const { settings, updateSettings, connected, setConnected } = useApp();
+  const [testState, setTestState] = useState(null);
+  const [editingPin, setEditingPin] = useState(false);
+  const [pinVal, setPinVal] = useState(settings.pin || '');
+
+  const runTest = () => {
+    setTestState('loading');
+    setTimeout(() => setTestState(connected ? 'success' : 'error'), 1400);
+  };
+
+  const icons = {
+    host: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="1" y="4" width="14" height="9" rx="2" stroke={t.brand} strokeWidth="1.4"/>
+        <path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1" stroke={t.brand} strokeWidth="1.4"/>
+        <circle cx="8" cy="8.5" r="1.5" fill={t.brand}/>
+      </svg>
+    ),
+    port: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M2 8h12M8 2v12" stroke={t.brand} strokeWidth="1.5" strokeLinecap="round"/>
+        <circle cx="8" cy="8" r="2.5" stroke={t.brand} strokeWidth="1.4"/>
+      </svg>
+    ),
+    pin: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="3" y="7" width="10" height="8" rx="2" stroke={t.brand} strokeWidth="1.4"/>
+        <path d="M5 7V5a3 3 0 016 0v2" stroke={t.brand} strokeWidth="1.4"/>
+        <circle cx="8" cy="11" r="1.3" fill={t.brand}/>
+      </svg>
+    ),
+    wifi: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M2 7a8.5 8.5 0 0112 0" stroke={t.brand} strokeWidth="1.4" strokeLinecap="round"/>
+        <path d="M4 10a5 5 0 018 0" stroke={t.brand} strokeWidth="1.4" strokeLinecap="round"/>
+        <path d="M6 13a2.5 2.5 0 014 0" stroke={t.brand} strokeWidth="1.4" strokeLinecap="round"/>
+        <circle cx="8" cy="14.5" r="1" fill={t.brand}/>
+      </svg>
+    ),
+    unlink: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M6 10l-1.5 1.5a2.83 2.83 0 01-4-4L4 4" stroke="#FF453A" strokeWidth="1.4" strokeLinecap="round"/>
+        <path d="M10 6l1.5-1.5a2.83 2.83 0 014 4L12 12" stroke="#FF453A" strokeWidth="1.4" strokeLinecap="round"/>
+        <path d="M2 2l12 12" stroke="#FF453A" strokeWidth="1.4" strokeLinecap="round"/>
+      </svg>
+    ),
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <LargeNavBar title={s('tab_settings')} />
+
+      <ScrollView>
+        {/* Connection status header */}
+        <div style={{
+          margin: '14px 16px 0',
+          background: connected ? t.successDim : t.errorDim,
+          border: `1px solid ${connected ? t.success + '33' : '#FF453A33'}`,
+          borderRadius: 14, padding: '12px 14px',
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12,
+            background: connected ? t.successDim : t.errorDim,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{
+              width: 12, height: 12, borderRadius: '50%',
+              background: connected ? t.success : '#FF453A',
+              animation: !connected ? 'khayt-pulse 2s ease-in-out infinite' : 'none',
+            }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: connected ? t.success : '#FF453A' }}>
+              {connected ? s('connectedToDesktop') : s('notConnected')}
+            </div>
+            <div style={{ fontSize: 12, color: t.label2, marginTop: 2 }}>
+              {connected ? `${settings.host}:${settings.port}` : s('tapTestRetry')}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ height: 14 }} />
+
+        {/* LAN Connection settings */}
+        <SettingsGroup header={s('lanConnection')} footer={s('lanFooter')}>
+          <SettingRow label={s('desktopIp')} value={settings.host} detail={s('ipDetail')} icon={icons.host}
+            onPress={() => { const v = prompt('Desktop IP address', settings.host); if (v) updateSettings({ host: v }); }} />
+          <SettingRow label={s('port')} value={settings.port} icon={icons.port}
+            onPress={() => { const v = prompt('Port number', settings.port); if (v) updateSettings({ port: v }); }} />
+          <SettingRow label={s('lanPin')} value={'•'.repeat(4)} detail={s('pinDetail')} icon={icons.pin} isLast
+            onPress={() => { const v = prompt('Enter 4-digit PIN', ''); if (v) updateSettings({ pin: v }); }} />
+        </SettingsGroup>
+
+        {/* Test connection */}
+        <SettingsGroup>
+          <SettingRow
+            label={s('testConnection')}
+            icon={icons.wifi}
+            onPress={runTest}
+            isLast
+          />
+        </SettingsGroup>
+        <TestResult state={testState} />
+
+        {/* Simulate connected toggle for demo */}
+        <div style={{ margin: '4px 16px 0' }}>
+          <div style={{
+            background: t.surface, borderRadius: 14,
+            padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: t.label }}>{s('simulateConn')}</div>
+              <div style={{ fontSize: 12, color: t.label2, marginTop: 2 }}>{s('demoToggle')}</div>
+            </div>
+            <div
+              onClick={() => setConnected(!connected)}
+              style={{
+                width: 50, height: 30, borderRadius: 15,
+                background: connected ? t.brand : t.surface3,
+                position: 'relative', cursor: 'pointer',
+                transition: 'background 0.2s ease',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 3, left: connected ? 22 : 3,
+                width: 24, height: 24, borderRadius: 12,
+                background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                transition: 'left 0.2s ease',
+              }} />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ height: 14 }} />
+
+        {/* Pairing */}
+        <SettingsGroup header={s('device')}>
+          <SettingRow
+            label={s('rerunPairing')}
+            detail={s('pairDifferent')}
+            icon={icons.wifi}
+            onPress={onShowPairing}
+          />
+          <SettingRow
+            label={s('unpairDevice')}
+            danger
+            icon={icons.unlink}
+            onPress={() => {
+              if (window.confirm("Unpair this phone from the desktop? You'll need to re-pair to reconnect.")) {
+                updateSettings({ host: '', port: '8765', pin: '' });
+                setConnected(false);
+              }
+            }}
+            isLast
+          />
+        </SettingsGroup>
+
+        {/* About */}
+        <SettingsGroup header={s('about')}>
+          <SettingRow label={s('appVersion')} value="1.0.0-beta" />
+          <SettingRow label={s('protocol')} value="LAN v1" />
+          <SettingRow label={s('language')} value={lang === 'ar' ? 'العربية' : 'English'} isLast />
+        </SettingsGroup>
+
+        <div style={{ height: 32 }} />
+      </ScrollView>
+    </div>
+  );
+}
+
+// ─── Pairing Wizard ────────────────────────────────────────────────────────────
+
+function PairingWizard({ onComplete, onSkip }) {
+  const { t, dark } = useTheme();
+  const { updateSettings, setConnected } = useApp();
+  const [step, setStep] = useState(0);
+  const [host, setHost] = useState('192.168.1.');
+  const [port, setPort] = useState('8765');
+  const [pin, setPin] = useState(['', '', '', '']);
+  const [testing, setTesting] = useState(false);
+  const [testOk, setTestOk] = useState(null);
+
+  const pinRefs = [React.useRef(), React.useRef(), React.useRef(), React.useRef()];
+
+  const setDigit = (i, val) => {
+    if (!/^\d?$/.test(val)) return;
+    const next = [...pin];
+    next[i] = val;
+    setPin(next);
+    if (val && i < 3) pinRefs[i + 1].current?.focus();
+  };
+
+  const testConn = () => {
+    setTesting(true);
+    setTimeout(() => { setTesting(false); setTestOk(true); }, 1600);
+  };
+
+  const steps = [
+    // Step 0: Welcome
+    {
+      title: 'Connect to\nKhayt Desktop',
+      content: (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: '20px 0 0' }}>
+          {/* Khayt logo mark */}
+          <div style={{
+            width: 100, height: 100, borderRadius: 28,
+            background: `linear-gradient(135deg, ${t.brand}30 0%, ${t.brand}10 100%)`,
+            border: `2px solid ${t.brand}30`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+              <path d="M12 28L28 12L44 28" stroke={t.brand} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M20 44V28h16v16" stroke={t.brand} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+              <rect x="22" y="36" width="12" height="8" rx="2" fill={t.brandDim}/>
+            </svg>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 15, color: t.label2, lineHeight: 1.6 }}>
+              Khayt Companion connects over your <strong style={{ color: t.label }}>local Wi-Fi</strong> to the Khayt desktop app.
+            </div>
+            <div style={{ marginTop: 12, fontSize: 13, color: t.label3, lineHeight: 1.5 }}>
+              No cloud. No account. Shop data stays on your network.
+            </div>
+          </div>
+          <div style={{
+            background: t.surface2, borderRadius: 14,
+            padding: '12px 16px', width: '100%', display: 'flex', flexDirection: 'column', gap: 8,
+          }}>
+            {[
+              'Khayt desktop app is running',
+              'Phone is on the same Wi-Fi',
+              'LAN PIN is ready on desktop',
+            ].map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 20, height: 20, borderRadius: 10, background: t.brandDim, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, color: t.brand, fontWeight: 700 }}>{i + 1}</span>
+                </div>
+                <span style={{ fontSize: 13, color: t.label2 }}>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+      cta: "Let's go →",
+    },
+    // Step 1: IP + Port
+    {
+      title: 'Desktop\nAddress',
+      content: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 8 }}>
+          <div style={{ fontSize: 14, color: t.label2, lineHeight: 1.5 }}>
+            On the Khayt desktop app, open <strong style={{ color: t.label }}>Settings → Mobile</strong> to find your IP address.
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: t.label2, letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' }}>Desktop IP Address</div>
+            <input
+              value={host}
+              onChange={e => setHost(e.target.value)}
+              placeholder="192.168.1.100"
+              style={{
+                width: '100%', padding: '13px 14px',
+                background: t.surface2, border: `1.5px solid ${t.sep}`,
+                borderRadius: 12, fontSize: 17, color: t.label,
+                outline: 'none', boxSizing: 'border-box',
+                fontVariantNumeric: 'tabular-nums', letterSpacing: 0.5,
+              }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: t.label2, letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' }}>Port</div>
+            <input
+              value={port}
+              onChange={e => setPort(e.target.value)}
+              placeholder="8765"
+              style={{
+                width: '100%', padding: '13px 14px',
+                background: t.surface2, border: `1.5px solid ${t.sep}`,
+                borderRadius: 12, fontSize: 17, color: t.label,
+                outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ fontSize: 12, color: t.label3, marginTop: 5 }}>Default port is 8765</div>
+          </div>
+        </div>
+      ),
+      cta: 'Next: Enter PIN →',
+    },
+    // Step 2: PIN
+    {
+      title: 'Enter\nLAN PIN',
+      content: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', paddingTop: 8 }}>
+          <div style={{ fontSize: 14, color: t.label2, lineHeight: 1.5, alignSelf: 'stretch' }}>
+            Open <strong style={{ color: t.label }}>Khayt desktop → Settings → Mobile</strong> and tap <em>Show PIN</em>.
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            {pin.map((d, i) => (
+              <input
+                key={i}
+                ref={pinRefs[i]}
+                maxLength={1}
+                inputMode="numeric"
+                value={d}
+                onChange={e => setDigit(i, e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Backspace' && !d && i > 0) pinRefs[i - 1].current?.focus();
+                }}
+                style={{
+                  width: 60, height: 68, textAlign: 'center',
+                  fontSize: 28, fontWeight: 700, letterSpacing: 0,
+                  background: t.surface2,
+                  border: `2px solid ${d ? t.brand + '80' : t.sep}`,
+                  borderRadius: 14, color: t.label,
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                }}
+              />
+            ))}
+          </div>
+          <div style={{ fontSize: 13, color: t.label3 }}>PIN is stored securely in Keychain</div>
+        </div>
+      ),
+      cta: 'Test Connection →',
+    },
+    // Step 3: Test
+    {
+      title: 'All set!',
+      content: (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, paddingTop: 16 }}>
+          <div style={{
+            width: 80, height: 80, borderRadius: '50%',
+            background: testOk ? t.successDim : t.brandDim,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 36,
+            transition: 'background 0.3s',
+          }}>
+            {testing ? (
+              <div style={{ width: 32, height: 32, borderRadius: '50%', border: `3px solid ${t.brand}`, borderTopColor: 'transparent', animation: 'khayt-spin 0.8s linear infinite' }} />
+            ) : testOk ? '✓' : '📡'}
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 17, fontWeight: 600, color: t.label, marginBottom: 6 }}>
+              {testing ? 'Connecting…' : testOk ? 'Connected!' : 'Ready to connect'}
+            </div>
+            <div style={{ fontSize: 14, color: t.label2, lineHeight: 1.5 }}>
+              {testOk ? `Paired with Khayt Desktop at ${host}:${port}` : 'Tap the button below to test your connection'}
+            </div>
+          </div>
+          {!testOk && !testing && (
+            <button onClick={testConn} style={{
+              padding: '12px 28px', borderRadius: 14,
+              background: t.brandDim, border: `1.5px solid ${t.brand}40`,
+              color: t.brand, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            }}>Test Connection</button>
+          )}
+        </div>
+      ),
+      cta: testOk ? 'Open Khayt Companion' : 'Skip for now',
+    },
+  ];
+
+  const currentStep = steps[step];
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 300,
+      background: dark ? t.bg : t.bg,
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Header */}
+      <div style={{ paddingTop: 62, padding: '62px 16px 0', flexShrink: 0 }}>
+        {/* Step dots */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
+          {steps.map((_, i) => (
+            <div key={i} style={{
+              height: 4, flex: i <= step ? 2 : 1,
+              borderRadius: 2,
+              background: i <= step ? t.brand : t.surface3,
+              transition: 'all 0.3s ease',
+            }} />
+          ))}
+        </div>
+        {/* Title */}
+        <div style={{
+          fontSize: 30, fontWeight: 700, color: t.label,
+          letterSpacing: -0.5, lineHeight: 1.2,
+          whiteSpace: 'pre-line',
+          marginBottom: 20,
+        }}>{currentStep.title}</div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px', paddingBottom: 16 }}>
+        {currentStep.content}
+      </div>
+
+      {/* CTA */}
+      <div style={{ padding: '12px 16px 32px', flexShrink: 0 }}>
+        <button onClick={() => {
+          if (step < steps.length - 1) {
+            setStep(s => s + 1);
+          } else {
+            updateSettings({ host, port, pin: pin.join('') });
+            if (testOk) setConnected(true);
+            onComplete();
+          }
+        }} style={{
+          width: '100%', padding: '16px',
+          background: t.brand, border: 'none',
+          borderRadius: 16, fontSize: 16, fontWeight: 700,
+          color: '#fff', cursor: 'pointer',
+          boxShadow: `0 4px 20px ${t.brand}40`,
+        }}>{currentStep.cta}</button>
+        {step > 0 && (
+          <button onClick={() => setStep(s => s - 1)} style={{
+            width: '100%', marginTop: 10, padding: '12px',
+            background: 'none', border: 'none',
+            fontSize: 15, color: t.label2, cursor: 'pointer',
+          }}>← Back</button>
+        )}
+        {step === 0 && onSkip && (
+          <button onClick={onSkip} style={{
+            width: '100%', marginTop: 10, padding: '12px',
+            background: 'none', border: 'none',
+            fontSize: 15, color: t.label2, cursor: 'pointer',
+          }}>Skip setup</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+Object.assign(window, { SettingsScreen, PairingWizard });
+
+
+// ======================= khayt-widget.jsx =======================
+// khayt-widget.jsx — iOS Home Screen widget concept overlay
+// Exports: WidgetPreview
+
+function KhaytMark({ size = 18, color }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M5 13L12 6l7 7" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M8.5 19v-6h7v6" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function WidgetConnDot({ connected, label }) {
+  const color = connected ? '#32D74B' : '#FF453A';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, direction: 'ltr' }}>
+      <span style={{
+        width: 7, height: 7, borderRadius: '50%', background: color,
+        boxShadow: `0 0 6px ${color}99`,
+      }} />
+      {label && <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{label}</span>}
+    </div>
+  );
+}
+
+// Small 2×2 widget — queue count + connection dot
+function SmallWidget({ counts, connected, s }) {
+  return (
+    <div style={{
+      width: 150, height: 150, borderRadius: 24,
+      background: 'linear-gradient(160deg, #23232E 0%, #16161D 100%)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+      padding: 16, display: 'flex', flexDirection: 'column',
+      justifyContent: 'space-between',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{
+          width: 26, height: 26, borderRadius: 8,
+          background: 'rgba(129,131,255,0.18)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <KhaytMark size={16} color="#A5A8FF" />
+        </div>
+        <WidgetConnDot connected={connected} />
+      </div>
+      <div>
+        <div style={{ fontSize: 52, fontWeight: 700, color: '#fff', lineHeight: 0.95, letterSpacing: -2, fontVariantNumeric: 'tabular-nums', direction: 'ltr' }}>
+          {counts.pending}
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+          {s('inQueue')}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#8183FF', flexShrink: 0 }} />
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+          <span style={{ direction: 'ltr', display: 'inline-block' }}>{counts.printing}</span> {s('printingStat').toLowerCase()}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// Medium 4×2 widget — full pipeline + connection
+function MediumWidget({ counts, connected, s, printingOrder }) {
+  const stages = STAGE_SEQUENCE;
+  return (
+    <div style={{
+      width: 322, height: 150, borderRadius: 24,
+      background: 'linear-gradient(160deg, #23232E 0%, #16161D 100%)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+      padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 24, height: 24, borderRadius: 7,
+            background: 'rgba(129,131,255,0.18)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <KhaytMark size={15} color="#A5A8FF" />
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{s('shopPulse')}</span>
+        </div>
+        <WidgetConnDot connected={connected} label={connected ? s('connected') : s('offline')} />
+      </div>
+
+      {/* Pipeline counts */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', direction: 'ltr' }}>
+        {stages.map((stage, i) => {
+          const st = STAGES[stage];
+          const c = counts[stage] || 0;
+          return (
+            <React.Fragment key={stage}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                <span style={{ fontSize: 22, fontWeight: 700, color: c > 0 ? st.dot : 'rgba(255,255,255,0.25)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{c}</span>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: c > 0 ? st.dot : 'rgba(255,255,255,0.2)' }} />
+              </div>
+              {i < stages.length - 1 && (
+                <div style={{ flex: 1, height: 1.5, background: 'rgba(255,255,255,0.08)', margin: '0 2px', marginBottom: 8 }} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {/* Active print */}
+      <div style={{
+        background: 'rgba(129,131,255,0.12)', borderRadius: 10,
+        padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#8183FF', flexShrink: 0,
+          animation: 'khayt-pulse 2s ease-in-out infinite' }} />
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+          {printingOrder ? `${printingOrder.name}` : s('noJobs')}
+        </span>
+        {printingOrder && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#A5A8FF', direction: 'ltr' }}>{printingOrder.progress}%</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WidgetPreview({ onClose }) {
+  const { t, s, rtl } = useTheme();
+  const { orders, connected } = useApp();
+
+  const counts = STAGE_SEQUENCE.reduce((acc, st) => {
+    acc[st] = orders.filter(o => o.status === st).length;
+    return acc;
+  }, {});
+  const printingOrder = orders.find(o => o.status === 'printing');
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 300,
+      background: 'linear-gradient(180deg, #2a2350 0%, #1a1530 45%, #0d0b1a 100%)',
+      display: 'flex', flexDirection: 'column',
+      animation: 'khayt-slide-up 0.3s ease',
+    }}>
+      {/* Status bar spacer */}
+      <div style={{ height: 62, flexShrink: 0 }} />
+
+      {/* Header */}
+      <div dir={rtl ? 'rtl' : 'ltr'} style={{ padding: '4px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>{s('widgetTitle')}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{s('widgetSub')}</div>
+        </div>
+        <button onClick={onClose} style={{
+          width: 30, height: 30, borderRadius: 15,
+          background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer',
+          color: '#fff', fontSize: 15, fontWeight: 600,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(10px)',
+        }}>✕</button>
+      </div>
+
+      {/* Widgets on simulated home screen */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, padding: 20 }}>
+        {/* Row: small + (dummy app icons) */}
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <SmallWidget counts={counts} connected={connected} s={s} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {[['#8183FF', true], ['#32D74B', false], ['#FF9F0A', false]].map(([c, mark], i) => (
+              <div key={i} style={{
+                width: 62, height: 62, borderRadius: 15,
+                background: `linear-gradient(160deg, ${c}40, ${c}15)`,
+                border: '1px solid rgba(255,255,255,0.08)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: 0.5,
+              }}>
+                {mark && <KhaytMark size={26} color="rgba(255,255,255,0.5)" />}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Medium widget */}
+        <MediumWidget counts={counts} connected={connected} s={s} printingOrder={printingOrder} />
+
+        {/* Caption */}
+        <div style={{
+          fontSize: 12, color: 'rgba(255,255,255,0.5)', textAlign: 'center',
+          maxWidth: 280, lineHeight: 1.5, direction: rtl ? 'rtl' : 'ltr',
+        }}>
+          {rtl
+            ? 'تحدّث العناصر تلقائياً عبر الشبكة المحلية. النقطة تعرض حالة الاتصال بسطح المكتب.'
+            : 'Widgets refresh over LAN. The dot shows live desktop connection — green when paired, red when offline.'}
+        </div>
+      </div>
+
+      {/* Dock hint */}
+      <div style={{ height: 28, flexShrink: 0 }} />
+    </div>
+  );
+}
+
+Object.assign(window, { WidgetPreview });
+
+
+// ======================= khayt-main.jsx =======================
+// khayt-main.jsx — Root App, mock data, context providers, Tweaks
+// Exports: mounts the root React app to #root
+
+// React hooks come from khayt-i18n.jsx (shared scope).
+
+// ─── Mock Data ────────────────────────────────────────────────────────────────
+
+const INITIAL_ORDERS = [
+  { id: 'KH-0041', name: 'Bracket Set ×4',      customer: 'Ahmed Al-Rashid', filament: 'eSUN PLA+ Black',       status: 'printing',  dueDate: '2026-06-05', progress: 68, printer: 'Bambu X1C #2', eta: '1h 23m', qty: 4, overdue: false, notes: '' },
+  { id: 'KH-0042', name: 'Phone Stand',          customer: 'Sara Almutairi',  filament: 'Polymaker PETG White',  status: 'pending',   dueDate: '2026-06-06', progress: 0,  printer: null,           qty: 1, overdue: false, notes: 'White matte finish preferred' },
+  { id: 'KH-0043', name: 'Cable Organizer ×10',  customer: 'Faisal Corp',     filament: 'Bambu PLA Matte Grey',  status: 'post',      dueDate: '2026-06-04', progress: 100, printer: 'Bambu P1S #1', qty: 10, overdue: true,  notes: '' },
+  { id: 'KH-0044', name: 'Logo Plaque',          customer: 'Nora Design',     filament: 'eSUN PLA+ White',       status: 'qc',        dueDate: '2026-06-04', progress: 100, printer: 'Creality K1', qty: 1, overdue: false, notes: '' },
+  { id: 'KH-0040', name: 'Gear Mount ×2',        customer: 'Tech Solutions',  filament: 'PETG Black',            status: 'completed', dueDate: '2026-06-03', progress: 100, printer: 'Bambu X1C #1', qty: 2, overdue: false, notes: '' },
+  { id: 'KH-0039', name: 'Wall Bracket',         customer: 'Home Store',      filament: 'PLA White',             status: 'completed', dueDate: '2026-06-02', progress: 100, printer: 'Bambu P1S #1', qty: 3, overdue: false, notes: '' },
+];
+
+const INITIAL_SPOOLS = [
+  { id: 'SP-001', brand: 'eSUN',      material: 'PLA+',       color: 'Black',   colorHex: '#1A1A1A', weightTotal: 1000, weightRemaining: 340,  sku: 'ESUN-PLA+-BK-1KG',  lot: 'L240301', printTemp: '210-230°C', bedTemp: '60-80°C',   lowStock: true  },
+  { id: 'SP-002', brand: 'Polymaker', material: 'PETG',       color: 'White',   colorHex: '#F5F5F0', weightTotal: 1000, weightRemaining: 890,  sku: 'PM-PETG-WH-1KG',    lot: 'L240408', printTemp: '230-250°C', bedTemp: '70-90°C',   lowStock: false },
+  { id: 'SP-003', brand: 'Bambu',     material: 'PLA Matte',  color: 'Grey',    colorHex: '#8A8A8A', weightTotal: 1000, weightRemaining: 85,   sku: 'BL-PLA-M-GY-1KG',   lot: 'L240412', printTemp: '190-220°C', bedTemp: '35-45°C',   lowStock: true  },
+  { id: 'SP-004', brand: 'eSUN',      material: 'PLA+',       color: 'White',   colorHex: '#FEFEFE', weightTotal: 1000, weightRemaining: 620,  sku: 'ESUN-PLA+-WH-1KG',  lot: 'L240315', printTemp: '210-230°C', bedTemp: '60-80°C',   lowStock: false },
+  { id: 'SP-005', brand: 'Bambu',     material: 'PLA',        color: 'Red',     colorHex: '#C0392B', weightTotal: 1000, weightRemaining: 420,  sku: 'BL-PLA-RD-1KG',     lot: 'L240420', printTemp: '190-220°C', bedTemp: '35-45°C',   lowStock: false },
+  { id: 'SP-006', brand: 'Creality',  material: 'PETG',       color: 'Black',   colorHex: '#0A0A0A', weightTotal: 1000, weightRemaining: 155,  sku: 'CR-PETG-BK-1KG',    lot: 'L240320', printTemp: '230-245°C', bedTemp: '70-85°C',   lowStock: true  },
+];
+
+const INITIAL_MACHINES = [
+  { id: 'M-001', name: 'Bambu X1C #1',  model: 'Bambu Lab X1C', status: 'idle',     material: null,           progress: 0,  eta: null,       currentJob: null,       error: null },
+  { id: 'M-002', name: 'Bambu X1C #2',  model: 'Bambu Lab X1C', status: 'printing', material: 'PLA+ Black',   progress: 68, eta: '1h 23m',  currentJob: 'KH-0041',  error: null },
+  { id: 'M-003', name: 'Bambu P1S #1',  model: 'Bambu Lab P1S', status: 'idle',     material: null,           progress: 0,  eta: null,       currentJob: null,       error: null },
+  { id: 'M-004', name: 'Creality K1',   model: 'Creality K1',   status: 'error',    material: null,           progress: 0,  eta: null,       currentJob: null,       error: 'Nozzle jam — manual clear needed' },
+  { id: 'M-005', name: 'Bambu A1 Mini', model: 'Bambu Lab A1 Mini', status: 'idle', material: null,           progress: 0,  eta: null,       currentJob: null,       error: null },
+];
+
+const INITIAL_SETTINGS = { host: '192.168.1.42', port: '8765', pin: '5829' };
+
+// ─── TWEAK_DEFAULTS ────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "dark": true,
+  "connected": true,
+  "showPairing": false,
+  "lang": "en",
+  "accent": "#8183FF"
+}/*EDITMODE-END*/;
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+
+function KhaytApp() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const dark = tweaks.dark;
+  const t = dark ? DARK_TOKENS : LIGHT_TOKENS;
+  const lang = tweaks.lang || 'en';
+  const rtl = lang === 'ar';
+  const s = useMemo(() => makeS(lang), [lang]);
+
+  const [orders, setOrders] = useState(INITIAL_ORDERS);
+  const [spools, setSpools] = useState(INITIAL_SPOOLS);
+  const [machines] = useState(INITIAL_MACHINES);
+  const [settings, setSettings] = useState(INITIAL_SETTINGS);
+  const [connected, setConnected] = useState(tweaks.connected);
+  const [showPairing, setShowPairing] = useState(tweaks.showPairing);
+
+  const [activeTab, setActiveTab] = useState('home');
+  const [ordersFilter, setOrdersFilter] = useState(null);
+  const [showWidget, setShowWidget] = useState(false);
+
+  // Keep connected in sync with tweak (one-way init)
+  const [syncDone, setSyncDone] = useState(false);
+  React.useEffect(() => {
+    if (!syncDone) { setConnected(tweaks.connected); setShowPairing(tweaks.showPairing); setSyncDone(true); }
+  }, [tweaks.connected, tweaks.showPairing]);
+
+  const advanceOrder = useCallback((order) => {
+    const idx = STAGE_SEQUENCE.indexOf(order.status);
+    if (idx >= STAGE_SEQUENCE.length - 1) return;
+    const nextStatus = STAGE_SEQUENCE[idx + 1];
+    setOrders(prev => prev.map(o => o.id === order.id
+      ? { ...o, status: nextStatus, progress: nextStatus === 'completed' ? 100 : o.progress }
+      : o
+    ));
+  }, []);
+
+  const addSpool = useCallback((spool) => {
+    setSpools(prev => [spool, ...prev]);
+  }, []);
+
+  const updateSettings = useCallback((patch) => {
+    setSettings(prev => ({ ...prev, ...patch }));
+  }, []);
+
+  const appValue = useMemo(() => ({
+    orders, spools, machines, settings, connected, setConnected,
+    advanceOrder, addSpool, updateSettings,
+  }), [orders, spools, machines, settings, connected]);
+
+  const themeValue = useMemo(() => ({ dark, t, lang, rtl, s }), [dark, t, lang, rtl, s]);
+
+  const goToOrders = useCallback((filter) => {
+    setOrdersFilter(filter || null);
+    setActiveTab('orders');
+  }, []);
+
+  const [pendingOrderDetail, setPendingOrderDetail] = useState(null);
+
+  const openOrderDetail = useCallback((order) => {
+    setPendingOrderDetail(order);
+    setActiveTab('orders');
+  }, []);
+
+  const renderScreen = () => {
+    switch (activeTab) {
+      case 'home':
+        return (
+          <HomeScreen
+            onOrderTap={openOrderDetail}
+            onGoToInventory={() => setActiveTab('inventory')}
+            onGoToOrders={goToOrders}
+          />
+        );
+      case 'orders':
+        return <OrdersScreen initialFilter={ordersFilter} />;
+      case 'inventory':
+        return <InventoryScreen />;
+      case 'machines':
+        return <MachinesScreen />;
+      case 'settings':
+        return <SettingsScreen onShowPairing={() => setShowPairing(true)} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <ThemeContext.Provider value={themeValue}>
+      <AppContext.Provider value={appValue}>
+        <div style={{
+          minHeight: '100vh',
+          background: dark ? '#0A0A0F' : '#D8D8E0',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif",
+          WebkitFontSmoothing: 'antialiased',
+          padding: '24px 16px',
+        }}>
+          <IOSDevice dark={dark} width={393} height={852}>
+            <div dir={rtl ? 'rtl' : 'ltr'} style={{
+              height: '100%',
+              display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
+              background: dark ? t.bg : t.bg,
+              fontFamily: rtl
+                ? "'SF Arabic', 'Geeza Pro', -apple-system, BlinkMacSystemFont, sans-serif"
+                : "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+            }}>
+              {/* Status bar spacer — the IOSDevice renders status bar absolutely */}
+              <div style={{ height: 62, flexShrink: 0 }} />
+
+              {/* Connection banner */}
+              {!connected && (
+                <ConnectionBanner onRetry={() => {
+                  setTimeout(() => setConnected(true), 800);
+                }} />
+              )}
+
+              {/* Screen content */}
+              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                {renderScreen()}
+                {showPairing && (
+                  <PairingWizard
+                    onComplete={() => setShowPairing(false)}
+                    onSkip={() => setShowPairing(false)}
+                  />
+                )}
+                {showWidget && (
+                  <WidgetPreview onClose={() => setShowWidget(false)} />
+                )}
+              </div>
+
+              {/* Tab bar */}
+              <TabBar activeTab={activeTab} onTabChange={(tab) => { setActiveTab(tab); setOrdersFilter(null); }} />
+            </div>
+          </IOSDevice>
+
+          {/* Tweaks panel */}
+          <TweaksPanel>
+            <TweakSection label="Appearance" />
+            <TweakToggle label="Dark mode" value={dark} onChange={v => setTweak('dark', v)} />
+            <TweakRadio label="Language" value={lang}
+              options={[{ value: 'en', label: 'English' }, { value: 'ar', label: 'العربية' }]}
+              onChange={v => setTweak('lang', v)} />
+            <TweakSection label="Connection" />
+            <TweakToggle label="Connected to desktop" value={connected} onChange={v => setConnected(v)} />
+            <TweakSection label="Flows" />
+            <TweakButton label="Show Pairing Wizard" onClick={() => setShowPairing(true)} />
+            <TweakButton label="Show Home Widgets" onClick={() => setShowWidget(true)} />
+            <TweakButton label="Reset all orders" onClick={() => setOrders(INITIAL_ORDERS)} />
+          </TweaksPanel>
+        </div>
+      </AppContext.Provider>
+    </ThemeContext.Provider>
+  );
+}
+
+// ─── Mount ────────────────────────────────────────────────────────────────────
+const khaytRoot = ReactDOM.createRoot(document.getElementById('root'));
+khaytRoot.render(<KhaytApp />);
+
+
+  </script>
+</body>
+</html>

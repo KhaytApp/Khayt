@@ -1,0 +1,778 @@
+import Foundation
+import KhaytCore
+import SwiftUI
+
+/// One job in the shop's book.
+///
+/// Decoded leniently on purpose. This store is written by the Electron app, and
+/// a newer build will put fields here that this app has never heard of; a
+/// stricter decoder would drop whole orders over a field it does not use. It is
+/// also genuinely loose data: `clientId`, `dueDate` and `paymentMethod` are all
+/// null across every order in the seed store, `price` arrives as an integer
+/// where `costBasis` arrives as a double, and `priority` is a bool.
+extension DateFormatter {
+    /// Today, as the SHOP would write it: `yyyy-MM-dd` in the machine's own
+    /// time zone.
+    ///
+    /// Not UTC. A projection made at one in the morning in Riyadh is dated
+    /// today, not yesterday — the same trap that once put a purchase on the
+    /// wrong day, and the reason `Order.dayFormatter` beside this one is
+    /// deliberately UTC: it PARSES a stored date, which is written in UTC,
+    /// while this one WRITES a date a person will read.
+    static let shopDay: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+}
+
+struct Order: Identifiable, Decodable, Hashable, Sendable {
+    let id: String
+    /// The readable half of a job's id. Since ids became unique across
+    /// computers (lib/order-new.js `mintOrderId`) a new job's id is
+    /// `INV-2026-0042-k7qx` and this is `INV-2026-0042`; older jobs have none.
+    let jobNumber: String?
+    /// The reference a PERSON reads: the job number, else the id. Every
+    /// screen that shows a job's reference shows this; `id` stays the key.
+    var reference: String { (jobNumber?.isEmpty == false ? jobNumber : nil) ?? id }
+    let date: String
+    /// The day this job's invoice was ISSUED — `PaymentTerms.invoiceDate`
+    /// (`lib/payment-terms.js`): a job that began as a quote is invoiced when
+    /// it was accepted, not on the quote's `date`. What its due date counts
+    /// from; "" when the job holds no day at all.
+    let invoiceDay: String
+    let status: String
+    let project: String
+    let client: String
+    let currency: String
+    let price: Double
+    /// A test, a gift, something for the shop itself: out of revenue, order
+    /// counts and reports, still in nozzle wear and capacity. See
+    /// `lib/business-scope.js`. Absent is the ordinary case, a real job.
+    let nonBusiness: Bool?
+    /// `voidedAt` / `creditedAt` are set: the invoice was voided, or credited
+    /// in full. Read as `!!x` the way the shared rules read them. Neither is
+    /// money owed — see `owesAtAll`.
+    let voided: Bool
+    let credited: Bool
+    let paidAmount: Double
+    let costBasis: Double
+    /// What the product's components (a box, magnets) cost when the job was
+    /// taken — `lib/order-new.js` prices them into the job and freezes this
+    /// beside the price. Not part of `costBasis`, which is the parts alone and
+    /// what the P&L's cost of goods is built from; a job's OWN margin adds it
+    /// (`jobCost`). 0 on every job without components.
+    let componentsCost: Double
+    let paymentStatus: String
+    /// How the last payment arrived. Optional because an unpaid job has no
+    /// answer, and "cash" is a claim rather than a default.
+    let paymentMethod: String?
+    let printTime: Double
+    let priority: Bool
+    /// 'normal' | 'high' | 'urgent'. Optional because an older record carries
+    /// only the boolean above — `Shop.priorityOf` reads the pair.
+    let priorityLevel: String?
+    let notes: String
+    let machineId: String?
+    /// Who did the work: an `OP-…` in `store.operators`, or nobody. Lenient: a
+    /// field this app never wrote until operators came to it must not be able
+    /// to make a job unreadable.
+    let operatorId: String?
+    /// This piece came off the shelf. It was printed in a batch weeks ago and
+    /// is being SOLD now, not made now — so its price, its cost and its print
+    /// hours all land on the sale, which is the only combination that leaves
+    /// the existing figures true.
+    ///
+    /// Absent on every order written before stock existed, and absent on every
+    /// made-to-order job since, so `false` and "nobody said" are the same
+    /// answer here and there is nothing to migrate.
+    let fromStock: Bool
+    /// The customer's row in `clients`, when the job was linked to one. Absent
+    /// on a job taken for a walk-in, and on every job in a shop that has never
+    /// used the customer screen.
+    let clientId: String?
+    /// The job's customer was ERASED (`clientErasedAt`, written by the erase).
+    /// An invoiced job keeps the name with no link, and without this mark it
+    /// was matched by that name to any other customer who shares it — showing
+    /// them the erased person's history.
+    let clientErased: Bool
+    /// The catalogue product this job is for, when it was taken from one.
+    ///
+    /// What the catalogue counts to say a product has been made 14 times and
+    /// earned 6,300 — and what `lib/product-docs.js` follows to put the right
+    /// assembly sheet in the box. Absent on a job somebody typed out.
+    let productId: String?
+    let completedAt: String?
+    let deliveredAt: String?
+    /// When the parcel left the shop. A shipped job is still `completed`;
+    /// see `Stage.of` and `lib/order-status.js`.
+    let shippedAt: String?
+    /// Who took the parcel and under what number — `lib/shipment.js` writes
+    /// both. Absent on a job shipped by hand-stamping the date, which is every
+    /// job this app shipped before the Ship sheet.
+    let carrier: String?
+    let trackingNumber: String?
+    let shippingService: String?
+    /// Where the parcel is: `label_created` → `in_transit` → `out_for_delivery`
+    /// → `delivered`, or `exception`. Moved by hand or by the carrier's webhook.
+    let shippingStatus: String?
+    let dueDate: String?
+    let parts: [Part]
+    /// The payment plan written on this job, in the order it is collected.
+    /// Empty on the great majority of jobs — a plan is something a shop sets up
+    /// deliberately, for a customer paying over months.
+    let instalments: [PlanRow]
+    /// The cash the order held when the plan was generated. See
+    /// `collectionTotals` in `lib/payment-plan.js`: without it, collecting a
+    /// row either destroys the deposit or leaves it outstanding forever.
+    /// Absent on a hand-built plan, and on every plan made before Sep 2026.
+    let instalmentBase: Double?
+    /// The invoice's number, once the job has one. `lib/order-new.js` writes
+    /// it under both spellings (`invoiceNumber` and `invoiceNum`) and older
+    /// books carry one or the other — and sometimes a NUMBER. Read for ⌘K,
+    /// which finds a job by the number on the paper the customer is holding.
+    let invoiceNumber: String?
+    /// What the job's COMPLETION took off the shelf, draw by draw —
+    /// `lib/order-deduction.js` writes it and `returnForOrder` reads it to
+    /// put exactly that back. Decoded for display only (the Filament used
+    /// section, and finding a job by the lot it drew from); never written
+    /// from here. Absent on a job not finished, or finished before the record.
+    let materialDrawn: MaterialDrawn?
+    /// The lines of the store order this job came from, each with the
+    /// catalogue product it matched (`lib/store-order-job.js`) — or none, for a
+    /// line the shop still has to pick a product for. Empty on every job that
+    /// did not come from a store.
+    let storeLines: [StoreLine]
+    /// The job this one reprints, and the jobs that reprint this one
+    /// (`lib/reprint.js`). Nil and empty on almost every job.
+    let reprintOf: String?
+    let reprintedInto: [String]
+
+    struct StoreLine: Decodable, Hashable, Sendable {
+        let name: String
+        let qty: Int
+        let productId: String?
+        let sku: String?
+
+        private enum CodingKeys: String, CodingKey { case name, qty, productId, sku }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = ((try? c.decodeIfPresent(String.self, forKey: .name)) ?? nil) ?? ""
+            let n = ((try? c.decodeIfPresent(Double.self, forKey: .qty)) ?? nil) ?? 1
+            // A count off the wire, never a trap — clamped as `lib/shelf-sale.js` clamps it.
+            qty = n.isFinite ? Int(max(1, min(100_000, n.rounded(.down)))) : 1
+            productId = ((try? c.decodeIfPresent(String.self, forKey: .productId)) ?? nil)
+                .flatMap { $0.isEmpty ? nil : $0 }
+            sku = ((try? c.decodeIfPresent(String.self, forKey: .sku)) ?? nil)
+                .flatMap { $0.isEmpty ? nil : $0 }
+        }
+    }
+
+    struct MaterialDrawn: Decodable, Hashable, Sendable {
+        let spools: [Draw]
+
+        struct Draw: Decodable, Hashable, Sendable {
+            let spoolId: String
+            let grams: Double
+            /// Stamped at draw time since lot tracing; absent before.
+            let lot: String?
+            let poId: String?
+
+            private enum CodingKeys: String, CodingKey { case spoolId, grams, lot, poId }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                spoolId = ((try? c.decodeIfPresent(String.self, forKey: .spoolId)) ?? nil) ?? ""
+                let g = ((try? c.decodeIfPresent(Double.self, forKey: .grams)) ?? nil) ?? 0
+                grams = g.isFinite ? g : 0
+                lot = ((try? c.decodeIfPresent(String.self, forKey: .lot)) ?? nil)
+                    .flatMap { let t = $0.trimmingCharacters(in: .whitespacesAndNewlines); return t.isEmpty ? nil : t }
+                poId = ((try? c.decodeIfPresent(String.self, forKey: .poId)) ?? nil)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey { case spools }
+
+        /// Lenient: a malformed draw is dropped, never the job.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            spools = ((try? c.decodeIfPresent([Draw].self, forKey: .spools)) ?? nil) ?? []
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, jobNumber, date, timestamp, quoteAcceptedAt, clientApprovedAt, status, project, client, currency, price, paidAmount, costBasis, componentsCost
+        case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
+        case machineId, operatorId, clientId, clientErasedAt, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
+        case carrier, trackingNumber, shippingService, shippingStatus
+        case fromStock
+        case nonBusiness
+        case voidedAt, creditedAt
+        case instalments, instalmentBase
+        case invoiceNumber, invoiceNum
+        case materialDrawn
+        case storeLines, reprintOf, reprintedInto
+    }
+
+    /// THREE FIELDS A NEW JOB HAS NOT GOT YET.
+    ///
+    /// `client` is the customer's name denormalised onto the order, and Khayt's
+    /// own calculator never writes it — only the paths that already know the
+    /// name do. `currency` is absent when the job is in the shop's own. And
+    /// `costBasis` is not fixed until the job is COMPLETED, which is the whole
+    /// point of it: what a job cost is settled once, when it is finished.
+    ///
+    /// Decoded strictly, every job Khayt's calculator created was skipped by
+    /// this app — silently, because a row that will not decode is counted and
+    /// not shown. It never surfaced because this Mac's own book was written
+    /// entirely by Bed Ready's job creator, which does set `client`.
+    ///
+    /// So they are defaulted rather than required.
+    ///
+    /// NINE FIELDS THE OTHER APP DOES NOT REQUIRE EITHER.
+    ///
+    /// `date`, `status`, `project`, `price`, `paidAmount`, `paymentStatus`,
+    /// `printTime`, `priority` and `notes` were required here, and a number
+    /// was required to BE a number. A job an import, a webstore or an older
+    /// build wrote without one of them — or with `"price": "120"` — was
+    /// skipped: counted, and not shown, while Khayt and every `lib/` rule read
+    /// it fine. They are read now the way `lib/` reads them:
+    ///
+    ///   price, paidAmount, printTime   `+o.price || 0` (`order-money.js`,
+    ///                                   `order-payment.js`): a numeric string is
+    ///                                   its number, absent/blank/junk is 0.
+    ///   status                         `KhaytOrderStatus.stageOf` returns the
+    ///                                   status or null — so "" here, `Stage.of`
+    ///                                   is nil, and the board says it has a job
+    ///                                   it has no column for. Not "pending":
+    ///                                   that would put it in a column the shop
+    ///                                   never chose and the other app's board
+    ///                                   does not draw it in.
+    ///   paymentStatus                  "" — the stored word is only ever read
+    ///                                   through `order-payment.js` `statusOf`,
+    ///                                   which derives it from price and paid.
+    ///   date, project, notes           `o.project || ''`: empty text.
+    ///   priority                       `!!o.priority`, JavaScript truthiness.
+    ///
+    /// READ, NEVER WRITTEN. `Order` is not `Encodable`: every write starts from
+    /// the stored record and changes only what the shop changed
+    /// (`EditJobSheet.fields`, `RoundTrip`), so a default shown here is never
+    /// put into the book. A job missing its price still has no price after it
+    /// is opened and saved.
+    ///
+    /// Only a row without an `id` is still refused — nothing could find it
+    /// again to write to it.
+    /// A text field that may be absent, null, empty or — for a numeric AWB —
+    /// a number. Empty reads as absent.
+    private static func lenientText(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> String? {
+        if let s = try? c.decodeIfPresent(String.self, forKey: key) { return s.isEmpty ? nil : s }
+        if let n = try? c.decodeIfPresent(Double.self, forKey: key) {
+            return n == n.rounded() && abs(n) < 1e15 ? String(Int(n)) : String(n)
+        }
+        return nil
+    }
+
+    /// `!!x` in JavaScript: what the shared rules make of a stored flag.
+    private static func truthy(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Bool {
+        guard c.contains(key), (try? c.decodeNil(forKey: key)) != true else { return false }
+        if let b = try? c.decode(Bool.self, forKey: key) { return b }
+        if let n = try? c.decode(Double.self, forKey: key) { return n != 0 && !n.isNaN }
+        if let s = try? c.decode(String.self, forKey: key) { return !s.isEmpty }
+        // An object or an array: truthy in JavaScript.
+        return true
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // The ONE field a job cannot be read without: every write finds its
+        // record by it, so a row with no id is skipped and counted (`Shop.skipped`,
+        // which the sidebar and the status line both report).
+        id = try c.decode(String.self, forKey: .id)
+        jobNumber = try? c.decodeIfPresent(String.self, forKey: .jobNumber)
+        // Everything below reads the way `lib/` reads it — see "NINE FIELDS THE
+        // OTHER APP DOES NOT REQUIRE" above.
+        date = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
+        // The day its invoice was issued, by the shared rule — read from the
+        // four fields that rule reads, leniently, so a stray value in one of
+        // them can never make the job unreadable.
+        var dated: [String: JSONValue] = [:]
+        for key in [CodingKeys.date, .timestamp, .quoteAcceptedAt, .clientApprovedAt] {
+            if let v = try? c.decodeIfPresent(JSONValue.self, forKey: key) { dated[key.rawValue] = v }
+        }
+        invoiceDay = PaymentTerms.invoiceDate(dated)
+        status = try c.decodeIfPresent(String.self, forKey: .status) ?? ""
+        project = try c.decodeIfPresent(String.self, forKey: .project) ?? ""
+        client = try c.decodeIfPresent(String.self, forKey: .client) ?? ""
+        currency = try c.decodeIfPresent(String.self, forKey: .currency) ?? ""
+        // Lenient: only `true` means anything, and a stray value in an old
+        // book must not take the whole job list down with it.
+        nonBusiness = (try? c.decodeIfPresent(Bool.self, forKey: .nonBusiness)) ?? nil
+        voided = Self.truthy(c, .voidedAt)
+        credited = Self.truthy(c, .creditedAt)
+        price = try c.decodeIfPresent(Double.self, forKey: .price) ?? 0
+        paidAmount = try c.decodeIfPresent(Double.self, forKey: .paidAmount) ?? 0
+        costBasis = try c.decodeIfPresent(Double.self, forKey: .costBasis) ?? 0
+        // Lenient and finite: a stray value must not take the job list down,
+        // nor make a margin read NaN.
+        let components = (try? c.decodeIfPresent(Double.self, forKey: .componentsCost)) ?? nil
+        componentsCost = components.map { $0.isFinite ? max(0, $0) : 0 } ?? 0
+        paymentStatus = try c.decodeIfPresent(String.self, forKey: .paymentStatus) ?? ""
+        paymentMethod = try c.decodeIfPresent(String.self, forKey: .paymentMethod)
+        printTime = try c.decodeIfPresent(Double.self, forKey: .printTime) ?? 0
+        priority = Self.truthy(c, .priority)
+        priorityLevel = try c.decodeIfPresent(String.self, forKey: .priorityLevel)
+        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        machineId = try c.decodeIfPresent(String.self, forKey: .machineId)
+        operatorId = (try? c.decodeIfPresent(String.self, forKey: .operatorId)).flatMap { $0 }
+            .flatMap { $0.isEmpty ? nil : $0 }
+        // Absent means made to order, which is every order written before
+        // the shelf existed and most of them since.
+        fromStock = (try? c.decodeIfPresent(Bool.self, forKey: .fromStock)) as? Bool ?? false
+        clientId = try c.decodeIfPresent(String.self, forKey: .clientId)
+        clientErased = ((try? c.decodeIfPresent(String.self, forKey: .clientErasedAt)) ?? nil)
+            .map { !$0.isEmpty } ?? false
+        productId = try c.decodeIfPresent(String.self, forKey: .productId)
+        completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
+        deliveredAt = try c.decodeIfPresent(String.self, forKey: .deliveredAt)
+        shippedAt = try c.decodeIfPresent(String.self, forKey: .shippedAt)
+        // Leniently: the Electron dialog has written `null` for a missing
+        // tracking number, and older books a NUMBER for a numeric AWB.
+        carrier = Self.lenientText(c, .carrier)
+        trackingNumber = Self.lenientText(c, .trackingNumber)
+        shippingService = Self.lenientText(c, .shippingService)
+        shippingStatus = Self.lenientText(c, .shippingStatus)
+        dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate)
+        parts = try c.decodeIfPresent([Part].self, forKey: .parts) ?? []
+        instalments = try c.decodeIfPresent([PlanRow].self, forKey: .instalments) ?? []
+        instalmentBase = try c.decodeIfPresent(Double.self, forKey: .instalmentBase)
+        invoiceNumber = Self.lenientText(c, .invoiceNumber) ?? Self.lenientText(c, .invoiceNum)
+        // Lenient: a record this app only DISPLAYS must never make a job unreadable.
+        materialDrawn = (try? c.decodeIfPresent(MaterialDrawn.self, forKey: .materialDrawn)) ?? nil
+        // Lenient, like everything above: a stray value here must not take
+        // the job off the board.
+        storeLines = ((try? c.decodeIfPresent([StoreLine].self, forKey: .storeLines)) ?? nil) ?? []
+        reprintOf = Self.lenientText(c, .reprintOf)
+        reprintedInto = ((try? c.decodeIfPresent([String].self, forKey: .reprintedInto)) ?? nil) ?? []
+    }
+
+    /// One payment of a plan, as Khayt writes it.
+    ///
+    /// `paid` is the flag the shop sets and every reader honours; `paidAt` is
+    /// the day it was collected, and is a RECORD rather than the truth — a row
+    /// with `paid` false and a `paidAt` on it is not collected. Written this way
+    /// by `renderer/order-flows.js`, which is why it is read this way here.
+    struct PlanRow: Decodable, Hashable, Identifiable, Sendable {
+        /// Minted by whichever app created the plan. Defaulted because a row
+        /// typed into an older build has none, and a plan that will not decode
+        /// is a plan this app would silently drop on the next save.
+        let id: String
+        let amount: Double
+        /// 'YYYY-MM-DD'. Empty on a row a shop added and has not dated yet.
+        let dueDate: String
+        let note: String
+        let paid: Bool
+        let paidAt: String?
+
+        private enum CodingKeys: String, CodingKey { case id, amount, dueDate, note, paid, paidAt }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decodeIfPresent(String.self, forKey: .id) ?? ""
+            amount = try c.decodeIfPresent(Double.self, forKey: .amount) ?? 0
+            dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate) ?? ""
+            note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+            paid = try c.decodeIfPresent(Bool.self, forKey: .paid) ?? false
+            paidAt = try c.decodeIfPresent(String.self, forKey: .paidAt)
+        }
+
+        init(id: String, amount: Double, dueDate: String, note: String = "",
+             paid: Bool = false, paidAt: String? = nil) {
+            self.id = id; self.amount = amount; self.dueDate = dueDate
+            self.note = note; self.paid = paid; self.paidAt = paidAt
+        }
+    }
+
+    struct Part: Decodable, Hashable, Identifiable, Sendable {
+        /// A part written by Khayt's calculator HAS NO ID — `snapshotPartFromForm`
+        /// does not mint one, and only the paths that build parts some other way
+        /// do. Every part in this Mac's own book has one, which is why requiring
+        /// it never surfaced: the book was written by Bed Ready's job creator.
+        ///
+        /// Defaulted rather than required, and the list that draws them is keyed
+        /// by position so a fresh value on each read cannot churn the rows.
+        let id: String
+        let name: String
+        let material: String
+        let qty: Int
+        let printWeight: Double
+        /// Grams of support the part prints with, beside `printWeight`. What
+        /// the deduction draws is the two together (`partGramsConsumed`).
+        let supportWeight: Double
+        let unitCost: Double
+        let colour: String
+        /// The library model this part was printed from, when the job was made
+        /// by picking one. Absent on a job auto-logged from a printer's own
+        /// history, which knows a filename and nothing about the library.
+        let printFileId: String?
+        /// THE NAME THE PRINTER KNOWS THIS PART BY.
+        ///
+        /// A machine's completion carries a gcode filename and nothing else, so
+        /// this is the only honest link between an order and the figures a
+        /// printer reported for it — `renderer/order-flows.js` matches on
+        /// exactly this field. Absent on a job that was never sent to a
+        /// machine, which is why the caller falls back to the newest completion
+        /// and the sheet names which print it is offering.
+        let fileRef: String?
+        /// Handed to the customer ahead of the rest of the order — the
+        /// desktop's partial delivery (`renderer/order-flows.js`). `true` or
+        /// absent in the book; never written as `false` here.
+        let delivered: Bool
+        /// Grams this part's print took from OTHER spools, written by the
+        /// spool-switch flow as it draws them. The deduction at completion
+        /// leaves these grams off the part's own spool (`claimsFor` in
+        /// `lib/order-deduction.js`), so they are not charged twice.
+        let additionalSpools: [ExtraSpool]
+
+        /// One `parts[i].additionalSpools` entry: `{spoolId, weight}`.
+        struct ExtraSpool: Decodable, Hashable, Sendable {
+            let spoolId: String
+            let weight: Double
+
+            private enum CodingKeys: String, CodingKey { case spoolId, weight }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                spoolId = (try? c.decodeIfPresent(String.self, forKey: .spoolId)) ?? nil ?? ""
+                weight = (try? c.decodeIfPresent(Double.self, forKey: .weight)) ?? nil ?? 0
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case id, name, material, qty, printWeight, supportWeight, unitCost, colour, printFileId, fileRef
+            case delivered, additionalSpools
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+            name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+            material = try c.decodeIfPresent(String.self, forKey: .material) ?? ""
+            qty = try c.decodeIfPresent(Int.self, forKey: .qty) ?? 1
+            printWeight = try c.decodeIfPresent(Double.self, forKey: .printWeight) ?? 0
+            supportWeight = try c.decodeIfPresent(Double.self, forKey: .supportWeight) ?? 0
+            unitCost = try c.decodeIfPresent(Double.self, forKey: .unitCost) ?? 0
+            colour = try c.decodeIfPresent(String.self, forKey: .colour) ?? ""
+            printFileId = try c.decodeIfPresent(String.self, forKey: .printFileId)
+            fileRef = try c.decodeIfPresent(String.self, forKey: .fileRef)
+            // Read leniently: a malformed flag or list is a part that shows
+            // nothing extra, never a job that fails to load.
+            delivered = ((try? c.decodeIfPresent(Bool.self, forKey: .delivered)) ?? nil) ?? false
+            additionalSpools = ((try? c.decodeIfPresent([ExtraSpool].self, forKey: .additionalSpools)) ?? nil) ?? []
+        }
+    }
+
+    /// What the shop is still owed — `lib/order-money.js`'s answer, resolved
+    /// once per load by `Shop` and stored here so a table can sort on it.
+    ///
+    /// This USED to be the Swift subtraction below, and the comment above it
+    /// claimed money was not a Swift opinion while being exactly that. It is
+    /// short by a credit note and by a gift card: a job priced at 1,000 with a
+    /// 300 credit note read as 1,000 still owed on the Mac and 700 in Khayt,
+    /// in the title bar, the customers table and on the card. Neither book on
+    /// this machine has either field, which is why nothing showed.
+    var owedResolved: Double?
+
+    /// What this job billed and was paid, in the shop's currency, on the
+    /// terms `owedResolved` is on (`KhaytEngine.billedAndPaidByOrder`) — so a
+    /// customer's Billed − Paid is its Owed. Nil until a load resolves it.
+    var billedPaidResolved: KhaytEngine.BilledAndPaid?
+
+    /// The shared answer when there is one, and a subtraction when there is
+    /// not. A dead engine must not blank the money column — but it is the LAST
+    /// resort, and it is wrong in the two ways above.
+    var owed: Double {
+        guard owesAtAll else { return 0 }
+        return owedResolved ?? max(0, price - paidAmount)
+    }
+
+    /// Can this job owe the shop anything at all? `KhaytOrderMoney.owesAtAll`:
+    /// a quote has not been agreed, a cancelled job was called off, a voided
+    /// invoice is not an invoice and one credited in full was handed back. The
+    /// shared rule already answers 0 for them; this keeps the dead-engine
+    /// fallback — and the title bar and widget built on `owed` — from
+    /// counting them anyway.
+    var owesAtAll: Bool {
+        status != "quote" && status != "cancelled" && !voided && !credited
+    }
+
+    var isSettled: Bool { owed < 0.005 }
+
+    /// What `KhaytOrderMoney` says this job is billed, keeps and still owes,
+    /// in its OWN currency — resolved once per load beside `owedResolved`.
+    var figures: KhaytEngine.OrderFigures?
+
+    /// What is still owed in the job's OWN currency — the figure to print
+    /// beside the job's currency mark.
+    ///
+    /// `owed` is the SHOP's currency (`orderOwedBase`), which is right for a
+    /// total across jobs and wrong beside a job's own price: a 100 USD job on
+    /// a riyal shop read "Owed 375.00 USD" in the inspector. The subtraction
+    /// is the dead-engine fallback, as it is for `owed`.
+    var owedInOwnCurrency: Double {
+        guard owesAtAll else { return 0 }
+        return figures?.owed ?? max(0, price - paidAmount)
+    }
+
+    /// How far through settling this job is, 0…1 — the Owed meter under the
+    /// figure in the jobs table.
+    ///
+    /// The share of what the job is settled against (`due`) that is no longer
+    /// owed, read off `owedInOwnCurrency` — the figure printed above the meter
+    /// — so the two cannot disagree. It was `paidAmount / due`, which ignores
+    /// credit notes and gift cards: a 1,000 job with 500 paid and a 300 credit
+    /// note read "200" owed over a half-full bar.
+    var settledFraction: Double {
+        let billed = figures?.due ?? price
+        guard billed > 0 else { return 0 }
+        return min(1, max(0, 1 - owedInOwnCurrency / billed))
+    }
+
+    /// Whether the attention engine calls this job late, resolved once per
+    /// load by `Shop` — the same answer the dashboard's Late tile shows.
+    var isLateResolved: Bool?
+
+    /// Late, as the badges and the title bar report it.
+    ///
+    /// The fallback below was the whole rule until now: "not settled and past
+    /// its due date". That is a DIFFERENT QUESTION — a job completed and
+    /// delivered is not late because its invoice is unpaid, and a quote has no
+    /// deadline to miss — and it answers much larger. On the sample book it
+    /// said eleven where `attention` says two, and both numbers were on screen
+    /// at once: the badges from this, the dashboard's tile from the engine.
+    ///
+    /// Kept only for a dead engine. Absent, unparseable and future dates all
+    /// mean "not overdue" there: a red badge on a job that is fine is worse
+    /// than no badge at all.
+    func isOverdue(now: Date = Date()) -> Bool {
+        if let isLateResolved { return isLateResolved }
+        guard !isSettled, let due = Self.day(dueDate) else { return false }
+        return due < now
+    }
+
+    var day: Date? { Self.day(date) }
+
+    /// ── THE SHOP'S DAY, NOT UTC'S ────────────────────────────────────────
+    ///
+    /// This parsed "2026-08-08" as UTC midnight. In Riyadh that is 03:00, so a
+    /// job due today counted down to "3:00 AM" — a time nobody entered — and
+    /// west of UTC it fell on the PREVIOUS local day, so a job read as late on
+    /// its own due day. A day is now the shop's local midnight, and a full
+    /// timestamp is the local day it happened on: the same days `Calendar.book`
+    /// counts in. Found by the September 2026 scan.
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = .book
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .autoupdatingCurrent
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    static func day(_ s: String?) -> Date? {
+        guard let s, !s.isEmpty else { return nil }
+        // Both shapes are in the store: "2026-08-08" and a full ISO timestamp.
+        if s.count > 10, let instant = instant(s) {
+            return Calendar.book.startOfDay(for: instant)
+        }
+        let head = s.prefix(10)
+        if let fast = plainDay(head) { return fast }
+        return dayFormatter.date(from: String(head))
+    }
+
+    /// "2026-08-08" as the shop's local midnight, read by hand. The same
+    /// answer as `dayFormatter`, which goes through ICU on every call: the
+    /// board sorted by due date read two of these per comparison, and that
+    /// parse was most of the time it took to draw (Nov 2026). Anything not
+    /// exactly that shape, or a day that does not exist (Feb 31), is nil here
+    /// and left to the formatter.
+    static func plainDay(_ s: Substring) -> Date? {
+        let u = Array(s.utf8)
+        guard u.count == 10, u[4] == 45, u[7] == 45 else { return nil }
+        func number(_ r: Range<Int>) -> Int? {
+            var v = 0
+            for i in r { let c = u[i]; guard c >= 48, c <= 57 else { return nil }; v = v * 10 + Int(c - 48) }
+            return v
+        }
+        guard let y = number(0..<4), let m = number(5..<7), let d = number(8..<10),
+              (1...12).contains(m), (1...31).contains(d) else { return nil }
+        let date = Calendar.book.date(from: DateComponents(year: y, month: m, day: d))
+        // A day the calendar rolled over (Feb 31 → Mar 3) is not this day.
+        guard let date, Calendar.book.component(.day, from: date) == d else { return nil }
+        return date
+    }
+
+    /// A full ISO timestamp — the shared, made-once formatters.
+    private static func instant(_ s: String) -> Date? { Calendar.instant(s) }
+}
+
+/// The statuses Khayt uses, in the order a job moves through them.
+///
+/// Taken from `lib/order-progress.js`, which is bundled into KhaytCore — the
+/// sidebar's order is the pipeline's order, not alphabetical and not whatever
+/// the data happened to contain.
+enum Stage: String, CaseIterable, Identifiable, Sendable {
+    // In the order work moves through them, which is also the order the board
+    // and the sidebar draw. `on_hold` sits between pending and printing because
+    // that is where a job stops: nothing is held before it is accepted.
+    case quote, pending, on_hold, printing, post, qc, completed, shipped, delivered, cancelled
+
+    var id: String { rawValue }
+
+    /// Khayt's own word for each stage, so the two apps call one thing one
+    /// thing. `cancelled` is the exception: the shared catalogue has no word for
+    /// it, so the Mac app's own is used and marked as such in `Words.own`.
+    var key: String {
+        switch self {
+        case .quote: "queue.quote"
+        case .pending: "queue.pending"
+        case .on_hold: "queue.on_hold"
+        case .printing: "queue.printing"
+        case .post: "queue.post"
+        case .qc: "queue.qc"
+        case .completed: "queue.completed"
+        case .shipped: "queue.shipped"
+        case .delivered: "queue.delivered"
+        case .cancelled: "mac.cancelled"
+        }
+    }
+
+    /// The stages a job can be sent to from a menu, in the order work moves
+    /// through them.
+    ///
+    /// `on_hold` is not among them because it asks a question first, and
+    /// `delivered` is not because it is not a stage: handing a job over stamps
+    /// a date on a completed one. Both have their own item wherever this list
+    /// is offered.
+    ///
+    /// One list, read by the Job menu in the menu bar, the right-click menu on
+    /// the orders table, and the right-click menu on a board card. Which of
+    /// them a move was started from must not change where a job can go.
+    static let destinations: [Stage] = [.quote, .pending, .printing, .post, .qc, .completed]
+
+    /// SF Symbols, not emoji. The Electron app puts a coloured emoji next to
+    /// almost every label, and it is a large part of why it reads as a web page:
+    /// emoji do not take the text colour, do not thin at small sizes, and do not
+    /// match the rest of the system.
+    var symbol: String {
+        switch self {
+        case .quote: "doc.text"
+        case .pending: "clock"
+        case .on_hold: "pause.circle"
+        case .printing: "printer"
+        // Washing, curing, sanding — the work after the printer stops.
+        case .post: "sparkles"
+        // Inspection, not approval: a job in QC is being looked at.
+        case .qc: "magnifyingglass"
+        case .completed: "checkmark.circle"
+        // In the post: the parcel is moving, and that is the whole difference
+        // between this and the box sitting finished on the bench.
+        case .shipped: "box.truck"
+        case .delivered: "shippingbox"
+        case .cancelled: "xmark.circle"
+        }
+    }
+
+    /// The colour of this stage, where the palette already has a word for it.
+    ///
+    /// ── WHY MOST STAGES RETURN NIL ────────────────────────────────────────
+    ///
+    /// Nine stages given nine colours is a rainbow, and a rainbow is what a
+    /// colour scheme looks like when it has stopped meaning anything — the
+    /// same mistake, from the opposite direction, as the amber that was on
+    /// forty-eight unrelated things before `Palette.swift` was written.
+    ///
+    /// So only the four that `Palette.swift` already defines in words get one,
+    /// and they get exactly the colour that definition names. Quote, pending,
+    /// post-processing and QC are the ordinary course of a job — nothing about
+    /// them is news, and they stay the colour of ordinary text. If a stage
+    /// here ever needs a fifth colour, the question to answer first is which
+    /// sentence in the palette it is an instance of.
+    var tint: Color? {
+        switch self {
+        // "Something is being made right now" — the drop of filament in the
+        // app's own icon, and the one state worth looking up at.
+        case .printing: Khayt.hot
+        // "Wants a person, and will keep working if it does not get one" — a
+        // held job is precisely that, and nothing else on this list is.
+        case .on_hold: Khayt.attention
+        // "Finished, paid, sent, agreed." — the palette's own sentence names
+        // sent, so a shipped job belongs here rather than in a fifth colour.
+        case .completed, .shipped, .delivered: Khayt.done
+        // "Late, failed, refused."
+        case .cancelled: Khayt.late
+        case .quote, .pending, .post, .qc: nil
+        }
+    }
+
+    /// The columns the board draws, in the order work moves through them.
+    ///
+    /// Here rather than inside the view because `board` is keyed by EVERY stage
+    /// — the dictionary is the whole book grouped, and the screen chooses. Two
+    /// places deciding which stages are "on the board" is how a test comes to
+    /// agree with a list nobody is looking at.
+    ///
+    /// Delivered and cancelled are off it on purpose: they are where work goes
+    /// to stop being work, and a column of two hundred delivered jobs buries the
+    /// four that need doing.
+    ///
+    /// SHIPPED IS ON IT, and the difference is whether anyone might still have
+    /// to do something. A parcel in the post can go missing, sit at a depot, or
+    /// need chasing; a delivered one is finished with. The board is for work in
+    /// flight, and a job with a courier still is.
+    static let boardColumns: [Stage] = [.quote, .pending, .on_hold, .printing, .post, .qc, .completed, .shipped]
+
+    /// The way work actually goes, for "move it along" and "move it back".
+    ///
+    /// `boardColumns` WITHOUT `on_hold`, and that is the whole point of having
+    /// a second list: hold sits between pending and printing on the board
+    /// because that is where a held job is easiest to find, but it is a
+    /// detour, not a step. A shop pressing "move along" on a pending job means
+    /// "start printing it", and stepping it into hold instead would be the app
+    /// misreading a plain instruction.
+    ///
+    /// A job that IS on hold has no "along" here on purpose — where it goes
+    /// back to is a decision, and the same menu lists every stage by name.
+    static let progression: [Stage] = boardColumns.filter { $0 != .on_hold }
+
+    /// The next stage along, or nil at either end — and nil for a job on hold.
+    func stepped(by delta: Int) -> Stage? {
+        guard let at = Self.progression.firstIndex(of: self) else { return nil }
+        let next = at + delta
+        guard next >= 0, next < Self.progression.count else { return nil }
+        return Self.progression[next]
+    }
+
+    /// The stage a job is in, or nil for a status this app has no column for.
+    ///
+    /// DELIVERED IS NOT A STATUS. A handed-over job stays `completed` and
+    /// carries a `deliveredAt`; that pair is what Khayt's own board reads, and
+    /// reading `status` alone filed every delivered job under Completed here.
+    /// The rule is `KhaytOrderStatus.stageOf` — mirrored rather than called
+    /// because it is two comparisons on a decoded row and this runs per cell,
+    /// and `StageParityTests` runs the shared one against it.
+    ///
+    /// Nil is not "no stage" — it is a job that will not appear on the board, so
+    /// every caller has to decide what to do about it rather than filtering it
+    /// away. `split` reaches here: a parent order replaced by the sub-orders
+    /// that carry its price between them.
+    static func of(_ order: Order) -> Stage? {
+        // Delivered first: it is the later of the two, so a parcel that has
+        // arrived is delivered rather than still in the post.
+        if order.status == "completed", order.deliveredAt != nil { return .delivered }
+        if order.status == "completed", order.shippedAt != nil { return .shipped }
+        return Stage(rawValue: order.status)
+    }
+}

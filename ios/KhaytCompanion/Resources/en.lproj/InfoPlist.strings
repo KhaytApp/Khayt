@@ -1,0 +1,3 @@
+"NSCameraUsageDescription" = "Khayt uses the camera to read spool labels and barcodes, photograph receipts, and take photos of finished prints.";
+"NFCReaderUsageDescription" = "Khayt reads and writes the NFC tags on filament spools.";
+"NSLocalNetworkUsageDescription" = "Khayt connects to Khayt on your Mac or PC on the same Wi‑Fi to show the queue, inventory and printer status.";

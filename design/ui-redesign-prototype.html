@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-mode="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Khayt — UI Redesign Prototype</title>
+<style>
+/* ============ ONE TOKEN SYSTEM (themes would override color only) ============ */
+:root{
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --r-ctl:8px; --r-card:12px; --r-pill:999px;
+  --ctl-h:34px;
+  --fw-label:600; --fw-head:700;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;
+}
+html[data-mode="dark"]{
+  --bg:#0f1419; --bg-2:#161c24; --surface:#1b232d; --surface-2:#222c38;
+  --border:#2a3644; --hair:#212a35; --text:#e7edf3; --text-dim:#9fb0c0; --text-faint:#6b7c8c;
+  --primary:#4f9cf0; --primary-ink:#0a1622; --accent:#37d3b5; --danger:#ef5a6f; --warn:#f5b53d; --ok:#46c08a;
+  --shadow:0 8px 30px rgba(0,0,0,.35);
+}
+html[data-mode="light"]{
+  --bg:#f4f6f9; --bg-2:#eef1f5; --surface:#ffffff; --surface-2:#f6f8fb;
+  --border:#dde3ea; --hair:#e9edf2; --text:#16202b; --text-dim:#5a6b7b; --text-faint:#8a99a8;
+  --primary:#2f7fe0; --primary-ink:#fff; --accent:#16a989; --danger:#d8425a; --warn:#cf9012; --ok:#1e9e6c;
+  --shadow:0 8px 30px rgba(20,40,70,.10);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer}
+.app{display:grid;grid-template-columns:248px 1fr;height:100vh}
+.app.collapsed{grid-template-columns:64px 1fr}
+
+/* ============ SIDEBAR (grouped nav — fixes 13 flat items) ============ */
+.side{background:var(--bg-2);border-inline-end:1px solid var(--hair);display:flex;flex-direction:column;padding:var(--s3);gap:var(--s1);overflow:hidden}
+.brand{display:flex;align-items:center;gap:var(--s2);padding:var(--s2) var(--s2) var(--s4);font-weight:var(--fw-head);font-size:16px;letter-spacing:.3px}
+.brand .logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--primary),var(--accent));display:grid;place-items:center;color:#fff;font-size:14px;flex:none}
+.navgroup{font-size:10.5px;letter-spacing:1.4px;color:var(--text-faint);font-weight:var(--fw-label);text-transform:uppercase;padding:var(--s4) var(--s2) var(--s1)}
+.navitem{display:flex;align-items:center;gap:var(--s3);padding:9px var(--s2);border-radius:var(--r-ctl);color:var(--text-dim);border:none;background:none;width:100%;text-align:start;font-weight:500}
+.navitem:hover{background:var(--surface);color:var(--text)}
+.navitem.active{background:color-mix(in srgb,var(--primary) 16%,transparent);color:var(--text)}
+.navitem.active .ic{color:var(--primary)}
+.navitem .ic{width:18px;text-align:center;flex:none;color:var(--text-faint)}
+.navitem .lbl{white-space:nowrap;overflow:hidden}
+.navitem .badge{margin-inline-start:auto;background:var(--danger);color:#fff;border-radius:var(--r-pill);font-size:10px;padding:1px 6px;font-weight:700}
+.collapsed .navgroup,.collapsed .navitem .lbl,.collapsed .brand span{display:none}
+.side .spacer{flex:1}
+
+/* ============ MAIN ============ */
+.main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s5);border-bottom:1px solid var(--hair);background:color-mix(in srgb,var(--bg) 60%,transparent)}
+.topbar h1{font-size:17px;margin:0;font-weight:var(--fw-head)}
+.topbar .burger{background:none;border:none;color:var(--text-dim);font-size:18px;padding:4px}
+.search{flex:1;max-width:420px;margin-inline:auto;display:flex;align-items:center;gap:var(--s2);height:var(--ctl-h);padding:0 var(--s3);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-ctl);color:var(--text-faint)}
+.search kbd{margin-inline-start:auto;font-size:10px;border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:var(--text-dim)}
+.tbtns{display:flex;align-items:center;gap:var(--s2)}
+.iconbtn{width:var(--ctl-h);height:var(--ctl-h);border-radius:var(--r-ctl);border:1px solid var(--border);background:var(--surface);color:var(--text-dim);display:grid;place-items:center;position:relative}
+.iconbtn:hover{color:var(--text)}
+.iconbtn .dot{position:absolute;top:7px;inset-inline-end:8px;width:7px;height:7px;border-radius:50%;background:var(--danger)}
+
+/* context bar: filters left, ONE primary action right (fixes unclear primary) */
+.ctxbar{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s5);border-bottom:1px solid var(--hair);background:var(--bg)}
+.pill{height:30px;display:inline-flex;align-items:center;gap:6px;padding:0 var(--s3);border:1px solid var(--border);border-radius:var(--r-pill);background:var(--surface);color:var(--text-dim);font-size:13px}
+.ctxbar .grow{flex:1}
+
+/* ============ ONE BUTTON LANGUAGE (kills small/sm + radius drift) ============ */
+.btn{height:var(--ctl-h);display:inline-flex;align-items:center;gap:var(--s2);padding:0 var(--s4);border-radius:var(--r-ctl);border:1px solid var(--border);background:var(--surface);color:var(--text);font-weight:var(--fw-label)}
+.btn:hover{border-color:var(--text-faint)}
+.btn--primary{background:var(--primary);border-color:var(--primary);color:var(--primary-ink)}
+.btn--primary:hover{filter:brightness(1.06)}
+.btn--ghost{background:none}
+.btn--danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 50%,var(--border))}
+.btn--sm{height:28px;padding:0 var(--s3);font-size:13px}
+
+/* ============ CONTENT / CARDS (one card language, real states) ============ */
+.scroll{flex:1;overflow:auto;padding:var(--s5)}
+.grid{display:grid;gap:var(--s4)}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:var(--s4)}
+.card h3{margin:0 0 var(--s3);font-size:13px;color:var(--text-dim);font-weight:var(--fw-label);display:flex;align-items:center;gap:var(--s2)}
+.kpi .v{font-size:26px;font-weight:var(--fw-head);letter-spacing:-.5px}
+.kpi .lbl{font-size:12px;color:var(--text-faint)}
+.kpi .delta{font-size:12px;font-weight:600}
+.delta.up{color:var(--ok)} .delta.down{color:var(--danger)}
+.two{grid-template-columns:1.6fr 1fr}
+@media(max-width:900px){.two{grid-template-columns:1fr}}
+.row{display:flex;align-items:center;gap:var(--s3);padding:10px 0;border-bottom:1px solid var(--hair)}
+.row:last-child{border-bottom:none}
+.row .grow{flex:1;min-width:0}
+.muted{color:var(--text-faint);font-size:12px}
+.tag{font-size:11px;padding:2px 8px;border-radius:var(--r-pill);background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border)}
+.tag.printing{color:var(--primary);border-color:color-mix(in srgb,var(--primary) 40%,transparent)}
+.tag.done{color:var(--ok)} .tag.warn{color:var(--warn)} .tag.error{color:var(--danger)}
+.dot-state{width:8px;height:8px;border-radius:50%;flex:none}
+
+/* kanban */
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s3)}
+@media(max-width:1100px){.kanban{grid-template-columns:repeat(2,1fr)}}
+.kcol{background:var(--bg-2);border:1px solid var(--hair);border-radius:var(--r-card);padding:var(--s3);min-height:200px}
+.kcol h4{margin:0 0 var(--s3);font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-dim);display:flex;justify-content:space-between}
+.kcard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:var(--s3);margin-bottom:var(--s2);border-inline-start:3px solid var(--primary)}
+.kcard .t{font-weight:var(--fw-label)}
+.ring{--p:60;width:42px;height:42px;border-radius:50%;background:conic-gradient(var(--primary) calc(var(--p)*1%),var(--surface-2) 0);display:grid;place-items:center;flex:none}
+.ring::after{content:"";width:30px;height:30px;border-radius:50%;background:var(--surface)}
+.ring b{position:absolute;font-size:11px;font-weight:700}
+
+/* table */
+table{width:100%;border-collapse:collapse}
+th{position:sticky;top:0;background:var(--surface);text-align:start;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--text-faint);padding:10px var(--s3);border-bottom:1px solid var(--border);cursor:pointer}
+td{padding:11px var(--s3);border-bottom:1px solid var(--hair)}
+.empty{display:grid;place-items:center;gap:var(--s3);padding:48px;color:var(--text-faint);text-align:center}
+.empty .big{font-size:34px}
+
+/* calculator split */
+.calc{display:grid;grid-template-columns:1fr 320px;gap:var(--s4)}
+@media(max-width:900px){.calc{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:var(--s3)}
+.field label{font-size:12px;color:var(--text-dim);font-weight:var(--fw-label)}
+.input{height:var(--ctl-h);border:1px solid var(--border);border-radius:var(--r-ctl);background:var(--bg-2);color:var(--text);padding:0 var(--s3)}
+.summary{position:sticky;top:0}
+.summary .line{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--hair)}
+.summary .total{font-size:22px;font-weight:var(--fw-head)}
+
+/* command palette */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;place-items:start center;padding-top:14vh;z-index:50}
+.scrim.open{display:grid}
+.palette{width:min(560px,92vw);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);box-shadow:var(--shadow);overflow:hidden}
+.palette input{width:100%;height:52px;border:none;background:none;color:var(--text);font-size:16px;padding:0 var(--s4);outline:none;border-bottom:1px solid var(--hair)}
+.palette .res{max-height:320px;overflow:auto;padding:var(--s2)}
+.palette .opt{display:flex;align-items:center;gap:var(--s3);padding:10px var(--s3);border-radius:var(--r-ctl);color:var(--text-dim)}
+.palette .opt.sel{background:color-mix(in srgb,var(--primary) 16%,transparent);color:var(--text)}
+.palette .opt .k{margin-inline-start:auto;font-size:11px;color:var(--text-faint)}
+.hint{position:fixed;bottom:14px;inset-inline-end:18px;font-size:12px;color:var(--text-faint);background:var(--surface);border:1px solid var(--border);padding:6px 10px;border-radius:var(--r-pill)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <div class="brand"><span class="logo">K</span><span>Khayt</span></div>
+    <button class="navitem active" data-screen="dashboard"><span class="ic">◇</span><span class="lbl">Dashboard</span></button>
+    <div class="navgroup">Work</div>
+    <button class="navitem" data-screen="calculator"><span class="ic">🧮</span><span class="lbl">Calculator</span></button>
+    <button class="navitem" data-screen="queue"><span class="ic">▤</span><span class="lbl">Queue</span><span class="badge">3</span></button>
+    <button class="navitem" data-screen="fleet"><span class="ic">◫</span><span class="lbl">Fleet</span></button>
+    <div class="navgroup">Catalog</div>
+    <button class="navitem" data-screen="inventory"><span class="ic">▦</span><span class="lbl">Inventory</span></button>
+    <button class="navitem" data-screen="clients"><span class="ic">☺</span><span class="lbl">Clients</span></button>
+    <div class="navgroup">Money</div>
+    <button class="navitem" data-screen="invoices"><span class="ic">₪</span><span class="lbl">Invoices &amp; Orders</span></button>
+    <button class="navitem" data-screen="analytics"><span class="ic">▮</span><span class="lbl">Analytics</span></button>
+    <div class="spacer"></div>
+    <button class="navitem" data-screen="settings"><span class="ic">⚙</span><span class="lbl">Settings</span></button>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <button class="burger" id="burger" title="Collapse">≡</button>
+      <h1 id="title">Dashboard</h1>
+      <button class="search" id="searchBtn"><span>🔍</span><span>Search or run a command…</span><kbd>⌘K</kbd></button>
+      <div class="tbtns">
+        <button class="iconbtn" id="themeBtn" title="Theme">◐</button>
+        <button class="iconbtn" title="Notifications"><span>🔔</span><span class="dot"></span></button>
+        <button class="iconbtn" title="Account">👤</button>
+        <button class="btn btn--sm btn--ghost" title="Language">EN ▾</button>
+      </div>
+    </header>
+
+    <div class="ctxbar">
+      <span class="pill">📍 Location: All ▾</span>
+      <span class="pill" id="ctxFilter">Status: Active ▾</span>
+      <span class="grow"></span>
+      <button class="btn btn--primary" id="primaryAction">+ New order</button>
+    </div>
+
+    <div class="scroll" id="screen"></div>
+  </div>
+</div>
+
+<!-- COMMAND PALETTE -->
+<div class="scrim" id="scrim">
+  <div class="palette">
+    <input id="palInput" placeholder="Jump to a screen or run an action…" autocomplete="off">
+    <div class="res" id="palRes"></div>
+  </div>
+</div>
+<div class="hint">Prototype · click the sidebar · press <b>⌘K / Ctrl-K</b> · toggle <b>◐</b> theme</div>
+
+<script>
+const $=s=>document.querySelector(s), app=$('#app');
+const PRIMARY={dashboard:'+ New order',calculator:'Create order →',queue:'+ New order',fleet:'Add printer',inventory:'+ Add spool',clients:'+ Add client',invoices:'+ New invoice',analytics:'Export',settings:'Saved ✓'};
+const TITLES={dashboard:'Dashboard',calculator:'Calculator',queue:'Queue',fleet:'Fleet',inventory:'Inventory',clients:'Clients',invoices:'Invoices & Orders',analytics:'Analytics',settings:'Settings'};
+
+const screens={
+ dashboard:()=>`
+  <div class="grid kpis" style="margin-bottom:var(--s4)">
+    ${kpi('Revenue today','SAR 2,480','+12%','up')}
+    ${kpi('Orders in progress','7','3 due today','')}
+    ${kpi('Filament used','1.9 kg','today','')}
+    ${kpi('Outstanding','SAR 5,120','4 clients','down')}
+  </div>
+  <div class="grid two">
+    <div class="card"><h3>Today's work</h3>
+      ${trow('Lithophane lamp · Sara','printing','62%')}
+      ${trow('Gridfinity set ×12 · Workshop','post','')}
+      ${trow('Cosplay helmet · Faisal','qc','')}
+      ${trow('Vase batch · Retail','pending','')}
+    </div>
+    <div class="grid" style="gap:var(--s4)">
+      <div class="card"><h3>Fleet · live</h3>
+        ${fleet('Bambu X1C','printing',62)}
+        ${fleet('Prusa MK4','printing',88)}
+        ${fleet('Ender-3 #2','error',0)}
+      </div>
+      <div class="card" style="border-color:color-mix(in srgb,var(--warn) 40%,var(--border))"><h3>⚠ Needs attention</h3>
+        <div class="row"><span class="dot-state" style="background:var(--danger)"></span><div class="grow">Ender-3 #2 — <b>error</b> (nozzle)</div><button class="btn btn--sm">View</button></div>
+        <div class="row"><span class="dot-state" style="background:var(--warn)"></span><div class="grow">PLA Black — <b>low stock</b> (180g)</div><button class="btn btn--sm">Reorder</button></div>
+        <div class="row"><span class="dot-state" style="background:var(--warn)"></span><div class="grow">2 quotes expiring this week</div><button class="btn btn--sm">Follow up</button></div>
+      </div>
+    </div>
+  </div>`,
+ queue:()=>`
+  <div class="kanban">
+    ${kcol('Pending',2,['Vase batch · Retail','Keychains ×40 · Noor'])}
+    ${kcol('Printing',2,['Lithophane lamp · Sara','Gridfinity ×12 · Workshop'])}
+    ${kcol('Post / QC',2,['Cosplay helmet · Faisal','Bracket v3 · ACME'])}
+    ${kcol('Completed',1,['Sign · Cafe Luna'])}
+  </div>`,
+ inventory:()=>`
+  <div class="card" style="padding:0;overflow:hidden">
+    <table>
+      <thead><tr><th>Material ▾</th><th>Color</th><th>Remaining</th><th>Location</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        ${inv('PLA','Galaxy Black','820 g','Main shop','')}
+        ${inv('PETG','Sky Blue','180 g','Main shop','warn')}
+        ${inv('PLA','Warm White','1,140 g','Site 2','')}
+        ${inv('TPU','Coral','60 g','— unassigned','warn')}
+        ${inv('ABS','Slate','940 g','Site 2','')}
+      </tbody>
+    </table>
+  </div>`,
+ calculator:()=>`
+  <div class="calc">
+    <div class="card">
+      <h3>Build</h3>
+      <div class="field"><label>Project name</label><input class="input" value="Lithophane lamp"></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:var(--s3)">
+        <div class="field"><label>Filament</label><input class="input" value="PLA · Galaxy Black"></div>
+        <div class="field"><label>Weight (g)</label><input class="input" value="240"></div>
+        <div class="field"><label>Print time (h)</label><input class="input" value="9.5"></div>
+        <div class="field"><label>Quantity</label><input class="input" value="1"></div>
+      </div>
+      <button class="btn btn--ghost btn--sm">+ Add part</button>
+    </div>
+    <div class="card summary">
+      <h3>Summary</h3>
+      <div class="line"><span class="muted">Material</span><span>SAR 18</span></div>
+      <div class="line"><span class="muted">Machine + power</span><span>SAR 14</span></div>
+      <div class="line"><span class="muted">Labor</span><span>SAR 30</span></div>
+      <div class="line"><span class="muted">Margin 45%</span><span>SAR 28</span></div>
+      <div class="line total"><span>Price</span><span>SAR 90</span></div>
+      <div style="display:flex;flex-direction:column;gap:var(--s2);margin-top:var(--s4)">
+        <button class="btn btn--primary" style="justify-content:center">Create order →</button>
+        <button class="btn btn--ghost" style="justify-content:center">Save as quote</button>
+      </div>
+    </div>
+  </div>`,
+ fleet:()=>`<div class="grid kpis">
+    ${fleetcard('Bambu X1C','printing',62,'Lithophane · 2h14m left','218°/60°')}
+    ${fleetcard('Prusa MK4','printing',88,'Gridfinity · 26m left','215°/60°')}
+    ${fleetcard('Ender-3 #2','error',0,'Nozzle clog','—')}
+    ${fleetcard('Elegoo Saturn','idle',0,'Ready','—')}
+  </div>`,
+ clients:()=>empty('☺','No clients match','Add a client or clear the search.'),
+ invoices:()=>empty('₪','Invoices & Orders','Your numbered orders and invoices live here (renamed from "Logs").'),
+ analytics:()=>empty('▮','Analytics','Waste, P&L and gift cards fold in here as tabs.'),
+ settings:()=>`<div class="card" style="max-width:620px"><h3>Preferences <span class="muted" style="margin-inline-start:auto">Saved ✓</span></h3>
+   <div class="field"><label>Language</label><input class="input" value="English"></div>
+   <div class="field"><label>Default currency</label><input class="input" value="SAR — Saudi Riyal"></div>
+   <p class="muted">One model: changes auto-save with a single “Saved ✓” indicator — no scattered Save buttons.</p></div>`,
+};
+function kpi(l,v,d,dir){return `<div class="card kpi"><div class="lbl">${l}</div><div class="v">${v}</div>${d?`<div class="delta ${dir}">${dir==='up'?'▲':dir==='down'?'▼':''} ${d}</div>`:''}</div>`}
+function trow(t,s,p){return `<div class="row"><div class="grow"><div>${t}</div><div class="muted">${p?p+' printed':'in '+s}</div></div><span class="tag ${s==='printing'?'printing':s==='qc'?'warn':''}">${s}</span></div>`}
+function fleet(n,s,p){return `<div class="row"><div class="ring" style="--p:${p}"><b>${s==='error'?'!':p+'%'}</b></div><div class="grow"><div>${n}</div><div class="muted">${s}</div></div><span class="dot-state" style="background:${s==='error'?'var(--danger)':'var(--ok)'}"></span></div>`}
+function fleetcard(n,s,p,sub,temp){return `<div class="card"><div style="display:flex;gap:var(--s3);align-items:center"><div class="ring" style="--p:${p}"><b>${s==='error'?'!':s==='idle'?'·':p+'%'}</b></div><div class="grow"><div style="font-weight:600">${n}</div><span class="tag ${s==='printing'?'printing':s==='error'?'error':''}">${s}</span></div></div><div class="muted" style="margin-top:var(--s3)">${sub}<br>🌡 ${temp}</div></div>`}
+function kcol(t,n,items){return `<div class="kcol"><h4>${t}<span>${n}</span></h4>${items.map(i=>`<div class="kcard"><div class="t">${i.split(' · ')[0]}</div><div class="muted">${i.split(' · ')[1]||''}</div></div>`).join('')||'<div class="muted">Nothing here yet</div>'}</div>`}
+function inv(m,c,r,loc,st){return `<tr><td><b>${m}</b></td><td>${c}</td><td>${r}</td><td><span class="tag">${loc}</span></td><td>${st==='warn'?'<span class="tag warn">low</span>':'<span class="tag done">ok</span>'}</td><td style="text-align:end"><button class="btn btn--sm btn--ghost">⋯</button></td></tr>`}
+function empty(ic,h,sub){return `<div class="empty"><div class="big">${ic}</div><div><b>${h}</b><div class="muted">${sub}</div></div><button class="btn btn--primary">${'Get started'}</button></div>`}
+
+function go(name){
+  document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('active',b.dataset.screen===name));
+  $('#title').textContent=TITLES[name]; $('#screen').innerHTML=screens[name]();
+  const pa=$('#primaryAction'); pa.textContent=PRIMARY[name]; pa.className='btn '+(name==='settings'?'btn--ghost':'btn--primary');
+}
+document.querySelectorAll('.navitem').forEach(b=>b.onclick=()=>go(b.dataset.screen));
+$('#burger').onclick=()=>app.classList.toggle('collapsed');
+$('#themeBtn').onclick=()=>document.documentElement.dataset.mode=document.documentElement.dataset.mode==='dark'?'light':'dark';
+
+// command palette
+const PAL=[['Dashboard','dashboard','◇'],['Calculator','calculator','🧮'],['Queue','queue','▤'],['Fleet','fleet','◫'],['Inventory','inventory','▦'],['Clients','clients','☺'],['Invoices & Orders','invoices','₪'],['Analytics','analytics','▮'],['Settings','settings','⚙'],['New order','calculator','+'],['Add spool','inventory','+'],['Toggle theme','__theme','◐']];
+let sel=0;
+function openPal(){$('#scrim').classList.add('open');$('#palInput').value='';renderPal('');$('#palInput').focus()}
+function closePal(){$('#scrim').classList.remove('open')}
+function renderPal(q){const r=PAL.filter(p=>p[0].toLowerCase().includes(q.toLowerCase()));sel=0;
+  $('#palRes').innerHTML=r.map((p,i)=>`<div class="opt ${i===0?'sel':''}" data-go="${p[1]}"><span>${p[2]}</span><span>${p[0]}</span><span class="k">↩</span></div>`).join('')||'<div class="opt">No matches</div>';
+  $('#palRes').querySelectorAll('.opt').forEach(o=>o.onclick=()=>run(o.dataset.go));}
+function run(g){closePal();if(g==='__theme')$('#themeBtn').click();else if(g)go(g);}
+$('#searchBtn').onclick=openPal;
+$('#palInput').oninput=e=>renderPal(e.target.value);
+$('#scrim').onclick=e=>{if(e.target.id==='scrim')closePal()};
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPal()}
+  if(e.key==='Escape')closePal();
+  if($('#scrim').classList.contains('open')){
+    const opts=[...document.querySelectorAll('.opt[data-go]')];
+    if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,opts.length-1)}
+    if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0)}
+    if(e.key==='Enter'&&opts[sel])run(opts[sel].dataset.go);
+    opts.forEach((o,i)=>o.classList.toggle('sel',i===sel));
+  }
+});
+go('dashboard');
+</script>
+</body>
+</html>

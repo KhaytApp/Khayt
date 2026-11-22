@@ -1,0 +1,184 @@
+/* NOTE: --ink-3 (aliased to --text-muted) is darkened/lightened to clear
+   WCAG AA 4.5:1 against BOTH --bg and --surface. It is used as a text colour in
+   192 CSS rules and 540 renderer call sites — hints, subtitles, metadata — so it
+   is body text, not decoration, and 2.75:1 was a real readability failure.
+   Measured, not eyeballed: see the contrast sweep in the scan.
+
+   Nocturne — the night-shift theme.
+
+   WHY THIS EXISTS. Workbench, Command, Vivid and Blueprint are all light by
+   default. But a print farm runs unattended overnight, and the person who
+   checks on it at 2am is standing in a dim workshop, often reading the screen
+   from across the room. A wall of white destroys dark adaptation and turns a
+   glance into a squint. Nocturne is built for that hour and not retrofitted
+   for it — dark is the DEFAULT appearance here, not the alternate.
+
+   Every decision below follows from that use, not from taste:
+
+   1. AMBER ACCENT, not blue. Aviation and marine instrument panels have used
+      amber and red at night for a century because long-wavelength light
+      preserves dark adaptation — you can look at the panel and still see the
+      room. It also reads as machine status rather than as branding, which is
+      the right register for a fleet you are checking on.
+
+   2. STATUS IS THE ONLY SATURATED THING. Chrome is desaturated on purpose so a
+      red failure is the loudest element on the screen by a wide margin. On a
+      dark ground, saturation is the scarcest resource in the design; spending
+      it on decoration is how a real alert gets lost.
+
+   3. ELEVATION BY LINE, NOT BY LIGHT. Panels lift with a hairline border and a
+      barely-lighter fill instead of a bright surface. A dark UI that raises
+      contrast by making panels brighter just builds lamps.
+
+   4. FIGURES ARE BIG AND TABULAR. Glanceability from three metres is the
+      actual requirement, so numerals are monospaced, tabular, and set a step
+      larger than the other themes.
+
+   The ground is near-black with a cool slate tint rather than pure #000 —
+   pure black smears on LCD panels during scroll and is harsher than it needs
+   to be, while still being deep enough to suit an OLED panel in a dark room. */
+
+html[data-design="nocturne"] {
+  /* ---- Surfaces (near-black, cool slate tint, low glare) ---- */
+  --bg:        #0a0c10;   /* window backdrop */
+  --bg-2:      #070910;   /* rail / sidebar, recedes below the ground */
+  --surface:   #12151c;   /* primary panel */
+  --surface-1: #12151c;
+  --surface-2: #171b24;   /* hover / subtle raise */
+  --surface-3: #1d222d;
+  --panel:     #12151c;
+  --panel-2:   #171b24;
+
+  /* ---- Ink. Not pure white: #e8eaf0 at ~13.5:1 on the ground is past AAA and
+         easier at night than #fff, which glares on a dark field. ---- */
+  --ink:       #e8eaf0;
+  --ink-2:     #a8aebd;
+  --ink-3:     #787f8f;
+  --ink-4:     #545a68;
+
+  /* ---- Lines carry the structure here, so they are a touch stronger than a
+         light theme would use ---- */
+  --line:      #252a35;
+  --line-2:    #1c212b;
+  --line-soft: #1c212b;
+  --hairline:  rgba(232,234,240,0.07);
+
+  /* ---- Accent (amber) — HSL channels so applyAccent() can swap them ---- */
+  --accent-h: 38;
+  --accent-s: 92%;
+  --accent-l: 58%;
+  --accent:      hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  --accent-ink:  #170f00;   /* dark ink ON amber — amber is too light for white */
+  --on-accent:   #170f00;
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.16);
+  --accent-line: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.45);
+  --accent-2:    #f0a92a;
+
+  /* ---- Status. The one place saturation is spent. Foregrounds are checked
+         for AA on --surface; the -bg fills stay dark so the text carries. ---- */
+  --nk-blue:#5fa8ff;   --nk-blue-bg:#10233d;
+  --nk-green:#3ad18d;  --nk-green-bg:#0c2b1f;
+  --nk-red:#ff6b5e;    --nk-red-bg:#331614;
+  --nk-amber:#f5b342;  --nk-amber-bg:#2f2410;
+  --nk-violet:#b98bfa; --nk-violet-bg:#241b3a;
+  --nk-teal:#33c9c2;   --nk-teal-bg:#0b2c2e;
+
+  /* ---- Shadows: depth without halo ---- */
+  --shadow-1: 0 1px 2px rgba(0,0,0,.55);
+  --shadow-2: 0 10px 30px rgba(0,0,0,.62), 0 1px 2px rgba(0,0,0,.5);
+  --shadow-pop: var(--shadow-2);
+
+  /* ---- Radii — softer than Blueprint's drafting square, calmer at low light ---- */
+  --radius:    12px;
+  --radius-sm: 8px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+
+  /* ---- Fonts. Both already vendored under renderer/fonts/ for the CSP. ---- */
+  --font-ui:   "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-ar:   "IBM Plex Sans Arabic", var(--font-ui);
+  --font-sans: var(--font-ui);
+  --font-num:  var(--font-mono);
+  --mono:      var(--font-mono);
+
+  /* ---- Aliases the shared renderer reads ---- */
+  --text: var(--ink);
+  --text-dim: var(--ink-2);
+  --text-muted: var(--ink-3);
+  --text-faint: var(--ink-4);
+  --border: var(--line);
+  --border-2: #2f3542;
+  --border-soft: var(--line-2);
+  --primary: var(--accent);
+  --primary-soft: var(--accent-soft);
+  --success: var(--nk-green);
+  --warning: var(--nk-amber);
+  --danger: var(--nk-red);
+  --ok: var(--nk-green);
+  --bg-elev: var(--surface-2);
+  --bg-card: var(--surface);
+
+  --nav-w: 236px;
+}
+
+/* Light — the day shift. Nocturne is dark-first, but appearance is the user's
+   choice and switching must not hand them a broken screen. This is a warm,
+   low-glare light that keeps the amber identity rather than a generic white:
+   a bone ground, and the accent DARKENED to 42% so amber-on-white clears AA,
+   which it does not at the 58% used on the dark ground. */
+html[data-design="nocturne"][data-theme="light"] {
+  --bg:        #f4f2ee;
+  --bg-2:      #edeae4;
+  --surface:   #fbfaf8;
+  --surface-1: #fbfaf8;
+  --surface-2: #f2efea;
+  --surface-3: #e8e4dd;
+  --panel:     #fbfaf8;
+  --panel-2:   #f2efea;
+
+  --ink:       #17191f;
+  --ink-2:     #4b4f5a;
+  /* Darker than the dark-mode value above, not lighter: this is the LIGHT
+     variant and Nocturne is the one theme whose BASE block is dark. A contrast
+     pass that assumes base == light adjusts the wrong block and leaves this one
+     at 3.79:1 — which is exactly what happened first time round. */
+  --ink-3:     #6a6f7b;
+  --ink-4:     #a1a5ae;
+
+  --line:      #e2ded7;
+  --line-2:    #ebe7e1;
+  --line-soft: #ebe7e1;
+  --hairline:  rgba(23,25,31,0.06);
+  --border-2:  #d5d0c8;
+
+  --accent-l: 42%;
+  --accent-ink: #ffffff;
+  --on-accent:  #ffffff;
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.14);
+
+  --nk-blue:#1f63c4;   --nk-blue-bg:#e4edfb;
+  --nk-green:#12734c;  --nk-green-bg:#e0f3e9;
+  --nk-red:#c02f26;    --nk-red-bg:#fce9e7;
+  --nk-amber:#8a5d00;  --nk-amber-bg:#fbf0d8;
+  --nk-violet:#6d3fb5; --nk-violet-bg:#efe8fb;
+  --nk-teal:#0f6f6b;   --nk-teal-bg:#dff3f1;
+
+  --shadow-1: 0 1px 2px rgba(23,25,31,.07), 0 2px 6px rgba(23,25,31,.05);
+  --shadow-2: 0 8px 24px rgba(23,25,31,.10);
+}
+
+html[data-design="nocturne"],
+html[data-design="nocturne"] body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+html[data-design="nocturne"][dir="rtl"],
+html[data-design="nocturne"][dir="rtl"] body {
+  font-family: var(--font-ar);
+}

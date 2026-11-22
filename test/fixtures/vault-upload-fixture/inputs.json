@@ -1,0 +1,24 @@
+{
+  "_comment": "Inputs for one pinned vault upload. expected.json is generated from these by scripts/gen-vault-upload-fixture.js. See README.md.",
+  "shopDek": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "dataKey": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+  "fileId": "f_7Qm2xK9a",
+  "uploadId": "u_01JB4ZP3",
+  "version": 1,
+  "existingFileId": null,
+  "baseVersion": null,
+  "deviceId": "mac-test-device",
+  "lastSeq": 4,
+  "plaintext": { "size": 4195304, "mul": 31, "add": 7, "_recipe": "byte k = (k * mul + add) mod 256; size = CHUNK_BYTES (4194304) + 1000, two chunks" },
+  "name": "مزهرية.3mf",
+  "path": "prints/vases",
+  "kind": "3mf",
+  "key": "prints/vases/مزهرية.3mf",
+  "recordId": "rec_42",
+  "nonces": {
+    "_comment": "Chunk nonces are not random: chunk i uses 0x00000000 || uint64be(i). Only these three are drawn at random in production.",
+    "wrap": "101112131415161718191a1b",
+    "versionMeta": "202122232425262728292a2b",
+    "meta": "303132333435363738393a3b"
+  }
+}

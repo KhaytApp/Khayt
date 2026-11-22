@@ -1,0 +1,451 @@
+import Foundation
+import KhaytCore
+
+/// A printer on the shop floor.
+///
+/// Decoded leniently, like everything else read out of this store. The record is
+/// wide — webcam, downtime blocks, per-vendor API settings — and this app shows
+/// the part a person standing in front of the machine cares about.
+struct Machine: Identifiable, Decodable, Hashable, Sendable {
+    let id: String
+    let name: String
+    let color: String?
+    let vendor: String?
+    let printerModelName: String?
+    let compatMaterials: [String]?
+    let maxColors: Int?
+    let nozzleDiameter: Double?
+    let extruderType: String?
+    let powerDraw: Double?
+    /// Hours a day the shop wants this machine printing. The machine sheet
+    /// asked for it and never read it back, so every edit on this Mac wrote
+    /// it over with nothing.
+    let targetHoursPerDay: Double?
+    /// The shop says this printer clears its own plate (a belt printer, a
+    /// plate changer, a push-off end routine). `lib/auto-dispatch.js` then
+    /// offers it work without waiting for "Bed is clear".
+    var clearsOwnBed: Bool? = nil
+    let bed: Bed?
+    let nozzle: Nozzle?
+    let printerApi: PrinterApi?
+
+    /// The camera on this machine, if the shop has set one up.
+    ///
+    /// Decoded but never DERIVED here: where a camera might live and what a
+    /// relative path means against the printer's host are `lib/webcam.js`'s,
+    /// asked through the engine. This is only what the book already says.
+    let webcam: Webcam?
+
+    /// When this machine is out of action. Three things read it — the band,
+    /// the scheduler and the delivery promise — so an unreadable row is not
+    /// cosmetic; see `lib/machine-edit.js`.
+    let downtimeBlocks: [Downtime]?
+
+    /// The smart plug the printer sits on, when the shop set one up. Every
+    /// field optional; the token and password are `__enc__` sealed and opened
+    /// only at the moment a request is sent. See `lib/smart-plug.js`.
+    let smartPlug: SmartPlug?
+
+    /// What the machine cost and how long it should last, when the shop has
+    /// said — `lib/depreciation.js`. Every field optional: a machine without
+    /// one is quoted at its flat wear rate, as every machine always was.
+    let depreciation: Depreciation?
+
+    /// Which of the shop's sites this machine stands in (`store.locations`).
+    /// Empty, absent or naming a location since deleted all mean "none" —
+    /// `lib/location-pl.js` reads them the same way. A job on this machine
+    /// belongs to this site unless the job names one of its own.
+    let locationId: String?
+
+    // ── IN SERVICE, UNDER SERVICE, RETIRED ───────────────────────────────
+    //
+    // `lib/machine-status.js` owns the meaning; these are the fields as the
+    // book writes them, each read on its own so a hand-edited `isOffline: "yes"`
+    // costs that field and never the whole machine list. Read them through
+    // `isRetired` / `isUnderService` and the four accessors below.
+    let isOffline: LenientField<Bool>?
+    let offlineReason: LenientField<String>?
+    let offlineSince: LenientField<String>?
+    let status: LenientField<String>?
+    let retiredAt: LenientField<String>?
+    let retiredReason: LenientField<String>?
+
+    private static func text(_ field: LenientField<String>?) -> String {
+        (field?.value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    private static func said(_ field: LenientField<String>?) -> String? {
+        let t = text(field); return t.isEmpty ? nil : t
+    }
+
+    /// Sold, scrapped or given away — `isRetired` in the rule: `status:
+    /// 'retired'`, or a `retiredAt` on its own.
+    var isRetired: Bool { Self.text(status) == "retired" || !Self.text(retiredAt).isEmpty }
+
+    /// Temporarily out — `isUnderService`: never as well as retired.
+    var isUnderService: Bool {
+        !isRetired && (isOffline?.value == true || Self.text(status) == "offline")
+    }
+
+    /// Neither: may be given work today.
+    var inService: Bool { !isRetired && !isUnderService }
+
+    /// Why it is under service, and since when (an ISO day), when the shop said.
+    var underServiceReason: String? { isUnderService ? Self.said(offlineReason) : nil }
+    var underServiceSince: String? { isUnderService ? Self.said(offlineSince) : nil }
+    /// When it was retired (an ISO day) and why, when the shop said.
+    var retiredOn: String? { isRetired ? Self.said(retiredAt).map { String($0.prefix(10)) } : nil }
+    var retiredBecause: String? { isRetired ? Self.said(retiredReason) : nil }
+
+    struct Depreciation: Decodable, Hashable, Sendable {
+        let price: Double?
+        let purchaseDate: String?
+        let life: Double?
+        /// `hours` or `years`.
+        let lifeUnit: String?
+        let residual: Double?
+        /// `perHour` or `straightLine`.
+        let method: String?
+        let monthlyHours: Double?
+
+        private enum CodingKeys: String, CodingKey {
+            case price, purchaseDate, life, lifeUnit, residual, method, monthlyHours
+        }
+
+        /// Field by field, so one value of the wrong type costs that field and
+        /// never the whole machine list.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            price = try? c.decode(Double.self, forKey: .price)
+            purchaseDate = try? c.decode(String.self, forKey: .purchaseDate)
+            life = try? c.decode(Double.self, forKey: .life)
+            lifeUnit = try? c.decode(String.self, forKey: .lifeUnit)
+            residual = try? c.decode(Double.self, forKey: .residual)
+            method = try? c.decode(String.self, forKey: .method)
+            monthlyHours = try? c.decode(Double.self, forKey: .monthlyHours)
+        }
+    }
+
+    struct SmartPlug: Decodable, Hashable, Sendable {
+        let type: String?
+        let host: String?
+        let entity: String?
+        let user: String?
+        let token: String?
+        let password: String?
+        let autoOff: Bool?
+        let delayMin: Double?
+
+        /// A kind the rule speaks, with an address: something that can be asked.
+        var usable: Bool {
+            ["shelly", "shelly-rpc", "tasmota", "homeassistant"].contains(type ?? "")
+                && !(host ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        }
+    }
+
+    /// What the shop says is loaded, head by head, for a printer that cannot
+    /// report it. Every field optional: a row this app cannot read is skipped,
+    /// never allowed to fail the whole machine list. See `lib/machine-edit.js`.
+    let loaded: [Loaded]?
+
+    struct Loaded: Decodable, Hashable, Sendable {
+        let slot: Int?
+        let hex: String?
+        let material: String?
+    }
+
+    /// The hand-entered spools as the library's rule reads them.
+    var loadedByHand: [KhaytEngine.LoadedSlot] {
+        (loaded ?? []).enumerated().compactMap { index, row in
+            guard let hex = row.hex, !hex.isEmpty else { return nil }
+            return KhaytEngine.LoadedSlot(slot: row.slot ?? index, hex: hex, material: row.material ?? "")
+        }
+    }
+
+    struct Downtime: Decodable, Hashable, Sendable {
+        let from: String?
+        let to: String?
+        /// Khayt's machine modal writes `reason`; `note` is accepted too.
+        let reason: String?
+        let note: String?
+        var words: String { (reason?.isEmpty == false ? reason : note) ?? "" }
+    }
+
+    struct Webcam: Decodable, Hashable, Sendable {
+        let enabled: Bool?
+        let snapshotUrl: String?
+        let streamUrl: String?
+        /// `mjpeg`, `hls` or `rtsp` — the shared module's `STREAM_TYPES`.
+        ///
+        /// Only `rtsp` changes what this app does: it is the one that is not a
+        /// URL something can simply GET, so `Camera.fetch` opens a session and
+        /// decodes a keyframe instead. Optional because books written before
+        /// the field existed do not carry it, and a missing value means the old
+        /// behaviour — fetch `snapshotUrl` over HTTP.
+        let streamType: String?
+        /// 0, 90, 180 or 270. A camera zip-tied to a gantry is rarely the right
+        /// way up.
+        let rotate: Int?
+        let flipH: Bool?
+        let flipV: Bool?
+    }
+
+    struct Bed: Decodable, Hashable, Sendable {
+        let x: Double?
+        let y: Double?
+        let z: Double?
+    }
+
+    struct Nozzle: Decodable, Hashable, Sendable {
+        let material: String?
+        let installedAt: String?
+        let gramsThreshold: Double?
+        let gramsAtInstall: Double?
+    }
+
+    /// How the app reaches the machine. **The key is never read here**: the
+    /// store keeps it encrypted, `SafeStorage` is the only thing that opens it,
+    /// and a screen that shows a printer's address has no business decrypting
+    /// its credentials to do so.
+    struct PrinterApi: Decodable, Hashable, Sendable {
+        let type: String?
+        let host: String?
+        let port: Int?
+        /// STILL SEALED. Carried so the poller can open it at the moment it
+        /// sends one — OctoPrint, PrusaLink and Repetier always need a key —
+        /// and opened nowhere else. No screen displays it and none ever should.
+        let apiKey: String?
+        /// ALSO STILL SEALED — `store-secret-paths.js` registers
+        /// `machines[].printerApi.accessCode` alongside the key. A Bambu's LAN
+        /// access code is the MQTT password; it is opened at the moment the
+        /// connection is made and held nowhere.
+        let accessCode: String?
+        /// Which Bambu. Every MQTT topic is scoped by it —
+        /// `device/{serial}/report` — so without it there is nothing to
+        /// subscribe to. Not a secret: it is printed on the machine.
+        let serial: String?
+        /// Which printer, on a Repetier-Server that runs several. It is in
+        /// every request path rather than a header, and `machine-edit.js`
+        /// stores an empty string when the shop has not said — which the
+        /// adapter reads as `default`, the name Repetier itself uses.
+        let printerSlug: String?
+    }
+
+    /// Has the machine's own job history been read into the book?
+    ///
+    /// It is not decoded — five hundred jobs are a wear figure, not something a
+    /// screen shows — but whether it is THERE changes what the nozzle counter
+    /// means, and a shop is owed that.
+    let printerHistory: History?
+
+    struct History: Decodable, Hashable, Sendable {
+        let source: String?
+        let importedAt: String?
+    }
+
+    var hasPrinterHistory: Bool { printerHistory?.importedAt?.isEmpty == false }
+
+    /// Is there a camera to draw at all? `lib/webcam.js`'s `hasCamera` in one
+    /// line: switched on, and with somewhere to fetch from.
+    var hasCamera: Bool {
+        guard let webcam, webcam.enabled == true else { return false }
+        return !(webcam.snapshotUrl ?? "").isEmpty || !(webcam.streamUrl ?? "").isEmpty
+    }
+
+    var model: String { printerModelName ?? vendor ?? "" }
+
+    /// `270 × 270 × 270`, or nothing when the record does not say. The unit
+    /// is the caller's to add, in the shop's language (`mac.unit_mm`).
+    ///
+    /// `Int(saturating:)`, not `Int(_:)`: a bed of 1e300 from a hand-edited
+    /// or imported book trapped and took the machine card down with it.
+    var bedSize: String? { bedSize(numeral: { String($0) }) }
+
+    /// The same, each figure in the shop's digits (`Words.numeral`).
+    func bedSize(numeral: (Int) -> String) -> String? {
+        guard let bed, let x = bed.x, let y = bed.y, let z = bed.z else { return nil }
+        return [x, y, z].map { numeral(Int(saturating: $0)) }.joined(separator: " × ")
+    }
+
+    /// Where it can be reached, without the credential.
+    var address: String? {
+        guard let api = printerApi, let host = api.host, !host.isEmpty else { return nil }
+        guard let port = api.port, port > 0 else { return host }
+        return "\(host):\(port)"
+    }
+}
+
+/// One field read leniently: a value of the wrong type reads as nil, never as
+/// a machine list that failed to decode. Absent or `null` is a nil field
+/// (`decodeIfPresent`), so only a present value ever reaches this.
+struct LenientField<T: Decodable & Hashable & Sendable>: Decodable, Hashable, Sendable {
+    let value: T?
+    init(_ value: T?) { self.value = value }
+    init(from decoder: Decoder) throws {
+        value = try? decoder.singleValueContainer().decode(T.self)
+    }
+}
+
+/// A spool on the shelf.
+struct Spool: Identifiable, Decodable, Hashable, Sendable {
+    let id: String
+    let material: String
+    /// What the spool cost, in the shop's currency. This is what left the bank
+    /// and it never changes: `vatAmount` below is what a JOB is costed at.
+    let cost: Double?
+    /// The tax inside that price, when the shop recorded it and can reclaim it.
+    /// Absent on every spool bought before Khayt asked, and reclaims nothing —
+    /// no tax is invented on a receipt nobody described. See
+    /// `KhaytSpoolEdit.netCost`, which is the one place that decides.
+    let vatAmount: Double?
+    /// Grams remaining. The seed rows are whole kilos.
+    let weight: Double?
+    /// What it weighed when it arrived, written once by `spool-edit.js`.
+    /// Absent on every spool bought before that, and unrecoverable.
+    let spoolWeight: Double?
+    let openedAt: String?
+    let storage: String?
+    /// What the shop calls this particular colour — "Matte Black" — as opposed
+    /// to `color`, which is the swatch a screen draws.
+    let colourVariant: String?
+    let color: String?
+    let materialType: String?
+    let lot: String?
+    let purchasedAt: String?
+    /// What this item is counted in — `g`, `ml`, `sheet`. Absent is grams;
+    /// `lib/inventory-units.js` decides that and this is the raw field. Prefer
+    /// `Shop.unit(of:)`, which knows about a unit a newer Khayt may have
+    /// written and this does not.
+    let unit: String?
+    /// Warn below this many — IN THE UNIT ABOVE. Reorder this many.
+    let reorderPoint: Double?
+    let reorderQty: Double?
+    let printTemp: Double?
+    let bedTemp: Double?
+    let maxSpeed: Double?
+    /// What this spool cost before, and when it changed. Written by the editor
+    /// whenever the price moves, so a shop can check a supplier's invoice.
+    let priceHistory: [PriceChange]?
+
+    struct PriceChange: Decodable, Hashable, Sendable {
+        let cost: Double
+        let date: String
+    }
+
+    /// Where this spool actually went: one entry per job it was deducted for.
+    ///
+    /// Written by the deduction chain in BOTH apps and read by neither this
+    /// one nor any screen it has — the shop's own book holds it and nothing
+    /// shows it. It is the answer to "what happened to that kilo", which is
+    /// the question a shelf count raises every time it disagrees.
+    let usageHistory: [Use]?
+    /// Which of the shop's sites the spool is kept at (`store.locations`).
+    /// Absent or empty is Unassigned — `lib/spool-edit.js` writes no key for
+    /// it. A `var` with a default so the memberwise init keeps its shape.
+    var locationId: String? = nil
+
+    struct Use: Decodable, Hashable, Sendable {
+        /// `YYYY-MM-DD`.
+        let date: String
+        /// The job it went to, as it was named at the time. A job since
+        /// renamed keeps the name the spool was spent under, which is what a
+        /// record of what happened means.
+        let project: String
+        let orderId: String
+        let weightUsed: Double
+        /// The lot the spool had when this was drawn (or received), stamped
+        /// since lot tracing (`lib/order-deduction.js` `lotStamp`). Absent on
+        /// every row written before, which `lib/lot-trace.js` then INFERS
+        /// from the spool's current lot.
+        let lot: String?
+        /// `received` for an arrival against a purchase order; absent for a job.
+        let type: String?
+
+        /// No `id`: the book writes none, and one made from the row
+        /// (date|job|grams) REPEATS — two equal draws on one day for one job
+        /// are two entries — which SwiftUI then drew as one. A list of these
+        /// is keyed by its position instead (`SpoolHistorySheet`).
+
+        /// An arrival against a purchase order: a NEGATIVE `weightUsed`,
+        /// because the history is what LEFT the spool. Not a use.
+        var isReceipt: Bool { type == "received" }
+
+        private enum CodingKeys: String, CodingKey { case date, project, orderId, weightUsed, lot, type }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            date = ((try? c.decodeIfPresent(String.self, forKey: .date)) ?? nil) ?? ""
+            project = ((try? c.decodeIfPresent(String.self, forKey: .project)) ?? nil) ?? ""
+            orderId = ((try? c.decodeIfPresent(String.self, forKey: .orderId)) ?? nil) ?? ""
+            weightUsed = ((try? c.decodeIfPresent(Double.self, forKey: .weightUsed)) ?? nil) ?? 0
+            lot = ((try? c.decodeIfPresent(String.self, forKey: .lot)) ?? nil)
+                .flatMap { let t = $0.trimmingCharacters(in: .whitespacesAndNewlines); return t.isEmpty ? nil : t }
+            type = ((try? c.decodeIfPresent(String.self, forKey: .type)) ?? nil)
+        }
+    }
+
+    /// What this spool has been spent on altogether, in its own unit.
+    ///
+    /// Receipts are not spending. They are negative rows, and adding them in
+    /// netted the delivery against the use: 1000 g received and 300 g used
+    /// read as "−700 g used".
+    var totalUsed: Double {
+        (usageHistory ?? []).reduce(0) { $1.isReceipt ? $0 : $0 + $1.weightUsed }
+    }
+
+    /// How a shop picks this spool out of a list: what it is, and where — the
+    /// two things that tell one 1kg PLA apart from another on the same shelf.
+    ///
+    /// Takes the catalogue because the unit is in it — `common.grams` is `غ`
+    /// in Arabic, so a `g` written here would be an English letter in an Arabic
+    /// list — and takes the item's UNIT, because a stack of plywood picked out
+    /// of a list read "Birch ply · 6g · Rack by the laser".
+    @MainActor func label(_ words: Words, unit: KhaytEngine.InventoryUnit? = nil) -> String {
+        let amount = weight.map { " · " + Quantity.say($0, unit, words) } ?? ""
+        let where_ = storage.flatMap { $0.isEmpty ? nil : " · \($0)" } ?? ""
+        return material + amount + where_
+    }
+
+    /// What a kilo of it cost, from what it weighed WHEN IT ARRIVED.
+    ///
+    /// Never from `weight`, which is what is left and falls as the shop prints:
+    /// dividing the price by that made the supplier-comparison figure climb as
+    /// the roll emptied — 75 became 150 half way down and 2,000 near the end,
+    /// worst on exactly the spool a shop is about to reorder. That version was
+    /// deleted rather than fixed, because nothing recorded the original weight
+    /// to divide by.
+    ///
+    /// `spool-edit.js` records it now, so this answers for every spool bought
+    /// from that point on and NIL for one already on the shelf. Nil is the
+    /// honest answer there: a shop that has used half a roll has no record of
+    /// the other half, and a rate worked out from what is left would be the
+    /// same wrong number wearing a new comment.
+    var costPerKilo: Double? {
+        guard let cost, let original = spoolWeight, original > 0 else { return nil }
+        return cost / (original / 1000)
+    }
+
+    /// How much of it is left, 0…1 — and NIL where that is not knowable.
+    ///
+    /// Same rule as `costPerKilo` and for the same reason: it needs what the
+    /// spool weighed when it arrived. A spool bought before Khayt asked has no
+    /// record of the other half, and guessing a kilo would draw a half-empty
+    /// roll as two-thirds full — a picture that is confidently wrong is worse
+    /// than one that does not claim.
+    ///
+    /// Clamped, because a shop that tops a roll up or mistypes a figure should
+    /// get a full spool rather than a ring wider than the flange.
+    var fill: Double? {
+        guard let left = weight, let original = spoolWeight, original > 0 else { return nil }
+        return min(1, max(0, left / original))
+    }
+}
+
+extension String {
+    /// Equal ignoring case and the spaces around it — "Snapmaker U1" and
+    /// "snapmaker u1 " are the same printer typed twice.
+    func caseInsensitiveEquals(_ other: String) -> Bool {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .compare(other.trimmingCharacters(in: .whitespacesAndNewlines),
+                     options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+    }
+}

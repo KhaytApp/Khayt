@@ -1,0 +1,905 @@
+/**
+ * Shift checklist, EOD report, recurring orders, gift cards, VAT export,
+ * slicer profiles, and environmental logging.
+ */
+/* ============================================================
+   BATCH-2 FEATURES (Features 1-15)
+   ============================================================ */
+
+
+/* ── Feature 2: Shift-Start Checklist ──────────────────────── */
+function openShiftChecklistModal() {
+  const checks = [
+    { id: 'c1', label: t('checkFilamentLevels')    || 'Check filament levels on all printers' },
+    { id: 'c2', label: t('verifyTemperatures')     || 'Verify printer temperatures are correct' },
+    { id: 'c3', label: t('reviewOrderQueue')       || "Review today's order queue" },
+    { id: 'c4', label: t('checkFailedPrints')      || 'Check for any failed prints from previous shift' },
+    { id: 'c5', label: t('cleanPrintSurfaces')     || 'Clean print surfaces' },
+    { id: 'c6', label: t('logShiftStartTime')      || 'Log shift start time' },
+  ];
+  const bodyHtml = `
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">${escapeHtml(t('shiftChecklistHint') || 'Complete the checklist before starting your shift.')}</p>
+    ${checks.map(c => `
+      <label style="display:flex;align-items:center;gap:10px;padding:6px 0;cursor:pointer;border-bottom:1px solid var(--border-soft);">
+        <input type="checkbox" id="shift_${c.id}" style="width:auto;margin:0;accent-color:var(--primary);">
+        <span style="font-size:13px;">${escapeHtml(c.label)}</span>
+      </label>`).join('')}`;
+  openFormModal({
+    title: '▶ ' + t('shiftChecklist'),
+    bodyHtml,
+    saveLabel: t('startShift') || 'Start Shift',
+    sizeLg: false,
+    onSave(modal) {
+      const count = checks.filter(c => modal.querySelector(`#shift_${c.id}`)?.checked).length;
+      if (!shiftLogs) shiftLogs = [];
+      const activeOp = settings.activeOperatorId
+        ? (operators.find(o => o.id === settings.activeOperatorId)?.name || null)
+        : null;
+      shiftLogs.push({
+        id: uid('SHF'),
+        startedAt: new Date().toISOString(),
+        operator: activeOp,
+        checksCompleted: count,
+        totalChecks: checks.length,
+      });
+      saveAll();
+      toast(t('shift.started'), 'success');
+    },
+  });
+}
+
+/* ── Feature 3: End-of-Day Report Modal ─────────────────────── */
+function openEndOfDayReport() {
+  const today = localDateStr();
+  /* The shop's day a record belongs to. A plain `YYYY-MM-DD` is already written
+   * in local time; a full ISO stamp (completedAt) is UTC, so slicing it filed a
+   * job finished between midnight and 03:00 in Riyadh under yesterday. */
+  const dayOf = (raw) => {
+    const s = String(raw || '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    return s && !isNaN(d) ? localDateStr(d) : '';
+  };
+  const completedToday = printLog.filter(o => KhaytOrderStatus.isFinished(o) && dayOf(o.completedAt || o.date) === today);
+  const revenueToday   = completedToday.reduce((s, o) => s + orderNetRevenueBase(o), 0);
+  const inProgress     = printLog.filter(o => ['pending','printing','post','qc'].includes(o.status));
+  const wasteToday     = wasteLog.filter(w => dayOf(w.date) === today);
+  const wasteTotalG    = wasteToday.reduce((s, w) => s + (+w.weight || 0), 0);
+  /* Time entries are written with `hours` (ops-locations.js, lib/operators.js);
+   * this summed a `durationMins` nothing writes, so it always read 0. */
+  const timeToday      = timeEntries.filter(te => dayOf(te.date || te.createdAt) === today);
+  const timeTotal      = Math.round(timeToday.reduce((s, te) => s + (+te.hours > 0 ? +te.hours : 0), 0) * 60);
+  const overdueOrders  = printLog.filter(o => o.dueDate === today && KhaytOrderStatus.isOpen(o));
+
+  const overdueHtml = overdueOrders.length > 0 ? `
+    <div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.35);border-radius:6px;padding:10px;margin-top:12px;">
+      <strong style="font-size:12px;color:var(--warning);">Due Today — Not Completed</strong>
+      ${overdueOrders.map(o => `<div style="font-size:12px;margin-top:4px;">• ${escapeHtml(o.project || jobRef(o))}</div>`).join('')}
+    </div>` : '';
+
+  const bodyHtml = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div class="card" style="padding:12px;">
+        <div style="font-size:11px;color:var(--text-muted);">Orders Completed</div>
+        <div style="font-size:24px;font-weight:700;">${completedToday.length}</div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:11px;color:var(--text-muted);">Revenue Today</div>
+        <div style="font-size:20px;font-weight:700;">${fmtPrice(revenueToday)}</div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:11px;color:var(--text-muted);">In Progress</div>
+        <div style="font-size:24px;font-weight:700;">${inProgress.length}</div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:11px;color:var(--text-muted);">Filament Wasted Today</div>
+        <div style="font-size:20px;font-weight:700;">${wasteTotalG.toFixed(0)}g</div>
+      </div>
+      <div class="card" style="padding:12px;grid-column:1/-1;">
+        <div style="font-size:11px;color:var(--text-muted);">Time Logged Today</div>
+        <div style="font-size:20px;font-weight:700;">${(timeTotal / 60).toFixed(1)}h (${timeTotal} min)</div>
+      </div>
+    </div>
+    ${overdueHtml}`;
+
+  const eodHtmlForExport = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>End of Day Report — ${today}</title>
+    <style>body{font-family:sans-serif;max-width:600px;margin:auto;padding:24px;}h1{font-size:20px;}table{width:100%;border-collapse:collapse;}td,th{border:1px solid #ddd;padding:8px;}</style></head>
+    <body><h1>End of Day Report — ${escapeHtml(today)}</h1>
+    <table><tr><th>Metric</th><th>Value</th></tr>
+    <tr><td>Orders Completed</td><td>${completedToday.length}</td></tr>
+    <tr><td>Revenue</td><td>${fmtPrice(revenueToday)}</td></tr>
+    <tr><td>In Progress</td><td>${inProgress.length}</td></tr>
+    <tr><td>Filament Wasted</td><td>${wasteTotalG.toFixed(0)}g</td></tr>
+    <tr><td>Time Logged</td><td>${timeTotal} min</td></tr>
+    </table>${overdueOrders.length > 0 ? '<h2>Due Today — Not Completed</h2><ul>' + overdueOrders.map(o => `<li>${escapeHtml(o.project || jobRef(o))}</li>`).join('') + '</ul>' : ''}
+    </body></html>`;
+
+  openFormModal({
+    title: 'End of Day Report — ' + today,
+    bodyHtml,
+    sizeLg: false,
+    noSave: false,
+    saveLabel: 'Export as PDF',
+    onSave() {
+      if (window.hubAPI?.exportPDF) {
+        window.hubAPI.exportPDF({ html: eodHtmlForExport, filename: `eod-report-${today}.pdf` })
+          .then(() => toast(t('common.export_done'), 'success'))
+          .catch(() => toast(t('common.pdf_unavailable'), 'error'));
+      } else {
+        toast(t('common.pdf_unavailable'), 'info');
+      }
+      return false; // keep modal open after export
+    },
+  });
+}
+
+/* ── Feature 4: Recurring Order Auto-Generation ─────────────── */
+function processRecurringOrders() {
+  const today = localDateStr();
+  let created = 0;
+  const toUpdate = [];
+
+  for (const order of printLog) {
+    if (!order.isRecurring) continue;
+    if (!order.nextDueDate || order.nextDueDate > today) continue;
+
+    // Check no child created in last 24h
+    const recentChild = printLog.find(o =>
+      o.parentRecurringId === order.id &&
+      o.date >= localDateStr(new Date(Date.now() - 86400000))
+    );
+    if (recentChild) continue;
+
+    const newOrder = {
+      ...order,
+      id: uid('REC'),
+      date: today,
+      dueDate: order.nextDueDate,
+      status: 'pending',
+      isRecurring: false,
+      parentRecurringId: order.id,
+      queuePos: printLog.filter(o => o.status === 'pending').length + 1,
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+      printingStartedAt: null,
+      timerStart: null,
+      timerPausedAt: null,
+      timerPausedMs: null,
+      // Clear fields that must not carry over from the parent order
+      survey: null,
+      // The parent's timelapse is a video of THAT print, not of this one.
+      printerTimelapse: null,
+      paymentStatus: null,
+      invoiceId: null,
+      giftCardCode: null,
+      giftCardDiscount: null,
+      changeLog: [],
+      failurePhotoPath: null,
+    };
+    printLog.push(newOrder);
+    created++;
+
+    // Advance nextDueDate
+    const d = new Date(order.nextDueDate + 'T00:00:00');
+    if (order.recurringInterval === 'weekly')   d.setDate(d.getDate() + 7);
+    else if (order.recurringInterval === 'biweekly') d.setDate(d.getDate() + 14);
+    else /* monthly */                          d.setMonth(d.getMonth() + 1);
+    order.nextDueDate = localDateStr(d);
+    toUpdate.push(order.id);
+  }
+
+  if (created > 0) {
+    saveAll();
+    setTimeout(() => toast(t(created === 1 ? 'rec.auto_created_one' : 'rec.auto_created', { n: created }), 'success', 4000), 500);
+  }
+}
+
+/* ── Quote follow-up auto-nudge (opt-in, default OFF) ────────────
+   Mirrors the recurring-order auto-create pattern: on app start (and on a
+   timer) it finds quotes due for a follow-up via the pure selector and either
+   sends them (if a phone + transport is available) or logs them, recording
+   followUpSentAt/followUpCount so they are not repeated within the cooldown. */
+function processQuoteFollowUps() {
+  if (typeof KhaytQuoteFollowUp === 'undefined') return;
+  const cfg = KhaytQuoteFollowUp.followUpConfig(settings);
+  if (!cfg.enabled) return; // toggle OFF by default
+
+  const due = KhaytQuoteFollowUp.selectQuotesDueForFollowUp(printLog, settings, Date.now());
+  if (due.length === 0) return;
+
+  let sent = 0;
+  for (const q of due) {
+    const client = q.clientId ? clients.find(c => c.id === q.clientId) : null;
+    const phone = (client?.phone || '').replace(/\D/g, '');
+    if (phone && typeof sendQuoteFollowUp === 'function') {
+      // Reuse the existing transport; mark + persist happens inside.
+      sendQuoteFollowUp(q.id, { silent: true });
+    } else {
+      // No phone/transport — still record the nudge so we surface it once.
+      Object.assign(q, KhaytQuoteFollowUp.markFollowUpPatch(q, Date.now()));
+    }
+    sent++;
+  }
+  saveAll();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  setTimeout(() => toast(t('quote.followup_auto', { n: sent }) || `Followed up on ${sent} quote(s)`, 'info', 4000), 600);
+}
+
+/** Fire an outbound event webhook for an order event (opt-in). Fire-and-forget;
+ *  HMAC-signed in the main process. No-op unless settings.eventWebhooks is on
+ *  with this event enabled + a URL set. */
+function fireOrderWebhook(type, order) {
+  try {
+    if (!order || typeof KhaytWebhooks === 'undefined' || !window.hubAPI?.webhookPost) return;
+    const w = settings.eventWebhooks;
+    if (!w || !w.enabled || !/^https:\/\//i.test(w.url || '')) return;
+    if (w.events && w.events[type] === false) return;
+    // ONE FAN-OUT. The event webhook is a subscription the bus derives from
+    // these settings (KhaytWebhookBus.effectiveSubscriptions), so a shop that
+    // pointed the subscriptions list at the same URL for the same moment gets
+    // it once, not once per system. Never stored; see lib/webhook-bus.js.
+    const Bus = (typeof KhaytWebhookBus !== 'undefined') ? KhaytWebhookBus : null;
+    const busEvent = Bus && Bus.EVENT_WEBHOOK_EVENTS ? Bus.EVENT_WEBHOOK_EVENTS[type] : null;
+    const sub = Bus && Bus.effectiveSubscriptions
+      ? Bus.effectiveSubscriptions(settings).find((s) => Bus.isEventWebhook(s)) : null;
+    if (busEvent && Bus && !(sub && sub.events.includes(busEvent))) return;
+    const client = order.clientId ? clients.find((c) => c.id === order.clientId) : null;
+    const payload = KhaytWebhooks.buildWebhookEvent(type, order, {
+      at: new Date().toISOString(),
+      shopName: shopField('biz') || 'Khayt',
+      clientName: client ? (typeof localName === 'function' ? localName(client) : client.name) : '',
+      currency: (typeof currencySymbol === 'function') ? currencySymbol() : '',
+    });
+    // Route through the durable delivery path when it is available: exponential backoff,
+    // persist-before-arm, boot resume, delivery log, and a toast when retries are
+    // exhausted. This used to be one shot with the failure fully swallowed, so an
+    // order_paid / order_shipped event feeding a shop's fulfilment automation vanished on
+    // any transient blip — while the OTHER webhook system got the durable treatment.
+    if (typeof deliverWebhook === 'function' && sub) {
+      deliverWebhook({ ...sub, secret: w.secret }, payload);
+    } else {
+      Promise.resolve(window.hubAPI.webhookPost({ url: w.url, secret: w.secret, payload }))
+        .catch((e) => console.error('order webhook failed:', e));
+    }
+  } catch (e) { /* webhooks must never break the action */ }
+}
+
+// QC / RMA lifecycle events (qc_failed, rma_opened) — dispatch through the
+// generic named-event webhook. A no-op unless the user has configured a URL for
+// that event; never throws, so it can't break the QC/RMA action.
+function fireQcWebhook(eventName, order) {
+  try {
+    if (!order || typeof fireWebhook !== 'function') return;
+    fireWebhook(eventName, {
+      orderId: order.id,
+      project: order.project,
+      status: order.status,
+      qcStatus: order.qcStatus || null,
+      reprintOf: order.reprintOf || null,
+      client: order.client || null,
+    });
+  } catch (e) { /* events must never break the action */ }
+}
+
+/** Flag overdue unpaid invoices for a payment reminder (opt-in): selects them
+ *  (cooldown/cap via the pure lib) and surfaces a single prompt; the owner
+ *  sends with the one-tap 💰 reminder, which records it. Marks nothing and
+ *  does not auto-message customers. */
+function processPaymentReminders() {
+  if (typeof KhaytPaymentReminder === 'undefined') return;
+  const cfg = KhaytPaymentReminder.reminderConfig(settings);
+  if (!cfg.enabled) return;
+  const owedOf = (o) => (typeof orderOwedBase === 'function' ? orderOwedBase(o) : (+o.price || 0) - (+o.paidAmount || 0));
+  const due = KhaytPaymentReminder.selectInvoicesDueForReminder(printLog, settings, owedOf, Date.now(), clients);
+  // FLAG ONLY. This used to stamp every selected invoice as reminded, so the
+  // 💰 send that followed counted the same reminder a second time and the
+  // three-reminder cap was reached after one and a half. The record is the
+  // send's (`sendPaymentReminder`, after it goes out). Without a stamp the same
+  // invoices are selected every 6 hours, so each is flagged once per session.
+  const flagged = processPaymentReminders.flagged || (processPaymentReminders.flagged = new Set());
+  const fresh = due.filter((o) => !flagged.has(o.id));
+  if (fresh.length === 0) return;
+  for (const o of fresh) flagged.add(o.id);
+  if (typeof renderDashboard === 'function') renderDashboard();
+  setTimeout(() => toast(t('pay.reminder_auto', { n: fresh.length }) || `${fresh.length} invoice(s) overdue — send a payment reminder`, 'info', 5000), 800);
+}
+
+/** Periodic overdue-invoice check (~6h). Idempotent. */
+function startPaymentReminderTimer() {
+  if (typeof window === 'undefined') return;
+  if (window.__khaytPayReminderTimer) return;
+  window.__khaytPayReminderTimer = setInterval(() => {
+    try { processPaymentReminders(); } catch (e) { console.error('[payment-reminder]', e); }
+  }, 6 * 60 * 60 * 1000);
+}
+
+/** Start the periodic auto-nudge timer (re-checks every ~6h). Idempotent. */
+function startQuoteFollowUpTimer() {
+  if (typeof window === 'undefined') return;
+  if (window.__khaytQuoteFollowUpTimer) return;
+  window.__khaytQuoteFollowUpTimer = setInterval(() => {
+    try { processQuoteFollowUps(); } catch (e) { console.error('[quote-followup]', e); }
+  }, 6 * 60 * 60 * 1000);
+}
+
+/* ── Feature 5: Gift Cards / Store Credit ───────────────────── */
+function renderGiftCards() {
+  const container = document.getElementById('giftCardsContainer');
+  if (!container) return;
+  if (giftCards.length === 0) {
+    container.innerHTML = `<div class="empty-state" style="padding:24px;">${escapeHtml(t('giftCardEmpty') || 'No gift cards issued yet.')}</div>`;
+    return;
+  }
+  const today = localDateStr();
+  const rows = giftCards.map(gc => {
+    const cl = gc.issuedTo ? clients.find(c => c.id === gc.issuedTo) : null;
+    // `lib/gift-card.js`, not three ternaries here — the Mac app draws the
+    // same table from the same rule, and a card that reads Active in one and
+    // Expired in the other is a shop arguing with itself in front of a customer.
+    const state = KhaytGiftCard.status(gc, today);
+    const status = state === KhaytGiftCard.EXPIRED ? (t('gcExpired') || 'Expired')
+      : state === KhaytGiftCard.USED ? (t('gcUsed') || 'Used')
+      : (t('gcActive') || 'Active');
+    const statusColor = state === KhaytGiftCard.EXPIRED ? 'var(--danger)'
+      : state === KhaytGiftCard.USED ? 'var(--text-muted)' : 'var(--success)';
+    return `<tr>
+      <td style="font-family:monospace;">${escapeHtml(gc.code)}</td>
+      <td>${fmtPrice(gc.balance)} / ${fmtPrice(gc.initialBalance)}</td>
+      <td>${cl ? escapeHtml(localName(cl)) : (gc.issuedToName ? escapeHtml(gc.issuedToName) : '—')}</td>
+      <td>${gc.expiresAt ? escapeHtml(gc.expiresAt) : '—'}</td>
+      <td style="color:${statusColor};font-weight:600;">${escapeHtml(status)}</td>
+    </tr>`;
+  }).join('');
+  container.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>${escapeHtml(t('giftCardCode'))}</th><th>${escapeHtml(t('giftCardBalance'))}</th><th>${escapeHtml(t('giftCardIssuedTo'))}</th><th>${escapeHtml(t('giftCardExpiry'))}</th><th>${escapeHtml(t('common.status'))}</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function openCreateGiftCardModal() {
+  const shortUid = () => uid('GC').replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  const code = shortUid();
+  const clientOptions = clients.map(c => `<option value="${c.id}">${escapeHtml(localName(c))}</option>`).join('');
+  openFormModal({
+    title: t('issueGiftCard'),
+    sizeLg: false,
+    saveLabel: t('common.save'),
+    bodyHtml: `
+      <label>${escapeHtml(t('giftCardCode'))}</label>
+      <input type="text" id="gcCode" value="${escapeHtml(code)}" style="font-family:monospace;">
+      <label style="margin-top:10px;">${escapeHtml(t('giftCardIssuedTo'))}</label>
+      <select id="gcClient"><option value="">— ${escapeHtml(t('common.none') || 'None')} —</option>${clientOptions}</select>
+      <label style="margin-top:10px;">${escapeHtml(t('giftCardInitialBalance'))} (${currencySymbol()})</label>
+      <input type="number" id="gcBalance" min="0" step="0.01" value="50">
+      <label style="margin-top:10px;">${escapeHtml(t('giftCardExpiry'))}</label>
+      <input type="date" id="gcExpiry">`,
+    onSave(modal) {
+      const clientId = modal.querySelector('#gcClient').value;
+      const cl = clientId ? clients.find(c => c.id === clientId) : null;
+      // Every refusal below is the shared rule's, so the Mac refuses the same
+      // codes for the same reasons. It answers with a KEY and this owns the
+      // language — a module that returned English would be a module the Arabic
+      // app could not use.
+      const made = KhaytGiftCard.newCard({
+        code: modal.querySelector('#gcCode').value,
+        initialBalance: num(modal.querySelector('#gcBalance').value, 0),
+        issuedTo: clientId || null,
+        issuedToName: cl ? localName(cl) : '',
+        expiresAt: modal.querySelector('#gcExpiry').value || null,
+      }, { id: uid('GC'), now: new Date().toISOString(), existing: giftCards });
+      if (!made.ok) {
+        const said = {
+          giftCardCodeRequired: 'Enter a code',
+          giftCardCodeInvalid: 'Code must be 3–20 alphanumeric characters',
+          giftCardBalanceRequired: 'Initial balance must be greater than 0',
+          giftCardCodeDuplicate: 'Code already exists',
+        };
+        toast(t(made.error) || said[made.error] || made.error, 'error');
+        return false;
+      }
+      giftCards.push(made.card);
+      saveAll();
+      renderGiftCards();
+      toast(t('giftCardIssued') || 'Gift card issued!', 'success');
+    },
+  });
+}
+
+function applyGiftCard(orderId, code) {
+  const order = printLog.find(o => o.id === orderId);
+  if (!order) return false;
+  const gc = giftCards.find(g => g.code === KhaytGiftCard.normaliseCode(code));
+  if (!gc) { toast(t('giftCardInvalid') || 'Invalid or depleted gift card', 'error'); return false; }
+
+  // WHAT THE ORDER OWES IS `KhaytOrderMoney`'S QUESTION, and this used to
+  // answer it itself: price − paid − giftCardDiscount, with the CREDIT NOTES
+  // left out. A 500 order carrying a 300 credit note read 500, so redeeming
+  // spent 300 of the customer's balance on money they did not owe. The card is
+  // theirs; over-spending it is not a rounding difference.
+  const done = KhaytGiftCard.redeem(gc, order, {
+    today: localDateStr(), now: new Date().toISOString(),
+  });
+  if (!done.ok) {
+    const said = {
+      giftCardInvalid: 'Invalid or depleted gift card',
+      giftCardExpired: 'Gift card is expired',
+      orderFullyCovered: 'Order is already fully covered',
+      giftCardNoMoneyRule: 'Khayt cannot work out what this order owes right now.',
+    };
+    const key = done.reason === 'orderFullyCovered' ? 'pay.order_fully_covered' : done.reason;
+    toast(t(key) || said[done.reason] || done.reason,
+      done.reason === 'orderFullyCovered' ? 'info' : 'error');
+    return false;
+  }
+
+  // The rule returns what these SHOULD become rather than editing them, so a
+  // refusal above has already left the shop exactly as it was.
+  Object.assign(gc, done.card);
+  Object.assign(order, done.order);
+  saveAll();
+  toast(t('giftCardAppliedAmount', { amt: fmtPrice(done.amount) }) || `Gift card applied! ${fmtPrice(done.amount)} deducted.`, 'success');
+  return true;
+}
+
+/* ── Feature 6: Multi-Material AMS/MMU Cost ─────────────────── */
+// Note: Multi-material support already exists via currentExtraMaterials / extraMaterials array
+// and computePartBaseCost already handles part.extraMaterials.
+// This feature exposes a UI "Add Material" button that appends to currentExtraMaterials.
+// The existing renderExtraMaterials() function in app.js handles display.
+// We add a convenience wrapper here for clarity.
+function addAMSMaterialRow() {
+  currentExtraMaterials.push({ material: '', weight: 0 });
+  if (typeof renderExtraMaterials === 'function') renderExtraMaterials();
+}
+
+/* ── FILED VAT RETURNS ──────────────────────────────────────────
+ * The owner's rule (2026-10-22, lib/vat-periods.js): a return the shop marks
+ * FILED keeps the figures it was filed with, and a later cancel, void, credit,
+ * edit or backdated invoice is adjusted in the first open period — the next
+ * quarter, or the next month for a monthly filer (Settings → VAT). The P&L,
+ * the tax summary and the return export already read the marks
+ * (KhaytPnl.vatCorrections); this is where the shop makes them. ONLY THIS
+ * MARK makes a period filed: a deadline passing marks nothing. The Mac's
+ * VAT returns card (PnlControls.swift) is the model, word for word.
+ *
+ * The marks live in this book's settings, which Khayt Cloud sync does not
+ * carry: a period marked on the Mac is not marked here. */
+
+/** `2026-Q3` → "Q3 2026"; `2026-09` → the month in the app's language. */
+function vatPeriodLabel(key) {
+  const m = /^(\d{4})-(?:Q([1-4])|(\d{2}))$/.exec(String(key || ''));
+  if (!m) return String(key || '');
+  if (m[2]) return t('pnl.vat_quarter_label', { q: m[2], year: m[1] });
+  try {
+    return new Date(Date.UTC(+m[1], +m[3] - 1, 1)).toLocaleDateString(localeTag(), { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  } catch { return key; }
+}
+
+/** A manager may read Settings but not change them (lib/rbac.js settings: R,
+ *  as settings.js settingsReadOnly) — and filing a return is a settings write. */
+function _vatReadOnly() {
+  return typeof operatorCan === 'function' && !operatorCan('settings', 'edit');
+}
+
+function _vatToday() {
+  return KhaytVatPeriods.localDay(new Date().toISOString());
+}
+
+function _vatCtx() {
+  return { clients: (typeof clients !== 'undefined' ? clients : []),
+           currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined };
+}
+
+/** Write a vat-periods result back into the live settings and save. */
+function _vatApply(next) {
+  settings.vatFiledPeriods = next.vatFiledPeriods || [];
+  if ('vatUnfiledPeriods' in next) settings.vatUnfiledPeriods = next.vatUnfiledPeriods;
+  saveAll();
+  renderVatFiling();
+}
+
+function setVatPeriodFiled(key, filed, fresh) {
+  if (_vatReadOnly()) { toast(t('set.readonly_note'), 'error'); return; }
+  const V = KhaytVatPeriods;
+  if (filed) {
+    const other = V.overlapOf(settings, key);
+    if (other) { toast(t('pnl.vat_filed_overlap', { period: vatPeriodLabel(key), other: vatPeriodLabel(other) }), 'error'); return; }
+    _vatApply(V.markFiled(settings, key, printLog, new Date(), _vatCtx(), { fresh: !!fresh }));
+  } else {
+    const later = V.laterFiledOf(settings, key);
+    if (later) { toast(t('pnl.vat_filed_later', { later: vatPeriodLabel(later), period: vatPeriodLabel(key) }), 'error'); return; }
+    _vatApply(V.unmarkFiled(settings, key));
+  }
+}
+
+function askVatPeriodFiled(key, filed, archived) {
+  const label = vatPeriodLabel(key);
+  if (!filed) {
+    // Un-filing forgets what was filed in the screen's eyes: asked first.
+    openFormModal({
+      title: t('pnl.vat_unfile_title', { period: label }),
+      bodyHtml: `<p style="margin:0;">${escapeHtml(t('pnl.vat_unfile_message', { period: label }))}</p>`,
+      saveLabel: t('pnl.vat_unfile_confirm'),
+      sizeLg: false,
+      onSave: () => { setVatPeriodFiled(key, false); return true; },
+    });
+    return;
+  }
+  if (!archived) { setVatPeriodFiled(key, true); return; }
+  // Filed before, un-filed, and filed again: restore what was sent (the
+  // default), or record the book as it is now for an amended return.
+  openFormModal({
+    title: t('pnl.vat_refile_title', { period: label }),
+    bodyHtml: `<p style="margin:0 0 10px;">${escapeHtml(t('pnl.vat_refile_message'))}</p>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:normal;"><input type="radio" name="vatRefile" value="restore" checked style="width:auto;margin:0;">${escapeHtml(t('pnl.vat_refile_restore'))}</label>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:normal;margin-top:6px;"><input type="radio" name="vatRefile" value="fresh" style="width:auto;margin:0;">${escapeHtml(t('pnl.vat_refile_fresh'))}</label>`,
+    saveLabel: t('pnl.vat_mark_filed'),
+    sizeLg: false,
+    onSave: (modal) => {
+      const pick = modal.querySelector('input[name="vatRefile"]:checked');
+      setVatPeriodFiled(key, true, !!(pick && pick.value === 'fresh'));
+      return true;
+    },
+  });
+}
+
+/** The VAT return card: the export picker in the shop's frequency, and the
+ *  ended return periods, each markable filed. */
+function renderVatFiling() {
+  if (typeof KhaytVatPeriods === 'undefined') return;
+  const V = KhaytVatPeriods;
+  const today = _vatToday();
+  const freq = V.frequencyOf(settings);
+
+  const sel = document.getElementById('vatReturnPeriod');
+  if (sel) {
+    const was = sel.value;
+    const keys = V.periodsBetween(`${today.slice(0, 4)}-01-01`, today, freq).reverse();
+    sel.innerHTML = `<option value="year">${escapeHtml(t('analytics.this_year'))}</option>`
+      + keys.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(vatPeriodLabel(k))}</option>`).join('');
+    // The last ENDED period first: that is the return about to be filed.
+    const ended = keys.find((k) => V.periodBounds(k).to < today);
+    sel.value = [...sel.options].some((o) => o.value === was) && was !== 'year' ? was : (ended || keys[0] || 'year');
+  }
+
+  const box = document.getElementById('vatFilingSection');
+  if (!box) return;
+  const profile = KhaytTax.profileFromSettings(settings);
+  if (!profile.rates.reduce((sum, r) => sum + r.percent, 0)) { box.innerHTML = ''; return; }
+  const ro = _vatReadOnly();
+  const rows = V.filingPeriods(settings, { today, count: 8 });
+  const rowHtml = (r) => {
+    const label = escapeHtml(vatPeriodLabel(r.period));
+    let state = '', btn = '';
+    if (r.partOf) {
+      state = `<span style="color:var(--text-muted);">${escapeHtml(t('pnl.vat_filed_part_of', { period: vatPeriodLabel(r.partOf) }))}</span>`;
+    } else if (r.filed) {
+      state = `<span style="color:var(--success);">${escapeHtml(t('pnl.vat_filed'))}</span>`;
+      btn = `<button class="btn small ghost" data-act="vat-unfile" data-period="${escapeHtml(r.period)}"${ro ? ' disabled' : ''}>${escapeHtml(t('pnl.vat_unfile_confirm'))}</button>`;
+    } else {
+      btn = `<button class="btn small" data-act="vat-file" data-period="${escapeHtml(r.period)}" data-archived="${r.archived ? '1' : ''}"${ro ? ' disabled' : ''}>${escapeHtml(t('pnl.vat_mark_filed'))}</button>`;
+    }
+    return `<div class="vat-filing-row" data-period="${escapeHtml(r.period)}" style="display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border);">
+      <span style="flex:1;">${label}</span>${state}${btn}</div>`;
+  };
+  box.innerHTML = `<div class="card" style="margin-top:8px;">
+      <h4 style="margin:0 0 6px;font-size:13px;">${escapeHtml(t('pnl.vat_returns'))}</h4>
+      ${rows.length ? rows.map(rowHtml).join('') : `<p style="margin:0;color:var(--text-muted);font-size:12px;">${escapeHtml(t('pnl.vat_returns_none'))}</p>`}
+      <p style="margin:8px 0 0;color:var(--text-muted);font-size:11.5px;">${escapeHtml(t('pnl.vat_filed_hint'))}</p>
+    </div>`;
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-act]');
+      if (!b || b.disabled) return;
+      if (b.dataset.act === 'vat-file') askVatPeriodFiled(b.dataset.period, true, b.dataset.archived === '1');
+      else if (b.dataset.act === 'vat-unfile') askVatPeriodFiled(b.dataset.period, false);
+    });
+  }
+}
+
+/* ── Feature 7: GAZT VAT Return Export ─────────────────────── */
+function exportGaztVatReturn(period) {
+  period = period || 'year';
+  const now = new Date();
+  let fromDate, toDate;
+  // A return period key from the picker (`2026-Q3`, or `2026-09` for a
+  // monthly filer — lib/vat-periods.js), or the older this-year shorthands.
+  const bounds = (typeof KhaytVatPeriods !== 'undefined') ? KhaytVatPeriods.periodBounds(period) : null;
+  if (bounds) {
+    fromDate = bounds.from;
+    toDate = bounds.to;
+  } else if (period === 'year') {
+    fromDate = `${now.getFullYear()}-01-01`;
+    toDate   = `${now.getFullYear()}-12-31`;
+  } else if (period === 'q1') { fromDate = `${now.getFullYear()}-01-01`; toDate = `${now.getFullYear()}-03-31`; }
+  else if (period === 'q2') { fromDate = `${now.getFullYear()}-04-01`; toDate = `${now.getFullYear()}-06-30`; }
+  else if (period === 'q3') { fromDate = `${now.getFullYear()}-07-01`; toDate = `${now.getFullYear()}-09-30`; }
+  else if (period === 'q4') { fromDate = `${now.getFullYear()}-10-01`; toDate = `${now.getFullYear()}-12-31`; }
+  else { fromDate = `${now.getFullYear()}-01-01`; toDate = `${now.getFullYear()}-12-31`; }
+
+  // THE FIGURES AND THE DOCUMENT ARE lib/vat-return.js's — the Mac prints the
+  // same return from the same rule. Every issued invoice dated in the period
+  // (the invoice is the tax point, `KhaytPnl.isTaxPoint`/`taxPointDate`),
+  // split by lib/tax.js the way the invoices are; a FILED period's later
+  // changes adjusted in the first open one (`KhaytPnl.vatCorrections`); and
+  // the shop's own tax name, with box numbers only on the Saudi form. See the
+  // module for the history of each.
+  const vatBoxes = KhaytVatReturn.boxes(printLog, expenses || [], {
+    settings, clients: (typeof clients !== 'undefined' ? clients : []),
+    currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
+    from: fromDate, to: toDate, revenueOf: orderNetRevenueBase,
+  });
+  const periodTitle = bounds ? vatPeriodLabel(period) : `${period.toUpperCase()} ${now.getFullYear()}`;
+  const html = KhaytVatReturn.html(vatBoxes, {
+    shopName: shopName() || '', periodTitle, currencySymbol: currencySymbol(),
+  });
+
+  if (window.hubAPI?.exportPDF) {
+    window.hubAPI.exportPDF({ html, filename: `tax-summary-${period}-${now.getFullYear()}.pdf` })
+      .then(() => toast(t('ops.tax_exported'), 'success'))
+      .catch(() => _fallbackVatDownload(html, period, now.getFullYear()));
+  } else {
+    _fallbackVatDownload(html, period, now.getFullYear());
+  }
+}
+
+function _fallbackVatDownload(html, period, year) {
+  const blob = new Blob([html], { type: 'text/html' });
+  downloadBlob(blob, `tax-summary-${period}-${year}.html`);
+  toast(t('ops.tax_downloaded'), 'info');
+}
+
+/* ── Feature 8: Slicer Profile Library ─────────────────────── */
+function renderSlicerProfiles() {
+  const container = document.getElementById('slicerProfilesContainer');
+  if (!container) return;
+
+  const machFilter = (document.getElementById('slicerMachineFilter') || {}).value || '';
+  const matFilter  = (document.getElementById('slicerMaterialFilter') || {}).value || '';
+
+  let profiles = slicerProfiles || [];
+  if (machFilter) profiles = profiles.filter(p => p.machineId === machFilter);
+  if (matFilter)  profiles = profiles.filter(p => p.material === matFilter);
+
+  if (profiles.length === 0) {
+    container.innerHTML = `<div class="empty-state" style="padding:20px;">No slicer profiles yet.</div>`;
+    return;
+  }
+
+  const rows = profiles.map(p => {
+    const mach = p.machineId ? machines.find(m => m.id === p.machineId) : null;
+    return `<tr>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${mach ? escapeHtml(mach.name) : '—'}</td>
+      <td>${escapeHtml(p.material || '—')}</td>
+      <td>${p.layerHeight ? p.layerHeight + ' mm' : '—'}</td>
+      <td>${p.infill ? p.infill + '%' : '—'}</td>
+      <td>${p.supports ? 'Yes' : 'No'}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.notes || '')}</td>
+      <td>
+        <button type="button" class="btn small ghost" data-act="edit-slicer-profile" data-id="${escapeHtml(p.id)}">Edit</button>
+        <button type="button" class="btn danger small" data-act="delete-slicer-profile" data-id="${escapeHtml(p.id)}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Machine</th><th>Material</th><th>Layer</th><th>Infill</th><th>Supports</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function openSlicerProfileModal(profileId) {
+  const existing = profileId ? (slicerProfiles || []).find(p => p.id === profileId) : null;
+  const machOptions = activeMachines(existing && existing.machineId).map(m => `<option value="${m.id}"${existing && existing.machineId === m.id ? ' selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
+  const matOptions = [...new Set(inventory.map(i => i.material).filter(Boolean))].map(m =>
+    `<option value="${escapeHtml(m)}"${existing && existing.material === m ? ' selected' : ''}>${escapeHtml(m)}</option>`
+  ).join('');
+
+  openFormModal({
+    title: existing ? 'Edit Slicer Profile' : 'New Slicer Profile',
+    sizeLg: false,
+    saveLabel: existing ? 'Save' : 'Create',
+    bodyHtml: `
+      <label>Profile Name</label>
+      <input type="text" id="spName" value="${escapeHtml(existing?.name || '')}">
+      <label style="margin-top:10px;">Machine</label>
+      <select id="spMachine"><option value="">— Any —</option>${machOptions}</select>
+      <label style="margin-top:10px;">Material</label>
+      <select id="spMaterial"><option value="">— Any —</option>${matOptions}</select>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+        <div><label>Layer Height (mm)</label><input type="number" id="spLayer" step="0.01" min="0.01" value="${existing?.layerHeight || 0.2}"></div>
+        <div><label>Infill %</label><input type="number" id="spInfill" min="0" max="100" value="${existing?.infill || 20}"></div>
+      </div>
+      <label style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="spSupports" style="width:auto;" ${existing?.supports ? 'checked' : ''}> Supports
+      </label>
+      <label style="margin-top:10px;">Notes</label>
+      <textarea id="spNotes" rows="2">${escapeHtml(existing?.notes || '')}</textarea>`,
+    onSave(modal) {
+      const name = modal.querySelector('#spName').value.trim();
+      if (!name) { toast(t('slp.name_required'), 'error'); return false; }
+      const profile = {
+        id: existing ? existing.id : uid('SP'),
+        name,
+        machineId: modal.querySelector('#spMachine').value || null,
+        material:  modal.querySelector('#spMaterial').value || '',
+        layerHeight: num(modal.querySelector('#spLayer').value, 0.2),
+        infill:    num(modal.querySelector('#spInfill').value, 20),
+        supports:  modal.querySelector('#spSupports').checked,
+        notes:     modal.querySelector('#spNotes').value.trim(),
+        createdAt: existing ? existing.createdAt : new Date().toISOString(),
+      };
+      if (!slicerProfiles) slicerProfiles = [];
+      if (existing) {
+        const idx = slicerProfiles.findIndex(p => p.id === profileId);
+        if (idx !== -1) slicerProfiles[idx] = profile;
+      } else {
+        slicerProfiles.push(profile);
+      }
+      saveAll();
+      renderSlicerProfiles();
+      toast(existing ? 'Profile updated' : 'Profile created', 'success');
+    },
+  });
+}
+
+function deleteSlicerProfile(profileId) {
+  slicerProfiles = (slicerProfiles || []).filter(p => p.id !== profileId);
+  saveAll();
+  renderSlicerProfiles();
+  toast(t('slp.deleted'), 'success');
+}
+
+/* ── Feature 9: Environmental Condition Logging ─────────────── */
+/** Take a reading out — the Mac can, and a mistyped 250 °C was there for good.
+ *  Asks first, and Undo puts it back where it was. */
+async function deleteEnvLog(id) {
+  const i = envLogs.findIndex((l) => l && l.id === id);
+  if (i < 0) return;
+  if (!(await confirmModal(t('common.delete') + '?', { danger: true }))) return;
+  const [gone] = envLogs.splice(i, 1);
+  saveAll();
+  renderEnvLogs();
+  toast(t('env.deleted'), 'success', 6000, {
+    undo: () => { envLogs.splice(Math.min(i, envLogs.length), 0, gone); saveAll(); renderEnvLogs(); },
+  });
+}
+
+function renderEnvLogs() {
+  const container = document.getElementById('envLogsContainer');
+  if (!container) return;
+  if (!container.dataset.delWired) {
+    container.dataset.delWired = '1';
+    container.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-env-del]');
+      if (b && b.dataset.envDel) deleteEnvLog(b.dataset.envDel);
+    });
+  }
+
+  // `lib/env-log.js` — the list and the line; the Mac reads them from it too.
+  const recent = KhaytEnvLog.recent(envLogs);
+
+  if (recent.length === 0) {
+    container.innerHTML = `<div class="empty-state" style="padding:20px;">No environmental logs yet.</div>`;
+    return;
+  }
+
+  const rows = recent.map(log => {
+    const mach = log.machineId ? machines.find(m => m.id === log.machineId) : null;
+    return `<tr>
+      <td style="font-size:11px;">${escapeHtml(new Date(log.timestamp).toLocaleString())}</td>
+      <td>${log.temperature != null ? log.temperature + ' °C' : '—'}</td>
+      <td>${log.humidity    != null ? log.humidity    + '%'  : '—'}</td>
+      <td>${mach ? escapeHtml(mach.name) : '—'}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(log.notes || '')}</td>
+      <td><button type="button" class="btn small ghost" data-env-del="${escapeHtml(log.id || '')}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  // Simple SVG sparkline for temperature — last 20 entries in chronological order
+  const trend = KhaytEnvLog.temperatureTrend(envLogs);
+
+  let sparkHtml = '';
+  if (trend) {
+    const temps = trend.readings;
+    const minT = trend.min, maxT = trend.max;
+    const range = maxT - minT || 1;
+    const W = 240, H = 48;
+    const pts = temps.map((t, i) => {
+      const x = (i / (temps.length - 1)) * W;
+      const y = H - ((t - minT) / range) * H;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    sparkHtml = `<div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Temperature trend (last ${temps.length} readings)</div>
+      <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="overflow:visible;">
+        <polyline fill="none" stroke="var(--primary)" stroke-width="2" points="${escapeHtml(pts)}"/>
+      </svg>
+    </div>`;
+  }
+
+  container.innerHTML = `
+    ${sparkHtml}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>Temp (°C)</th><th>Humidity (%)</th><th>Machine</th><th>Notes</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function openLogEnvModal() {
+  const machOptions = activeMachines().map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  openFormModal({
+    title: 'Log Environmental Conditions',
+    sizeLg: false,
+    saveLabel: 'Log',
+    bodyHtml: `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div><label>Temperature (°C)</label><input type="number" id="envTemp" step="0.1" placeholder="e.g. 22"></div>
+        <div><label>Humidity (%)</label><input type="number" id="envHumidity" min="0" max="100" step="1" placeholder="e.g. 45"></div>
+      </div>
+      <label style="margin-top:10px;">Machine (optional)</label>
+      <select id="envMachine"><option value="">— All / None —</option>${machOptions}</select>
+      <label style="margin-top:10px;">Notes (optional)</label>
+      <textarea id="envNotes" rows="2"></textarea>`,
+    onSave(modal) {
+      // `lib/env-log.js` checks and builds the record. The check used to read
+      // the temperature into a local `t`, shadowing the translation function,
+      // so an out-of-range reading threw instead of saying why.
+      const form = {
+        temperature: modal.querySelector('#envTemp').value,
+        humidity:    modal.querySelector('#envHumidity').value,
+        machineId:   modal.querySelector('#envMachine').value || null,
+        notes:       modal.querySelector('#envNotes').value,
+      };
+      const refused = KhaytEnvLog.check(form);
+      if (refused) { toast(t(refused), 'error'); return false; }
+      if (!envLogs) envLogs = [];
+      envLogs.push(KhaytEnvLog.entry(form, { id: uid('ENV'), now: Date.now() }));
+      saveAll();
+      renderEnvLogs();
+      toast(t('env.logged'), 'success');
+    },
+  });
+}
+(function (global) {
+  const api = {
+    deleteEnvLog,
+    openShiftChecklistModal,
+    openEndOfDayReport,
+    processRecurringOrders,
+    processQuoteFollowUps,
+    startQuoteFollowUpTimer,
+    processPaymentReminders,
+    startPaymentReminderTimer,
+    renderGiftCards,
+    openCreateGiftCardModal,
+    applyGiftCard,
+    addAMSMaterialRow,
+    exportGaztVatReturn,
+    renderVatFiling,
+    vatPeriodLabel,
+    setVatPeriodFiled,
+    renderSlicerProfiles,
+    openSlicerProfileModal,
+    deleteSlicerProfile,
+    renderEnvLogs,
+    openLogEnvModal,
+    // order-flows.js fires this on qc_failed and rma_opened behind a typeof
+    // guard that was always false from outside this IIFE — so neither webhook
+    // ever left the building.
+    fireQcWebhook,
+  };
+  Object.assign(global, api);
+  global.KhaytOperationsExtras = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof globalThis !== 'undefined' ? globalThis : window);

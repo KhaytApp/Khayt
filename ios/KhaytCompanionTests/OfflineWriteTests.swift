@@ -1,0 +1,640 @@
+import XCTest
+import KhaytCore
+@testable import KhaytCompanion
+
+/**
+ * Working with the Mac switched off.
+ *
+ * These are about the phone's half: an edit lands in the book, is stamped so it
+ * can travel, shows up in the outbox, and stops being pending once the Mac has
+ * taken it. What happens on the Mac is `LanServerTests`' job.
+ */
+final class OfflineWriteTests: XCTestCase {
+
+    private var dir: URL!
+    private var book: CompanionBook!
+    private var writer: BookWriter!
+    private var reader: BookReader!
+    /// One for the class: starting the rules costs about a fifth of a second.
+    private static let sharedEngine = Result { try KhaytEngine() }
+    private var engine: KhaytEngine!
+
+    override func setUpWithError() throws {
+        dir = FileManager.default.temporaryDirectory
+            .appending(path: "offline-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        book = CompanionBook(directory: dir)
+        writer = BookWriter(book: book)
+        reader = BookReader(book: book)
+        engine = try Self.sharedEngine.get()
+        try book.replace(with: shop(), scope: nil)
+    }
+
+    override func tearDownWithError() throws { try? FileManager.default.removeItem(at: dir) }
+
+    private func shop() -> [String: JSONValue] {
+        [
+            "settings": .object(["shopName": .string("Ward")]),
+            "printLog": .array([
+                .object(["id": .string("O-1"), "status": .string("printing"),
+                         "project": .string("Bracket"), "date": .string("2026-09-19"),
+                         "machineId": .string("M-1"), "machine": .string("Bambu X1C"),
+                         "rev": .number(3)]),
+                .object(["id": .string("Q-1"), "status": .string("quote"), "rev": .number(1)]),
+                .object(["id": .string("Q-2"), "status": .string("quote"),
+                         "quoteAcceptedAt": .string("2026-10-01"), "rev": .number(1)]),
+                .object(["id": .string("Q-3"), "status": .string("quote"), "rev": .number(1)]),
+            ]),
+            "inventory": .array([
+                .object(["id": .string("S-1"), "material": .string("PLA"),
+                         "weight": .number(640), "spoolWeight": .number(1000),
+                         "rev": .number(1)]),
+            ]),
+            "machines": .array([
+                .object(["id": .string("M-1"), "name": .string("Bambu X1C")]),
+                .object(["id": .string("M-2"), "name": .string("Prusa CORE One")]),
+            ]),
+            "waitingList": .array([
+                .object(["id": .string("W-1"), "status": .string("new"), "rev": .number(1)]),
+            ]),
+        ]
+    }
+
+    private func record(_ collection: String, _ id: String) throws -> [String: JSONValue] {
+        guard case .array(let rows)? = try book.read()[collection] else { return [:] }
+        for row in rows {
+            if case .object(let o) = row, case .string(let rid)? = o["id"], rid == id { return o }
+        }
+        return [:]
+    }
+
+    func testAdvancingAJobLandsInTheBookAndIsStampedToTravel() async throws {
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
+
+        let order = try record("printLog", "O-1")
+        XCTAssertEqual(order["status"], .string("qc"))
+        // The stamp is what makes it reach the Mac at all: `changesToSend`
+        // compares revisions and the fold keeps the higher one.
+        XCTAssertEqual(order["rev"], .number(4))
+        XCTAssertNotNil(order["updatedAt"])
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        XCTAssertEqual(outbox.count, 1)
+    }
+
+    func testAssigningAPrinterWritesTheNameAsWellAsTheId() async throws {
+        // The server looks the machine up and stores both. A record with only
+        // the id reads as "Unassigned" on every screen not handed a machine list.
+        let machines = try await reader.machines()
+        try writer.assignMachine(orderId: "O-1", machineId: "M-2", machines: machines)
+
+        let order = try record("printLog", "O-1")
+        XCTAssertEqual(order["machineId"], .string("M-2"))
+        XCTAssertEqual(order["machine"], .string("Prusa CORE One"))
+    }
+
+    func testTakingAJobOffAPrinterClearsBothFields() async throws {
+        let machines = try await reader.machines()
+        try writer.assignMachine(orderId: "O-1", machineId: nil, machines: machines)
+
+        let order = try record("printLog", "O-1")
+        XCTAssertEqual(order["machineId"], .null)
+        XCTAssertEqual(order["machine"], .null, "the old printer's name outlived the assignment")
+    }
+
+    func testCorrectingASpoolWritesAllThreeNamesForWhatIsLeft() throws {
+        // A record carrying the wire's name as well, stale. One name left
+        // unwritten is enough to show the old figure: the model reads
+        // `remaining ?? weightRemaining ?? weight`.
+        try book.update { root in
+            guard case .array(var rows)? = root["inventory"],
+                  case .object(var spool) = rows[0] else { return }
+            spool["weightRemaining"] = .number(640)
+            spool["remaining"] = .number(640)
+            rows[0] = .object(spool)
+            root["inventory"] = .array(rows)
+        }
+
+        try writer.setSpoolRemaining(spoolId: "S-1", grams: 410)
+
+        let spool = try record("inventory", "S-1")
+        // The endpoint writes every one of them, and its own comment says why:
+        // writing `remaining` alone meant the next print deducted from the
+        // figure the shop had just replaced.
+        XCTAssertEqual(spool["weight"], .number(410))
+        XCTAssertEqual(spool["remaining"], .number(410))
+        XCTAssertEqual(spool["weightRemaining"], .number(410),
+                       "the wire's name kept the old figure, so the shelf and the deduction disagree")
+        // And the full roll is untouched — they are different facts.
+        XCTAssertEqual(spool["spoolWeight"], .number(1000))
+
+        // What the model actually shows, which is the thing a shop reads.
+        let spools = try JSONDecoder().decode(
+            [InventorySpool].self,
+            from: try JSONEncoder().encode(JSONValue.array([.object(spool)])))
+        XCTAssertEqual(spools[0].remainingGrams, 410)
+    }
+
+    func testAnImpossibleCorrectionIsClampedTheWayTheEndpointClampsIt() throws {
+        try writer.setSpoolRemaining(spoolId: "S-1", grams: -5)
+        XCTAssertEqual(try record("inventory", "S-1")["weight"], .number(0))
+
+        try writer.setSpoolRemaining(spoolId: "S-1", grams: 9_999_999)
+        XCTAssertEqual(try record("inventory", "S-1")["weight"], .number(50_000),
+                       "a correction of half a tonne is a typo, and the endpoint says so")
+    }
+
+    /// The endpoint MOVES a declined request: into `waitingListHistory` with a
+    /// `declinedAt`, and out of `waitingList`. The phone makes the same move,
+    /// and the removal travels as a tombstone.
+    func testDecliningMovesTheRequestAndTheMoveReachesTheMac() async throws {
+        let macCopy = try book.read()             // what the Mac holds before
+        try writer.setWaitingStatus(id: "W-1", to: "declined")
+
+        // On the phone: gone from the queue, in the history, with a tombstone.
+        guard case .array(let queue)? = try book.read()["waitingList"] else { return XCTFail() }
+        XCTAssertTrue(queue.isEmpty, "a declined request is not in the queue")
+        let declined = try record("waitingListHistory", "W-1")
+        XCTAssertEqual(declined["status"], .string("declined"))
+        XCTAssertNotNil(declined["declinedAt"])
+        guard case .array(let tombs)? = try book.read()["tombstones"], case .object(let t)? = tombs.first else {
+            return XCTFail("no tombstone: the removal would never reach the Mac")
+        }
+        XCTAssertEqual(t["collection"], .string("waitingList"))
+        XCTAssertEqual(t["rev"], .number(1), "the rev the phone saw, which the conflict check measures")
+
+        // And through the shop's own fold: the Mac's copy ends up the same shape.
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        XCTAssertEqual(outbox.tombstones.count, 1)
+        let engine = try await reader.sharedEngine()
+        let folded = try await engine.foldDeltas(base: macCopy, deltas: [outbox.wire]).store
+        guard case .array(let macQueue)? = folded["waitingList"],
+              case .array(let macHistory)? = folded["waitingListHistory"] else { return XCTFail("\(folded.keys)") }
+        XCTAssertTrue(macQueue.isEmpty, "the Mac would otherwise put the request straight back in the queue")
+        XCTAssertEqual(macHistory.count, 1)
+    }
+
+    /// "Take it" is the desktop's `promoteWaitingItem`: the same move as a
+    /// decline, recorded as `converted` — so the shop's conversion funnel counts
+    /// it, and the Mac does not fold the request back into the queue.
+    func testTakingARequestRecordsItAsConvertedAndItReachesTheMac() async throws {
+        let macCopy = try book.read()
+        try writer.setWaitingStatus(id: "W-1", to: "converted")
+
+        let taken = try record("waitingListHistory", "W-1")
+        XCTAssertEqual(taken["status"], .string("converted"))
+        XCTAssertNotNil(taken["convertedAt"])
+        XCTAssertNil(taken["declinedAt"], "a request taken is not a request declined")
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        let engine = try await reader.sharedEngine()
+        let folded = try await engine.foldDeltas(base: macCopy, deltas: [outbox.wire]).store
+        guard case .array(let macQueue)? = folded["waitingList"] else { return XCTFail() }
+        XCTAssertTrue(macQueue.isEmpty)
+    }
+
+    func testDecliningARequestThatIsAlreadyGoneChangesNothing() throws {
+        try writer.setWaitingStatus(id: "W-gone", to: "declined")
+        XCTAssertNil(try book.read()["tombstones"])
+        XCTAssertEqual(try record("waitingList", "W-1")["status"], .string("new"))
+    }
+
+    func testTheOtherTriageStatesAreOrdinaryEdits() throws {
+        try writer.setWaitingStatus(id: "W-1", to: "reminded")
+        XCTAssertEqual(try record("waitingList", "W-1")["status"], .string("reminded"))
+        XCTAssertEqual(try record("waitingList", "W-1")["rev"], .number(2))
+    }
+
+    func testAPrinterTheShopDoesNotHaveIsRefused() async throws {
+        let machines = try await reader.machines()
+        // The endpoint answers 404 for this. Writing the id anyway would put a
+        // job on a printer that is not there, and the row would read as
+        // unassigned for ever after because no name resolves.
+        XCTAssertThrowsError(
+            try writer.assignMachine(orderId: "O-1", machineId: "M-NOPE", machines: machines)
+        ) { error in
+            XCTAssertEqual(error as? BookWriter.Refusal, .noSuchMachine)
+        }
+        // The job is still on the printer it was on.
+        XCTAssertEqual(try record("printLog", "O-1")["machineId"], .string("M-1"))
+        XCTAssertEqual(try record("printLog", "O-1")["machine"], .string("Bambu X1C"))
+    }
+
+    func testAQuoteMovedOnIsStampedAcceptedOnTheLocalDay() async throws {
+        // 22:30 UTC is already the next day in Riyadh: the stamp is the local
+        // day, as the Mac's Approve button and `lib/order-status.js` write it.
+        let now = ISO8601DateFormatter().date(from: "2026-10-21T22:30:00Z")!
+        try await writer.setOrderStatus(orderId: "Q-1", to: "pending", engine: engine, now: now)
+        XCTAssertEqual(try record("printLog", "Q-1")["quoteAcceptedAt"], .string(BookWriter.localDay(now)))
+
+        try await writer.setOrderStatus(orderId: "Q-2", to: "pending", engine: engine, now: now)
+        XCTAssertEqual(try record("printLog", "Q-2")["quoteAcceptedAt"], .string("2026-10-01"), "an earlier yes stays")
+
+        try await writer.setOrderStatus(orderId: "Q-3", to: "cancelled", engine: engine, now: now)
+        XCTAssertNil(try record("printLog", "Q-3")["quoteAcceptedAt"], "a cancelled quote was not accepted")
+
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine, now: now)
+        XCTAssertNil(try record("printLog", "O-1")["quoteAcceptedAt"], "only a quote is accepted")
+    }
+
+    func testACancelIsStampedOnTheLocalDayAndUnstampedWhenUndone() async throws {
+        // The cancel day places the VAT reversal in a period, as
+        // `lib/order-status.js` stamps it on the Mac.
+        let now = ISO8601DateFormatter().date(from: "2026-10-21T22:30:00Z")!
+        try await writer.setOrderStatus(orderId: "O-1", to: "cancelled", engine: engine, now: now)
+        XCTAssertEqual(try record("printLog", "O-1")["cancelledAt"], .string(BookWriter.localDay(now)))
+
+        let later = now.addingTimeInterval(3 * 86_400)
+        try await writer.setOrderStatus(orderId: "O-1", to: "cancelled", engine: engine, now: later)
+        XCTAssertEqual(try record("printLog", "O-1")["cancelledAt"], .string(BookWriter.localDay(now)),
+                       "staying cancelled keeps the first day")
+
+        try await writer.setOrderStatus(orderId: "O-1", to: "pending", engine: engine, now: later)
+        XCTAssertNil(try record("printLog", "O-1")["cancelledAt"], "a job brought back is not cancelled")
+    }
+
+    func testTwoEditsToOneRecordTravelAsOne() async throws {
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
+        try await writer.setOrderStatus(orderId: "O-1", to: "completed", engine: engine)
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        // One record changed, so one delta — carrying the latest state, not a
+        // history of keystrokes.
+        XCTAssertEqual(outbox.count, 1)
+        XCTAssertEqual(try record("printLog", "O-1")["status"], .string("completed"))
+        XCTAssertEqual(try record("printLog", "O-1")["rev"], .number(5))
+    }
+
+    func testEditsAcrossCollectionsAllTravel() async throws {
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
+        try writer.setSpoolRemaining(spoolId: "S-1", grams: 410)
+        try writer.setWaitingStatus(id: "W-1", to: "reminded")
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        XCTAssertEqual(outbox.count, 3)
+    }
+
+    func testOnceTheMacHasTakenThemNothingIsPendingAgain() async throws {
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
+        let before = try await reader.pendingChanges()
+        XCTAssertEqual(try XCTUnwrap(before).count, 1)
+
+        // What a confirmed send does.
+        try book.markSynced(try book.read())
+
+        let after = try await reader.pendingChanges()
+        XCTAssertTrue(try XCTUnwrap(after).isEmpty,
+                      "the same edit would be sent again on the next connection")
+        // And the edit is still in the book — synced, not discarded.
+        XCTAssertEqual(try record("printLog", "O-1")["status"], .string("qc"))
+    }
+
+    func testAnEditMadeAfterSyncingIsPendingOnItsOwn() async throws {
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
+        try book.markSynced(try book.read())
+        try await writer.setOrderStatus(orderId: "O-1", to: "completed", engine: engine)
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        XCTAssertEqual(outbox.count, 1, "the baseline did not move with the sync")
+    }
+
+    func testEditsSurviveBeingClosedAndReopened() async throws {
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
+
+        // A different handle on the same directory — the phone was put down and
+        // picked up again. An edit held only in memory would vanish here, and
+        // the shop would have advanced a job that quietly did not move.
+        let reopened = BookReader(book: CompanionBook(directory: dir))
+        let produced = try await reopened.pendingChanges()
+        XCTAssertEqual(try XCTUnwrap(produced).count, 1)
+    }
+
+    /// Edit offline, walk back into range, open a screen: the refresh that
+    /// screen triggers used to REPLACE the book and take the edit with it.
+    func testAPullFromTheMacKeepsAnEditNotYetSent() async throws {
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)         // rev 3 → 4, pending
+        var fromMac = shop()
+        // The Mac's copy moved on elsewhere too: a spool it corrected at rev 5.
+        fromMac["inventory"] = .array([.object(["id": .string("S-1"), "material": .string("PLA"),
+                                                "weight": .number(300), "rev": .number(5)])])
+        try await reader.adopt(fromMac, scope: nil)
+
+        XCTAssertEqual(try record("printLog", "O-1")["status"], .string("qc"), "the edit survived the pull")
+        XCTAssertEqual(try record("inventory", "S-1")["weight"], .number(300), "and the Mac's own change arrived")
+        let produced = try await reader.pendingChanges()
+        XCTAssertEqual(try XCTUnwrap(produced).count, 1, "still on its way — and only it")
+    }
+
+    func testANewerChangeFromTheMacStillWins() async throws {
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)         // rev 4 here
+        var fromMac = shop()
+        fromMac["printLog"] = .array([.object(["id": .string("O-1"), "status": .string("completed"),
+                                               "project": .string("Bracket"), "rev": .number(9)])])
+        try await reader.adopt(fromMac, scope: nil)
+        XCTAssertEqual(try record("printLog", "O-1")["status"], .string("completed"),
+                       "the higher revision wins, as it does everywhere else")
+    }
+
+    // MARK: - A move runs the shop's status rule
+
+    /// A shop that deducts on completion, with one job in QC that owes 120 g
+    /// of PLA from S-1, and one with no filament data at all.
+    private func finishingShop(paused: Bool = false) -> [String: JSONValue] {
+        var settings: [String: JSONValue] = ["shopName": .string("Ward"), "autoDeduct": .bool(true)]
+        if paused { settings["productionPaused"] = .bool(true) }
+        return [
+            "settings": .object(settings),
+            "printLog": .array([
+                .object(["id": .string("J-1"), "status": .string("qc"), "project": .string("Bracket"),
+                         "parts": .array([.object(["name": .string("Bracket"), "filamentId": .string("S-1"),
+                                                   "printWeight": .number(120), "qty": .number(1)])]),
+                         "rev": .number(2)]),
+                .object(["id": .string("J-2"), "status": .string("qc"), "project": .string("Nothing known"),
+                         "rev": .number(1)]),
+                .object(["id": .string("J-3"), "status": .string("pending"), "project": .string("Next"),
+                         "rev": .number(1)]),
+            ]),
+            "inventory": .array([
+                .object(["id": .string("S-1"), "material": .string("PLA"), "weight": .number(640),
+                         "spoolWeight": .number(1000), "rev": .number(1)]),
+                .object(["id": .string("S-2"), "material": .string("PETG"), "weight": .number(800),
+                         "spoolWeight": .number(1000), "rev": .number(1)]),
+            ]),
+            "consumables": .array([]),
+            "machines": .array([]),
+        ]
+    }
+
+    private func number(_ v: JSONValue?) -> Double? {
+        if case .number(let n)? = v { return n }
+        return nil
+    }
+
+    func testCompletingAJobTakesItsFilamentAndDatesItInOneWrite() async throws {
+        try book.replace(with: finishingShop(), scope: nil)
+        let before = try book.read()
+        let now = ISO8601DateFormatter().date(from: "2026-10-30T09:15:00Z")!
+
+        try await writer.setOrderStatus(orderId: "J-1", to: "completed", engine: engine, now: now)
+
+        let order = try record("printLog", "J-1")
+        XCTAssertEqual(order["status"], .string("completed"))
+        XCTAssertEqual(order["completedAt"], .string("2026-10-30T09:15:00.000Z"))
+        guard case .array(let history)? = order["statusHistory"],
+              case .object(let last)? = history.last else { return XCTFail("no statusHistory: \(order)") }
+        XCTAssertEqual(last["status"], .string("completed"))
+
+        let spool = try record("inventory", "S-1")
+        XCTAssertEqual(number(spool["weight"]), 520, "120 g off the spool the part was assigned")
+        guard case .array(let usage)? = spool["usageHistory"], case .object(let line)? = usage.first else {
+            return XCTFail("no usage line: \(spool)")
+        }
+        XCTAssertEqual(line["orderId"], .string("J-1"))
+        XCTAssertEqual(number(line["weightUsed"]), 120)
+        XCTAssertEqual(line["date"], .string(BookWriter.localDay(now)))
+        XCTAssertEqual(number(spool["rev"]), 2, "the spool is stamped so it travels")
+        XCTAssertEqual(number(try record("inventory", "S-2")["weight"]), 800, "another material is not touched")
+        XCTAssertEqual(number(try record("inventory", "S-2")["rev"]), 1, "an untouched spool is not stamped")
+
+        // ONE write: the rollback copy is the book as it was before the move,
+        // not a book with the status changed and the spool not yet.
+        let prev = book.url.appendingPathExtension("prev")
+        let rolledBack = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: prev))
+        XCTAssertEqual(rolledBack, before)
+
+        let produced = try await reader.pendingChanges()
+        XCTAssertEqual(try XCTUnwrap(produced).count, 2, "the job and the spool travel together")
+    }
+
+    /// The Mac's move is `lib/order-status.js` `apply` followed by
+    /// `lib/order-deduction.js` `deductForOrder`. Run those two directly, here,
+    /// on the same book, and the phone's write must hold the same job and the
+    /// same spool — apart from the stamps and the survey token, which the host
+    /// mints.
+    func testTheMoveMatchesTheSharedRuleRunDirectly() async throws {
+        let shop = finishingShop()
+        try book.replace(with: shop, scope: nil)
+        let now = ISO8601DateFormatter().date(from: "2026-10-30T21:30:00Z")!
+        let today = BookWriter.localDay(now)
+
+        func js(_ v: JSONValue) throws -> String { String(decoding: try JSONEncoder().encode(v), as: UTF8.self) }
+        guard case .array(let orders)? = shop["printLog"], case .array(let inventory)? = shop["inventory"],
+              case .object(let settings)? = shop["settings"] else { return XCTFail() }
+        struct Expected: Decodable { let order: [String: JSONValue]; let inventory: [JSONValue] }
+        let orderJS = try js(orders[0]), inventoryJS = try js(.array(inventory)), settingsJS = try js(.object(settings))
+        let nowMs = Int(now.timeIntervalSince1970 * 1000)
+        let expected = try await engine.raw("""
+            (function () {
+              var order = \(orderJS), inventory = \(inventoryJS);
+              KhaytOrderStatus.apply(order, 'completed',
+                { now: \(nowMs), inventory: inventory, consumables: [], returnMaterial: true });
+              KhaytOrderDeduction.deductForOrder(order, { settings: \(settingsJS),
+                inventory: inventory, consumables: [], machines: [], today: '\(today)', actualGrams: order.actualWeight });
+              KhaytOrderDeduction.deductPackaging(order, { consumables: [] });
+              return { order: order, inventory: inventory };
+            })()
+            """, as: Expected.self)
+
+        try await writer.setOrderStatus(orderId: "J-1", to: "completed", engine: engine, now: now)
+
+        func content(_ o: [String: JSONValue]) -> [String: JSONValue] {
+            var c = o
+            for k in ["rev", "updatedAt", "surveyToken"] { c.removeValue(forKey: k) }
+            return c
+        }
+        XCTAssertEqual(content(try record("printLog", "J-1")), content(expected.order))
+        guard case .object(let expectedSpool)? = expected.inventory.first else { return XCTFail() }
+        XCTAssertEqual(content(try record("inventory", "S-1")), content(expectedSpool))
+    }
+
+    func testMovingAFinishedJobBackGivesItsFilamentBackAsTheMacDoes() async throws {
+        try book.replace(with: finishingShop(), scope: nil)
+        try await writer.setOrderStatus(orderId: "J-1", to: "completed", engine: engine)
+        XCTAssertEqual(number(try record("inventory", "S-1")["weight"]), 520)
+
+        try await writer.setOrderStatus(orderId: "J-1", to: "qc", engine: engine)
+        XCTAssertEqual(number(try record("inventory", "S-1")["weight"]), 640,
+                       "the completion's grams go back, as the Mac's move (returnMaterial) gives them")
+        XCTAssertNil(try record("printLog", "J-1")["completedAt"], "no longer finished")
+
+        // And finishing it again takes them once, not twice.
+        try await writer.setOrderStatus(orderId: "J-1", to: "completed", engine: engine)
+        XCTAssertEqual(number(try record("inventory", "S-1")["weight"]), 520)
+    }
+
+    func testAJobWithNoFilamentDataCompletesWithoutTouchingTheShelf() async throws {
+        try book.replace(with: finishingShop(), scope: nil)
+        try await writer.setOrderStatus(orderId: "J-2", to: "completed", engine: engine)
+        let order = try record("printLog", "J-2")
+        XCTAssertEqual(order["status"], .string("completed"))
+        XCTAssertNotNil(order["completedAt"])
+        XCTAssertEqual(number(try record("inventory", "S-1")["weight"]), 640)
+        XCTAssertEqual(number(try record("inventory", "S-1")["rev"]), 1)
+    }
+
+    func testAMoveTheRuleRefusesIsNotMadeAndSaysWhy() async throws {
+        try book.replace(with: finishingShop(paused: true), scope: nil)
+        do {
+            try await writer.setOrderStatus(orderId: "J-3", to: "printing", engine: engine)
+            XCTFail("a paused shop started a print")
+        } catch let refused as BookWriter.MoveRefused {
+            XCTAssertEqual(refused.code, "production_paused")
+            XCTAssertEqual(refused.errorDescription, L10n.tr("move.refused.production_paused"))
+            XCTAssertNotEqual(refused.errorDescription, "move.refused.production_paused", "the sentence exists")
+        }
+        XCTAssertEqual(try record("printLog", "J-3")["status"], .string("pending"))
+        let produced = try await reader.pendingChanges()
+        XCTAssertTrue(try XCTUnwrap(produced).isEmpty, "nothing was written")
+
+        // Shipped is a stamp, not a stage: refused by the rule too.
+        do {
+            try await writer.setOrderStatus(orderId: "J-1", to: "shipped", engine: engine)
+            XCTFail("shipped was written as a status")
+        } catch let refused as BookWriter.MoveRefused {
+            XCTAssertEqual(refused.code, "stage_not_a_status")
+        }
+    }
+
+    func testTheShopsOwnRefusalOverTheWireIsSaidInTheSameWords() throws {
+        // lib/lan-rest.js answers a refused PATCH /api/orders/:id with this.
+        let paused = Data(#"{"error":"Move refused","code":"production_paused","params":{}}"#.utf8)
+        let fromWire = try XCTUnwrap(BookWriter.MoveRefused.fromWire(status: 409, body: paused))
+        XCTAssertEqual(fromWire.code, "production_paused")
+        XCTAssertEqual(fromWire.errorDescription, L10n.tr("move.refused.production_paused"))
+
+        let wip = Data(#"{"error":"Move refused","code":"wip_blocked","params":{"col":"printing","n":3}}"#.utf8)
+        let full = try XCTUnwrap(BookWriter.MoveRefused.fromWire(status: 409, body: wip))
+        XCTAssertEqual(full.errorDescription, L10n.format("move.refused.wip_blocked", L10n.tr("status.printing"), 3))
+
+        // Anything else is still the ordinary error path.
+        XCTAssertNil(BookWriter.MoveRefused.fromWire(status: 400, body: paused))
+        XCTAssertNil(BookWriter.MoveRefused.fromWire(status: 409, body: Data(#"{"error":"Conflict"}"#.utf8)))
+        XCTAssertNil(BookWriter.MoveRefused.fromWire(status: 409, body: Data("not json".utf8)))
+    }
+
+    // MARK: - Deleting, waste and expenses
+
+    /// The native Mac serves no `DELETE /api/inventory`, so this is the only way
+    /// a spool deleted on the phone is deleted at all for a shop on it.
+    func testDeletingASpoolLeavesATombstoneAndTheMacTakesItOff() async throws {
+        let macCopy = try book.read()
+        try writer.deleteSpool(id: "S-1")
+
+        guard case .array(let shelf)? = try book.read()["inventory"] else { return XCTFail() }
+        XCTAssertTrue(shelf.isEmpty)
+        guard case .array(let tombs)? = try book.read()["tombstones"], case .object(let t)? = tombs.first else {
+            return XCTFail("no tombstone: the removal would never reach the Mac")
+        }
+        XCTAssertEqual(t["collection"], .string("inventory"))
+        XCTAssertEqual(t["rev"], .number(1), "the rev the phone saw, which the conflict check measures")
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        XCTAssertEqual(outbox.tombstones.count, 1)
+        let engine = try await reader.sharedEngine()
+        let folded = try await engine.foldDeltas(base: macCopy, deltas: [outbox.wire]).store
+        guard case .array(let macShelf)? = folded["inventory"] else { return XCTFail() }
+        XCTAssertTrue(macShelf.isEmpty, "the Mac's copy lost the spool too")
+    }
+
+    func testDeletingASpoolThisPhoneDoesNotHoldWritesNothing() throws {
+        XCTAssertThrowsError(try writer.deleteSpool(id: "S-gone")) {
+            XCTAssertEqual($0 as? BookWriter.Refusal, .noSuchSpool)
+        }
+        XCTAssertNil(try book.read()["tombstones"], "no tombstone for a record never seen")
+    }
+
+    private func waste(grams: Double, deduct: Bool, material: String = "PLA") -> WasteEntry {
+        WasteEntry(material: material, failureType: "spaghetti", weight: grams, cost: 4.5,
+                   reason: "  lifted off the bed ", notes: "", machineId: "M-1", deduct: deduct)
+    }
+
+    func testLoggingWasteFilesItUnderTheShopsDayAndItReachesTheMac() async throws {
+        let macCopy = try book.read()
+        let made = try writer.logWaste(waste(grams: 40, deduct: false))
+
+        XCTAssertEqual(made.entry["date"], .string(BookWriter.localDay(Date())))
+        XCTAssertEqual(made.entry["reason"], .string("lifted off the bed"), "trimmed, as the endpoint trims")
+        XCTAssertNil(made.deducted)
+        XCTAssertEqual(try record("inventory", "S-1")["weight"], .number(640), "not asked to deduct")
+        guard case .string(let id)? = made.entry["id"] else { return XCTFail() }
+        XCTAssertTrue(id.hasPrefix("w-"), "the endpoint's own id shape")
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        let engine = try await reader.sharedEngine()
+        let folded = try await engine.foldDeltas(base: macCopy, deltas: [outbox.wire]).store
+        guard case .array(let log)? = folded["wasteLog"] else {
+            return XCTFail("the Mac never got the waste: \(folded.keys)")
+        }
+        XCTAssertEqual(log.count, 1)
+    }
+
+    /// The endpoint deducts from `weight`; the phone reads `remaining` first,
+    /// so all three names move or the shelf shows the old figure.
+    func testDeductingWasteMovesAllThreeNamesForWhatIsLeft() throws {
+        let made = try writer.logWaste(waste(grams: 40, deduct: true))
+        XCTAssertEqual(made.deducted, "S-1")
+        let spool = try record("inventory", "S-1")
+        XCTAssertEqual(spool["weight"], .number(600))
+        XCTAssertEqual(spool["remaining"], .number(600))
+        XCTAssertEqual(spool["weightRemaining"], .number(600))
+        XCTAssertEqual(spool["rev"], .number(2), "stamped, so the deduction travels too")
+    }
+
+    func testWasteNeverTakesASpoolBelowZero() throws {
+        try writer.logWaste(waste(grams: 5_000, deduct: true))
+        XCTAssertEqual(try record("inventory", "S-1")["weight"], .number(0))
+    }
+
+    func testWasteOfAMaterialNotOnTheShelfDeductsNothing() throws {
+        let made = try writer.logWaste(waste(grams: 40, deduct: true, material: "PETG"))
+        XCTAssertNil(made.deducted)
+        XCTAssertEqual(try record("inventory", "S-1")["weight"], .number(640))
+    }
+
+    func testWasteWithNoMaterialIsRefused() {
+        XCTAssertThrowsError(try writer.logWaste(waste(grams: 40, deduct: false, material: "  "))) {
+            XCTAssertEqual($0 as? BookWriter.Refusal, .noMaterial)
+        }
+    }
+
+    func testAnExpenseWithoutAReceiptIsARecordThatReachesTheMac() async throws {
+        let macCopy = try book.read()
+        let made = try writer.addExpense(ExpenseDraft(amount: 120, category: "", note: "nozzles",
+                                                      receiptBase64: nil))
+        XCTAssertEqual(made["category"], .string("other"), "the endpoint's default")
+        XCTAssertEqual(made["receiptPath"], .null)
+        XCTAssertEqual(made["date"], .string(BookWriter.localDay(Date())))
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        let engine = try await reader.sharedEngine()
+        let folded = try await engine.foldDeltas(base: macCopy, deltas: [outbox.wire]).store
+        guard case .array(let expenses)? = folded["expenses"] else { return XCTFail("\(folded.keys)") }
+        XCTAssertEqual(expenses.count, 1)
+    }
+
+    func testAnExpenseOfNothingIsRefused() {
+        XCTAssertThrowsError(try writer.addExpense(ExpenseDraft(amount: 0, category: "x", note: "",
+                                                                receiptBase64: nil))) {
+            XCTAssertEqual($0 as? BookWriter.Refusal, .noAmount)
+        }
+    }
+
+    /// Sent, then pulled: the Mac's working set carries no `wasteLog`, and that
+    /// must not read as the phone deleting the entry.
+    func testAPullAfterSendingWasteDoesNotDeleteIt() async throws {
+        try writer.logWaste(waste(grams: 40, deduct: false))
+        try book.markSynced(try book.read())
+        try await reader.adopt(shop(), scope: nil)
+        let outbox = try await reader.pendingChanges()
+        XCTAssertEqual(outbox?.tombstones.count ?? 0, 0, "absence after a pull is not a deletion")
+    }
+}

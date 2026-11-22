@@ -1,0 +1,1874 @@
+import Foundation
+import CryptoKit
+import Testing
+import KhaytCore
+@testable import KhaytApp
+
+/// The phone's way in, held to the Node server.
+///
+/// ── WHAT A MAC-ONLY SHOP COULD NOT DO ─────────────────────────────────────
+///
+/// Put the queue on a phone. `lib/lan-server.js` served it to every Windows
+/// and Linux shop and cannot run here, so a Mac shop had the queue on one
+/// screen in one room. `LanServer` is a listener and a route table over the
+/// SAME modules that server now reads its pages and its lockout from, so the
+/// bytes a phone receives are the bytes the other app sends — which is what
+/// these tests compare: every body against the module the Node server calls,
+/// through the engine, not against a copy pasted into the test.
+@MainActor
+struct LanServerTests {
+
+    /// A server on loopback, an ephemeral port, the sample book, a fixed clock.
+    @MainActor final class PrinterCalls { var calls: [String] = [] }
+
+    @MainActor final class Bench {
+        let shop: Shop
+        let engine: KhaytEngine
+        let server: LanServer
+        let port: UInt16
+        var clock: Date
+        static let start = Date(timeIntervalSince1970: 1_800_000_000)   // 2027-01-15
+
+        /// What `/api/intake` wrote into the book.
+        let recorded = Recorded()
+        /// The book the server reads — mutable, so an approval shows on the next read.
+        let book = Book()
+        /// How many times the delta writer was actually entered.
+        let foldCalls = Counter()
+        /// What `/api/printer/…` asked the stubbed printer hook, in order.
+        let printerCalls = PrinterCalls()
+        /// What `/api/orders/{id}/photos` handed the stubbed photo hook: the
+        /// job and the byte count, in order.
+        let photoCalls = PrinterCalls()
+        var tokens = 0
+        /// The phones enrolled here, and the "Pair a phone" window, on the bench clock.
+        let devices = LanDevices.inMemory()
+        let pairing: LanPairingWindow
+
+        init(pin: String = "24682468", intakeToken: String = "", recordFails: Bool = false,
+             calendarToken: String = "", measures: Bool = true, sliced: Bool = false,
+             readTimeout: TimeInterval = 15, foldsDeltas: Bool = false,
+             rest: Bool = false, printerWebhookToken: String = "",
+             identity: Curve25519.Signing.PrivateKey = .init()) async throws {
+            let shop = Shop()
+            await shop.load(.sample)
+            let engine = try #require(shop.engine)
+            self.shop = shop
+            self.engine = engine
+            var clock = Self.start
+            self.clock = clock
+            let box = ClockBox(clock)
+            self.box = box
+            let recorded = self.recorded
+            let book = self.book
+            // The REST routes read the clients and the shelf too (`lanRestBook`).
+            book.value = rest ? shop.lanRestBook : shop.lanBook
+            var host = LanServer.Host(
+                store: { book.value }, pin: pin, engine: engine,
+                now: { box.now }, nowText: { "09:16" },
+                icon: { LanServer.bundledIcon($0) })
+            host.intakeToken = intakeToken
+            host.calendarToken = calendarToken
+            // The lockouts read the monotonic clock; the bench moves it with
+            // the wall clock so `advance` lifts a lockout as before.
+            host.lockoutClock = { box.now.timeIntervalSince1970 }
+            host.identity = { identity }
+            host.devices = devices
+            let pairing = LanPairingWindow(clock: { box.now.timeIntervalSince1970 })
+            self.pairing = pairing
+            host.pairing = pairing
+            host.library = { [shop] q, folder, offset, limit in
+                shop.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit)
+            }
+            host.libraryThumb = { [shop] id in await shop.phoneLibraryThumb(id) }
+            host.libraryEstimate = { [shop] id, plate, qty in await shop.phoneLibraryEstimate(id, plate: plate, qty: qty) }
+            // The pricing inputs, from the same bench book — the app hands the
+            // server `Shop.pricingBook` here; see `PricingBookTests` for why.
+            host.pricing = { book.value }
+            // Per BENCH, not per process: the stall tests run in parallel and a
+            // shared static put one test's restore in the middle of another
+            // test's wait.
+            host.readTimeout = readTimeout
+            host.mintId = { "intake-fixed" }
+            // The reader is Swift and file-backed; the bench stands in for it
+            // so these tests are about the ROUTE, not about mesh arithmetic.
+            host.measure = { _, _ in measures ? LanServerTests.measuredCube : nil }
+            // A slicer is not on a test machine, so the slice is stood in for
+            // — what is proved here is that the route PREFERS it and falls
+            // back cleanly when it is not there.
+            host.sliceUpload = { _, _ in sliced ? LanServerTests.slicedFigures : nil }
+            host.record = { entry in
+                if recordFails { throw CocoaError(.fileWriteUnknown) }
+                recorded.entries.append(entry)
+            }
+            host.survey = { token, rating, comment, nowIso in
+                if recordFails { throw CocoaError(.fileWriteUnknown) }
+                guard case .array(var log)? = book.value["printLog"] else { return false }
+                for i in log.indices {
+                    guard case .object(let o) = log[i], case .string(let held)? = o["surveyToken"],
+                          LanServer.constantTimeEqual(token, held) else { continue }
+                    log[i] = try await engine.lanSurveyPatch(order: .object(o), rating: rating, comment: comment, nowIso: nowIso)
+                    book.value["printLog"] = .array(log)
+                    return true
+                }
+                return false
+            }
+            host.approve = { id, nowIso in
+                if recordFails { throw CocoaError(.fileWriteUnknown) }
+                let result = try await engine.lanQuoteApply(store: .object(book.value), orderId: id, nowIso: nowIso)
+                guard result.found, result.error == nil, let log = result.printLog else { return nil }
+                book.value["printLog"] = log
+                return result.order
+            }
+            // Off unless a test asks for it, exactly as it is off on a Mac
+            // whose app has not wired it. `foldCalls` lets a test prove the
+            // writer was NOT reached, which is most of what the refusals are for.
+            if foldsDeltas {
+                let calls = self.foldCalls
+                host.fold = { payload in
+                    calls.n += 1
+                    let folded = try await engine.foldDeltas(base: book.value, deltas: [payload])
+                    book.value = folded.store
+                    return folded
+                }
+            }
+            // Stubbed: the ROUTE is under test, and no test should reach a
+            // printer. `printerCalls` says whether the hook was reached at all.
+            let printerCalls = self.printerCalls
+            host.printerCommand = { id, verb in
+                printerCalls.calls.append("\(id) \(verb.rawValue)")
+                return (200, #"{"ok":true,"state":"paused"}"#)
+            }
+            let photoCalls = self.photoCalls
+            host.addJobPhoto = { id, data in
+                photoCalls.calls.append("\(id) \(data.count)")
+                return (201, #"{"ok":true,"index":0}"#)
+            }
+            // The REST writes, as the app runs them (`Shop.applyLanRest`) — on
+            // the bench's book rather than a file. Off unless asked, as in the app.
+            if rest {
+                host.restBook = { book.value }
+                // `applyLanRestWrite`, as `Shop.lanRestWrite` runs it: a status
+                // move goes through the board's `applyMove`.
+                let words = shop.words
+                host.restWrite = { @MainActor op, args in
+                    var root = book.value
+                    let done = try await Shop.applyLanRestWrite(into: &root, engine: engine, words: words,
+                                                                op: op, args: args)
+                    if done.outcome.changed != nil { book.value = root }
+                    return done.outcome
+                }
+                host.printerWebhookToken = printerWebhookToken
+                host.randomHex = { "ab12" }
+                // Fixed, so a job's tokens and id tag are known: 0x07 is `7`
+                // in the id-tag alphabet's 32 characters.
+                host.randomBytes = { n in Array(repeating: 7, count: n) }
+            }
+            let server = LanServer(host: host)
+            self.server = server
+            port = try await server.start(port: 0, bind: .loopback)
+            clock = Self.start
+        }
+        let box: ClockBox
+
+        func form(_ path: String, body: String) async throws -> Reply {
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
+            request.httpMethod = "POST"
+            request.httpBody = Data(body.utf8)
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            let (data, response) = try await NoRedirect.session.data(for: request)
+            let http = try #require(response as? HTTPURLResponse)
+            var out: [String: String] = [:]
+            for (k, v) in http.allHeaderFields { out[String(describing: k).lowercased()] = String(describing: v) }
+            return Reply(status: http.statusCode, headers: out, body: data)
+        }
+
+        func post(_ path: String, json: String, headers: [String: String] = [:]) async throws -> Reply {
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
+            request.httpMethod = "POST"
+            request.httpBody = Data(json.utf8)
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
+            let (data, response) = try await NoRedirect.session.data(for: request)
+            let http = try #require(response as? HTTPURLResponse)
+            var out: [String: String] = [:]
+            for (k, v) in http.allHeaderFields { out[String(describing: k).lowercased()] = String(describing: v) }
+            return Reply(status: http.statusCode, headers: out, body: data)
+        }
+
+        /// Open the form and come back with its session cookie.
+        func openForm() async throws -> (Reply, cookie: String) {
+            let reply = try await get("/intake")
+            let setCookie = reply.headers["set-cookie"] ?? ""
+            let cookie = String(setCookie.split(separator: ";").first ?? "")
+            return (reply, cookie)
+        }
+        func advance(seconds: TimeInterval) { box.now = box.now.addingTimeInterval(seconds) }
+
+        struct Reply { let status: Int; let headers: [String: String]; let body: Data
+                       var text: String { String(decoding: body, as: UTF8.self) } }
+
+        func get(_ path: String, headers: [String: String] = [:], method: String = "GET") async throws -> Reply {
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
+            request.httpMethod = method
+            for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
+            let (data, response) = try await NoRedirect.session.data(for: request)
+            let http = try #require(response as? HTTPURLResponse)
+            var out: [String: String] = [:]
+            for (k, v) in http.allHeaderFields { out[String(describing: k).lowercased()] = String(describing: v) }
+            return Reply(status: http.statusCode, headers: out, body: data)
+        }
+        /// Any method, any body — the REST routes take PATCH and DELETE.
+        func send(_ method: String, _ path: String, body: Data? = nil,
+                  headers: [String: String] = [:]) async throws -> Reply {
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
+            request.httpMethod = method
+            request.httpBody = body
+            if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+            for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
+            let (data, response) = try await NoRedirect.session.data(for: request)
+            let http = try #require(response as? HTTPURLResponse)
+            var out: [String: String] = [:]
+            for (k, v) in http.allHeaderFields { out[String(describing: k).lowercased()] = String(describing: v) }
+            return Reply(status: http.statusCode, headers: out, body: data)
+        }
+        func stop() { server.stop() }
+    }
+
+    final class ClockBox: @unchecked Sendable {
+        var now: Date
+        init(_ d: Date) { now = d }
+    }
+    final class Recorded: @unchecked Sendable {
+        var entries: [JSONValue] = []
+    }
+    /// How many times something was entered. Proving a writer was NOT reached
+    /// is most of what the refusal tests are for, and absence of a side effect
+    /// is not evidence on its own.
+    final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = 0
+        var n: Int {
+            get { lock.lock(); defer { lock.unlock() }; return value }
+            set { lock.lock(); defer { lock.unlock() }; value = newValue }
+        }
+    }
+
+    final class Book: @unchecked Sendable {
+        var value: [String: JSONValue] = [:]
+        /// Put one job into the book, replacing any with the same id.
+        func put(_ job: [String: JSONValue]) {
+            var log: [JSONValue] = []
+            if case .array(let had)? = value["printLog"] { log = had }
+            log.removeAll { if case .object(let o) = $0 { return o["id"] == job["id"] } else { return false } }
+            log.append(.object(job))
+            value["printLog"] = .array(log)
+        }
+        func job(_ id: String) -> [String: JSONValue]? {
+            guard case .array(let log)? = value["printLog"] else { return nil }
+            for row in log { if case .object(let o) = row, o["id"] == .string(id) { return o } }
+            return nil
+        }
+    }
+
+    /// URLSession follows a 302 by itself; the test wants to see the 302.
+    final class NoRedirect: NSObject, URLSessionTaskDelegate, Sendable {
+        static let session: URLSession = {
+            let config = URLSessionConfiguration.ephemeral
+            // Cookies are passed BY HAND: a jar shared by every bench (all on
+            // 127.0.0.1) would carry one test's session into the next.
+            config.httpShouldSetCookies = false
+            config.httpCookieAcceptPolicy = .never
+            // SIXTY, not ten. These requests go to a server in this same
+            // process, so the only thing this timeout can measure is whether
+            // the scheduler got round to it — and every suite in the bundle
+            // starts at once. Measured in one such window: `SmtpParityTests`,
+            // ten milliseconds of pure JavaScript on a desk, took 66 seconds.
+            // Ten seconds produced `NSURLErrorDomain -1001` on a server that
+            // was working perfectly, which reads as a broken LAN API.
+            //
+            // See `LanStallTests.patience` for the same correction and the
+            // same reasoning.
+            //
+            // THREE HUNDRED, not sixty (Oct 2026). The server answers on the
+            // main actor, which every `@MainActor` suite in the bundle shares;
+            // the staff-lock suites added a few dozen more tests that each
+            // build and load a whole sample Shop there. On CI's three cores a
+            // request then waited past sixty seconds for its turn, and four
+            // LAN tests failed with -1001 on a working server — one run in
+            // three. Still a ceiling, not a target: a request that does not
+            // come back in five minutes is a real hang.
+            //
+            // NINE HUNDRED, not three hundred (Nov 2026). The parity batches
+            // added a few hundred more `@MainActor` tests to shard `a`
+            // (mac/test-shards.sh), which now queues ~2,800 s of main-actor
+            // work on CI. Main failed twice in a row (after #2266, and #2269),
+            // and in both runs every shard-`a` LAN test timed out at once with
+            // -1001, on a server that answers in milliseconds when the suite
+            // runs alone (141 tests in 33 s). Like `LanStallTests.patience`
+            // (600), it is the time a request may wait for its turn on a
+            // shared main thread, not how long the server takes.
+            config.timeoutIntervalForRequest = 900
+            config.httpShouldSetCookies = false
+            config.httpCookieAcceptPolicy = .never
+            return URLSession(configuration: config, delegate: NoRedirect(), delegateQueue: nil)
+        }()
+        func urlSession(_ session: URLSession, task: URLSessionTask,
+                        willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+                        completionHandler: @escaping (URLRequest?) -> Void) {
+            completionHandler(nil)
+        }
+    }
+
+    // MARK: - The bodies are the module's
+
+    @Test("the status API serves the shared module's JSON, with the four security headers")
+    func statusIsTheModules() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let reply = try await bench.get("/api/status?format=json")
+        #expect(reply.status == 200)
+        let expected = try await bench.engine.lanStatusBody(store: .object(bench.shop.lanBook),
+                                                            today: LanServer.localDay(Bench.start))
+        #expect(reply.text == expected)
+        #expect(reply.headers["content-type"] == "application/json")
+        let security = try await bench.engine.lanSecurityHeaders()
+        #expect(security.count == 4, Comment(rawValue: "\(security)"))
+        for (name, value) in security {
+            #expect(reply.headers[name.lowercased()] == value, Comment(rawValue: "missing \(name)"))
+        }
+        // Not empty: the sample book has jobs in the queue, so the counts are real.
+        #expect(reply.text.contains("\"queued\":"), Comment(rawValue: reply.text))
+        #expect(!reply.text.contains("\"queued\":0"), "the sample book's queue came out empty")
+    }
+
+    @Test("a browser asking for /api/status is sent to the intake form, as on the PC")
+    func statusRedirectsBrowsers() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let reply = try await bench.get("/api/status")
+        #expect(reply.status == 302)
+        #expect(reply.headers["location"] == "/intake")
+    }
+
+    @Test("the queue API is the module's JSON behind the PIN, by header only")
+    func queueBehindPin() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let expected = try await bench.engine.lanQueueBody(store: .object(bench.shop.lanBook))
+        let byHeader = try await bench.get("/api/queue", headers: ["x-khayt-pin": "24682468"])
+        #expect(byHeader.status == 200)
+        #expect(byHeader.text == expected)
+        // The PIN in the address is ignored on an API route, read or write.
+        let byQuery = try await bench.get("/api/queue?pin=24682468")
+        #expect(byQuery.status == 401)
+        let none = try await bench.get("/api/queue")
+        #expect(none.status == 401)
+        #expect(none.text == #"{"error":"Unauthorized"}"#)
+        let wrong = try await bench.get("/api/queue", headers: ["x-khayt-pin": "0000"])
+        #expect(wrong.status == 401)
+        // The refusal carries the security headers too — set once, not per route.
+        #expect(wrong.headers["x-content-type-options"] == "nosniff")
+    }
+
+    @Test("a phone is never handed a PIN hash, in the working set or the whole book")
+    func noPinHashes() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        // Hashes the desktop's operator lock checks PINs against. Settings go
+        // out on every pull, so the recovery hash used to; operators go out
+        // only with `?scope=whole`, so a staff PIN did there.
+        let hash = "p2$210000$00112233445566778899aabbccddeeff$" + String(repeating: "ab", count: 32)
+        bench.book.value["settings"] = .object([
+            "shopName": .string("Ward"), "recoveryCodeHash": .string(hash),
+        ])
+        bench.book.value["operators"] = .array([.object([
+            "id": .string("OP-1"), "name": .string("Noura"), "pinHash": .string(hash),
+        ])])
+        for path in ["/api/store", "/api/store?scope=whole"] {
+            let reply = try await bench.get(path, headers: ["x-khayt-pin": "24682468"])
+            #expect(reply.status == 200, Comment(rawValue: reply.text))
+            #expect(!reply.text.contains(hash), "\(path) sent a PIN hash to a phone")
+            #expect(reply.text.contains("Ward"), "\(path) did not send the book at all")
+        }
+        let whole = try await bench.get("/api/store?scope=whole", headers: ["x-khayt-pin": "24682468"])
+        #expect(whole.text.contains("Noura"), "the operator itself still goes, masked")
+    }
+
+    @Test("a phone is sent a working set, not the whole book, with the shop's secrets masked")
+    func workingSetBehindPin() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+
+        // A shop with a printer's access code and a bot token in it — two of the
+        // paths `lib/store-secret-paths.js` names. This app reads the store from
+        // disk, so unlike the renderer it is genuinely holding them.
+        bench.book.value["settings"] = .object([
+            "shopName": .string("Ward"),
+            "telegram": .object(["botToken": .string("__enc__BOTSECRET")]),
+        ])
+        bench.book.value["machines"] = .array([.object([
+            "id": .string("m1"),
+            "name": .string("X1C"),
+            "printerApi": .object(["accessCode": .string("__enc__12345678")]),
+        ])])
+        // Put the history in the book on purpose rather than relying on the
+        // sample having it: what is being tested is that this is left behind,
+        // and a fixture that never had it would pass by accident.
+        bench.book.value["printFiles"] = .array([.object(["id": .string("f1")])])
+        bench.book.value["waTemplates"] = .array([.object(["id": .string("wa1"), "text": .string("Ready, {name}")])])
+        bench.book.value["auditLog"] = .array([.object(["id": .string("a1")])])
+        bench.book.value["products"] = .array([.object(["id": .string("PROD-1"), "nameEn": .string("Lamp")])])
+
+        let none = try await bench.get("/api/store")
+        #expect(none.status == 401, "the shop's book must never be open on the LAN")
+
+        let reply = try await bench.get("/api/store", headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+
+        struct Envelope: Decodable {
+            let whole: Bool
+            let scope: BookScope.Taken
+            let store: [String: JSONValue]
+        }
+        let sent = try #require(try? JSONDecoder().decode(Envelope.self, from: Data(reply.text.utf8)))
+
+        #expect(sent.whole == false, "the phone was sent the whole book")
+
+        // The history that is half a real shop's store and that no companion
+        // screen has ever shown. Withheld, and SAID to be withheld — a phone
+        // cannot tell "not sent" from "there are none" by looking.
+        #expect(sent.store["printFiles"] == nil)
+        #expect(sent.store["auditLog"] == nil)
+        #expect(sent.scope.omitted.contains("printFiles"))
+        #expect(sent.scope.omitted.contains("auditLog"))
+
+        // What it does get, and the settings without which it can price nothing.
+        #expect(sent.store["settings"] != nil)
+        #expect(sent.store["printLog"] != nil)
+        #expect(sent.store["inventory"] != nil)
+        // The shop's WhatsApp wording, which the phone's job update uses.
+        #expect(sent.store["waTemplates"] != nil, "the phone was not sent the shop's WhatsApp templates")
+        #expect(sent.store["products"] != nil, "the phone was not sent the catalogue")
+
+        // Said as a fact rather than a comparison, because a comparison against
+        // `forCloud` would still pass if `forCloud` stopped masking.
+        guard case .object(let settings)? = sent.store["settings"],
+              case .object(let telegram)? = settings["telegram"],
+              case .array(let machines)? = sent.store["machines"],
+              case .object(let machine) = machines[0],
+              case .object(let api)? = machine["printerApi"] else {
+            Issue.record("the book did not arrive in the shape it was sent in")
+            return
+        }
+        #expect(telegram["botToken"] == .string("__KHAYT_MASKED__"),
+                "a shop's bot token went out over the LAN")
+        #expect(api["accessCode"] == .string("__KHAYT_MASKED__"),
+                "a printer's access code went out over the LAN")
+        #expect(settings["shopName"] == .string("Ward"), "masking took something that was not a secret")
+    }
+
+    /// Cloud deltas never carry settings, so a phone that refreshes from Khayt
+    /// Cloud learns of a connector installed here (or a currency changed here)
+    /// only from this. It must be `/api/store`'s settings exactly — the same
+    /// mask, the same gate — and never `{}`, which the phone would take as
+    /// "the shop has no settings".
+    @Test("the shop's settings alone, masked as /api/store masks them, behind the PIN")
+    func settingsAlone() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value["settings"] = .object([
+            "shopName": .string("Ward"),
+            "currency": .string("SAR"),
+            "telegram": .object(["botToken": .string("__enc__BOTSECRET")]),
+            "plugins": .array([.object([
+                "id": .string("app.khayt.samples.lamha"), "version": .string("1.0.0"), "enabled": .bool(true),
+                "config": .object(["carrierId": .string("7")]),
+                "secrets": .object(["apiToken": .string("test-token-not-real")]),
+            ])]),
+        ])
+
+        #expect(try await bench.get("/api/store/settings").status == 401, "the settings must not be open on the LAN")
+        #expect(try await bench.get("/api/store/settings?pin=24682468").status == 401, "a PIN in the URL is not the header")
+
+        struct Body: Decodable { let settings: [String: JSONValue]; let servedAt: String }
+        let reply = try await bench.get("/api/store/settings", headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        let body = try #require(try? JSONDecoder().decode(Body.self, from: Data(reply.text.utf8)))
+        #expect(!body.servedAt.isEmpty)
+        #expect(!reply.text.contains("BOTSECRET") && !reply.text.contains("test-token-not-real"),
+                "a secret left the Mac")
+
+        // Exactly what /api/store sends as settings: one mask, not two.
+        struct Store: Decodable { let store: [String: JSONValue] }
+        let store = try await bench.get("/api/store", headers: ["x-khayt-pin": "24682468"])
+        let book = try #require(try? JSONDecoder().decode(Store.self, from: Data(store.text.utf8)))
+        #expect(book.store["settings"] == .object(body.settings))
+        guard case .array(let plugins)? = body.settings["plugins"] else { Issue.record("no connectors sent"); return }
+        #expect(plugins.count == 1)
+
+        // The documented `/v1` name is the same route.
+        #expect(try await bench.get("/v1/store/settings", headers: ["x-khayt-pin": "24682468"]).status == 200)
+
+        // A book with no settings to send is a 500, never `{}`.
+        bench.book.value["settings"] = .object([:])
+        let empty = try await bench.get("/api/store/settings", headers: ["x-khayt-pin": "24682468"])
+        #expect(empty.status == 500, Comment(rawValue: empty.text))
+    }
+
+    @Test("`?scope=whole` still exists for the caller that genuinely wants everything")
+    func wholeOnRequest() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let reply = try await bench.get("/api/store?scope=whole", headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+
+        struct Envelope: Decodable {
+            let whole: Bool
+            let store: [String: JSONValue]
+        }
+        let sent = try #require(try? JSONDecoder().decode(Envelope.self, from: Data(reply.text.utf8)))
+        #expect(sent.whole)
+        // Masked all the same: wanting everything is not the same as being
+        // entitled to the shop's credentials.
+        let expected = try await bench.engine.storeForCloud(bench.book.value)
+        #expect(sent.store == expected)
+    }
+
+    @Test("/api/store is cut and encoded off the main actor, byte for byte as before")
+    func storeBodyOffMain() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        // The reply as the route built it inline on the main actor, before the
+        // cut and the encode moved to a Dispatch thread. The phone's wire
+        // contract (scripts/ios-contract-capture.mjs) is this exact text.
+        let masked = try await bench.engine.storeForPhone(bench.book.value)
+        let now = bench.box.now
+        for whole in [false, true] {
+            let cut = whole
+                ? (store: masked, taken: BookScope.Taken(
+                    collections: [:], omitted: [], takenAt: StoreWriter.iso(now)))
+                : BookScope.take(from: masked, now: now)
+            let before = try #require(LanServer.envelope(store: cut.store, taken: cut.taken, whole: whole))
+            let reply = try await bench.get(whole ? "/api/store?scope=whole" : "/api/store",
+                                            headers: ["x-khayt-pin": "24682468"])
+            #expect(reply.status == 200)
+            #expect(reply.text == before, "the /api/store reply changed shape (whole: \(whole))")
+        }
+        // And the heavy half really is off the main actor: a 15 MB book with
+        // `?scope=whole` froze the window for seconds, repeatable by any phone.
+        let src = try ShopSources.read(URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/LanServer.swift"))
+        let route = try #require(src.range(of: #"case ("/api/store", true):"#))
+        let body = String(src[route.lowerBound...].prefix(1800))
+        #expect(body.contains("await PinWork.run({ Self.storeBody("), "the book is cut on the main actor again")
+        #expect(!body.contains("BookScope.take("), "the cut is back inline in the route")
+    }
+
+    @Test("the shop is advertised under its own name, and an Arabic one is not cut in half")
+    func advertisedName() {
+        // What somebody standing in the shop recognises in a list.
+        #expect(LanServer.advertisedName(["settings": .object(["shopName": .string("Ward")])]) == "Ward")
+
+        // A shop that has not named itself gets the product, not an empty row —
+        // an unselectable blank in a list reads as a broken app.
+        #expect(LanServer.advertisedName([:]) == "Khayt")
+        #expect(LanServer.advertisedName(["settings": .object(["shopName": .string("   ")])]) == "Khayt")
+
+        // Bonjour allows 63 BYTES. Arabic is two bytes a letter, so a name well
+        // under 63 characters is over the limit — and the failure is not a
+        // shortened label, it is a service that never registers and a shop that
+        // simply does not appear on the phone.
+        let arabic = String(repeating: "ورشة", count: 12)          // 48 chars, 96 bytes
+        #expect(arabic.count == 48)
+        #expect(arabic.utf8.count == 96)
+        let cut = LanServer.advertisedName(["settings": .object(["shopName": .string(arabic)])])
+        #expect(cut.utf8.count <= 63)
+        // And it is still a string: truncating bytes can split a character in
+        // half, which produces bytes no reader can decode.
+        #expect(!cut.isEmpty)
+        #expect(arabic.hasPrefix(cut), "the shortened name is not a prefix of the shop's")
+
+        // An ASCII name at the boundary keeps every byte it is entitled to.
+        let long = String(repeating: "a", count: 70)
+        #expect(LanServer.advertisedName(["settings": .object(["shopName": .string(long)])]).count == 63)
+    }
+
+    @Test("a phone's changes are folded into the book, and a stale one cannot undo desk work")
+    func foldFromPhone() async throws {
+        let bench = try await Bench(foldsDeltas: true)
+        defer { bench.stop() }
+
+        // The shop's book as this Mac holds it. C-1 was edited at the desk after
+        // the phone last pulled, so it stands at rev 5.
+        bench.book.value["printLog"] = .array([
+            .object(["id": .string("C-1"), "name": .string("Edited at the desk"), "rev": .number(5)]),
+            .object(["id": .string("C-2"), "name": .string("Nora"), "rev": .number(1)]),
+        ])
+
+        // The phone carries a genuine edit to C-2, and a STALE C-1 at rev 2 —
+        // the shape a phone has when it was pulled before the desk touched it.
+        let outbox = #"""
+        {"deltas":[
+          {"collection":"printLog","record":{"id":"C-2","name":"Nora Al-Harbi","rev":2}},
+          {"collection":"printLog","record":{"id":"C-1","name":"Stale from the phone","rev":2}}],
+         "tombstones":[],"cursor":null}
+        """#
+
+        let none = try await bench.post("/api/store/deltas", json: outbox)
+        #expect(none.status == 401, "a phone's edits reached the book without the PIN")
+
+        let reply = try await bench.post("/api/store/deltas", json: outbox,
+                                         headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"applied\":1"), Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"skipped\":1"), Comment(rawValue: reply.text))
+
+        guard case .array(let clients)? = bench.book.value["printLog"] else {
+            Issue.record("the printLog collection went missing"); return
+        }
+        var byId: [String: [String: JSONValue]] = [:]
+        for row in clients {
+            guard case .object(let o) = row, case .string(let id)? = o["id"] else { continue }
+            byId[id] = o
+        }
+        #expect(byId["C-2"]?["name"] == .string("Nora Al-Harbi"), "the phone's real edit did not land")
+        // The desk's work survived a phone that had never seen it. This is
+        // `applyDeltas`'s higher-rev rule, and it is the whole reason a phone is
+        // allowed to write to a shop's book at all.
+        #expect(byId["C-1"]?["name"] == .string("Edited at the desk"),
+                "a stale phone overwrote work done at the desk")
+        #expect(byId["C-1"]?["rev"] == .number(5))
+    }
+
+    @Test("a phone changes only what the companion writes: never a staff member")
+    func foldOnlyPhoneCollections() async throws {
+        let bench = try await Bench(foldsDeltas: true)
+        defer { bench.stop() }
+        let hash = "p2$210000$00112233445566778899aabbccddeeff$" + String(repeating: "ab", count: 32)
+        bench.book.value["operators"] = .array([.object([
+            "id": .string("OP-1"), "name": .string("Noura"), "roleKey": .string("operator"),
+            "pinHash": .string(hash), "rev": .number(1),
+        ])])
+        bench.book.value["printLog"] = .array([
+            .object(["id": .string("J-1"), "project": .string("Bracket"), "rev": .number(1)]),
+        ])
+        // With the owner PIN, the shapes that took owner rights on a desktop
+        // with the operator lock on: a promotion that also drops the PIN, a new
+        // owner with no PIN, a staff member deleted, labour invented — beside
+        // one real edit to a job, which must still land.
+        let outbox = #"""
+        {"deltas":[
+          {"collection":"operators","record":{"id":"OP-1","name":"Noura","roleKey":"owner","rev":4}},
+          {"collection":"operators","record":{"id":"OP-X","name":"Me","roleKey":"owner","rev":1}},
+          {"collection":"timeEntries","record":{"id":"TE-X","hours":900,"cost":99999,"rev":1}},
+          {"collection":"printLog","record":{"id":"J-1","project":"Bracket v2","rev":2}}],
+         "tombstones":[{"collection":"operators","id":"OP-1","rev":9}],"cursor":null}
+        """#
+        let reply = try await bench.post("/api/store/deltas", json: outbox,
+                                         headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"applied\":1"), Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"skipped\":4"), Comment(rawValue: reply.text))
+        // Refused for the collection, not stale: said on its own too, so the
+        // phone keeps nothing pending that can never land.
+        #expect(reply.text.contains("\"dropped\":4"), Comment(rawValue: reply.text))
+
+        guard case .array(let ops)? = bench.book.value["operators"], ops.count == 1,
+              case .object(let op) = ops[0] else {
+            Issue.record("a phone added or removed a staff member"); return
+        }
+        #expect(op["roleKey"] == .string("operator"), "a phone promoted a staff member")
+        #expect(op["pinHash"] == .string(hash), "a phone stripped a staff member's PIN")
+        #expect(bench.book.value["timeEntries"] == nil, "a phone invented labour")
+        guard case .array(let jobs)? = bench.book.value["printLog"], case .object(let job) = jobs[0] else {
+            Issue.record("the job went missing"); return
+        }
+        #expect(job["project"] == .string("Bracket v2"), "the phone's real edit did not land")
+
+        // Nothing it may write: answered, not written.
+        let calls = bench.foldCalls.n
+        let only = try await bench.post("/api/store/deltas",
+            json: #"{"deltas":[{"collection":"operators","record":{"id":"OP-Y","rev":1}}],"tombstones":[],"cursor":null}"#,
+            headers: ["x-khayt-pin": "24682468"])
+        #expect(only.status == 200)
+        #expect(only.text.contains("\"skipped\":1"))
+        #expect(only.text.contains("\"dropped\":1"))
+        #expect(bench.foldCalls.n == calls, "the book was rewritten for a batch with nothing to write")
+    }
+
+    @Test("a phone's line in a customer's comms log, and a supplier it adds, reach the book")
+    func foldClientsAndSuppliers() async throws {
+        let bench = try await Bench(foldsDeltas: true)
+        defer { bench.stop() }
+        bench.book.value["clients"] = .array([
+            .object(["id": .string("C-1"), "name": .string("Nora"), "rev": .number(1)]),
+        ])
+        // The WhatsApp update's comms entry (BookWriter.addCommEntry) and the
+        // receipt card's "Add as supplier" — dropped as skipped before, with a
+        // 200 the phone read as delivered.
+        let outbox = #"""
+        {"deltas":[
+          {"collection":"clients","record":{"id":"C-1","name":"Nora","rev":2,
+            "commsLog":[{"at":"2026-10-13T09:00:00Z","channel":"whatsapp","text":"Your order is ready"}]}},
+          {"collection":"suppliers","record":{"id":"sup1","name":"Filament Co","vat":"300000000000003",
+            "category":"","phone":"","website":"","notes":"","priceList":[],"leadDays":null,"purchases":[],"rev":1}}],
+         "tombstones":[],"cursor":null}
+        """#
+        let reply = try await bench.post("/api/store/deltas", json: outbox,
+                                         headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"applied\":2"), Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"skipped\":0"), Comment(rawValue: reply.text))
+
+        guard case .array(let clients)? = bench.book.value["clients"], case .object(let client) = clients[0] else {
+            Issue.record("the client went missing"); return
+        }
+        guard case .array(let log)? = client["commsLog"] else {
+            Issue.record("the comms entry did not land"); return
+        }
+        #expect(log.count == 1)
+        guard case .array(let suppliers)? = bench.book.value["suppliers"], case .object(let sup) = suppliers[0] else {
+            Issue.record("the supplier did not land"); return
+        }
+        #expect(sup["name"] == .string("Filament Co"))
+        #expect(LanServer.phoneWritable.contains("operators") == false, "staff stay out of a phone's reach")
+    }
+
+    @Test("a Mac that has not switched the capability on says so, rather than failing")
+    func foldRefusedWhenUnwired() async throws {
+        let bench = try await Bench()          // fold is nil, as on an unwired Mac
+        defer { bench.stop() }
+        let reply = try await bench.post("/api/store/deltas",
+                                         json: #"{"deltas":[{"collection":"clients","record":{"id":"C-9","rev":2}}],"tombstones":[],"cursor":null}"#,
+                                         headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 405, Comment(rawValue: reply.text))
+        #expect(reply.text.contains("does not take changes"))
+    }
+
+    @Test("nonsense is refused before the engine sees it")
+    func foldRefusesNonsense() async throws {
+        let bench = try await Bench(foldsDeltas: true)
+        defer { bench.stop() }
+
+        for (label, raw) in [
+            ("not an object", "[]"),
+            ("deltas is not an array", #"{"deltas":{},"tombstones":[]}"#),
+            ("tombstones missing", #"{"deltas":[]}"#),
+        ] {
+            let reply = try await bench.post("/api/store/deltas", json: raw,
+                                             headers: ["x-khayt-pin": "24682468"])
+            #expect(reply.status == 400, Comment(rawValue: "\(label): \(reply.status) \(reply.text)"))
+        }
+
+        // An empty outbox is valid, and must not rewrite the book: a write with
+        // no change still rewrites the file and still rolls `.prev`.
+        let empty = try await bench.post("/api/store/deltas",
+                                         json: #"{"deltas":[],"tombstones":[],"cursor":null}"#,
+                                         headers: ["x-khayt-pin": "24682468"])
+        #expect(empty.status == 200)
+
+        #expect(bench.foldCalls.n == 0,
+                "the writer was entered for a payload that should never have reached it")
+    }
+
+    @Test("a write takes the PIN from the header only, and only as JSON")
+    func writeTakesPinFromHeaderOnly() async throws {
+        let bench = try await Bench(foldsDeltas: true)
+        defer { bench.stop() }
+        let outbox = #"{"deltas":[{"collection":"clients","record":{"id":"C-9","rev":2}}],"tombstones":[],"cursor":null}"#
+        // The right PIN, in the address: ignored on a POST, so refused.
+        let inQuery = try await bench.post("/api/store/deltas?pin=24682468", json: outbox)
+        #expect(inQuery.status == 401, Comment(rawValue: "\(inQuery.status) \(inQuery.text)"))
+        // A cross-origin "simple" POST cannot send application/json; refused
+        // before the PIN is even looked at.
+        for type in ["text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x"] {
+            let reply = try await bench.post("/api/store/deltas", json: outbox,
+                                             headers: ["x-khayt-pin": "24682468", "Content-Type": type])
+            #expect(reply.status == 415, Comment(rawValue: "\(type): \(reply.status)"))
+        }
+        #expect(bench.foldCalls.n == 0)
+        // What the phone sends — the header, and JSON with a charset — lands.
+        let phone = try await bench.post("/api/store/deltas", json: outbox,
+                                         headers: ["x-khayt-pin": "24682468",
+                                                   "Content-Type": "application/json; charset=utf-8"])
+        #expect(phone.status == 200, Comment(rawValue: phone.text))
+        // And so is a GET's: the header is the only way in to the API.
+        for path in ["/api/queue", "/api/store", "/api/machines/live", "/v1/queue"] {
+            #expect(try await bench.get("\(path)?pin=24682468").status == 401, Comment(rawValue: path))
+        }
+    }
+
+    @Test("the live queue page is the module's HTML, with the clock it was given")
+    func queuePageIsTheModules() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let reply = try await bench.get("/", headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 200)
+        #expect(reply.headers["content-type"] == "text/html; charset=utf-8")
+        let expected = try await bench.engine.lanQueuePage(store: .object(bench.shop.lanBook), now: "09:16")
+        #expect(reply.text == expected)
+        #expect(reply.text.contains("09:16"))
+        // And behind the PIN: it shows customers' names. Without one, a
+        // browser gets the PIN form — never the queue.
+        let none = try await bench.get("/")
+        #expect(none.status == 200)
+        #expect(none.text.contains(#"action="/session""#))
+        #expect(none.text != expected)
+    }
+
+    @Test("a browser trades the PIN for a session once, and the PIN never stays in the address")
+    func queueSession() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        // An old bookmark with ?pin= still works — once, and is sent on to a
+        // clean address carrying a cookie instead.
+        let byLink = try await bench.get("/?pin=24682468")
+        #expect(byLink.status == 303)
+        #expect(byLink.headers["location"] == "/")
+        let setCookie = try #require(byLink.headers["set-cookie"])
+        #expect(setCookie.contains("HttpOnly") && setCookie.contains("SameSite=Strict"))
+        let cookie = String(setCookie.split(separator: ";").first ?? "")
+        let queue = try await bench.get("/", headers: ["Cookie": cookie])
+        #expect(queue.status == 200 && !queue.text.contains(#"action="/session""#), "the session opens the queue")
+
+        // The form posts the PIN in the body.
+        let posted = try await bench.form("/session", body: "pin=24682468")
+        #expect(posted.status == 303)
+        let wrong = try await bench.form("/session", body: "pin=0000")
+        #expect(wrong.status == 401 && wrong.text.contains(#"action="/session""#))
+
+        // A forged or expired cookie is only the form again.
+        #expect(try await bench.get("/", headers: ["Cookie": "khayt_lan=forged"]).text.contains(#"action="/session""#))
+        bench.advance(seconds: LanServer.sessionLife + 1)
+        #expect(try await bench.get("/", headers: ["Cookie": cookie]).text.contains(#"action="/session""#))
+        // And a wrong ?pin= is refused like any wrong PIN.
+        #expect(try await bench.get("/?pin=1111").status == 401)
+    }
+
+    @Test("the manifest, the service worker and three different icons make it installable")
+    func installable() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let manifest = try await bench.get("/manifest.json")
+        #expect(manifest.status == 200)
+        #expect(manifest.headers["content-type"] == "application/manifest+json")
+        #expect(manifest.text == (try await bench.engine.lanManifestBody(store: .object(bench.shop.lanBook))))
+        let sw = try await bench.get("/sw.js")
+        #expect(sw.status == 200)
+        #expect(sw.headers["content-type"] == "application/javascript")
+        #expect(sw.headers["service-worker-allowed"] == "/")
+        #expect(sw.text == (try await bench.engine.lanServiceWorker()))
+        var icons: [Data] = []
+        for name in ["icon-192.png", "icon-512.png", "icon-maskable-512.png"] {
+            let icon = try await bench.get("/\(name)")
+            #expect(icon.status == 200, Comment(rawValue: name))
+            #expect(icon.headers["content-type"] == "image/png")
+            #expect(icon.body.prefix(4) == Data([0x89, 0x50, 0x4E, 0x47]), Comment(rawValue: "\(name) is not a PNG"))
+            #expect(icon.body.count > 1000, Comment(rawValue: "\(name) is the one-pixel fallback: \(icon.body.count) bytes"))
+            icons.append(icon.body)
+        }
+        // The size the manifest asked for, not one file for all three.
+        #expect(Set(icons).count == 3, "the three icons are the same bytes")
+    }
+
+    @Test("anything else is the module's 404, and /v1 is /api")
+    func notFoundAndAlias() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let missing = try await bench.get("/nothing/here")
+        #expect(missing.status == 404)
+        // The body is this server's own endpoint list, not the Node server's —
+        // see `LanEndpointsTests` for why that distinction is a security one.
+        #expect(missing.text == (try await bench.engine
+            .lanNotFoundBody(endpoints: LanServer.endpoints)))
+        #expect(missing.headers["content-type"] == "application/json")
+        let v1 = try await bench.get("/v1/status?format=json")
+        let api = try await bench.get("/api/status?format=json")
+        #expect(v1.status == 200)
+        #expect(v1.text == api.text)
+        // A trailing slash is the same route.
+        let slash = try await bench.get("/api/status/?format=json")
+        #expect(slash.status == 200)
+        // HEAD carries the headers and no body.
+        let head = try await bench.get("/manifest.json", method: "HEAD")
+        #expect(head.status == 200)
+        #expect(head.body.isEmpty)
+    }
+
+    // MARK: - The gate
+
+    @Test("ten wrong PINs lock an address out for a minute — the shared rule, not a Swift one")
+    func lockout() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        for i in 1...10 {
+            let wrong = try await bench.get("/api/queue", headers: ["x-khayt-pin": "wrong\(i)"])
+            #expect(wrong.status == 401, Comment(rawValue: "attempt \(i) gave \(wrong.status)"))
+        }
+        // The eleventh, RIGHT PIN included, is refused.
+        let locked = try await bench.get("/api/queue", headers: ["x-khayt-pin": "24682468"])
+        #expect(locked.status == 429, Comment(rawValue: locked.text))
+        #expect(locked.text.contains("Too many attempts"))
+        // A minute later the address may try again, and the right PIN opens it.
+        bench.advance(seconds: 61)
+        let after = try await bench.get("/api/queue", headers: ["x-khayt-pin": "24682468"])
+        #expect(after.status == 200, Comment(rawValue: after.text))
+        // And a success clears the count: nine more wrong ones do not lock.
+        for _ in 1...9 {
+            _ = try await bench.get("/api/queue", headers: ["x-khayt-pin": "no"])
+        }
+        let still = try await bench.get("/api/queue", headers: ["x-khayt-pin": "24682468"])
+        #expect(still.status == 200)
+    }
+
+    @Test("with no PIN configured the owner routes say so rather than opening")
+    func noPinConfigured() async throws {
+        let bench = try await Bench(pin: "")
+        defer { bench.stop() }
+        let reply = try await bench.get("/api/queue", headers: ["x-khayt-pin": ""])
+        #expect(reply.status == 401)
+        #expect(reply.text.contains("Configure a LAN PIN"))
+        // The public surface stays public.
+        let status = try await bench.get("/api/status?format=json")
+        #expect(status.status == 200)
+    }
+
+    @Test("the PIN comparison is byte-for-byte and length-aware")
+    func constantTime() {
+        #expect(LanServer.constantTimeEqual("24682468", "24682468"))
+        #expect(!LanServer.constantTimeEqual("24682468", "24682469"))
+        #expect(!LanServer.constantTimeEqual("246", "24682468"))
+        #expect(!LanServer.constantTimeEqual("", "24682468"))
+        #expect(LanServer.constantTimeEqual("", ""))
+    }
+
+    // MARK: - The intake form
+
+    @Test("the intake form is the module's page, and the first visit sets the session cookie")
+    func intakeForm() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (first, cookie) = try await bench.openForm()
+        #expect(first.status == 200)
+        #expect(first.headers["content-type"] == "text/html; charset=utf-8")
+        #expect(first.headers["cache-control"] == "no-cache")
+        let expected = try await bench.engine.lanIntakePage(store: .object(bench.shop.lanBook), quoteEnabled: false)
+        #expect(first.text == expected)
+        #expect(first.text.contains("Order Intake"))
+        // No upload widget: the estimate route is not served here.
+        #expect(!first.text.contains(#"id="modelFile""#))
+        #expect(cookie.hasPrefix("khayt_intake="), Comment(rawValue: cookie))
+        #expect(first.headers["set-cookie"]?.contains("HttpOnly") == true)
+        #expect(first.headers["set-cookie"]?.contains("Max-Age=14400") == true)
+        // A visitor with a live session is not handed a second cookie.
+        let again = try await bench.get("/intake", headers: ["Cookie": cookie])
+        #expect(again.status == 200)
+        #expect(again.headers["set-cookie"] == nil)
+        // The public status route sends browsers here, and now there is a here.
+        #expect(try await bench.get("/api/status").headers["location"] == "/intake")
+    }
+
+    @Test("a submission with the session cookie lands in the book as the module's entry")
+    func intakeSubmission() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        let body = #"{"name":"Sara","description":"Two brackets in PETG","email":"s@example.com","consent":true,"referenceLink":"https://example.com/x"}"#
+        let reply = try await bench.post("/api/intake", json: body, headers: ["Cookie": cookie])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text == #"{"ok":true}"#)
+        #expect(reply.headers["access-control-allow-origin"] == "*")
+        #expect(bench.recorded.entries.count == 1)
+        // The SAME entry the rule builds, from the same inputs.
+        let parsed = try JSONDecoder().decode(JSONValue.self, from: Data(body.utf8))
+        let expected = try await bench.engine.lanIntakeSubmission(body: parsed, shopName: "this shop", id: "intake-fixed",
+                                                                  nowIso: LanServer.isoNow(Bench.start))
+        #expect(bench.recorded.entries.first == expected.entry)
+        guard case .object(let entry)? = bench.recorded.entries.first else { Issue.record("no entry"); return }
+        #expect(entry["clientName"] == .string("Sara"))
+        #expect(entry["source"] == .string("intake_form"))
+        #expect(entry["status"] == .string("active"))
+        #expect(entry["submittedAt"] == .string("2027-01-15T08:00:00.000Z"))
+        if case .object(let consent)? = entry["consent"] { #expect(consent["agreed"] == .bool(true)) }
+        else { Issue.record("no consent record") }
+    }
+
+    @Test("a body nested thousands deep is refused, and the Mac keeps serving")
+    func deepBodyIsRefused() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        // Past 64 levels the reader hands the text to JSONDecoder, which recurses
+        // per level on a request's small stack: this was a crash of the app.
+        let deep = String(repeating: "[", count: 5_000) + String(repeating: "]", count: 5_000)
+        let reply = try await bench.post("/api/intake", json: deep, headers: ["Cookie": cookie])
+        #expect(reply.status == 400, Comment(rawValue: reply.text))
+        #expect(bench.recorded.entries.isEmpty)
+        let alive = try await bench.get("/api/status")
+        #expect(alive.status != 0)
+    }
+
+    @Test("the depth is counted outside strings, and stops counting past the limit")
+    func nestingCount() {
+        #expect(LanServer.nesting(Data(#"{"a":[1,{"b":2}]}"#.utf8), limit: 32) == 3)
+        #expect(LanServer.nesting(Data(#"{"a":"[[[[{{{{"}"#.utf8), limit: 32) == 1)
+        #expect(LanServer.nesting(Data(#"{"a":"\"[[[["}"#.utf8), limit: 32) == 1)
+        let deep = Data((String(repeating: "[", count: 100) + String(repeating: "]", count: 100)).utf8)
+        #expect(LanServer.nesting(deep, limit: 32) == 33)
+        #expect(LanServer.body(deep) == nil)
+        #expect(LanServer.body(Data(#"{"ok":true}"#.utf8)) == .object(["ok": .bool(true)]))
+    }
+
+    @Test("without a session or the intake token a submission is refused; with the token it is taken")
+    func intakeGate() async throws {
+        let bench = try await Bench(intakeToken: "tok-9")
+        defer { bench.stop() }
+        let body = #"{"name":"A","description":"B","consent":true}"#
+        let none = try await bench.post("/api/intake", json: body)
+        #expect(none.status == 401)
+        #expect(none.text == #"{"error":"Unauthorized"}"#)
+        let wrong = try await bench.post("/api/intake", json: body, headers: ["x-khayt-intake-token": "tok-8"])
+        #expect(wrong.status == 401)
+        let right = try await bench.post("/api/intake", json: body, headers: ["x-khayt-intake-token": "tok-9"])
+        #expect(right.status == 200, Comment(rawValue: right.text))
+        // A cookie from another address does not travel: the session is bound to the ip that opened it.
+        #expect(bench.recorded.entries.count == 1)
+    }
+
+    @Test("the rule's refusals and a bad body come back as the Node server's answers")
+    func intakeRefusals() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        let noName = try await bench.post("/api/intake", json: #"{"description":"B","consent":true}"#, headers: ["Cookie": cookie])
+        #expect(noName.status == 400)
+        #expect(noName.text == #"{"error":"name is required"}"#)
+        let noConsent = try await bench.post("/api/intake", json: #"{"name":"A","description":"B"}"#, headers: ["Cookie": cookie])
+        #expect(noConsent.status == 400)
+        #expect(noConsent.text == #"{"error":"Please agree to the privacy notice to submit your request."}"#)
+        let garbage = try await bench.post("/api/intake", json: "not json", headers: ["Cookie": cookie])
+        #expect(garbage.status == 400)
+        #expect(garbage.text.contains("Invalid request"))
+        #expect(bench.recorded.entries.isEmpty)
+    }
+
+    @Test("a book that cannot be written is OUR failure, told as a 500, not the customer's")
+    func intakeWriteFailure() async throws {
+        let bench = try await Bench(recordFails: true)
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        let reply = try await bench.post("/api/intake", json: #"{"name":"A","description":"B","consent":true}"#,
+                                         headers: ["Cookie": cookie])
+        #expect(reply.status == 500)
+        #expect(reply.text.contains("could not record your request"))
+    }
+
+    @Test("opening the form too often gets the module's too-many page; submitting too often a 429")
+    func intakeRates() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let limits = try await bench.engine.lanIntakeLimits()
+        for _ in 0..<Int(limits.SESSION_GRANT_LIMIT) {
+            let ok = try await bench.get("/intake")
+            #expect(ok.status == 200)
+        }
+        let tooMany = try await bench.get("/intake")
+        #expect(tooMany.status == 429)
+        #expect(tooMany.text == (try await bench.engine.lanIntakeTooManyPage()))
+        // Submissions have their own bucket, so the last cookie still submits — up to its limit.
+        bench.advance(seconds: 3601)
+        let (_, cookie) = try await bench.openForm()
+        for _ in 0..<Int(limits.SUBMIT_LIMIT) {
+            let ok = try await bench.post("/api/intake", json: #"{"name":"A","description":"B","consent":true}"#,
+                                          headers: ["Cookie": cookie])
+            #expect(ok.status == 200, Comment(rawValue: ok.text))
+        }
+        let over = try await bench.post("/api/intake", json: #"{"name":"A","description":"B","consent":true}"#,
+                                        headers: ["Cookie": cookie])
+        #expect(over.status == 429)
+        #expect(over.text.contains("Too many submissions"))
+    }
+
+    @Test("a session expires after four hours, and an expired cookie is refused")
+    func intakeSessionExpiry() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        bench.advance(seconds: 4 * 3600 + 1)
+        let reply = try await bench.post("/api/intake", json: #"{"name":"A","description":"B","consent":true}"#,
+                                         headers: ["Cookie": cookie])
+        #expect(reply.status == 401)
+    }
+
+    @Test("the clock prints as JavaScript's toISOString and the id as uniqueLanId")
+    func intakeSmallThings() {
+        #expect(LanServer.isoNow(Date(timeIntervalSince1970: 1_800_000_000)) == "2027-01-15T08:00:00.000Z")
+        #expect(LanServer.isoNow(Date(timeIntervalSince1970: 1_800_000_000.5)) == "2027-01-15T08:00:00.500Z")
+        let id = LanServer.uniqueId("intake")
+        #expect(id.range(of: #"^intake-\d{13}-[0-9a-f]{4}$"#, options: .regularExpression) != nil, Comment(rawValue: id))
+        #expect(LanServer.randomToken().count == 64)
+        #expect(LanServer.cookies("a=1; khayt_intake=abc; c=x=y") == ["a": "1", "khayt_intake": "abc", "c": "x=y"])
+    }
+
+    // MARK: - The customer's quote
+
+    static let quoteJob: [String: JSONValue] = [
+        "id": .string("Q-77"), "project": .string("Bracket <v2>"), "client": .string("Sara"),
+        "status": .string("quote"), "price": .number(140), "date": .string("2027-01-10"),
+        "quoteExpiresAt": .string("2027-01-31"), "quoteApprovalToken": .string("abcdef0123456789abcdef0123456789"),
+        "parts": .array([.object(["name": .string("Bracket"), "qty": .number(2)])]),
+    ]
+
+    @Test("the quote page is the module's, behind the job's own token")
+    func quotePage() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.quoteJob)
+        let missing = try await bench.get("/order/NOPE/quote?token=x")
+        #expect(missing.status == 404)
+        #expect(missing.text == (try await bench.engine.lanQuoteNotice("quote_not_found")))
+        let noToken = try await bench.get("/order/Q-77/quote")
+        #expect(noToken.status == 403)
+        #expect(noToken.text == (try await bench.engine.lanQuoteNotice("invalid_link")))
+        let wrong = try await bench.get("/order/Q-77/quote?token=abcdef0123456789abcdef0123456789ff")
+        #expect(wrong.status == 403)
+        let page = try await bench.get("/order/Q-77/quote?token=abcdef0123456789abcdef0123456789")
+        #expect(page.status == 200)
+        #expect(page.headers["content-type"] == "text/html; charset=utf-8")
+        #expect(page.headers["cache-control"] == "no-cache")
+        #expect(page.headers["x-frame-options"] == "DENY")
+        let shopName = try await bench.engine.lanQuoteShopName(store: .object(bench.book.value))
+        let expected = try await bench.engine.lanQuotePage(
+            order: .object(Self.quoteJob), shopName: shopName, approvePath: "/order/Q-77/approve",
+            approvalToken: "abcdef0123456789abcdef0123456789", alreadyApproved: false, expired: false,
+            currencyLabel: Shop.plainString(bench.shop.settingsDict["currency"]) ?? "")
+        #expect(page.text == expected)
+        #expect(page.text.contains("Approve Quote"))
+        #expect(page.text.contains("Bracket &lt;v2&gt;"), "the project name was not escaped")
+        #expect(!shopName.isEmpty && shopName != "Khayt", Comment(rawValue: "the sample shop's name did not come through: \(shopName)"))
+    }
+
+    @Test("approving from the page moves the job to pending, once")
+    func approve() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.quoteJob)
+        let body = #"{"action":"approve","approvalToken":"abcdef0123456789abcdef0123456789"}"#
+        let reply = try await bench.post("/order/Q-77/approve", json: body)
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text == (try await bench.engine.lanQuoteNotice("approved", project: "Bracket <v2>")))
+        #expect(reply.text.contains("Bracket &lt;v2&gt;"))
+        let job = try #require(bench.book.job("Q-77"))
+        #expect(job["status"] == .string("pending"))
+        #expect(job["clientApprovedAt"] == .string(LanServer.isoNow(Bench.start)))
+        #expect(job["quoteAcceptedAt"] == .string("2027-01-15"))
+        // The page now says approved rather than offering the button.
+        let page = try await bench.get("/order/Q-77/quote?token=abcdef0123456789abcdef0123456789")
+        #expect(page.text.contains("Quote approved"))
+        #expect(!page.text.contains("approveBtn"))
+        // A second approval is refused: the job is no longer awaiting one.
+        let again = try await bench.post("/order/Q-77/approve", json: body)
+        #expect(again.status == 409)
+        #expect(again.text == (try await bench.engine.lanQuoteNotice("cannot_approve")))
+    }
+
+    @Test("the approve route's refusals are the Node route's: bad link, expired, wrong action, missing")
+    func approveRefusals() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.quoteJob)
+        let bad = try await bench.post("/order/Q-77/approve", json: #"{"approvalToken":"nope"}"#)
+        #expect(bad.status == 403)
+        #expect(bad.text == (try await bench.engine.lanQuoteNotice("invalid_link_approve")))
+        let action = try await bench.post("/order/Q-77/approve", json: #"{"action":"decline","approvalToken":"abcdef0123456789abcdef0123456789"}"#)
+        #expect(action.status == 400)
+        let missing = try await bench.post("/order/NOPE/approve", json: "")
+        #expect(missing.status == 404)
+        // The token may travel in the query, as the page's link does.
+        var expired = Self.quoteJob
+        expired["id"] = .string("Q-78"); expired["quoteExpiresAt"] = .string("2027-01-01")
+        bench.book.put(expired)
+        let gone = try await bench.post("/order/Q-78/approve?token=abcdef0123456789abcdef0123456789", json: "")
+        #expect(gone.status == 410)
+        #expect(gone.text == (try await bench.engine.lanQuoteNotice("expired")))
+        // And the page for it says so, without a button.
+        let page = try await bench.get("/order/Q-78/quote?token=abcdef0123456789abcdef0123456789")
+        #expect(page.text.contains("This quote has expired"))
+        #expect(bench.book.job("Q-78")?["status"] == .string("quote"))
+    }
+
+    @Test("a book that cannot take the approval is a 500, and the job is untouched")
+    func approveWriteFailure() async throws {
+        let bench = try await Bench(recordFails: true)
+        defer { bench.stop() }
+        bench.book.put(Self.quoteJob)
+        let reply = try await bench.post("/order/Q-77/approve", json: #"{"approvalToken":"abcdef0123456789abcdef0123456789"}"#)
+        #expect(reply.status == 500)
+        #expect(bench.book.job("Q-77")?["status"] == .string("quote"))
+    }
+
+    @Test("the order path keeps only the characters the Node route keeps")
+    func orderPaths() {
+        #expect(LanServer.quotePath("/order/Q-77/quote") == "Q-77")
+        #expect(LanServer.quotePath("/order/a b%2F..;/quote") == "ab2F")
+        #expect(LanServer.quotePath("/order//quote") == nil)
+        #expect(LanServer.quotePath("/order/x/y/quote") == nil)
+        #expect(LanServer.approvePath("/order/Q-77/approve") == "Q-77")
+        #expect(LanServer.approvePath("/order/Q-77/quote") == nil)
+    }
+
+    // MARK: - The customer's order page
+
+    static let trackedJob: [String: JSONValue] = [
+        "id": .string("T-5"), "project": .string("Vase <b>"), "client": .string("Sara"), "status": .string("printing"),
+        "material": .string("PETG"), "dueDate": .string("2027-02-01"),
+        "trackingToken": .string("0123456789abcdef0123456789abcdef"),
+        "shippingStatus": .string("in_transit"), "trackingNumber": .string("TN-1"), "carrier": .string("smsa"),
+    ]
+
+    @Test("the tracking page is the module's, behind the order's tracking token")
+    func trackingPage() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.trackedJob)
+        let missing = try await bench.get("/order/NOPE?token=x")
+        #expect(missing.status == 404)
+        #expect(missing.text == (try await bench.engine.lanOrderNotice("order_not_found")))
+        let noToken = try await bench.get("/order/T-5")
+        #expect(noToken.status == 403)
+        #expect(noToken.text == (try await bench.engine.lanOrderNotice("invalid_tracking_link")))
+        let page = try await bench.get("/order/T-5?token=0123456789abcdef0123456789abcdef")
+        #expect(page.status == 200)
+        #expect(page.headers["content-type"] == "text/html; charset=utf-8")
+        #expect(page.headers["x-frame-options"] == "DENY")
+        let expected = try await bench.engine.lanTrackingPage(order: .object(Self.trackedJob), store: .object(bench.book.value))
+        #expect(page.text == expected)
+        #expect(page.text.contains("Vase &lt;b&gt;"))
+        #expect(page.text.contains("Printing"))
+        // The carriers directory came along: a carrier name and its tracking link.
+        #expect(page.text.contains("SMSA"), "the carrier's name is missing — lib/carriers.js is not loaded")
+        #expect(page.text.contains("TN-1"))
+        // `/status` and a trailing slash are the same page.
+        let alias = try await bench.get("/order/T-5/status?token=0123456789abcdef0123456789abcdef")
+        #expect(alias.status == 200)
+    }
+
+    /// THE OTHER APP'S ADDRESS FOR THE SAME PAGE.
+    ///
+    /// The Node server writes a status page per order and serves it from
+    /// `/status/<id>`; this app draws the live one at `/order/<id>/status`.
+    /// Same page, same token in front of it, different address — so a link a
+    /// shop had already sent a customer, or copied out of the other app,
+    /// answered 404 here and told them to use the link their shop sent.
+    @Test("a link written by the other app reaches the same page here")
+    func statusLinkFromTheOtherApp() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.trackedJob)
+        let token = "0123456789abcdef0123456789abcdef"
+
+        let page = try await bench.get("/status/T-5?token=\(token)")
+        #expect(page.status == 200)
+        let expected = try await bench.engine.lanTrackingPage(
+            order: .object(Self.trackedJob), store: .object(bench.book.value))
+        #expect(page.text == expected, "it is not the same page this app already serves")
+
+        // Node strips `.html`, because that is the file it wrote — whichever
+        // form the customer has, it is the same order.
+        #expect(try await bench.get("/status/T-5.html?token=\(token)").status == 200)
+        #expect(try await bench.get("/status/T-5/?token=\(token)").status == 200)
+
+        // AND THE GATE IS THE SAME GATE. A second address for a page is a
+        // second way in if it is not.
+        let noToken = try await bench.get("/status/T-5")
+        #expect(noToken.status == 403)
+        #expect(noToken.text == (try await bench.engine.lanOrderNotice("invalid_tracking_link")))
+        #expect(try await bench.get("/status/T-5?token=wrong").status == 403)
+        #expect(try await bench.get("/status/NOPE?token=\(token)").status == 404)
+    }
+
+    @Test("the status address takes an id and nothing else")
+    func statusPathParsing() {
+        #expect(LanServer.statusPath("/status/T-5") == "T-5")
+        #expect(LanServer.statusPath("/status/T-5.html") == "T-5")
+        #expect(LanServer.statusPath("/status/T-5/") == "T-5")
+        // Not a way to reach anything else: no traversal, no nesting, and an
+        // id that is only punctuation is not an id.
+        #expect(LanServer.statusPath("/status/../../etc/passwd") == nil)
+        #expect(LanServer.statusPath("/status/a/b") == nil)
+        #expect(LanServer.statusPath("/status/") == nil)
+        #expect(LanServer.statusPath("/status") == nil)
+        #expect(LanServer.statusPath("/statuses/T-5") == nil)
+        #expect(LanServer.statusPath("/status/...") == nil)
+    }
+
+    @Test("a quote's order page sends the customer to the quote page")
+    func trackingRedirectsQuotes() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.quoteJob)
+        let reply = try await bench.get("/order/Q-77")
+        #expect(reply.status == 302)
+        #expect(reply.headers["location"] == "/order/Q-77/quote")
+    }
+
+    @Test("a finished order's page offers the survey, and the survey lands on the order once")
+    func survey() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        var done = Self.trackedJob
+        done["status"] = .string("completed"); done["surveyToken"] = .string("survey-tok-1")
+        bench.book.put(done)
+        let page = try await bench.get("/order/T-5?token=0123456789abcdef0123456789abcdef")
+        #expect(page.text.contains(#"id="surveyCard""#))
+        let reply = try await bench.post("/api/survey", json: #"{"token":"survey-tok-1","orderId":"T-5","rating":4,"comment":"  lovely  "}"#)
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text == #"{"ok":true}"#)
+        #expect(reply.headers["access-control-allow-origin"] == "*")
+        let job = try #require(bench.book.job("T-5"))
+        #expect(job["surveyToken"] == nil, "the token was not spent")
+        if case .object(let survey)? = job["survey"] {
+            #expect(survey["rating"] == .number(4))
+            #expect(survey["comment"] == .string("lovely"))
+            #expect(survey["submittedAt"] == .string(LanServer.isoNow(Bench.start)))
+        } else { Issue.record("no survey on the order") }
+        // The page now thanks rather than asks.
+        let after = try await bench.get("/order/T-5?token=0123456789abcdef0123456789abcdef")
+        #expect(after.text.contains("Thank you for your feedback"))
+        #expect(!after.text.contains(#"id="surveyCard""#))
+        // A spent token is a 404, as on the Node server.
+        let again = try await bench.post("/api/survey", json: #"{"token":"survey-tok-1","rating":5}"#)
+        #expect(again.status == 404)
+        #expect(again.text == #"{"error":"Invalid or expired survey token"}"#)
+    }
+
+    @Test("the survey refuses what the Node route refuses, and is rate-limited")
+    func surveyRefusals() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let noRating = try await bench.post("/api/survey", json: #"{"token":"t"}"#)
+        #expect(noRating.status == 400)
+        #expect(noRating.text == #"{"error":"Invalid payload — token and rating (1-5) are required"}"#)
+        let six = try await bench.post("/api/survey", json: #"{"token":"t","rating":6}"#)
+        #expect(six.status == 400)
+        let unknown = try await bench.post("/api/survey", json: #"{"token":"nobody","rating":3}"#)
+        #expect(unknown.status == 404)
+        let limit = try await bench.engine.lanSurveyLimit()
+        #expect(limit == 30)
+        // Three used above; the rest of the bucket, then a 429.
+        for _ in 0..<(limit - 3) {
+            _ = try await bench.post("/api/survey", json: #"{"token":"nobody","rating":3}"#)
+        }
+        let over = try await bench.post("/api/survey", json: #"{"token":"nobody","rating":3}"#)
+        #expect(over.status == 429)
+        #expect(over.text.contains("Too many attempts"))
+    }
+
+    @Test("the tracking path keeps only what the Node route keeps")
+    func trackingPaths() {
+        #expect(LanServer.trackingPath("/order/T-5") == "T-5")
+        #expect(LanServer.trackingPath("/order/T-5/") == "T-5")
+        #expect(LanServer.trackingPath("/order/T-5/status") == "T-5")
+        #expect(LanServer.trackingPath("/order/T-5/status/") == "T-5")
+        #expect(LanServer.trackingPath("/order/a b;/") == "ab")
+        #expect(LanServer.trackingPath("/order/x/y") == nil)
+        #expect(LanServer.trackingPath("/order/") == nil)
+        // The quote and approve routes take theirs first; this one never sees them.
+        #expect(LanServer.quotePath("/order/T-5/quote") == "T-5")
+    }
+
+    // MARK: - Pricing a model the customer uploaded
+
+    /// A payload the scan will accept as a binary STL: the 80-byte header
+    /// every one carries, then a count, then something. The scan refuses
+    /// anything shorter, which is right — and which the four-byte "MESH" these
+    /// tests used to post was not.
+    static let stlBytes = String(repeating: "s", count: 120)
+
+    /// What a slicer says about the same model — the figures the shape cannot
+    /// reach, because geometry knows nothing about purge.
+    static let slicedFigures: JSONValue = .object([
+        "exact": .bool(true), "source": .string("slicer"),
+        "printTimeMins": .number(272), "filamentGrams": .number(57.18),
+        "slicer": .string("SnapmakerOrca"),
+    ])
+
+    /// A cube 50mm on a side, as this app's own reader measures one.
+    nonisolated static let measuredCube: JSONValue = .object([
+        "source": .string("geometry"), "exact": .bool(false),
+        "geometry": .object([
+            "volumeMm3": .number(125_000), "areaMm2": .number(15_000),
+            "triangleCount": .number(12),
+            "bbox": .object(["x": .number(50), "y": .number(50), "z": .number(50)]),
+        ]),
+    ])
+
+    /// A shop that has switched public pricing on and chosen a preset.
+    static func quotingBook(_ base: [String: JSONValue]) -> [String: JSONValue] {
+        var book = base
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = book["settings"] { settings = s }
+        settings["currency"] = .string("SAR")
+        var lan: [String: JSONValue] = [:]
+        if case .object(let l)? = settings["lanApi"] { lan = l }
+        lan["intakeQuote"] = .object([
+            "enabled": .bool(true), "presetId": .string("PRESET-1"),
+            "spoolCost": .number(75), "spoolWeight": .number(1000),
+            "marginPct": .number(30), "minPrice": .number(0), "wastePct": .number(0.05),
+            "hourlyLimit": .number(12),
+        ])
+        settings["lanApi"] = .object(lan)
+        book["settings"] = .object(settings)
+        book["printers"] = .array([.object([
+            "id": .string("PRESET-1"), "name": .string("U1"),
+            "wearRate": .number(0.75), "powerDraw": .number(150), "elecRate": .number(0.18),
+            "laborRate": .number(90), "failureRate": .number(10),
+            "prepTime": .number(0.1), "postTime": .number(0.1),
+        ])])
+        return book
+    }
+
+    @Test("the shop's own phone estimates a file with the owner PIN; the consent form stays the customer's")
+    func ownerPinQuotes() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        // No session, no intake token: a stranger is refused, as before.
+        let none = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes)
+        #expect(none.status == 401, Comment(rawValue: none.text))
+        let wrong = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                         headers: ["x-khayt-pin": "00000000"])
+        #expect(wrong.status == 401, Comment(rawValue: wrong.text))
+        // The owner PIN — what the phone's other routes send — opens it.
+        let owner = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                         headers: ["x-khayt-pin": "24682468"])
+        #expect(owner.status == 200, Comment(rawValue: owner.text))
+        // The form's submit is NOT opened by the PIN: it records the
+        // customer's own consent, which the shop cannot give for them.
+        let submitOwner = try await bench.post("/api/intake", json: #"{"name":"A"}"#,
+                                               headers: ["x-khayt-pin": "24682468"])
+        #expect(submitOwner.status == 401, Comment(rawValue: submitOwner.text))
+    }
+
+    @Test("a measured model comes back priced, and the form offers the upload")
+    func estimatePrices() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        // The widget appears exactly when the route would answer.
+        let (form, cookie) = try await bench.openForm()
+        #expect(form.text.contains(#"id="modelFile""#), "the form did not offer the upload")
+
+        let reply = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                         headers: ["Cookie": cookie])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        guard case .object(let q) = try JSONDecoder().decode(JSONValue.self, from: reply.body) else {
+            Issue.record("not an object: \(reply.text)"); return
+        }
+        #expect(q["ok"] == .bool(true), Comment(rawValue: reply.text))
+        guard case .number(let price)? = q["price"] else { Issue.record("no price: \(reply.text)"); return }
+        #expect(price > 0)
+        #expect(q["currency"] == .string("SAR"))
+        #expect(q["binding"] == .bool(false), "a public figure must never be a promise")
+        guard case .string(let ref)? = q["ref"] else { Issue.record("no reference"); return }
+
+        // And the SHOP's figure is what lands on the request, by reference.
+        let body = #"{"name":"Sara","description":"the cube","consent":true,"estimateRef":"\#(ref)"}"#
+        let sent = try await bench.post("/api/intake", json: body, headers: ["Cookie": cookie])
+        #expect(sent.status == 200, Comment(rawValue: sent.text))
+        guard case .object(let entry)? = bench.recorded.entries.first else { Issue.record("no entry"); return }
+        #expect(entry["estValue"] == .number(price), Comment(rawValue: "\(entry["estValue"] ?? .null)"))
+        if case .object(let model)? = entry["modelQuote"] {
+            #expect(model["binding"] == .bool(false))
+            #expect(model["price"] == .number(price))
+        } else { Issue.record("the quote was not attached to the request") }
+    }
+
+    @Test("a price the browser makes up is not the price the shop sees")
+    func postedPriceIsIgnored() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let (_, cookie) = try await bench.openForm()
+        // A reference that was never issued, and a price posted beside it.
+        let body = #"{"name":"A","description":"B","consent":true,"estimateRef":"made-up","price":9999}"#
+        let sent = try await bench.post("/api/intake", json: body, headers: ["Cookie": cookie])
+        #expect(sent.status == 200)
+        guard case .object(let entry)? = bench.recorded.entries.first else { Issue.record("no entry"); return }
+        #expect(entry["estValue"] == .number(0), Comment(rawValue: "\(entry["estValue"] ?? .null)"))
+        #expect(entry["modelQuote"] == nil, "a made-up reference produced a quote")
+    }
+
+    @Test("a file that is not what it claims is refused before it is measured")
+    func scanRefusesImposters() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let (_, cookie) = try await bench.openForm()
+
+        // A PNG called a 3MF. The reader would have been handed it.
+        let png = "\u{89}PNG\r\n\u{1A}\n" + String(repeating: "x", count: 200)
+        let fake = try await bench.post("/api/intake/estimate?name=model.3mf", json: png, headers: ["Cookie": cookie])
+        #expect(fake.status == 400)
+        #expect(fake.text.contains("not-what-it-says"), Comment(rawValue: fake.text))
+        // And nothing was measured: the stand-in reader was never reached.
+        #expect(bench.recorded.entries.isEmpty)
+
+        // Too short to be a binary STL and not ASCII either.
+        let stub = try await bench.post("/api/intake/estimate?name=tiny.stl", json: "\u{FF}\u{FE}",
+                                        headers: ["Cookie": cookie])
+        #expect(stub.status == 400)
+        #expect(stub.text.contains("not-what-it-says"))
+
+        // An honest STL of a believable size still gets through to the reader.
+        let real = try await bench.post("/api/intake/estimate?name=cube.stl",
+                                        json: String(repeating: "m", count: 200), headers: ["Cookie": cookie])
+        #expect(real.status == 200, Comment(rawValue: real.text))
+    }
+
+    @Test("what the facts are read from a file, without unpacking it")
+    func uploadFacts() throws {
+        // The opening bytes, as the scan wants them.
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        #expect(LanServer.uploadFacts(png, ext: "stl").header.hasPrefix("89504e47"))
+        // A non-archive is not asked for members at all.
+        #expect(LanServer.uploadFacts(png, ext: "stl").entries == nil)
+        // Something calling itself a 3MF that is not a zip yields no members,
+        // which the rule reads as "not what it says" rather than as cleared.
+        #expect(LanServer.uploadFacts(png, ext: "3mf").entries?.isEmpty == true)
+    }
+
+    @Test("the refusals come before the bytes, and in the Node route's order")
+    func estimateRefusals() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        // Off: answered before a single byte is read, so an off switch is not
+        // an upload target.
+        let off = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                       headers: ["Cookie": cookie])
+        #expect(off.status == 403)
+        #expect(off.text == #"{"ok":false,"reason":"off"}"#)
+        // And the form does not offer a widget whose request would be refused.
+        let (form, _) = try await bench.openForm()
+        #expect(!form.text.contains(#"id="modelFile""#))
+
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let noSession = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes)
+        #expect(noSession.status == 401)
+        let odd = try await bench.post("/api/intake/estimate?name=drawing.pdf", json: "X", headers: ["Cookie": cookie])
+        #expect(odd.status == 400)
+        #expect(odd.text == #"{"ok":false,"reason":"unsupported"}"#)
+        let empty = try await bench.post("/api/intake/estimate?name=cube.stl", json: "", headers: ["Cookie": cookie])
+        #expect(empty.status == 400)
+        #expect(empty.text == #"{"ok":false,"reason":"no-numbers"}"#)
+    }
+
+    @Test("a file this app cannot measure is refused rather than guessed at")
+    func unmeasurable() async throws {
+        let bench = try await Bench(measures: false)
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let (_, cookie) = try await bench.openForm()
+        let reply = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                         headers: ["Cookie": cookie])
+        #expect(reply.status == 400)
+        #expect(reply.text == #"{"ok":false,"reason":"no-numbers"}"#)
+    }
+
+    @Test("where the shop slices uploads, the slicer's figures beat the shape's")
+    func slicingBeatsGeometry() async throws {
+        let bench = try await Bench(sliced: true)
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let (_, cookie) = try await bench.openForm()
+        let reply = try await bench.post("/api/intake/estimate?name=dragon.stl", json: Self.stlBytes,
+                                         headers: ["Cookie": cookie])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        guard case .object(let q) = try JSONDecoder().decode(JSONValue.self, from: reply.body) else {
+            Issue.record("not an object"); return
+        }
+        #expect(q["ok"] == .bool(true), Comment(rawValue: reply.text))
+        // The slicer's own weight, not an estimate from the shape — and said
+        // to be exact, which the geometric answer never is.
+        #expect(q["exact"] == .bool(true))
+        #expect(q["slicer"] == .string("SnapmakerOrca"))
+        // 57.18 g plus the shop's 5% slack, where the shape would have given
+        // a far smaller number.
+        #expect(q["grams"] == .number(60), Comment(rawValue: "\(q["grams"] ?? .null)"))
+    }
+
+    @Test("with slicing off, or a slice that produced nothing, the shape still answers")
+    func slicingFallsBack() async throws {
+        // Off: the default, and the same answer the route always gave.
+        let off = try await Bench()
+        defer { off.stop() }
+        off.book.value = Self.quotingBook(off.book.value)
+        let (_, cookie) = try await off.openForm()
+        let reply = try await off.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                       headers: ["Cookie": cookie])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        guard case .object(let q) = try JSONDecoder().decode(JSONValue.self, from: reply.body) else {
+            Issue.record("not an object"); return
+        }
+        #expect(q["ok"] == .bool(true))
+        // Measured, not sliced: an estimate is never called exact.
+        #expect(q["exact"] != .bool(true))
+    }
+
+    @Test("a shop that has not asked for slicing does not get it, whatever else is set")
+    func slicingIsOffUntilAsked() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        // Nothing is written and no slicer is consulted: the switch decides
+        // first, before the slicer, the file or anything else is looked at.
+        let answer = await shop.sliceCustomerUpload(Data("x".utf8), ext: "stl")
+        #expect(answer == nil, "a sample book with no setting sliced a stranger's file")
+    }
+
+    @Test("a sliced file is quoted on the slicer's own figures")
+    func slicedUpload() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let (_, cookie) = try await bench.openForm()
+        let gcode = "; estimated printing time (normal mode) = 4h 32m 11s\n; filament used [g] = 140.91\n"
+        let reply = try await bench.post("/api/intake/estimate?name=part.gcode", json: gcode, headers: ["Cookie": cookie])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        guard case .object(let q) = try JSONDecoder().decode(JSONValue.self, from: reply.body) else {
+            Issue.record("not an object"); return
+        }
+        #expect(q["ok"] == .bool(true), Comment(rawValue: reply.text))
+        #expect(q["exact"] == .bool(true), "a sliced file was estimated instead of read")
+        // The slicer's 140.91 g plus the shop's own 5% purge and brim slack,
+        // which the rule adds because the customer's file does not account
+        // for it. The shop's allowance, not this app's.
+        #expect(q["grams"] == .number(148), Comment(rawValue: "\(q["grams"] ?? .null)"))
+    }
+
+    @Test("what a name is allowed to mean, and what the readers are")
+    func uploadNames() {
+        #expect(LanServer.uploadExtension("cube.STL") == "stl")
+        #expect(LanServer.uploadExtension("a/../b.3mf") == "3mf")
+        // A name with no extension yields whatever is left after the filter,
+        // which is not a reader this app has — so it is refused.
+        #expect(LanServer.uploadExtension("no-dot") == "nodot")
+        #expect(!LanServer.readableUploads.contains(LanServer.uploadExtension("no-dot")))
+        #expect(LanServer.uploadExtension("odd.st l;") == "stl")
+        #expect(LanServer.readableUploads == ["stl", "obj", "3mf", "gcode", "gco"])
+        #expect(!LanServer.quotingIsOn([:]))
+    }
+
+    // MARK: - The calendar
+
+    @Test("the calendar feed is the module's, for the subscription token only")
+    func calendarFeed() async throws {
+        let bench = try await Bench(calendarToken: "cal-token-1")
+        defer { bench.stop() }
+        bench.book.put(["id": .string("D-1"), "project": .string("Bracket"), "client": .string("Sara"),
+                        "status": .string("printing"), "dueDate": .string("2027-02-01")])
+        let none = try await bench.get("/calendar.ics")
+        #expect(none.status == 401)
+        #expect(none.headers["content-type"] == "text/plain; charset=utf-8")
+        #expect(none.text.contains("calendar subscription link"))
+        let wrong = try await bench.get("/calendar.ics?token=cal-token-2")
+        #expect(wrong.status == 401)
+        let byToken = try await bench.get("/calendar.ics?token=cal-token-1")
+        #expect(byToken.status == 200)
+        #expect(byToken.headers["content-type"] == "text/calendar; charset=utf-8")
+        #expect(byToken.headers["content-disposition"]?.contains("khayt-orders.ics") == true)
+        let expected = try await bench.engine.lanCalendarFeed(store: .object(bench.book.value))
+        #expect(byToken.text == expected)
+        #expect(byToken.text.contains("BEGIN:VCALENDAR") && byToken.text.contains("UID:khayt-D-1@khaytapp.com"))
+        #expect(byToken.text.contains("DTSTART;VALUE=DATE:20270201"))
+        #expect(byToken.text.contains("SUMMARY:Bracket (Sara)"))
+        // The owner PIN is not a calendar credential, by header or address:
+        // it was an unthrottled oracle for the PIN that opens the whole book.
+        let byPin = try await bench.get("/calendar.ics", headers: ["x-khayt-pin": "24682468"])
+        #expect(byPin.status == 401)
+        #expect(try await bench.get("/calendar.ics?pin=24682468").status == 401)
+    }
+
+    @Test("with no calendar token the feed opens to nobody — the PIN included")
+    func calendarNeedsAToken() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let empty = try await bench.get("/calendar.ics?token=")
+        #expect(empty.status == 401)
+        #expect(try await bench.get("/calendar.ics?pin=24682468").status == 401)
+        #expect(try await bench.get("/calendar.ics", headers: ["x-khayt-pin": "24682468"]).status == 401)
+    }
+
+    @Test("wrong PINs at the calendar are not free guesses: the feed never says yes to one")
+    func calendarIsNotAPinOracle() async throws {
+        let bench = try await Bench(calendarToken: "cal-token-1")
+        defer { bench.stop() }
+        // Fifty guesses at the calendar, the right one among them.
+        for i in 0..<50 {
+            let guess = i == 37 ? "24682468" : "guess\(i)xx"
+            #expect(try await bench.get("/calendar.ics?pin=\(guess)").status == 401)
+        }
+    }
+
+    // MARK: - The pane that makes public pricing reachable
+
+    @Test("the pricing settings survive a save, including a field the pane never showed")
+    func quoteSettingsSave() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        var root: [String: JSONValue] = ["settings": .object([
+            "lanApi": .object([
+                "enabled": .bool(true), "port": .number(3219), "pin": .string("sealed"),
+                "intakeQuote": .object(["enabled": .bool(false), "marginPct": .number(30),
+                                        "somethingNewer": .number(7)]),
+            ]),
+        ])]
+        var draft = OnlinePane.Draft()
+        draft.enabled = true
+        draft.quoteOn = true
+        draft.presetId = "PRESET-1"
+        draft.margin = "40"
+        draft.waste = "5"          // shown as a percentage…
+        draft.spoolCost = "75"
+        try await Shop.applySettings(to: &root,
+                                     form: ["lanApi": .object([
+                                        "enabled": .bool(true),
+                                        "intakeQuote": .object(draft.quoteForm()),
+                                     ])],
+                                     country: nil, engine: engine)
+        guard case .object(let settings)? = root["settings"], case .object(let lan)? = settings["lanApi"],
+              case .object(let q)? = lan["intakeQuote"] else { Issue.record("no pricing block"); return }
+        #expect(q["enabled"] == .bool(true))
+        #expect(q["presetId"] == .string("PRESET-1"))
+        #expect(q["marginPct"] == .number(40))
+        // …and stored as a fraction, or every shop's allowance would be ×100.
+        #expect(q["wastePct"] == .number(0.05), Comment(rawValue: "\(q["wastePct"] ?? .null)"))
+        #expect(q["spoolCost"] == .number(75))
+        #expect(q["somethingNewer"] == .number(7), "a field a newer build wrote was dropped")
+        #expect(lan["pin"] == .string("sealed"), "the PIN was lost saving the pricing block")
+    }
+
+    @Test("the pane reads the block back the way it stores it")
+    func quoteSettingsRead() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        var draft = OnlinePane.Draft()
+        OnlinePane.Draft.readQuote(["lanApi": .object(["intakeQuote": .object([
+            "enabled": .bool(true), "presetId": .string("P1"), "filamentId": .string("seed-1"),
+            "spoolCost": .number(75), "spoolWeight": .number(1000), "marginPct": .number(30),
+            "minPrice": .number(20), "wastePct": .number(0.05), "hourlyLimit": .number(6),
+        ])])], into: &draft)
+        #expect(draft.quoteOn && draft.presetId == "P1" && draft.filamentId == "seed-1")
+        #expect(draft.margin == "30" && draft.spoolCost == "75" && draft.minPrice == "20")
+        // A fraction on the way in, a percentage on the way out, and back again.
+        #expect(draft.waste == "5", Comment(rawValue: draft.waste))
+        #expect(draft.quoteForm()["wastePct"] == .number(0.05))
+        #expect(draft.limit == "6")
+        // A book that has never had the block reads as off, with the defaults.
+        var fresh = OnlinePane.Draft()
+        OnlinePane.Draft.readQuote([:], into: &fresh)
+        #expect(!fresh.quoteOn && fresh.spoolWeight == "1000" && fresh.limit == "12")
+        #expect(fresh.quoteForm()["wastePct"] == .number(0))
+    }
+
+    @Test("a preset is a name and the seven figures, and the same name replaces rather than doubles")
+    func presetShape() async throws {
+        let one = try #require(Shop.Preset.from(.object([
+            "id": .string("PRNTR-1"), "name": .string("U1"),
+            "wearRate": .number(0.75), "powerDraw": .number(150), "elecRate": .number(0.18),
+            "laborRate": .number(90), "failureRate": .number(10),
+            "prepTime": .number(0.1), "postTime": .number(0.1),
+        ])))
+        #expect(one.name == "U1" && one.rates["laborRate"] == 90)
+        guard case .object(let back) = one.record else { Issue.record("not an object"); return }
+        // Every one of the seven, because `lib/public-quote.js` reads them all
+        // and a missing rate is silently costed at nothing.
+        for key in Shop.Preset.rateKeys {
+            #expect(back[key] != nil, Comment(rawValue: "\(key) missing from a saved preset"))
+        }
+        #expect(back["id"] == .string("PRNTR-1"))
+        // A row with no id is not a preset: the quote rule finds presets BY id.
+        #expect(Shop.Preset.from(.object(["name": .string("no id")])) == nil)
+    }
+
+    // MARK: - The shop's side
+
+    @Test("the settings pane's block saves through the shared rule and keeps what it did not show")
+    func paneSavesThroughTheRule() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        var root: [String: JSONValue] = ["settings": .object([
+            "lanApi": .object(["enabled": .bool(false), "port": .number(3219), "pin": .string("sealed:old"),
+                               "webhookToken": .string("wh-1")]),
+        ])]
+        try await Shop.applySettings(to: &root,
+                                     form: ["lanApi": .object(["enabled": .bool(true), "port": .number(4000),
+                                                               "bindLan": .bool(true)])],
+                                     country: nil, engine: engine)
+        guard case .object(let settings)? = root["settings"], case .object(let lan)? = settings["lanApi"] else {
+            Issue.record("no lanApi after the save"); return
+        }
+        #expect(lan["enabled"] == .bool(true))
+        #expect(lan["port"] == .number(4000))
+        #expect(lan["bindLan"] == .bool(true))
+        #expect(lan["pin"] == .string("sealed:old"), "a blank PIN did not keep the stored one")
+        #expect(lan["webhookToken"] == .string("wh-1"), "a field the pane never showed was lost")
+    }
+
+    @Test("the draft reads the block the way the page shows it")
+    func draftReads() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let draft = OnlinePane.Draft.read(["lanApi": .object(["enabled": .bool(true), "port": .number(8080),
+                                                              "pin": .string("x"), "bindLan": .bool(true)])], shop: shop)
+        #expect(draft.enabled && draft.bindLan && draft.pinStored)
+        #expect(draft.port == "8080")
+        #expect(draft.pin.isEmpty, "the stored PIN is never shown back")
+        let empty = OnlinePane.Draft.read([:], shop: shop)
+        #expect(!empty.enabled && !empty.pinStored && empty.port == "3219")
+        #expect(OnlinePane.Draft(port: "abc").portNumber == 3219)
+    }
+
+    @Test("the sample book never starts a listener, and the config reads its defaults")
+    func sampleDoesNotAutostart() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.lanServer == nil)
+        #expect(shop.lanURL == nil)
+        let config = shop.lanConfig
+        #expect(config.enabled == false && config.port == 3219)
+    }
+
+    /// The intake and calendar tokens are opened once, at start — so a
+    /// token rotated by the other app or a sync must count as a config change
+    /// that restarts the server, or the OLD one keeps opening the form and
+    /// the feed. Oct 2026 review.
+    @Test("a rotated intake or calendar token is a config change")
+    func rotatedTokensRestart() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        func config(intake: String, calendar: String) -> LanConfig {
+            shop.settingsValue = .object(["lanApi": .object([
+                "enabled": .bool(true), "pin": .string("sealed-pin"),
+                "intakeToken": .string(intake), "calendarToken": .string(calendar)])])
+            return shop.lanConfig
+        }
+        let before = config(intake: "sealed-a", calendar: "sealed-c")
+        #expect(before.intakeToken == "sealed-a" && before.calendarToken == "sealed-c")
+        #expect(config(intake: "sealed-b", calendar: "sealed-c") != before)
+        #expect(config(intake: "sealed-a", calendar: "sealed-d") != before)
+        #expect(config(intake: "sealed-a", calendar: "sealed-c") == before)
+    }
+
+    @Test("the LAN address, when there is one, is a private IPv4 and never loopback")
+    func lanAddress() {
+        guard let address = LanServer.lanIPv4() else { return }   // a Mac with no network
+        #expect(!address.hasPrefix("127."), Comment(rawValue: address))
+        #expect(address.split(separator: ".").count == 4, Comment(rawValue: address))
+    }
+}

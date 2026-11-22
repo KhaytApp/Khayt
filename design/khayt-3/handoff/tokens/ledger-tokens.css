@@ -1,0 +1,83 @@
+/* ============================================================
+   KHAYT — Direction B "Workshop Ledger" (paper + ink) tokens,
+   written with the PRODUCTION APP's variable names.
+   Drop-in replacement for the :root / [data-theme="light"]
+   blocks at the top of renderer/styles.css.
+
+   NOTE: this direction is LIGHT-FIRST. The app defaults to dark,
+   so either default <html data-theme="light"> when shipping this
+   direction, or keep the structure below (dark "ink" as :root,
+   paper as the light override) and flip the toggle default.
+   Source design: `Khayt Alternative.html` (alt/ds.css).
+   ============================================================ */
+
+/* Ink (dark) — warm soot, not blue-black */
+:root {
+  --bg:           #15130e;
+  --bg-elev:      #1b1812;
+  --surface:      #221e17;
+  --surface-1:    #221e17;
+  --surface-2:    #29241b;
+  --border:       rgba(237,226,205,0.14);
+  --border-soft:  rgba(237,226,205,0.09);
+
+  --text:         #f0eadd;
+  --text-dim:     #beb5a0;
+  --text-muted:   #877f6c;
+
+  /* brand + status — primary is Safety Orange (pressroom ink).
+     Alternates explored in the prototype: Ultramarine hsl(224 72% 46%),
+     Press Green hsl(152 50% 34%), Filament Cyan hsl(189 80% 38%). */
+  --primary:      hsl(24 88% 48%);
+  --primary-2:    hsl(24 88% 42%);
+  --success:      #5bbd87;
+  --warning:      #d9a13c;
+  --danger:       #e06255;
+  --info:         #6f9bd8;
+  --cyan:         hsl(189 80% 38%);
+  --accent:       hsl(24 88% 48%);
+
+  /* shape + depth — squared, machined; hard 1px edges over blur */
+  --radius:       6px;
+  --radius-sm:    3px;
+  --shadow-1:     0 1px 0 rgba(0,0,0,0.35);
+  --shadow-2:     0 2px 0 rgba(0,0,0,0.4), 0 8px 22px rgba(0,0,0,0.35);
+  --shadow-3:     0 12px 40px rgba(0,0,0,0.5);
+
+  /* type — vendor as local .woff2 (CSP blocks Google Fonts) */
+  --font-sans:    "Archivo", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Cairo", "Tajawal", sans-serif;
+  --font-num:     "IBM Plex Mono", "SF Mono", ui-monospace, "Menlo", monospace;
+}
+
+/* Paper (light) — the DEFAULT face of this direction */
+[data-theme="light"] {
+  --bg:           #e9e4da;
+  --bg-elev:      #f1ede5;
+  --surface:      #faf8f3;
+  --surface-1:    #faf8f3;
+  --surface-2:    #f0ece3;
+  --border:       rgba(43,36,24,0.16);
+  --border-soft:  rgba(43,36,24,0.11);
+
+  --text:         #211c14;
+  --text-dim:     #57503f;
+  --text-muted:   #8a8270;
+
+  --success:      #2e7d4f;
+  --warning:      #a96f0e;
+  --danger:       #bd3a2d;
+  --info:         #2f5ea8;
+
+  --shadow-1:     0 1px 0 rgba(43,36,24,0.06);
+  --shadow-2:     0 2px 0 rgba(43,36,24,0.08), 0 8px 20px rgba(43,36,24,0.07);
+  --shadow-3:     0 12px 40px rgba(43,36,24,0.16);
+}
+
+/* Extra tokens this direction introduces */
+:root {
+  --accent-soft:  hsl(24 88% 48% / 0.13);
+  --ok-soft:      rgba(46,125,79,0.13);
+  --warn-soft:    rgba(169,111,14,0.14);
+  --danger-soft:  rgba(189,58,45,0.12);
+  --info-soft:    rgba(47,94,168,0.12);
+}

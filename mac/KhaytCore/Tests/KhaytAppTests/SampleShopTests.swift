@@ -1,0 +1,1285 @@
+import Foundation
+import Testing
+import KhaytCore
+@testable import KhaytApp
+
+/// The sample shop is what every screen is designed against, so a branch it
+/// cannot reach is a branch nobody ever looks at.
+///
+/// ── WHAT THIS IS FOR ───────────────────────────────────────────────────────
+///
+/// The first time the product catalogue was ever photographed it showed twenty
+/// rows reading `35%`, twenty reading "Rounded from", and a robot gripper
+/// weighing 12,882 g. None of that was a bug in the screen. Every sample
+/// product carried the same margin and the same rounding rule, and the
+/// quantities had been assigned at random — the product literally named "Shelf
+/// brackets, 24" was a batch of 4, while a prosthetic socket trial, which is a
+/// one-off by definition, was a batch of 24.
+///
+/// A column where every row agrees is a column that has never been tested, and
+/// it *looks* fine. So does a spool shelf where nothing can compute a rate.
+/// These tests do not check any particular figure — they check that the sample
+/// shop still SPANS the cases the screens have to draw.
+@MainActor
+struct SampleShopTests {
+
+    /// The book AS THE APP READS IT — moved to today by `SampleBook`, the same
+    /// way `Shop.load(.sample)` moves it.
+    ///
+    /// Everything below asks whether the sample still covers a case, and half
+    /// of those cases are about dates: a month with a reading and a month
+    /// without, a task far enough past due to stay overdue, a schedule that
+    /// reads as one the sample never runs. Measured against the FILE those
+    /// answers change every day the calendar moves; measured against the book
+    /// the app shows, they do not change at all.
+    static func book(asOf day: Date = Date()) throws -> [String: JSONValue] {
+        let url = Bundle.module.url(forResource: "sample-shop", withExtension: "json")!
+        let raw = try JSONDecoder().decode(JSONValue.self, from: try Data(contentsOf: url))
+        guard case .object(let o) = raw else { throw Oops.shape }
+        return SampleBook.rebased(o, to: day)
+    }
+
+    enum Oops: Error { case shape }
+
+    static func rows(_ key: String) throws -> [[String: JSONValue]] {
+        guard case .array(let a)? = try book()[key] else { return [] }
+        return a.compactMap { if case .object(let o) = $0 { return o } else { return nil } }
+    }
+
+    static func number(_ row: [String: JSONValue], _ key: String) -> Double? {
+        if case .number(let n)? = row[key] { return n }
+        return nil
+    }
+
+    // MARK: - The catalogue
+
+    /// The margin column drew `35%` twenty times. A shop prices a commodity
+    /// bracket and a bespoke prosthetic differently, and the screen has to show
+    /// that it can.
+    @Test("the sample products do not all carry the same margin")
+    func marginsDiffer() throws {
+        let margins = try Self.rows("products").map { Self.number($0, "defaultMargin") }
+        let set = Set(margins.compactMap { $0 })
+        #expect(set.count >= 5,
+                "every sample product priced at the same margin: \(set.sorted())")
+        // And a product nobody set a margin on, so the "—" the table draws for an
+        // absent margin is a thing somebody has seen.
+        #expect(margins.contains(where: { $0 == nil }),
+                "no sample product leaves its margin unset, so the '—' never renders")
+    }
+
+    /// Three prices in the catalogue explain themselves three different ways —
+    /// "Rounded from …", "Calculated", "Your own price". Nineteen of twenty rows
+    /// said the same one.
+    @Test("the sample products reach all three reasons a price can be what it is")
+    func everyPriceReasonIsReachable() async throws {
+        let products = try Self.rows("products").map { JSONValue.object($0) }
+        let rows = try await KhaytEngine().catalogue(products, language: "en", settings: [:])
+        let reasons = Set(rows.map(\.reason))
+        for wanted in ["pe.price_is_rounded", "pe.price_is_base", "pe.price_is_override"] {
+            #expect(reasons.contains(wanted),
+                    "no sample product ever shows '\(wanted)': \(reasons.sorted())")
+        }
+    }
+
+    /// A product that says how many it is has to BE that many.
+    ///
+    /// This is the test the loose one below could not be. "Shelf brackets, 24"
+    /// was a batch of 4 and "Signage letters, 12" a batch of 1, so the weight
+    /// column was quietly answering a different question from the one the name
+    /// asked. Nothing about the total hours was implausible enough to notice.
+    @Test("a sample product that names a count is a batch of that many")
+    func namedCountsMatchTheQuantity() throws {
+        for p in try Self.rows("products") {
+            guard case .string(let name)? = p["nameEn"],
+                  case .array(let parts)? = p["parts"] else { continue }
+            // The last run of digits in the name: "Cable chain, 40 links" → 40.
+            let counts = name.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+            // "Drone arm v4" is a version, not a count. Only a name with a comma
+            // before the number is stating how many.
+            guard name.contains(","), let said = counts.last else { continue }
+            let qty = parts.reduce(0.0) { total, part in
+                if case .object(let pt) = part { return total + (Self.number(pt, "qty") ?? 1) }
+                return total
+            }
+            #expect(Int(qty) == said, "\(name) is a batch of \(Int(qty))")
+        }
+    }
+
+    /// A batch of twenty-four one-hour prints is a day of machine time; a batch
+    /// of twenty-four twenty-four-hour prints is most of a month. A floor, not a
+    /// proof: it catches a generated absurdity, not a bad estimate.
+    @Test("no sample product asks for more machine time than a month has")
+    func batchesArePrintable() throws {
+        for p in try Self.rows("products") {
+            guard case .array(let parts)? = p["parts"] else { continue }
+            var hours = 0.0, grams = 0.0
+            for case .object(let pt) in parts {
+                let q = Self.number(pt, "qty") ?? 1
+                hours += (Self.number(pt, "printTime") ?? 0) * q
+                grams += ((Self.number(pt, "printWeight") ?? 0)
+                          + (Self.number(pt, "supportWeight") ?? 0)) * q
+            }
+            let name = { if case .string(let s)? = p["nameEn"] { return s } else { return "?" } }()
+            #expect(hours <= 24 * 30, "\(name) takes \(Int(hours)) machine hours")
+            // 20 kg is four of the biggest spools this shop stocks.
+            #expect(grams <= 20_000, "\(name) weighs \(Int(grams)) g")
+        }
+    }
+
+    // MARK: - The shelf
+
+    /// A spool's rate per gram needs what it weighed NEW, and not one sample
+    /// spool carried that — so the spool card fell to "what it cost" on all six,
+    /// every fill bar read full, and the rate branch was never once drawn.
+    @Test("every sample spool says what it weighed new, and none of them is full")
+    func spoolsCanShowARate() throws {
+        let spools = try Self.rows("inventory")
+        #expect(!spools.isEmpty)
+        for s in spools {
+            let new = Self.number(s, "spoolWeight")
+            #expect(new != nil, "a sample spool has no spoolWeight, so it can show no rate")
+            if let new, let left = Self.number(s, "weight") {
+                #expect(left <= new, "a spool with more left than it ever held")
+            }
+        }
+        // Six untouched 1 kg spools is not a shop. The fill levels have to differ,
+        // or a bar that draws the wrong percentage looks correct.
+        let fill = Set(spools.compactMap { s -> Int? in
+            guard let new = Self.number(s, "spoolWeight"), new > 0,
+                  let left = Self.number(s, "weight") else { return nil }
+            return Int((left / new * 100).rounded())
+        })
+        #expect(fill.count >= 4, "the sample spools all sit at the same fill: \(fill.sorted())")
+    }
+
+    /// ── ONE JOB THE SHOP LOST MONEY ON ───────────────────────────────────
+    ///
+    /// Forty-two jobs, forty-two positive margins. So the ledger's margin
+    /// column had never been drawn negative — which is the one row that column
+    /// exists to help a shop find, and the only case where its sign carries
+    /// anything. It was drawn in the same secondary grey as every other row
+    /// and nobody could have noticed, because on this book it could not
+    /// happen.
+    ///
+    /// ORD-01002 is the job in this book that went badly already — it is the
+    /// one carrying a rating of 2 — so it is the one that failed twice before
+    /// it printed, and cost more than it was quoted at. It stays a partial
+    /// payment, so it is a BRIGHT row rather than a settled one nobody looks
+    /// at twice.
+    ///
+    /// And the other side of the test matters as much: a book where every
+    /// margin is negative teaches a reviewer nothing either. The loss has to
+    /// be the exception it is in a real shop.
+    @Test("the sample shop has a job it lost money on, and exactly one")
+    func oneJobWentBadly() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let priced = shop.orders.filter { $0.price > 0 && $0.costBasis > 0 }
+        #expect(priced.count > 20, "the sample stopped being able to show a margin at all")
+
+        let lost = priced.filter { $0.costBasis > $0.price }
+        #expect(lost.count == 1, """
+            the ledger draws a loss-making job differently and this book has \
+            \(lost.count) of them — one is the case, several is a different book
+            """)
+        let job = try #require(lost.first)
+        #expect(!job.isSettled, "the loss-making job is settled, so it draws dimmed")
+        // Deep enough to read as a loss rather than as a rounding error.
+        let margin = (job.price - job.costBasis) / job.price
+        #expect(margin < -0.1, "the loss is \(margin), which rounds to nothing on screen")
+
+        // And it is still the exception.
+        #expect(Double(lost.count) / Double(priced.count) < 0.1,
+                "a book where losses are ordinary shows nothing about the ordinary case")
+    }
+
+    /// ── A SHELF WITH SOMETHING ON IT, AND SOMETHING SOLD OUT ─────────────
+    ///
+    /// The catalogue's shelf column draws three different things and the
+    /// difference between two of them is the whole point: a DASH for a product
+    /// the shop makes to order, a NUMBER for one it keeps boxed, and a ZERO
+    /// for one it keeps boxed and has sold out. Zero and a dash look alike and
+    /// mean opposite things — one says print more, the other says this was
+    /// never a stocked line — so a sample reaching only two of the three
+    /// leaves the third drawn by nobody.
+    @Test("the sample shelf reaches stocked, sold out, and made to order")
+    func theShelfSpansItsCases() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let ids = shop.catalogueRows.map(\.id)
+        #expect(ids.count > 10, "the sample catalogue shrank past being a fixture")
+
+        let counted = ids.compactMap { shop.stockCount(of: $0) }
+        #expect(counted.contains { $0 > 0 }, "nothing in the sample is on the shelf")
+        #expect(counted.contains(0), """
+            nothing in the sample is stocked-but-sold-out, so the one case that \
+            looks like "made to order" and means the opposite is never drawn
+            """)
+        #expect(counted.count < ids.count, """
+            every product is stocked, so the made-to-order case — which is most \
+            of a real catalogue — is never drawn
+            """)
+        // And every count carries its date, or a storefront cannot tell a
+        // fresh count from one it has already applied.
+        for id in ids where shop.stockCount(of: id) != nil {
+            #expect(shop.stockCountedAt(of: id) != nil,
+                    Comment(rawValue: "\(id) has a count with no date"))
+        }
+    }
+
+    /// The tax on a purchase is a real field now, and a book that carries none
+    /// of it shows nothing of the work. It must also carry a purchase with NO
+    /// tax — an import — because "absent is zero" is the rule that keeps every
+    /// existing shop's numbers still.
+    @Test("the sample shop has purchases with reclaimable tax, and one without")
+    func vatIsBothPresentAndAbsent() throws {
+        let spools = try Self.rows("inventory")
+        let taxed = spools.filter { (Self.number($0, "vatAmount") ?? 0) > 0 }
+        #expect(!taxed.isEmpty, "no sample spool records the tax inside its price")
+        #expect(taxed.count < spools.count,
+                "every sample spool reclaims tax, so the imported case never renders")
+        for s in taxed {
+            let vat = Self.number(s, "vatAmount") ?? 0
+            let cost = Self.number(s, "cost") ?? 0
+            #expect(vat < cost, "a spool whose tax is not less than its price")
+        }
+    }
+}
+
+extension SampleShopTests {
+
+    /// The Arabic catalogue read half in English.
+    ///
+    /// Ten of twenty sample products carried no `nameAr` at all, so a shop
+    /// looking at Khayt in Arabic — the market this app is for — saw ten rows
+    /// of English in a right-to-left table. Nothing was broken: the language
+    /// fallback did exactly what it should, ten times in a row.
+    ///
+    /// A few stay in English on purpose, because a Riyadh shop does keep some
+    /// technical names as they came ("HVAC duct adapter"), and because that
+    /// fallback is itself a thing worth having seen once.
+    @Test("the sample catalogue is mostly Arabic, and not entirely")
+    func mostProductsHaveAnArabicName() throws {
+        let products = try Self.rows("products")
+        let named = products.filter {
+            if case .string(let s)? = $0["nameAr"] { return !s.trimmingCharacters(in: .whitespaces).isEmpty }
+            return false
+        }
+        #expect(named.count * 4 >= products.count * 3,
+                "only \(named.count) of \(products.count) sample products have an Arabic name")
+        #expect(named.count < products.count,
+                "every product is translated, so the language fallback never renders")
+    }
+}
+
+extension SampleShopTests {
+
+    /// The sample shop was three filament printers and nothing else, so no
+    /// screen had ever drawn any other kind of machine — the nozzle row, the
+    /// wear block and the band's "cannot ask" line were all only ever seen in
+    /// the one case they were written for.
+    @Test("the sample shop runs more than filament printers")
+    func moreThanFilament() async throws {
+        let machines = try Self.rows("machines").map { JSONValue.object($0) }
+        let kinds = try await KhaytEngine().machineKinds(machines)
+        let seen = Set(kinds.values.map(\.kind))
+        #expect(seen.contains("fdm"))
+        #expect(seen.count >= 3,
+                "one kind of machine draws one version of every machine screen: \(seen.sorted())")
+        // And at least one Khayt cannot poll, which is the case that must not
+        // look like a printer that has stopped answering.
+        #expect(kinds.values.contains { !$0.polled },
+                "nothing here exercises 'Khayt has no protocol for this'")
+        #expect(kinds.values.contains { $0.polled })
+    }
+
+    /// The shelf was six spools of filament, so no screen had ever drawn a
+    /// quantity in anything but grams — and every one of them wrote the gram
+    /// after the number by hand.
+    @Test("the sample shelf holds more than filament")
+    func moreThanGrams() async throws {
+        let rows = try Self.rows("inventory").map { JSONValue.object($0) }
+        let units = try await KhaytEngine().inventoryUnits(rows, settings: [:])
+        let seen = Set(units.values.map(\.unit))
+        #expect(seen.contains("g"))
+        #expect(seen.count >= 3,
+                "one unit on the shelf draws one version of every stock screen: \(seen.sorted())")
+        // Each measure prices in its own denominator, which is the one place
+        // the gram assumption was load bearing rather than cosmetic.
+        let rates = Set(units.values.map(\.rateKey))
+        #expect(rates.count >= 3, "every item priced per kilo: \(rates.sorted())")
+    }
+
+    /// Low means something different per unit, and the shelf has to be able to
+    /// show that: two sheets left is low, and 180 g of the same number is not.
+    @Test("something on the sample shelf is low in a unit that is not grams")
+    func lowInAnotherUnit() async throws {
+        let rows = try Self.rows("inventory").map { JSONValue.object($0) }
+        let units = try await KhaytEngine().inventoryUnits(rows, settings: [:])
+        let lowNonGram = try Self.rows("inventory").contains { item in
+            guard case .string(let id)? = item["id"], let u = units[id], u.unit != "g",
+                  case .number(let left)? = item["weight"] else { return false }
+            return left <= u.low
+        }
+        #expect(lowNonGram, "nothing exercises a threshold that is not the gram one")
+    }
+
+    /// The setups panel draws three verdicts and one refusal, and the versions
+    /// panel only appears for a file that has more than one. Until this file
+    /// carried any setups at all, none of that had ever been drawn.
+    @Test("the sample library reaches every setup verdict, and a file nothing works on")
+    func setupSpread() async throws {
+        let files = try Self.rows("printFiles")
+        let engine = try KhaytEngine()
+        var verdicts: Set<String> = []
+        var sawNothingWorks = false
+        var sawUntried = false
+        var withSetups = 0
+
+        for file in files {
+            let read = try await engine.printSetups(.object(file))
+            guard read.total > 0 else { continue }
+            withSetups += 1
+            for setup in read.setups {
+                verdicts.insert(setup.status)
+                if setup.ok == 0 && setup.failed == 0 { sawUntried = true }
+            }
+            if read.recommendedId == nil { sawNothingWorks = true }
+        }
+
+        #expect(withSetups > 0, "no sample file records what it was printed with")
+        #expect(verdicts == ["known-good", "needs-test", "failed"],
+                Comment(rawValue: "the sample reaches only \(verdicts.sorted())"))
+        // The panel says "change something" rather than naming the least broken
+        // setup. That branch needs a file where everything has failed.
+        #expect(sawNothingWorks, "every sample file has something that works, so the no-good-setup line is never drawn")
+        // Never printed is not a score of nought, and the two are drawn
+        // differently.
+        #expect(sawUntried, "no sample setup is untried, so that caption is never drawn")
+        #expect(withSetups < files.count,
+                "every file records its settings, which is not what a real library looks like")
+    }
+
+    /// The parts list draws a kit, a record that disagrees with itself after a
+    /// sync, and a total that refuses to add up. No sample file was made of
+    /// more than one file at all, so none of those had ever been drawn.
+    @Test("the sample library has kits, one of them disagreeing with itself")
+    func partsSpread() async throws {
+        let files = try Self.rows("printFiles")
+        let engine = try KhaytEngine()
+        var kits = 0
+        var single = 0
+        var unknownTotal = 0
+        var reconciled = 0
+
+        for file in files {
+            let read = try await engine.printParts(.object(file))
+            if read.multi { kits += 1 } else { single += 1 }
+            if read.multi, read.totalSize == nil { unknownTotal += 1 }
+            // The awkward case: `sourceFile` names a file that is not in
+            // `files`, so the rule had to keep both rather than choose.
+            if case .array(let listed)? = file["files"],
+               case .object(let source)? = file["sourceFile"],
+               case .string(let primary)? = source["filename"] {
+                let names = listed.compactMap { row -> String? in
+                    if case .object(let f) = row, case .string(let n)? = f["filename"] { return n }
+                    return nil
+                }
+                if !names.contains(primary), read.parts.count == names.count + 1 { reconciled += 1 }
+            }
+        }
+
+        #expect(kits > 0, "no sample print is made of more than one file")
+        #expect(single > 0, "every sample print is a kit, which no real library is")
+        #expect(unknownTotal > 0, "no sample kit has an unmeasured part, so the refusal to total is never drawn")
+        #expect(reconciled > 0, "no sample record disagrees with itself, so the reconciliation is never exercised")
+    }
+
+    /// A library the shop has FILED, which the sample was not.
+    ///
+    /// Every model in it was ungrouped, so a project — a folder with a picture
+    /// and a count — could not be drawn from the sample at all. The feature had
+    /// nothing to show itself with, and anyone judging the library from the
+    /// demo book saw the flat list the grouping was built to replace.
+    ///
+    /// The spread that matters is THREE cases in one library, because each is a
+    /// different picture: a project big enough to need one, a small one, and
+    /// models that belong to none and must still be reachable.
+    @Test("the sample library has projects, of two sizes, and loose models too")
+    func groupSpread() throws {
+        let files = try Self.rows("printFiles")
+        var counts: [String: Int] = [:]
+        var loose = 0
+        for file in files {
+            var name = ""
+            if case .string(let g)? = file["group"], !g.isEmpty { name = g }
+            else if case .string(let f)? = file["folder"], !f.isEmpty { name = f }
+            if name.isEmpty { loose += 1 } else { counts[name, default: 0] += 1 }
+        }
+
+        #expect(counts.count >= 2, "the sample library has fewer than two projects in it")
+        #expect(loose > 0, """
+            every sample model is filed, so the loose half of the library — \
+            which is what a shop sees the day it imports — is never drawn
+            """)
+        #expect(counts.values.contains { $0 >= 5 }, """
+            no sample project is big enough to be worth a folder; a folder of \
+            two proves nothing about a library of hundreds
+            """)
+        #expect(counts.values.contains { $0 < 5 }, "every sample project is large")
+
+        // The cover is the first file that HAS a picture, so a project whose
+        // models are all pictureless would draw an empty square. Not a case the
+        // sample needs to contain, but one it must not contain by accident.
+        for (name, _) in counts {
+            let held = files.filter { file in
+                if case .string(let g)? = file["group"] { return g == name }
+                if case .string(let f)? = file["folder"] { return f == name }
+                return false
+            }
+            // An encrypted pack's models are never opened, so nothing in it
+            // can be pictured: that empty square is the honest one.
+            if !held.isEmpty, held.allSatisfy({ $0["archiveLocked"] == .bool(true) }) { continue }
+            let withPicture = held.contains { file in
+                if case .string(let t)? = file["thumbFile"] { return !t.isEmpty }
+                if case .string(let t)? = file["thumbnail"] { return !t.isEmpty }
+                return false
+            }
+            #expect(withPicture, "the sample project \(name) would draw an empty folder")
+        }
+    }
+
+    /// The library filter bar hides itself when there is nothing to offer, which
+    /// is right on a shop's first day and wrong in the sample: a sample library
+    /// with no categories and no tags draws no chips, so the whole bar — every
+    /// state of it, in both languages and both appearances — is a screen nobody
+    /// has ever looked at.
+    @Test("the sample library can be filtered on every axis the bar offers")
+    func filterSpread() throws {
+        let files = try Self.rows("printFiles")
+        func text(_ row: [String: JSONValue], _ key: String) -> String {
+            if case .string(let v)? = row[key] { return v }
+            return ""
+        }
+
+        var categories: Set<String> = []
+        var uncategorised = 0
+        var spellings: [String: Set<String>] = [:]
+        var tagged = 0
+        for file in files {
+            let c = text(file, "category")
+            if c.isEmpty { uncategorised += 1 } else {
+                categories.insert(c.lowercased())
+                spellings[c.lowercased(), default: []].insert(c)
+            }
+            if case .array(let tags)? = file["tags"], !tags.isEmpty { tagged += 1 }
+        }
+
+        #expect(categories.count >= 2, """
+            the sample library has \(categories.count) categories, so the chips             that narrow it are never drawn beside one another
+            """)
+        #expect(uncategorised > 0, """
+            every sample model has a category, so "filed under nothing" — the             state most of a real library is in — is never on screen
+            """)
+        #expect(tagged > 0, "no sample model is tagged, so the tag chips never draw")
+        #expect(spellings.values.contains { $0.count > 1 }, """
+            every sample category is spelled one way, so the folding rule — one             chip for "Wall art" and "wall art" — is never exercised by the sample
+            """)
+    }
+
+    /// The catalogue's chips, by the same argument as the library's above.
+    @Test("the sample catalogue can be filtered on every axis its bar offers")
+    func catalogueFilterSpread() throws {
+        let products = try Self.rows("products")
+        func text(_ row: [String: JSONValue], _ key: String) -> String {
+            if case .string(let v)? = row[key] { return v }
+            return ""
+        }
+
+        var categories: Set<String> = []
+        var uncategorised = 0, materials: Set<String> = [], unpriced = 0, free = 0
+        var spellings: [String: Set<String>] = [:]
+        for product in products {
+            let c = text(product, "category")
+            if c.isEmpty { uncategorised += 1 } else {
+                categories.insert(c.lowercased())
+                spellings[c.lowercased(), default: []].insert(c)
+            }
+            if case .array(let parts)? = product["parts"] {
+                for case .object(let part) in parts { materials.insert(text(part, "material")) }
+            }
+            let base = Shop.plainNumber(product["basePrice"]) ?? 0
+            let override = Shop.plainNumber(product["priceOverride"])
+            if override != nil { if override! <= 0 { free += 1 } } else if base <= 0 { unpriced += 1 }
+        }
+
+        #expect(categories.count >= 2, """
+            the sample catalogue has \(categories.count) categories, so the             chips that narrow it are never drawn beside one another
+            """)
+        #expect(uncategorised > 0, "every sample product is filed, so that state never draws")
+        #expect(materials.count >= 2, "the sample catalogue is all one material")
+        #expect(spellings.values.contains { $0.count > 1 }, """
+            every sample category is spelled one way, so the folding rule is             never exercised on this screen
+            """)
+        #expect(unpriced > 0, """
+            no sample product is unpriced, so the one catalogue chip worth             interrupting a shop for is never drawn
+            """)
+        #expect(free > 0, """
+            no sample product is free ON PURPOSE, so the case the unpriced chip             must NOT sweep up is never in front of anyone
+            """)
+    }
+
+    @Test("exactly one kind of sample file offers a choice of version")
+    func versionSpread() async throws {
+        let files = try Self.rows("printFiles")
+        let engine = try KhaytEngine()
+        var many = 0
+        var implicitOnly = 0
+
+        for file in files {
+            let read = try await engine.printVersions(.object(file))
+            if read.many { many += 1 }
+            if read.versions.count == 1, read.versions[0].implicit { implicitOnly += 1 }
+        }
+
+        #expect(many > 0, "no sample file has versions, so the panel is never drawn")
+        // And most do not, which is why the panel is hidden for a single
+        // version rather than drawn as a list of one.
+        #expect(implicitOnly > 0, "every sample file has versions, so a print that has only ever been one thing is never drawn")
+    }
+
+    /// The consumables card draws three different reasons an item is on it,
+    /// and refuses to name a quantity for a fourth. Until this file carried any
+    /// consumables at all, none of that had ever been drawn.
+    ///
+    /// `now` is PINNED. The usage rate is measured over a trailing window, so
+    /// a guard run against `Date()` passes today and reports "no rate" in a
+    /// month when the sample's own jobs have aged out of it — which would make
+    /// this test quietly stop checking the thing it exists for.
+    @Test("the sample shelf reaches every reason a consumable is reordered")
+    func consumableSpread() async throws {
+        let shelf = try Self.rows("consumables")
+        #expect(!shelf.isEmpty, "no consumables — the card is never drawn")
+
+        // TODAY, and it must be: `book()` above rebases the sample to
+        // `Date()`, so a literal here is a fixed clock against a moving book
+        // and the two drift apart by a day every day. See the note in
+        // `SnapshotTests.consumableNeeds` — this pair went red together.
+        let now = Date()
+        let needs = try await KhaytEngine().consumableNeeds(
+            consumables: shelf.map { JSONValue.object($0) },
+            orders: try Self.rows("printLog").map { JSONValue.object($0) },
+            now: now)
+
+        #expect(needs.contains { $0.low && $0.stock == 0 },
+                "nothing on the sample shelf has run out")
+        #expect(needs.contains { $0.low && $0.stock > 0 },
+                "nothing is below its minimum without being empty")
+        // The case a shop cannot see by looking at the rack: still above its
+        // minimum, but the rate eats it inside the lead time.
+        #expect(needs.contains { !$0.low && ($0.daysLeft ?? .infinity) > 0 },
+                "nothing is listed for its forecast alone")
+        // And one the rule will not put a number against, because no rate and
+        // no minimum is not a quantity — inventing one lands on a purchase order.
+        #expect(needs.contains { $0.suggestQty == 0 },
+                "every sample item gets a suggested quantity, so the refusal is never drawn")
+        // Something with a measurable rate, or every figure on the card is zero.
+        #expect(needs.contains { $0.perDay > 0 },
+                "no sample job consumes a consumable, so no rate is ever computed")
+
+        // Not everything is on the list: a well-stocked shelf must be able to
+        // stay off it, or the card is just a list of the consumables table.
+        let listed = Set(needs.map(\.id))
+        let all = Set(shelf.compactMap { row -> String? in
+            if case .string(let id)? = row["id"] { return id } else { return nil }
+        })
+        #expect(!all.subtracting(listed).isEmpty,
+                "every sample consumable is being reordered, which cannot be right")
+    }
+
+    /// The suppliers card draws three different suppliers, and until this file
+    /// carried any at all it drew an empty state and nothing else — so neither
+    /// a row, nor a quoted price, nor the total-spent column had ever been
+    /// looked at.
+    ///
+    /// The quoted price is the one that matters: it is what a drafted purchase
+    /// order is priced at, and a sample book with no quote in it can never
+    /// show that path working.
+    @Test("the sample shop has suppliers, one quoting and one that has cost nothing")
+    func supplierSpread() async throws {
+        let rows = try Self.rows("suppliers")
+        #expect(!rows.isEmpty, "no suppliers — the card only ever draws its empty state")
+
+        let suppliers = rows.compactMap { Supplier(row: .object($0)) }
+        #expect(suppliers.count == rows.count, "a sample supplier does not read as one")
+
+        #expect(suppliers.contains { !$0.priceList.isEmpty },
+                "no sample supplier quotes a price, so a drafted order is never priced off one")
+        #expect(suppliers.contains { $0.priceList.isEmpty },
+                "every sample supplier quotes, so the ordinary contact-only one is never drawn")
+        #expect(suppliers.contains { $0.totalSpent > 0 },
+                "nothing has been bought from anybody, so the money column is all dashes")
+
+        // ── THE CASE `supplier-prices` EXISTS FOR ─────────────────────────
+        //
+        // The same material bought two ways: spools, then loose by the
+        // kilogram. Comparing those two figures says the shop's PETG got
+        // cheaper when it did nothing of the sort, and a sample that cannot
+        // reach the case has never drawn the card that handles it.
+        let log = suppliers.flatMap(\.purchases)
+        #expect(!log.isEmpty, "no purchase has ever been logged, so the history sheet is empty")
+        let units = Set(log.map(\.unit))
+        #expect(units.count > 1, "every sample purchase is counted the same way")
+        let byMaterial = Dictionary(grouping: log.filter { !$0.materialType.isEmpty },
+                                    by: \.materialType)
+        #expect(byMaterial.values.contains { $0.count > 1 },
+                "nothing was bought twice, so no price can be compared with an earlier one")
+        #expect(log.contains { $0.materialType.isEmpty },
+                "every sample purchase names a material, so the untagged case is never drawn")
+        #expect(log.contains { $0.unitPrice == nil },
+                "every sample purchase carries a unit price, so the one that does not is never drawn")
+        #expect(suppliers.contains { $0.totalSpent == 0 },
+                "everything has been bought from somebody, so the dash is never drawn")
+        #expect(suppliers.contains { $0.leadDays != nil },
+                "no sample supplier says how long it takes")
+        #expect(suppliers.contains { $0.leadDays == nil },
+                "every sample supplier has a lead time, so the silent one is never drawn")
+        #expect(Set(suppliers.map(\.category)).count > 1,
+                "every sample supplier sells the same thing")
+
+        // And a quote the sample carries actually prices a spool the sample
+        // carries. A price list naming a material nothing on the shelf is made
+        // of would leave the pricing path as untrodden as an empty list.
+        let engine = try KhaytEngine()
+        let shelf = try Self.rows("inventory").map { JSONValue.object($0) }
+        var priced = 0
+        for spool in shelf {
+            let out = try await engine.perGramPrice(item: spool,
+                                                    suppliers: rows.map { JSONValue.object($0) })
+            if out.supplierId != nil, !(out.supplierId ?? "").isEmpty { priced += 1 }
+        }
+        #expect(priced > 0, "no sample quote names a material on the sample shelf, so an order drafted from this book is still priced off the spool's own cost")
+    }
+
+    /// The maintenance card draws four statuses and two clocks. Until this
+    /// file carried any tasks at all, none of those branches had ever been
+    /// drawn, let alone looked at.
+    @Test("the sample shop reaches all four maintenance statuses")
+    func maintenanceSpread() async throws {
+        let tasks = try Self.rows("machMaintTasks")
+        #expect(!tasks.isEmpty, "no maintenance tasks — the card is never drawn")
+
+        let jobs = try Self.rows("printLog").map { JSONValue.object($0) }
+        let taskValues = tasks.map { JSONValue.object($0) }
+        var seen: Set<String> = []
+        var machinesWithTasks: Set<String> = []
+        let engine = try KhaytEngine()
+
+        for machine in try Self.rows("machines") {
+            guard case .string(let id)? = machine["id"] else { continue }
+            let card = try await engine.maintenance(
+                machineId: id, tasks: taskValues, jobs: jobs,
+                machine: .object(machine), now: Date())
+            if !card.tasks.isEmpty { machinesWithTasks.insert(id) }
+            for task in card.tasks { seen.insert(task.status) }
+        }
+
+        // A status the card can draw but the sample cannot reach is a status
+        // nobody has looked at.
+        #expect(seen == ["ok", "warning", "due", "overdue"],
+                Comment(rawValue: "the sample reaches only \(seen.sorted())"))
+
+        // And a machine with none, so the card's other branch — leaving the
+        // section out entirely rather than drawing an empty heading — is drawn
+        // too. Most shops have set no tasks up at all.
+        let machineIds = try Self.rows("machines")
+        let all = Set(machineIds.compactMap { row -> String? in
+            if case .string(let id)? = row["id"] { return id } else { return nil }
+        })
+        #expect(!all.subtracting(machinesWithTasks).isEmpty,
+                "every sample machine has tasks, so the no-tasks card is never drawn")
+    }
+
+    /// A task whose status depends on the wall clock USED to drift: one set to
+    /// be "due" when this file was written read "overdue" a month later, and
+    /// the case it was added to cover stopped being covered. The book moves
+    /// with the calendar now, so what this pins is the placement — the task is
+    /// far enough past due that it reads as overdue and not as one that has
+    /// just come round.
+    @Test("a date-driven sample task cannot drift out of the case it covers")
+    func dateTasksAreStable() throws {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        for task in try Self.rows("machMaintTasks") {
+            guard let days = Self.number(task, "intervalDays"), days > 0,
+                  case .string(let last)? = task["lastDoneAt"],
+                  let done = iso.date(from: last) else { continue }
+            // Already past 1.5x the interval, so it stays overdue however long
+            // after this file was written the app is opened.
+            let elapsed = Date().timeIntervalSince(done) / 86_400
+            #expect(elapsed > days * 1.5,
+                    "a date-driven sample task must be far enough past due to stay overdue")
+        }
+    }
+
+    // MARK: - The trends
+
+    /// The trends card draws a column where a month has a reading and a gap
+    /// where it has none, for two figures. A sample where every month had a
+    /// reading — or none did — is a card whose gap was never drawn.
+    /// The downtime card needs a fleet where some machines went down and some
+    /// did not, and — the reason `lib/downtime.js` exists at all — a machine
+    /// with two OVERLAPPING windows. Without that pair the merge is never
+    /// exercised by anything a person looks at, and summing the windows
+    /// instead of merging them would draw a plausible wrong answer.
+    @Test("the sample fleet reaches a machine that went down, one that did not, and an overlap")
+    func downtimeSpan() async throws {
+        let engine = try KhaytEngine()
+        let machines = Shop.rows(try Self.book(), "machines")
+        let calendar = Calendar.book
+        var periods: [(from: Date, to: Date)] = []
+        for back in stride(from: 2, through: 0, by: -1) {
+            guard let day = calendar.date(byAdding: .month, value: -back, to: Date()),
+                  let month = calendar.dateInterval(of: .month, for: day) else { continue }
+            periods.append((from: month.start, to: month.end))
+        }
+        let rows = try await engine.downtimeHours(machines: machines, months: periods)
+        #expect(rows.count >= 2, "too few machines went down to rank any of them")
+        #expect(rows.count < machines.count,
+                "every machine went down — the card never draws a fleet member that simply ran")
+        #expect(rows.contains { $0.hours.contains { $0 > 0 } && $0.hours.contains { $0 == 0 } },
+                "no machine has a quiet month beside a bad one")
+
+        // The overlap, checked against what summing would have said. One
+        // machine's windows must merge to strictly less than their total.
+        var foundAnOverlap = false
+        for row in machines {
+            guard case .object(let m) = row,
+                  case .array(let blocks)? = m["downtimeBlocks"], blocks.count > 1 else { continue }
+            let merged = try await engine.downtimeHours(
+                machines: [row],
+                months: [(from: Date(timeIntervalSince1970: 0),
+                          to: Date(timeIntervalSince1970: 4_102_444_800))])
+            // WITH FRACTIONAL SECONDS. The book writes `...T08:00:00.000Z`,
+            // and the default formatter refuses those silently — it returns
+            // nil, the sum comes out zero, and the comparison below then
+            // "passes" for every machine by accident.
+            let reader = ISO8601DateFormatter()
+            reader.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let summed = blocks.reduce(0.0) { total, block in
+                guard case .object(let b) = block,
+                      case .string(let from)? = b["from"], case .string(let to)? = b["to"],
+                      let a = reader.date(from: from), let z = reader.date(from: to)
+                else { return total }
+                return total + z.timeIntervalSince(a) / 3600
+            }
+            #expect(summed > 0, "the sample's downtime dates did not parse at all")
+            if let total = merged.first?.total, total < summed - 0.001 { foundAnOverlap = true }
+        }
+        #expect(foundAnOverlap,
+                "no sample machine has overlapping windows — the merge is never exercised")
+    }
+
+    /// The maintenance card ranks machines by what servicing cost, keeps a
+    /// sold machine's spending, and covers ONE year. A sample with one entry
+    /// on one machine draws a single bar and proves none of that.
+    @Test("the sample servicing reaches several machines, a sold one, and another year")
+    func maintenanceCostSpan() async throws {
+        let engine = try KhaytEngine()
+        // At the anchor, not today. Rebasing moves every day by the same
+        // count, but a YEAR is not moved with them: 32 days after the anchor
+        // the one entry from last year (30 Nov) crossed into January, and the
+        // year filter lost its case overnight. A test asking whether the
+        // sample spans a year boundary has to ask on the day it was written.
+        let anchor = try #require(SampleBook.anchor)
+        let book = try Self.book(asOf: anchor)
+        let machines = Shop.rows(book, "machines")
+        // Through the constant, not a literal: a literal here is how the
+        // sample and the app agreed on a key no real book has.
+        let log = Shop.rows(book, ServiceLogEdit.collection)
+        #expect(!log.isEmpty, "nothing was ever serviced — the card draws its empty state only")
+        let year = Int(SampleBook.anchorDay.prefix(4)) ?? 0
+        let rows = try await engine.maintenanceCost(machines: machines, entries: log, year: year)
+        #expect(rows.count >= 3, "too few machines serviced to be worth ranking")
+        #expect(rows.contains { $0.orphan },
+                "no entry belongs to a machine the shop has sold")
+        #expect(rows.contains { !$0.orphan && $0.total > 0 })
+        // A machine serviced only in another year must not appear in this
+        // year's chart — the bucketing is the thing most likely to break.
+        let everyMachine = Set(log.compactMap { row -> String? in
+            if case .object(let o) = row, case .string(let id)? = o["machineId"] { return id }
+            return nil
+        })
+        #expect(everyMachine.count > rows.count,
+                "every machine ever serviced appears in this year — the year filter is never exercised")
+    }
+
+    /// The rating card draws a bar where a month was rated and a hairline
+    /// where it was not, and colours the two ends of the scale differently.
+    /// A sample where every month has one good rating draws one flat blue row
+    /// and leaves three of this card's four branches unseen.
+    @Test("the sample ratings reach a rated month, an unrated one, and both ends of the scale")
+    func ratingSpan() async throws {
+        let engine = try KhaytEngine()
+        // At the sample's own anchor day. The book is moved by whole DAYS to sit
+        // around today, so which ratings share a month changes from one day to
+        // the next: on Nov 5 2026 a 5 and the 3 joined the 2 in one month
+        // (3.3) and no month read poor, though nothing in the sample changed.
+        // The spread is authored at the anchor, so that is where it is checked.
+        let asOf = SampleBook.anchor ?? Date()
+        let orders = Shop.rows(try Self.book(asOf: asOf), "printLog")
+        // The same six months `Reports.recomputeRatings` asks for.
+        var months: [String] = []
+        let calendar = Calendar.book
+        for back in stride(from: 5, through: 0, by: -1) {
+            guard let month = calendar.date(byAdding: .month, value: -back, to: asOf),
+                  let year = calendar.dateComponents([.year], from: month).year,
+                  let m = calendar.dateComponents([.month], from: month).month
+            else { continue }
+            months.append(String(format: "%04d-%02d", year, m))
+        }
+        let trend = try await engine.ratingTrend(orders: orders, months: months)
+        #expect(trend.enough, "too few ratings to draw as a score")
+        #expect(trend.points.contains { $0.responses > 0 }, "no month was rated — the card draws nothing")
+        #expect(trend.points.contains { $0.responses == 0 }, "every month was rated — the gap is never drawn")
+        #expect(trend.points.contains { ($0.average ?? 0) >= 4.5 },
+                "no month is good enough to draw in the done colour")
+        #expect(trend.points.contains { let a = $0.average ?? 5; return $0.responses > 0 && a < 3 },
+                "no month is poor enough to draw in the late colour")
+    }
+
+    /// The sources card draws a row per source, and says something different
+    /// when the shop has never filled the field in. A sample where every
+    /// customer has a source never reaches the second, and one where none does
+    /// never reaches the first.
+    @Test("the sample customers reach several sources, and some with none recorded")
+    func clientSourceSpan() async throws {
+        let engine = try KhaytEngine()
+        let book = try Self.book()
+        let report = try await engine.clientSources(
+            clients: Shop.rows(book, "clients"), orders: Shop.rows(book, "printLog"),
+            settings: Shop.settings(book))
+        #expect(report.rows.count >= 4, "too few sources to be worth a chart")
+        #expect(report.rows.contains { $0.source == "online" },
+                "nobody arrived through the intake form — the row that used to be dropped")
+        #expect(report.rows.contains { $0.revenue > 0 }, "no source brought in any money")
+        // "Not recorded" and "Other" are different answers and the sheet
+        // offers both, so the book has to contain both.
+        let clients = Shop.rows(book, "clients")
+        #expect(clients.contains { row in
+            if case .object(let o) = row, case .string(let v)? = o["source"] { return v == "other" }
+            return false
+        }, "no customer is filed under Other")
+        #expect(clients.contains { row in
+            if case .object(let o) = row { return o["source"] == nil }
+            return false
+        }, "every customer has a source — the unset case is never drawn")
+    }
+
+    @Test("the sample trends reach a month with a reading and a month without, on both rows")
+    func trendsSpan() async throws {
+        let engine = try KhaytEngine()
+        let book = try Self.book()
+        let trends = try await engine.costTrends(
+            orders: Shop.rows(book, "printLog"), spools: Shop.rows(book, "inventory"),
+            settings: Shop.settings(book), clients: Shop.rows(book, "clients"),
+            now: Date(), months: 12)
+        #expect(trends.anyReading)
+        #expect(trends.months.contains { $0.perHour != nil }, "no month earned anything per hour")
+        #expect(trends.months.contains { $0.perHour == nil }, "every month has printing — the gap is never drawn")
+        #expect(trends.months.contains { $0.costPerGram != nil }, "no month opened a spool")
+        #expect(trends.months.contains { $0.costPerGram == nil }, "a spool was opened every month — the gap is never drawn")
+        #expect(trends.perHour != nil && trends.costPerGram != nil)
+    }
+
+    /// The cycle-time card draws a column where a month finished something and
+    /// a gap where it did not, and a table only when three jobs are measured.
+    @Test("the sample cycle time reaches a month with a figure, a month without, and a table")
+    func cycleTimeSpan() async throws {
+        let engine = try KhaytEngine()
+        let orders = Shop.rows(try Self.book(), "printLog")
+        let cycle = try await engine.cycleTime(orders: orders, now: Date(), months: 6)
+        #expect(cycle.jobs >= 3)
+        #expect(cycle.months.contains { $0.avgDays != nil }, "no month finished anything")
+        #expect(cycle.months.contains { $0.avgDays == nil }, "every month finished something — the gap is never drawn")
+        let lead = try await engine.leadTimeByProduct(orders: orders, top: 10)
+        #expect(lead.jobs >= 3 && lead.rows.count >= 2, "the table needs rows to rank")
+        #expect(lead.rows.contains { $0.productId != nil }, "no job joined its product")
+        #expect(lead.rows.contains { $0.jobs > 1 }, "no product was made twice, so fastest and slowest are one number")
+    }
+
+    /// The waste-trend card stacks the heaviest three types and an "other",
+    /// and draws a baseline for a month with nothing thrown away.
+    @Test("the sample waste reaches three named types, an other, and a month with nothing")
+    func wasteTrendSpan() async throws {
+        let engine = try KhaytEngine()
+        let trend = try await engine.wasteTrend(wasteLog: Shop.rows(try Self.book(), "wasteLog"),
+                                                now: Date(), months: 6, named: 3)
+        #expect(trend.total > 0)
+        #expect(trend.types.count == 4 && trend.types.last == "other",
+                "the sample needs more than three failure types so the fourth column is drawn: \(trend.types)")
+        #expect(trend.months.contains { $0.total == 0 }, "every month threw something away — the baseline is never drawn")
+        #expect(trend.months.contains { $0.byType.count >= 2 }, "no month has two types stacked")
+    }
+
+    /// The on-time card draws a rate, a late count, an average delay and the
+    /// promises missed worst first. A sample where every promise was kept is a
+    /// card whose lower half was never drawn — which is what it was.
+    @Test("the sample promises reach kept AND missed, with two different delays")
+    func onTimeSpan() async throws {
+        let engine = try KhaytEngine()
+        let report = try await engine.onTime(orders: Shop.rows(try Self.book(), "printLog"))
+        #expect(report.promised >= 5)
+        #expect(report.onTime > 0 && report.late >= 2, "both sides of the record")
+        #expect((report.worstDelayDays ?? 0) > (report.avgDelayDays ?? 0),
+                "the worst miss and the average are the same figure, so the list has no order")
+    }
+
+    // MARK: - The customers
+
+    /// The customer pane draws a price list, a standing order (running, paused,
+    /// or set up and switched off) and a log written by two different screens
+    /// of the other app. A sample shop where no customer had any of them is a
+    /// pane whose lower half was never once drawn.
+    @Test("the sample customers reach every state the pane draws")
+    func customersSpan() throws {
+        let clients = try Self.rows("clients").map {
+            try JSONDecoder().decode(Client.self, from: JSONEncoder().encode(JSONValue.object($0)))
+        }
+        #expect(clients.contains { $0.priceList.count > 1 }, "no customer has more than one agreed price")
+        #expect(clients.contains { $0.priceList.contains { !$0.note.isEmpty } }, "no agreed price carries a note")
+        #expect(clients.contains { $0.standingOrder.map { !$0.paused } == true }, "no running schedule")
+        #expect(clients.contains { $0.standingOrder?.paused == true }, "no paused schedule")
+        #expect(clients.contains { $0.recurring != nil && $0.standingOrder == nil },
+                "no schedule that was set up and switched off")
+        #expect(clients.contains { $0.recurring?.leadDays ?? 0 > 0 }, "no schedule with a lead time")
+        let lines = clients.flatMap(\.commLog)
+        #expect(lines.contains { $0.raw["type"] != nil }, "no log line in the editor's shape")
+        #expect(lines.contains { $0.raw["channel"] != nil }, "no log line in the quick note's shape")
+        #expect(Set(lines.map(\.kind)).count >= 3, "the log shows one kind of contact")
+        #expect(clients.count { !$0.commLog.isEmpty } >= 2, "only one customer has ever been spoken to")
+    }
+
+    /// A running schedule in the sample is due, and stays due. The sample book
+    /// is read-only, so nothing ever advances it: a date that read "next week"
+    /// would read as a shop that forgot, rather than as what it is — a schedule
+    /// the sample never runs. Well in the past is how that reads, and the book
+    /// moving with the calendar is what keeps it there.
+    @Test("a running sample schedule cannot drift out of the case it covers")
+    func schedulesAreStable() throws {
+        let clients = try Self.rows("clients").map {
+            try JSONDecoder().decode(Client.self, from: JSONEncoder().encode(JSONValue.object($0)))
+        }
+        for schedule in clients.compactMap(\.standingOrder) where !schedule.paused {
+            let due = try #require(schedule.nextDue.flatMap(Recurring.day))
+            #expect(Date().timeIntervalSince(due) > 30 * 86_400,
+                    "a running sample schedule must be well past due to stay due")
+        }
+    }
+
+    @Test("the sample library reaches every print-risk state the inspector draws")
+    func riskStatesAreReachable() async throws {
+        // FOUR STATES, and three of them are invisible without a summary on a
+        // record: findings, nothing-to-flag, and not-looked-yet. An inspector
+        // section whose only reachable state is "not looked yet" has never been
+        // seen doing its job.
+        let files = try Self.rows("printFiles")
+        let engine = try KhaytEngine()
+
+        var withFindings = 0, clear = 0, notLooked = 0
+        var ids = Set<String>()
+        for f in files {
+            guard case .object(let held)? = f["printRisk"],
+                  case .object(let analysis)? = held["analysis"] else { notLooked += 1; continue }
+
+            let report = try await engine.assessModel(analysis: analysis, nozzleDiameter: 0.4)
+            if report.note.isEmpty { clear += 1 } else { withFindings += 1 }
+            for r in report.risks { ids.insert(r.id) }
+        }
+
+        #expect(withFindings > 0, "no sample model has anything to report, so the list never draws")
+        #expect(clear > 0, "no sample model is clean, so the reassuring state never draws")
+        #expect(notLooked > 0, "every sample model is walked, so the ASK state never draws")
+
+        // And more than one KIND of finding. A library where the only answer is
+        // "overhang" leaves the thin-wall and bed lines unseen, and they are
+        // the two that read differently — one is critical, one is a question
+        // about the plate.
+        #expect(ids.count >= 2,
+                Comment(rawValue: "the sample library only ever reports \(ids.sorted())"))
+        #expect(ids.contains("thin"),
+                "nothing in the sample library has a wall worth mentioning")
+    }
+
+    @Test("a seeded summary describes the mesh its record points at")
+    func seededSummariesAreNotStale() throws {
+        // A summary carries the `contentHash` it was measured from, and a
+        // mismatch makes `LibraryFile.riskAnalysis` refuse it — correctly. A
+        // sample record whose hashes disagree would seed a state that reads as
+        // "not looked yet" while looking, in the file, exactly like an answer.
+        for f in try Self.rows("printFiles") {
+            guard case .object(let held)? = f["printRisk"] else { continue }
+            guard case .string(let id)? = f["id"] else { continue }
+            let measured: String? = { if case .string(let h)? = held["contentHash"] { return h } else { return nil } }()
+            let current: String? = { if case .string(let h)? = f["contentHash"] { return h } else { return nil } }()
+            #expect(measured == current,
+                    Comment(rawValue: "\(id): the summary says \(measured ?? "nil") and the record says \(current ?? "nil")"))
+        }
+    }
+
+    @Test("a product made from a model is JOINED to it, not just named after it")
+    func productFromModel() async throws {
+        // THE POINT OF THE FEATURE. The library knew what each model weighs and
+        // how long it takes; the catalogue asked a shop to type both in. What
+        // makes the join worth anything is `printFileId` — `order-file-link.js`
+        // opens by explaining that an order carried a free-text `fileRef`, "a
+        // filename somebody typed", so none of it joined up.
+        let shop = Shop()
+        await shop.load(.sample)
+        let file = try #require(shop.files.first { $0.sourceFile?.kind == "model" },
+                                "the sample library has no model to sell")
+
+        let product = try #require(await shop.productFromFile(file),
+                                   Comment(rawValue: shop.productProblem ?? "no product came back"))
+
+        // Named after the model, in every language the catalogue carries.
+        #expect(product.names.values.allSatisfy { $0 == file.title })
+        #expect(product.hasAName)
+
+        guard case .array(let parts)? = product.rest["parts"], case .object(let part) = parts.first
+        else { Issue.record("the product has no first part"); return }
+
+        #expect(part["printFileId"] == JSONValue.string(file.id),
+                "the part is not joined to the model — only a filename would be left")
+        #expect(part["name"] == JSONValue.string(file.title))
+
+        // ── `qty`, AND THIS TEST USED TO PIN THE BUG ──────────────────────
+        //
+        // It asserted `quantity`, which is what the code wrote and what NOTHING
+        // reads: the calculator's per-part cost, the packaging split, the price
+        // tiers and the catalogue's specs all read `qty`. So the product was
+        // written with a field no consumer looks at and the real one absent,
+        // and the test agreed with the code instead of with the rule.
+        //
+        // It was benign only by accident — `Math.max(1, +part.qty || 1)` falls
+        // back to one and the value written was always one. Found in a real
+        // shop's book, on a product made from the library.
+        #expect(part["qty"] == JSONValue.number(1),
+                "the part's quantity is in a field the calculator does not read")
+        #expect(part["quantity"] == nil,
+                "a field nothing reads was written beside the one that matters")
+        // And a filename too, because the other app reads that field.
+        if case .string(let ref)? = part["fileRef"] { #expect(!ref.isEmpty) }
+    }
+
+    @Test("an unsliced model still gets a weight and a time, from its geometry")
+    func productFromUnslicedModel() async throws {
+        // ── THE CASE A REAL SHOP'S LIBRARY IS MOSTLY MADE OF ──────────────
+        //
+        // Found in one: a 15 MB 3MF with no weight, no time and no material
+        // recorded, because nothing has sliced it. `partPatch` reports both as
+        // missing — correctly — and the product was then written with neither,
+        // which is honest and not much use: no weight means no cost, and no
+        // cost means no price. That is the "added a product but no price"
+        // report, one layer down.
+        //
+        // This app can measure the mesh and price it at the shop's own measured
+        // rate, so where the file cannot answer, the geometry does.
+        let shop = Shop()
+        await shop.load(.sample)
+        let file = try #require(
+            shop.files.first { f in
+                f.mesh.map { $0.volumeMm3 > 0 } == true && shop.estimates[f.id] != nil
+            },
+            "the sample library has no measured mesh to estimate from")
+
+        let product = try #require(await shop.productFromFile(file),
+                                   Comment(rawValue: shop.productProblem ?? "no product"))
+        guard case .array(let parts)? = product.rest["parts"], case .object(let part) = parts.first
+        else { Issue.record("no first part"); return }
+
+        #expect((Shop.plainNumber(part["printWeight"]) ?? 0) > 0,
+                "an unsliced model produced a part weighing nothing, so the product has no price")
+        #expect((Shop.plainNumber(part["printTime"]) ?? 0) > 0,
+                "the part takes no time, so nothing but material can be costed")
+    }
+
+    @Test("an estimate is never presented as a measurement")
+    func estimatesAreLabelled() async throws {
+        // A figure a shop believes was measured, and prices against, is the
+        // whole risk here. An estimate that looks typed is the same bug as a
+        // zero that looks typed — which this very path already had a note for.
+        let shop = Shop()
+        await shop.load(.sample)
+        let file = try #require(
+            shop.files.first { f in
+                f.mesh.map { $0.volumeMm3 > 0 } == true && shop.estimates[f.id] != nil
+            })
+        _ = await shop.productFromFile(file)
+        let note = try #require(shop.productNote,
+                                "weight and time were filled from an estimate and nothing said so")
+        #expect(note.lowercased().contains("estimat"), Comment(rawValue: note))
+    }
+
+    @Test("what the file could not answer for is said, not left as zeros")
+    func productFromModelIsHonest() async throws {
+        // A gcode record has no mesh and often no setups, so some fields cannot
+        // be filled. A zero that looks typed is worse than a blank somebody was
+        // told about — `partPatch` returns `missing` and this must surface it.
+        let shop = Shop()
+        await shop.load(.sample)
+        var sawANote = false
+        for file in shop.files where file.sourceFile?.kind == "model" {
+            _ = await shop.productFromFile(file)
+            if shop.productNote != nil { sawANote = true; break }
+        }
+        #expect(sawANote,
+                "no sample model is missing a figure, so the honesty path never draws")
+    }
+
+    // MARK: - The screens added after the book was written
+
+    @Test("a job is paying over months, with one payment already collected")
+    func aPlanIsMidCollection() throws {
+        // Without this the payment-plan sheet has only ever been seen EMPTY:
+        // its rows, its progress line and the collected state are three things
+        // nobody could look at, in a shop whose whole purpose is being designed
+        // against.
+        let planned = try Self.rows("printLog").filter { row in
+            if case .array(let rows)? = row["instalments"] { return !rows.isEmpty }
+            return false
+        }
+        #expect(!planned.isEmpty, "no sample job has a payment plan")
+
+        let rows: [[String: JSONValue]] = planned.flatMap { row -> [[String: JSONValue]] in
+            guard case .array(let list)? = row["instalments"] else { return [] }
+            return list.compactMap { if case .object(let o) = $0 { return o } else { return nil } }
+        }
+        let collected = rows.filter { if case .bool(true)? = $0["paid"] { return true } else { return false } }
+        #expect(!collected.isEmpty, "every instalment is outstanding — the collected row never draws")
+        #expect(collected.count < rows.count, "every instalment is collected — the outstanding row never draws")
+
+        // The base travels with the plan, or collecting a row silently uses
+        // the older rule and the deposit is double-counted.
+        for row in planned {
+            #expect(row["instalmentBase"] != nil,
+                    "a sample plan with no instalmentBase reads as one written before Sep 2026")
+        }
+    }
+
+    @Test("a plan's rows add up to what the job still owed when it was made")
+    func aPlanCoversTheBalance() throws {
+        // A sample plan that billed the gross price would be the exact bug the
+        // generator was fixed for, sitting in the book every screen is designed
+        // against.
+        for row in try Self.rows("printLog") {
+            guard case .array(let list)? = row["instalments"], !list.isEmpty,
+                  case .number(let base)? = row["instalmentBase"],
+                  case .number(let price)? = row["price"] else { continue }
+            let total = list.reduce(0.0) { sum, entry in
+                guard case .object(let e) = entry, case .number(let amount)? = e["amount"] else { return sum }
+                return sum + amount
+            }
+            #expect(abs(total - (price - base)) < 0.05,
+                    "the plan asks for \(total) against a balance of \(price - base)")
+        }
+    }
+
+    @Test("the rewards programme is on, and the customers span its tiers")
+    func loyaltySpansItsTiers() async throws {
+        // Off, the points section never draws at all. On with one tier, the
+        // "no tier yet" customer and the top tier are the same picture.
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.loyaltyOn, "the rewards programme is off, so its screen never draws")
+
+        var tiers: Set<String> = []
+        var withoutATier = 0
+        var spent = 0
+        for person in shop.customers.prefix(12) {
+            guard let standing = await shop.loyalty(of: person.id) else { continue }
+            if let tier = standing.tier { tiers.insert(tier) } else if standing.earned > 0 { withoutATier += 1 }
+            if standing.redeemed > 0 { spent += 1 }
+        }
+        #expect(tiers.count >= 2, "every customer is in the same tier: \(tiers)")
+        #expect(withoutATier > 0, "no customer is below the first tier, so that case never draws")
+        #expect(spent > 0, "nobody has spent points, so the 'redeemed' line never draws")
+    }
+
+    @Test("something is on order, and one delivery is part-arrived")
+    func somethingIsOnOrder() async throws {
+        // Without this the "on order" card and the receive sheet have only
+        // ever been seen EMPTY — and the part-arrived case is the one worth
+        // looking at, because it is the one where the box has to be typed in.
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.openOrders.count >= 2, "nothing is on order in the sample shop")
+        #expect(shop.openOrders.contains { $0.receivedSoFar > 0 },
+                "every order is untouched, so the part-arrived row never draws")
+        #expect(shop.openOrders.contains { $0.unit.isEmpty },
+                "no filament order, so the grams path never draws")
+        #expect(shop.openOrders.contains { !$0.unit.isEmpty },
+                "no consumable order, so the shop's-own-unit path never draws")
+        // Each one is linked to something the shelf actually holds, or
+        // receiving it would restock nothing.
+        for order in shop.openOrders {
+            let row = try #require(Self.rows("purchaseOrders").first {
+                if case .string(let id)? = $0["id"] { return id == order.id }
+                return false
+            })
+            guard case .string(let itemId)? = row["itemId"] else {
+                Issue.record("\(order.id) is linked to nothing"); continue
+            }
+            let shelf = try Self.rows("inventory") + Self.rows("consumables")
+            #expect(shelf.contains { if case .string(let id)? = $0["id"] { return id == itemId }
+                                     else { return false } },
+                    "\(order.id) points at \(itemId), which is on no shelf")
+        }
+    }
+
+    @Test("the sample book carries no money the app would ask to repair")
+    func theSampleBookIsNotBroken() async throws {
+        // The deposit-audit banner and the over-redeemed report are REPAIR
+        // states. Putting one in the sample shop would put a red warning across
+        // the top of every screenshot the app is reviewed from — so they are
+        // deliberately absent here and exercised from fixtures of their own.
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.erasedDeposits.isEmpty,
+                "the sample book carries an erased deposit, so every screen now warns about money")
+        #expect(shop.suspectOrders.isEmpty,
+                "the sample book carries a thousandfold purchase order, so the shelf now warns")
+    }
+
+    @Test("the sample library spans compressed files: an open pack of several models, and a locked one")
+    func samplesCompressedFiles() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let members = shop.files.filter(\.inArchive)
+        let open = members.filter { !$0.isLocked }
+        #expect(Set(open.compactMap(\.archivePath)).count >= 1 && open.count >= 2,
+                "no pack of several models: the archive folder tile is never drawn")
+        let anyLocked = members.contains { $0.isLocked }
+        let allHashed = open.allSatisfy { !($0.archiveHash ?? "").isEmpty }
+        let ordinary = shop.files.contains { !$0.inArchive }
+        #expect(anyLocked, "no locked member: the lock is never drawn")
+        #expect(allHashed, "an open member with no archive hash cannot be cached")
+        #expect(ordinary, "and the ordinary models are still there")
+        // Each pack's group is a folder the grid draws as the archive.
+        for path in Set(members.compactMap(\.groupName)) {
+            #expect(shop.archiveName(ofGroup: path) != nil, "\(path) is not drawn as its archive")
+        }
+    }
+
+    @Test("every machine in the sample shop says which kind it is")
+    func everyMachineSaysSo() throws {
+        for m in try Self.rows("machines") {
+            guard case .string(let kind)? = m["kind"] else {
+                Issue.record("a sample machine has no kind, so it is read as FDM by default rather than by choice")
+                continue
+            }
+            #expect(!kind.isEmpty)
+        }
+    }
+}

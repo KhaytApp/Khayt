@@ -1,0 +1,421 @@
+/**
+ * lib/spool-edit.js is the shelf's two writers, lifted out of
+ * renderer/inventory.js.
+ *
+ * THE PROOF: `addInventoryItem` and the spool editor's `onSave` are copied
+ * below VERBATIM — their form controls answered from the same input, their id
+ * and clock supplied — and run beside the module over thousands of generated
+ * forms and spools. The record and the mutated spool are compared field for
+ * field, and so is the shop's colour library, which the editor writes to.
+ */
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { newSpool, applyEdit, coloursFor, netCost } = require('../lib/spool-edit.js');
+
+const ORIGINAL_ADD = `
+function addInventoryItem() {
+  const material = $('#invMaterial').value.trim();
+  const cost = clampPositive($('#invCost').value);
+  const weight = Math.max(1, num($('#invWeight').value, 1000));
+  const color = $('#invColor').value || '#888888';
+  if (!material) { toast(t('inv.material_ph'), 'error'); return; }
+  const today = localDateStr();
+  const invMaterialType = $('#invMaterialType')?.value || 'fdm';
+  const lot = ($('#invLot')?.value || '').trim() || undefined;
+  // Per-location: tag the spool with the chosen branch (default to active filter).
+  const activeLoc = (typeof activeLocation !== 'undefined') ? activeLocation : null;
+  const locationId = ($('#invLocation')?.value || activeLoc || '') || undefined;
+  inventory.push({ id: uid('INV'), material, cost, weight, color, purchasedAt: today, materialType: invMaterialType, lot, locationId });
+  saveAll();
+  renderInventory();
+  $('#invMaterial').value = '';
+  if ($('#invLot')) $('#invLot').value = '';
+  toast(t('inv.added'), 'success');
+}
+
+return addInventoryItem;`;
+
+const ORIGINAL_EDIT = `
+function editSpool(item, settings) {
+      const material = document.getElementById('ieMatInput').value.trim();
+      if (!material) { return { refused: 'material' }; }
+      item.material = material;
+      item.color    = document.getElementById('ieColorInput').value || '#888888';
+      // Feature 7: Material type
+      item.materialType = document.getElementById('ieMaterialType')?.value || 'fdm';
+      // Feature 5: Colour variant — save to item and to settings.filamentColours library
+      const colourVariant = (document.getElementById('ieColourInput')?.value || '').trim();
+      item.colourVariant = colourVariant || undefined;
+      if (colourVariant) {
+        if (!settings.filamentColours) settings.filamentColours = {};
+        if (!settings.filamentColours[material]) settings.filamentColours[material] = [];
+        if (!settings.filamentColours[material].includes(colourVariant)) {
+          settings.filamentColours[material].push(colourVariant);
+        }
+      }
+      const newCost = clampPositive(document.getElementById('ieCostInput').value);
+      // Track price history when cost changes
+      if (newCost !== item.cost) {
+        if (!item.priceHistory) item.priceHistory = [];
+        item.priceHistory.push({ cost: item.cost, date: localDateStr() });
+      }
+      item.cost        = newCost;
+      item.weight      = Math.max(0, num(document.getElementById('ieWeightInput').value, 0));
+      item.purchasedAt = document.getElementById('iePurchasedAt').value || undefined;
+      item.openedAt    = document.getElementById('ieOpenedAt').value || undefined;
+      item.lot         = (document.getElementById('ieLot')?.value || '').trim() || undefined;
+      // Per-location: branch assignment (empty = unassigned/shared)
+      item.locationId  = (document.getElementById('ieLocation')?.value || '') || undefined;
+      // Feature 4: Print settings
+      const pt = num(document.getElementById('iePrintTemp').value, 0);
+      const bt = num(document.getElementById('ieBedTemp').value, 0);
+      const ms = num(document.getElementById('ieMaxSpeed').value, 0);
+      item.printTemp = pt > 0 ? pt : undefined;
+      item.bedTemp   = bt > 0 ? bt : undefined;
+      item.maxSpeed  = ms > 0 ? ms : undefined;
+      // New Feature 5: Per-spool reorder thresholds
+      const rp = num(document.getElementById('ieReorderPoint')?.value, 200);
+      const rq = num(document.getElementById('ieReorderQty')?.value, 1000);
+      item.reorderPoint = rp >= 0 ? rp : 200;
+      item.reorderQty   = rq >= 0 ? rq : 1000;
+
+  return { item, settings };
+}
+return editSpool;`;
+
+const helpers = {
+  num: (v, fallback = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : fallback; },
+  clampPositive: (v) => { const n = parseFloat(v); return Math.max(0, Number.isFinite(n) ? n : 0); },
+  toast: () => {},
+  t: (k) => k,
+  saveAll: () => {},
+  renderInventory: () => {},
+};
+
+function runOriginalAdd(form, ctx) {
+  const inventory = [];
+  const els = {
+    '#invMaterial': { value: form.material },
+    '#invCost': { value: form.cost },
+    '#invWeight': { value: form.weight },
+    '#invColor': { value: form.color },
+  };
+  if (form.materialType !== undefined) els['#invMaterialType'] = { value: form.materialType };
+  if (form.lot !== undefined) els['#invLot'] = { value: form.lot };
+  if (form.locationId !== undefined) els['#invLocation'] = { value: form.locationId };
+  const scope = Object.assign({}, helpers, {
+    $: (sel) => els[sel] || null,
+    inventory,
+    localDateStr: () => ctx.today,
+    uid: () => ctx.id,
+    activeLocation: ctx.activeLocation,
+  });
+  new Function(...Object.keys(scope), ORIGINAL_ADD)(...Object.values(scope))();
+  return inventory[0] ? { spool: inventory[0] } : { refused: 'material' };
+}
+
+function runOriginalEdit(item, form, ctx) {
+  const els = {
+    ieMatInput: { value: form.material },
+    ieColorInput: { value: form.color },
+    ieMaterialType: { value: form.materialType },
+    ieColourInput: { value: form.colourVariant },
+    ieCostInput: { value: form.cost },
+    ieWeightInput: { value: form.weight },
+    iePurchasedAt: { value: form.purchasedAt },
+    ieOpenedAt: { value: form.openedAt },
+    ieLot: { value: form.lot },
+    ieLocation: { value: form.locationId },
+    iePrintTemp: { value: form.printTemp },
+    ieBedTemp: { value: form.bedTemp },
+    ieMaxSpeed: { value: form.maxSpeed },
+    ieReorderPoint: { value: form.reorderPoint },
+    ieReorderQty: { value: form.reorderQty },
+  };
+  const scope = Object.assign({}, helpers, {
+    document: { getElementById: (id) => els[id] || null },
+    localDateStr: () => ctx.today,
+  });
+  const settings = JSON.parse(JSON.stringify(ctx.settings || {}));
+  const out = new Function(...Object.keys(scope), ORIGINAL_EDIT)(...Object.values(scope))(item, settings);
+  return out.refused ? out : { item: out.item, settings };
+}
+
+function rng(seed) {
+  let x = seed >>> 0 || 1;
+  return () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+}
+const pick = (r, list) => list[Math.floor(r() * list.length)];
+const value = (r) => pick(r, ['', '  ', ' PLA ', 'PETG', '0', '-5', '750', '1000.5', 'abc', '1e3']);
+
+test('the module and the original agree over 3000 generated new spools', () => {
+  const r = rng(31337);
+  for (let i = 0; i < 3000; i++) {
+    const form = {
+      material: pick(r, ['', '  ', ' PLA+ ', 'PETG-CF']),
+      cost: value(r), weight: value(r),
+      color: pick(r, ['', '#112233', '#888888']),
+      materialType: pick(r, [undefined, '', 'fdm', 'resin']),
+      lot: pick(r, [undefined, '', ' L-9 ']),
+      locationId: pick(r, [undefined, '', 'LOC-1']),
+    };
+    const ctx = { id: 'INV-' + i, today: '2026-09-04', activeLocation: pick(r, [null, '', 'LOC-2']) };
+    const made = newSpool(form, ctx);
+    const original = runOriginalAdd(form, ctx);
+
+    // `spoolWeight` is NEW and the original renderer never wrote it, so it is
+    // checked against the module's own `weight` and then set aside. Comparing
+    // it to the original would be asking a 2026 function about a field added
+    // after it — the equivalence this test exists for is about the fields both
+    // sides have opinions on.
+    if (made.spool) {
+      assert.equal(made.spool.spoolWeight, made.spool.weight,
+        'a new spool arrives at the weight it is bought with: ' + JSON.stringify(form));
+      delete made.spool.spoolWeight;
+      // `vatAmount` is new for the same reason and set aside the same way. None
+      // of these forms carries one, so every spool must come out with zero — a
+      // roll that says nothing about tax reclaims nothing, which is what every
+      // spool bought before Khayt asked does.
+      assert.equal(made.spool.vatAmount, 0,
+        'a form with no tax on it: ' + JSON.stringify(form));
+      delete made.spool.vatAmount;
+    }
+    assert.deepEqual(made, original, JSON.stringify(form));
+  }
+});
+
+test('the module and the original agree over 3000 generated edits, spool and colour library', () => {
+  const r = rng(99991);
+  for (let i = 0; i < 3000; i++) {
+    const before = {
+      id: 'S1',
+      material: pick(r, ['PLA', 'PETG']),
+      cost: pick(r, [0, 90, 120.5]),
+      weight: pick(r, [0, 400, 1000]),
+    };
+    if (r() < 0.4) before.priceHistory = [{ cost: 80, date: '2026-01-01' }];
+    if (r() < 0.3) before.printTemp = 215;
+    if (r() < 0.3) before.lot = 'OLD';
+    const form = {
+      material: pick(r, [' PLA ', 'PETG', 'ABS']),
+      color: pick(r, ['', '#111111']),
+      materialType: pick(r, ['', 'fdm', 'resin']),
+      colourVariant: pick(r, ['', '  ', ' Matte Black ', 'Galaxy']),
+      cost: value(r), weight: value(r),
+      purchasedAt: pick(r, ['', '2026-05-01']),
+      openedAt: pick(r, ['', '2026-06-01']),
+      lot: pick(r, ['', ' L-3 ']),
+      locationId: pick(r, ['', 'LOC-9']),
+      printTemp: value(r), bedTemp: value(r), maxSpeed: value(r),
+      reorderPoint: value(r), reorderQty: value(r),
+    };
+    const settings = r() < 0.5 ? {} : { filamentColours: { PLA: ['Matte Black'] } };
+    const ctx = { today: '2026-09-05', settings: JSON.parse(JSON.stringify(settings)) };
+
+    const theirs = runOriginalEdit(JSON.parse(JSON.stringify(before)), form, { today: ctx.today, settings });
+    const mine = JSON.parse(JSON.stringify(before));
+    applyEdit(mine, form, ctx);
+    assert.deepEqual(mine, theirs.item, `case ${i} spool: ${JSON.stringify(form)}`);
+    assert.deepEqual(ctx.settings, theirs.settings, `case ${i} colours: ${JSON.stringify(form)}`);
+  }
+});
+
+test('a spool with no material is refused, by both writers', () => {
+  assert.deepEqual(newSpool({ material: '   ' }, { id: 'S', today: 'x' }), { refused: 'material' });
+  const spool = { material: 'PLA', cost: 1 };
+  assert.deepEqual(applyEdit(spool, { material: '' }, {}), { refused: 'material' });
+  assert.equal(spool.material, 'PLA', 'and the spool is left as it was');
+});
+
+test('an edit changes only what it was given', () => {
+  // What lets a smaller editor exist without wiping the fields it never showed.
+  const spool = { id: 'S1', material: 'PLA', cost: 90, weight: 800, printTemp: 215,
+                  reorderPoint: 300, lot: 'L-1', usageHistory: [{ g: 12 }] };
+  applyEdit(spool, { weight: '650' }, { today: '2026-09-05' });
+  assert.deepEqual(spool, { id: 'S1', material: 'PLA', cost: 90, weight: 650, printTemp: 215,
+                            reorderPoint: 300, lot: 'L-1', usageHistory: [{ g: 12 }] });
+});
+
+test('a price change is remembered, and an unchanged price is not', () => {
+  const spool = { material: 'PLA', cost: 90 };
+  applyEdit(spool, { cost: '90' }, { today: '2026-09-05' });
+  assert.equal(spool.priceHistory, undefined, 'saving without changing the price writes no history');
+  applyEdit(spool, { cost: '110' }, { today: '2026-09-05' });
+  assert.deepEqual(spool.priceHistory, [{ cost: 90, date: '2026-09-05' }], 'the OLD price, with the date it changed');
+  applyEdit(spool, { cost: '95' }, { today: '2026-09-06' });
+  assert.equal(spool.priceHistory.length, 2);
+  assert.equal(spool.cost, 95);
+});
+
+test('a price stored as text is the same price, and its real change is remembered', () => {
+  // Another writer left `cost: "85"`. Re-saving 85 is not a price change, and
+  // a change to 90 records the old price once — the phantom entry made the
+  // Mac's untouched-save baseline carry the same history as the real edit,
+  // so the real entry was dropped.
+  const same = { material: 'PLA', cost: '85' };
+  applyEdit(same, { cost: 85 }, { today: '2026-09-05' });
+  assert.equal(same.priceHistory, undefined, 'the same price, spelled differently, is not a change');
+  const changed = { material: 'PLA', cost: '85' };
+  applyEdit(changed, { cost: 90 }, { today: '2026-09-05' });
+  assert.deepEqual(changed.priceHistory, [{ cost: '85', date: '2026-09-05' }]);
+  // A spool that never had a price gains one: that is a change, as it was.
+  const unpriced = { material: 'PLA' };
+  applyEdit(unpriced, { cost: 40 }, { today: '2026-09-05' });
+  assert.equal(unpriced.priceHistory.length, 1);
+});
+
+test('a colour variant is added to the shop\'s library once, under the material it was typed for', () => {
+  const settings = {};
+  const spool = { material: 'PLA' };
+  assert.equal(applyEdit(spool, { colourVariant: ' Matte Black ' }, { settings }).colourAdded, 'Matte Black');
+  assert.deepEqual(coloursFor(settings, 'PLA'), ['Matte Black']);
+  assert.equal(applyEdit(spool, { colourVariant: 'Matte Black' }, { settings }).colourAdded, undefined,
+    'the same colour twice is not two entries');
+  assert.deepEqual(coloursFor(settings, 'PLA'), ['Matte Black']);
+  // Renamed material and colour in one edit: the colour is filed under the NEW
+  // material, which is the one the spool now is.
+  applyEdit(spool, { material: 'PETG', colourVariant: 'Galaxy' }, { settings });
+  assert.deepEqual(coloursFor(settings, 'PETG'), ['Galaxy']);
+  assert.deepEqual(coloursFor(settings, 'nothing'), []);
+});
+
+test('the renderer writes no spool of its own any more', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'inventory.js'), 'utf8');
+  const at = src.indexOf('function addInventoryItem(');
+  const body = src.slice(at, src.indexOf('\n}\n', at));
+  assert.match(body, /KhaytSpoolEdit\.newSpool\(|SpoolEdit\.newSpool\(/,
+    'a new spool must come from the shared rule');
+  assert.doesNotMatch(body, /inventory\.push\(\{/,
+    'and the renderer must not build the record itself, or the two apps drift');
+});
+
+// ── what it weighed when it arrived ───────────────────────────────────────
+
+test('a new spool records the weight it came with, not just what is left', () => {
+  const made = newSpool({ material: 'PLA', cost: 75, weight: 1000 },
+                           { id: 'INV-1', today: '2026-09-07' });
+  assert.equal(made.spool.weight, 1000, 'what is left, today');
+  assert.equal(made.spool.spoolWeight, 1000, 'and what it arrived as');
+});
+
+// THE REASON IT EXISTS. `weight` falls as the shop prints, so any figure that
+// divides the spool's price by it drifts: a 1 kg roll bought at 75 reads 150
+// half way down and 375 with 200 g left — the supplier-comparison number,
+// wrong on exactly the spool a shop is about to reorder.
+test('the original weight is what a cost-per-kilo can be trusted to', () => {
+  const made = newSpool({ material: 'PLA', cost: 75, weight: 1000 }, { id: 'INV-1' });
+  const spool = made.spool;
+  spool.weight = 200;                              // 800 g printed
+  assert.equal(spool.cost / (spool.spoolWeight / 1000), 75, 'the rate moved');
+  assert.notEqual(spool.cost / (spool.weight / 1000), 75, 'the old sum was already right');
+});
+
+test('a part-roll records the part-roll', () => {
+  const made = newSpool({ material: 'PETG', cost: 40, weight: 500 }, { id: 'INV-2' });
+  assert.equal(made.spool.spoolWeight, 500);
+});
+
+// The same floor as `weight`: a spool weighing nothing divides into every
+// cost-per-gram in the app.
+test('the original weight has the same one-gram floor', () => {
+  assert.equal(newSpool({ material: 'PLA', weight: 0 }, {}).spool.spoolWeight, 1);
+  assert.equal(newSpool({ material: 'PLA' }, {}).spool.spoolWeight, 1000, 'a kilo by default');
+});
+
+test('the tax on a roll is kept, clamped, and never added to a roll that has none', () => {
+  const ctx = { id: 'S1', today: '2026-09-08' };
+  const made = (form) => newSpool({ material: 'PLA', cost: 75, weight: 1000, ...form }, ctx).spool;
+
+  assert.equal(made({}).vatAmount, 0, 'absent is nothing, not a guess');
+  assert.equal(made({ vatAmount: 9.78 }).vatAmount, 9.78, 'what the supplier invoice says');
+  assert.equal(made({ vatAmount: 500 }).vatAmount, 75, 'never more tax than the roll cost');
+  assert.equal(made({ vatAmount: -1 }).vatAmount, 0);
+
+  // Lowering the price lowers the tax inside it — the invariant is that one can
+  // never exceed the other.
+  const rolled = { id: 'S1', material: 'PLA', cost: 75, weight: 1000, vatAmount: 9.78 };
+  applyEdit(rolled, { cost: 5 }, { today: '2026-09-08' });
+  assert.equal(rolled.cost, 5);
+  assert.equal(rolled.vatAmount, 5, 'the tax cannot survive larger than the price it sits in');
+
+  // But a roll bought before Khayt asked does not GAIN the field just because
+  // somebody retyped its price: that is a row changed for no reason.
+  const legacy = { id: 'S2', material: 'PLA', cost: 75, weight: 1000 };
+  applyEdit(legacy, { cost: 60 }, { today: '2026-09-08' });
+  assert.equal(legacy.cost, 60);
+  assert.equal('vatAmount' in legacy, false, 'no field appeared on a record that never had one');
+});
+
+test('what a roll costs a JOB is not what it cost the shop', () => {
+  // A registered shop reclaims the tax it paid, so the tax is not part of what
+  // a print consumes — charging it to the job would understate every margin the
+  // shop quotes. One that cannot reclaim spent every riyal of it.
+  const roll = { id: 'S1', cost: 75, vatAmount: 9.78 };
+  assert.equal(netCost(roll, true), 65.22, 'registered: the price without the tax');
+  assert.equal(netCost(roll, false), 75, 'not registered: the whole price is the cost');
+  assert.equal(netCost({ cost: 75 }, true), 75, 'a roll with no tax recorded reclaims none');
+  assert.equal(netCost({}, true), 0);
+  // And a nonsense figure can never make a roll look free or negative.
+  assert.equal(netCost({ cost: 75, vatAmount: 500 }, true), 0);
+  assert.equal(netCost({ cost: 75, vatAmount: -5 }, true), 75);
+});
+
+// ── What an item is counted in ─────────────────────────────────────────────
+
+require('../lib/inventory-units.js');
+
+test('a shelf row can be told it is millilitres', () => {
+  const spool = { id: 'S1', material: 'Resin' };
+  KhaytSpoolEdit.applyEdit(spool, { unit: 'ml' }, {});
+  assert.equal(spool.unit, 'ml');
+});
+
+test('a unit the vocabulary does not know is refused where it is WRITTEN', () => {
+  const spool = { id: 'S1', material: 'Ply' };
+  KhaytSpoolEdit.applyEdit(spool, { unit: 'board-feet' }, {});
+  assert.equal(spool.unit, 'g', 'stored once, an unknown unit reads back as grams for ever');
+});
+
+test('editing a price does not turn a bottle of resin into a spool of filament', () => {
+  const spool = { id: 'S1', material: 'Resin', unit: 'ml' };
+  KhaytSpoolEdit.applyEdit(spool, { cost: 180 }, {});
+  assert.equal(spool.unit, 'ml');
+});
+
+test('an item written before this field existed is left without one', () => {
+  const spool = { id: 'S1', material: 'PLA' };
+  KhaytSpoolEdit.applyEdit(spool, { cost: 75 }, {});
+  assert.equal('unit' in spool, false, 'and the module reads that as grams, which it is');
+});
+
+/* ── driedAt: the shelf can finally answer "is this wet?" ────── */
+
+test('a spool records when it was last dried', () => {
+  const s = { id: 'sp-x', material: 'PETG', weight: 500 };
+  applyEdit(s, { driedAt: '2026-09-01' }, {});
+  assert.equal(s.driedAt, '2026-09-01');
+  // Cleared, not set to the empty string — an absent field is "never recorded".
+  applyEdit(s, { driedAt: '' }, {});
+  assert.equal(s.driedAt, undefined);
+});
+
+test('a spool nobody has dried is unknown to the dryness rule, not overdue', () => {
+  const Dry = require('../lib/filament-dryness.js');
+  const s = { id: 'sp-x', material: 'PA-CF', storage: 'shelf' };
+  const got = Dry.dryStatus(s, Date.now());
+  assert.equal(got.state, 'unknown', 'an unrecorded spool was accused of being wet');
+  assert.equal(got.daysSince, null);
+});
+
+test('the dryness rule reads a spool record directly, which is the point', () => {
+  // Before `driedAt` lived on the spool, this rule could only be asked about a
+  // Bed Ready dry-log record — a separate list with nothing joining it to the
+  // shelf. The shop tracked the same roll twice.
+  const Dry = require('../lib/filament-dryness.js');
+  const spool = { id: 'sp-x', material: 'Sunlu TPU', storage: 'open' };
+  applyEdit(spool, { driedAt: new Date(Date.now() - 9 * 86400000).toISOString() }, {});
+  assert.equal(Dry.dryStatus(spool, Date.now()).state, 'overdue',
+    'nine days of open air on a TPU is well past its three');
+});

@@ -1,0 +1,776 @@
+import Foundation
+
+/// A shop's tax setup, as `lib/tax.js` models it.
+///
+/// Thirty country presets, in two modes. `inclusive` means the price a shop
+/// types already contains the tax — true in the Gulf and most of Europe;
+/// `exclusive` means it is added on top, as in the US and Canada. Getting that
+/// backwards understates the tax due on every American and Canadian shop, so it
+/// is a first-class part of the type rather than a flag someone might miss.
+public struct TaxProfile: Codable, Sendable, Equatable {
+    public enum Mode: String, Codable, Sendable { case inclusive, exclusive }
+
+    public struct Rate: Codable, Sendable, Equatable {
+        public let id: String
+        public let label: String
+        public let percent: Double
+        public let compound: Bool?
+        public init(id: String, label: String, percent: Double, compound: Bool? = nil) {
+            self.id = id; self.label = label; self.percent = percent; self.compound = compound
+        }
+    }
+
+    public let name: String
+    public let mode: Mode
+    public let registration: String
+    public let rates: [Rate]
+
+    /// Memberwise, so a screen can build the profile a draft describes and ask
+    /// what a price of 100 would be invoiced as before anything is saved.
+    public init(name: String, mode: Mode, registration: String, rates: [Rate]) {
+        self.name = name; self.mode = mode; self.registration = registration; self.rates = rates
+    }
+
+    /// The combined percentage across every rate.
+    public var totalPercent: Double { rates.reduce(0) { $0 + $1.percent } }
+    /// A shop with no rate is not registered, whatever else is configured.
+    public var isRegistered: Bool { totalPercent > 0 }
+}
+
+/// A price split into what the shop keeps and what it merely collects.
+public struct TaxSplit: Codable, Sendable, Equatable {
+    public let subtotal: Double
+    public let taxTotal: Double
+}
+
+/// One dated instalment.
+public struct Installment: Codable, Sendable, Equatable {
+    public let dueDate: String
+    public let amount: Double
+    public let paidAt: String?
+}
+
+/// What an order's cash figures become once a plan's rows are collected.
+public struct PlanTotals: Codable, Sendable, Equatable {
+    public let paidAmount: Double
+    public let paymentStatus: String
+    /// The collected rows' total on its own — what this plan has brought in.
+    public let collected: Double
+}
+
+/// The money a job's price, deposit and credit notes divide into when it is
+/// split across machines.
+public struct SplitShare: Codable, Sendable, Equatable {
+    public let price: Double
+    public let paidAmount: Double
+    public let credited: Double
+}
+
+/// Everything a quote resolves to.
+public struct QuoteTotal: Codable, Sendable, Equatable {
+    public let priceBeforeDiscount: Double
+    public let discountAmount: Double
+    public let subtotal: Double
+    public let rushFee: Double
+    /// What the customer is asked for — rounded, or typed, when the rule was.
+    public let total: Double
+    /// What the arithmetic said before rounding or a typed figure. Optional
+    /// because the rule gained it in September 2026 and a bundle without it
+    /// must still decode.
+    public let computedTotal: Double?
+    /// `base`, `rounded` or `override`.
+    public let priceSource: String?
+    /// What the customer had already agreed, inside `total` and never marked up.
+    public let agreedAmount: Double?
+    /// The shop's fixed costs by the print hour, as a cost line under the
+    /// margin (`lib/overhead-rate.js`). 0 while the shop has it off; optional
+    /// because a bundle from before October 2026 has no such field.
+    public let overhead: Double?
+    /// The quote's marketplace FEE lines (a % line with a platformId, or
+    /// `fee: true`), in points, summed — present only when it has one. The
+    /// rule grosses them up: each is taken of the final price. The shop's own
+    /// % surcharges are not in it.
+    public let feePct: Double?
+    /// `fees-too-high` when those percentages reach the rule's cap and were
+    /// NOT grossed up, so the shop keeps less than it priced. Say so.
+    public let feeWarning: String?
+
+    public init(priceBeforeDiscount: Double, discountAmount: Double, subtotal: Double,
+                rushFee: Double, total: Double, computedTotal: Double? = nil,
+                priceSource: String? = nil, agreedAmount: Double? = nil,
+                overhead: Double? = nil, feePct: Double? = nil, feeWarning: String? = nil) {
+        self.priceBeforeDiscount = priceBeforeDiscount; self.discountAmount = discountAmount
+        self.subtotal = subtotal; self.rushFee = rushFee; self.total = total
+        self.computedTotal = computedTotal; self.priceSource = priceSource
+        self.agreedAmount = agreedAmount
+        self.overhead = overhead
+        self.feePct = feePct; self.feeWarning = feeWarning
+    }
+
+    /// The figure to say beside the total when the total is not the arithmetic.
+    public var differsFromComputed: Bool {
+        guard let computedTotal, let priceSource, priceSource != "base" else { return false }
+        return abs(computedTotal - total) >= 0.005
+    }
+}
+
+
+// MARK: - The dashboard
+
+/// What `lib/dashboard-facts.js` says about a shop right now.
+///
+/// Decoded loosely on purpose: this module answers six different themes and
+/// carries fields the Mac app has no screen for. A stricter decoder would fail
+/// the whole dashboard over a key it never reads.
+public struct DashboardFacts: Decodable, Sendable {
+    public let showsMoney: Bool
+    public let activeCount: Int
+    public let printingCount: Int
+    public let lateCount: Int
+    public let owed: Double?
+    public let fleet: Fleet
+    public let attn: Attention
+    /// Finished jobs charged nothing that still count as trade —
+    /// `selectUnpricedFinished` in `lib/attention.js`. Optional so an older
+    /// bundle without it still decodes.
+    public let unpriced: Unpriced?
+
+    public struct Unpriced: Decodable, Sendable, Equatable {
+        public let count: Int
+        public let ids: [String]
+    }
+
+    public struct Fleet: Decodable, Sendable {
+        public let total: Int
+        public let live: Int
+        public let offline: Int
+        public let idle: Int
+    }
+
+    public struct Attention: Decodable, Sendable {
+        public let count: Int
+        public let items: [Item]
+    }
+
+    /// One thing that needs looking at. `kind` is `order`, `machine`, `nozzle`
+    /// or `stock`; `severity` is the module's word, not a colour chosen here.
+    ///
+    /// Every field past `name` belongs to one kind and is nil on the rest —
+    /// `daysLate` on an order, `grams` on a nozzle or a spool, `state` on a
+    /// machine. Decoding them all here rather than per kind is what lets the
+    /// panel say WHAT IS WRONG rather than only that something is: "120 g left"
+    /// beats "PA-CF Carbon Grey" with no number after it.
+    public struct Item: Decodable, Sendable, Identifiable, Hashable {
+        public let severity: String
+        public let kind: String
+        public let id: String
+        public let name: String?
+        public let dueDate: String?
+        public let daysLate: Int?
+        /// `offline` or `error`, for a machine.
+        public let state: String?
+        /// Grams worn, for a nozzle; grams LEFT, for a spool.
+        public let grams: Double?
+        /// The gram figure the nozzle was measured against.
+        public let threshold: Double?
+        /// The shop's own name for a spool's colour.
+        public let variant: String?
+    }
+}
+
+/// A filament ranked by how close its colour is to one the shop wants.
+///
+/// `deltaE` is CIEDE2000 from `lib/color-mix.js` — perceptual distance, not a
+/// difference between hex triples. Under about 1 nobody can tell them apart;
+/// around 2-3 is a good match on a printed part; past 10 they are two colours.
+public struct ColourMatch: Decodable, Sendable, Identifiable, Hashable {
+    public let id: String
+    public let material: String?
+    public let colourVariant: String?
+    public let color: String?
+    public let weight: Double?
+    public let deltaE: Double
+}
+
+/// Something to chase: an invoice past its due date, or a quote about to run
+/// out. `lib/payment-reminder.js` and `lib/quote-followup.js` decide WHICH —
+/// each has its own grace period, cooldown and cap, and neither is a filter
+/// this app is allowed to guess at.
+public struct Chase: Decodable, Sendable, Identifiable, Hashable {
+    public let id: String
+    public let name: String?
+    /// Days PAST the due date for an invoice; days UNTIL expiry for a quote.
+    /// Both come from the module that selected the row.
+    public let days: Int?
+
+    public init(id: String, name: String?, days: Int?) {
+        self.id = id; self.name = name; self.days = days
+    }
+}
+
+
+// MARK: - The shop floor
+
+/// What `lib/nozzle-wear.js` says about a machine's nozzle.
+public struct NozzleWear: Decodable, Sendable {
+    /// Grams printed since the nozzle went in.
+    public let grams: Double
+    /// Wear in "abrasive-equivalent" grams — the module's own weighting, since
+    /// a kilo of carbon fibre is not a kilo of PLA as far as brass is concerned.
+    public let wear: Double
+    public let threshold: Double
+    /// 0–100. The module rounds it; this does not round it again.
+    public let pct: Double
+    public let over: Bool
+    public let abrasive: Bool
+}
+
+/// The figures `lib/kpi.js` computes, from rows `lib/kpi-rows.js` selected and
+/// `lib/order-money.js` priced. Not recomputed in Swift: the margin a shop is
+/// shown here is the margin its other app shows.
+public struct Kpis: Decodable, Sendable {
+    public let orderCount: Int
+    public let completedCount: Int
+    public let revenue: Double
+    public let cost: Double
+    public let grossProfit: Double
+    public let grossMargin: Double
+    public let avgOrderValue: Double
+    public let onTimePct: Double?
+    public let onTimeTotal: Int
+    public let outstanding: Double
+
+    public init(orderCount: Int, completedCount: Int, revenue: Double, cost: Double,
+                grossProfit: Double, grossMargin: Double, avgOrderValue: Double,
+                onTimePct: Double?, onTimeTotal: Int, outstanding: Double) {
+        self.orderCount = orderCount; self.completedCount = completedCount
+        self.revenue = revenue; self.cost = cost
+        self.grossProfit = grossProfit; self.grossMargin = grossMargin
+        self.avgOrderValue = avgOrderValue; self.onTimePct = onTimePct
+        self.onTimeTotal = onTimeTotal; self.outstanding = outstanding
+    }
+}
+
+/// Whether a job may move to a stage, as `lib/order-status.js` decides it.
+///
+/// A refusal names its reason as a CODE, never a sentence. The module does not
+/// know which language the shop reads, and the two apps have to refuse for the
+/// same reason even when they say it differently — which is the whole point of
+/// the rules living in one place.
+///
+/// `warn` survives a `block`: being told the column is full AND the assembly is
+/// unfinished is more use than being told one of the two.
+public struct StatusGate: Decodable, Sendable, Equatable {
+    /// Why a move was refused, or why it is a squeeze.
+    public struct Reason: Decodable, Sendable, Equatable {
+        /// `production_paused`, `wip_blocked`, `wip_reached`,
+        /// `assembly_not_assembled`, `assembly_parts`.
+        public let code: String
+        /// Whatever the sentence needs — the column and its limit, or the parts
+        /// still outstanding. Heterogeneous by code, so it stays untyped.
+        public let params: [String: JSONValue]
+    }
+
+    public let ok: Bool
+    public let block: Reason?
+    public let warn: Reason?
+    /// Completing a job is the moment the shop learns what it really cost, so
+    /// it is also the moment worth asking for the actual time and grams.
+    public let needsActuals: Bool
+}
+
+/// Something the person should be told, named by code rather than sentence.
+///
+/// The shared modules do not know which language the shop reads, so they hand
+/// back a code and whatever the sentence needs. `Words` turns it into words.
+public struct Notice: Decodable, Sendable, Equatable {
+    public let code: String
+    public let params: [String: JSONValue]
+}
+
+/// One of the places a status change reaches outside the shop's own book.
+///
+/// A webhook to somebody's ERP, a Telegram message, an email to the customer, a
+/// refresh of the link they are watching. None of it is undoable and none of it
+/// is repeatable — so an app that cannot send them must not make the move and
+/// quietly skip them.
+public struct Outbound: Decodable, Sendable, Equatable {
+    /// `webhooks`, `event_webhook`, `telegram`, `email`, `portal`.
+    public let channel: String
+    /// Why it applies: `enabled`, `published`, or the status that triggers it.
+    public let why: String
+    /// HOW it would be carried, when that decides whether this app can carry it.
+    ///
+    /// Only `email` sets it, and it is the provider: `sendgrid` and `mailgun`
+    /// are one HTTPS POST each, `custom` is SMTP — a socket and a dialogue that
+    /// Electron's main process implements and this app does not. The channel
+    /// alone cannot answer "can I send this", so the provider travels with it.
+    public let via: String?
+}
+
+/// A job moved from one stage to another, and everything that moved with it.
+///
+/// The three collections come back CHANGED rather than as a patch, because the
+/// shared modules mutate what they are handed and the caller's job is to write
+/// the result down. `unhandled` is the safety net: an effect type this app does
+/// not classify is reported rather than dropped, so a new effect in
+/// `lib/order-status.js` surfaces as a visible gap instead of a silent one.
+public struct JobMove: Decodable, Sendable {
+    public let ok: Bool
+    /// Present and refusing when `ok` is false.
+    public let gate: StatusGate
+    public let order: JSONValue?
+    public let inventory: [JSONValue]?
+    public let consumables: [JSONValue]?
+    public let notices: [Notice]?
+    /// What the move should be called in the activity log, if anything.
+    public let activity: String?
+    /// Effect types this app performed, cosmetically skipped, that would have
+    /// left the shop (and reached nobody, or the move would have been refused),
+    /// or that it does not know at all.
+    public let performed: [String]?
+    public let cosmetic: [String]?
+    public let outbound: [String]?
+    public let unhandled: [String]?
+    /// The outbound effects that are WEBHOOKS, with their arguments.
+    ///
+    /// `outbound` above is type names only, which is enough to refuse a move
+    /// and not enough to send one: two webhook effects on the same move differ
+    /// only in their `event`. So they come back whole.
+    public let webhookEffects: [WebhookEffect]?
+}
+
+/// One webhook a move asked for.
+///
+/// `kind` is the effect type — `webhook` is the subscription bus, whose events
+/// are named `status_changed`; `order_webhook` is the single configured URL,
+/// whose events are named `status`. They are two different systems with two
+/// different event vocabularies, and a shop can have both.
+public struct WebhookEffect: Decodable, Sendable {
+    public let kind: String
+    public let event: String
+    public let newStatus: String?
+
+    public init(kind: String, event: String, newStatus: String?) {
+        self.kind = kind
+        self.event = event
+        self.newStatus = newStatus
+    }
+}
+
+/// An order after money was recorded against it, and what that asked for.
+///
+/// `effects` are named but not detailed, because a payment's are simpler than a
+/// move's: saving, redrawing, and the notifications a shop with integrations
+/// would send — which the caller has already refused the move over if it has
+/// any of them.
+public struct PaymentRecorded: Decodable, Sendable {
+    public let order: JSONValue
+    public let effects: [String]
+    /// The webhooks this payment owes, WITH their event names.
+    ///
+    /// `effects` flattens each one to its type, which is enough to say what
+    /// happened and not enough to send anything: two webhooks on one payment
+    /// differ only in what they are called. A move has carried these since it
+    /// was written; a payment threw them away, so the Mac could only refuse to
+    /// record a payment that owed one.
+    public let webhookEffects: [WebhookEffect]?
+    /// Why the rule changed nothing, when it refused — `clearPayment` on a job
+    /// whose payment plan has collected rows says `plan_collected`.
+    public let refused: String?
+}
+
+/// A job handed over, or a job that was not ready to be.
+public struct Handover: Decodable, Sendable {
+    public let ok: Bool
+    public let order: JSONValue?
+}
+
+/// A job after its details were changed, and whether anything actually moved.
+public struct JobEdited: Decodable, Sendable {
+    public let order: JSONValue
+    public let changed: Bool
+}
+
+/// A job given another customer — `lib/order-edit.js changeCustomer`.
+public struct CustomerChange: Decodable, Sendable {
+    public let order: JSONValue
+    public let ok: Bool
+    public let reason: String?
+    public let currencyDiffers: Bool
+}
+
+/// A job that failed inspection, and the waste row it produced.
+public struct QcFailure: Decodable, Sendable {
+    public let order: JSONValue
+    public let waste: JSONValue
+    /// The shelf as the failed print left it. A failure takes its filament off
+    /// the spools it was printing from, so this has to be written with the
+    /// order and the waste row — three records that land together or not at all.
+    public let inventory: [JSONValue]
+    /// What actually came off, and which spools it came off.
+    public let deducted: Double
+    public let spools: [String]
+}
+
+/// A new job, and the shop's counters as taking it left them.
+///
+/// Both, because they must be written together: the order carries an invoice
+/// number the settings have just consumed, and saving one without the other
+/// either loses the job or hands its number to the next one.
+public struct NewOrder: Decodable, Sendable {
+    public let order: JSONValue
+    public let settings: [String: JSONValue]
+}
+
+/// What a shop's Telegram bot is about to say.
+public struct TelegramMessage: Decodable, Sendable, Equatable {
+    public let botToken: String
+    public let chatId: String
+    public let message: String
+
+    public init(botToken: String, chatId: String, message: String) {
+        self.botToken = botToken
+        self.chatId = chatId
+        self.message = message
+    }
+}
+
+/// The email a status change owes a customer, as `lib/order-email.js` writes it.
+///
+/// Addressed and finished: `html` is the body the other app has been sending
+/// since email notifications shipped, escaped by the module rather than by a
+/// renderer global this app does not have. Sending is not this type's business
+/// — `EmailClient` carries it, and `provider` says which door it goes through.
+public struct OrderEmail: Decodable, Sendable, Equatable {
+    public let to: String
+    public let subject: String
+    public let html: String
+    public let provider: String
+
+    /// Spelled out because the implicit memberwise initialiser of a public
+    /// struct is internal, and `EmailClient`'s own tests build one to prove
+    /// that a send which fails is reported rather than swallowed.
+    public init(to: String, subject: String, html: String, provider: String) {
+        self.to = to
+        self.subject = subject
+        self.html = html
+        self.provider = provider
+    }
+}
+
+/// The republish a move owes the customer's tracking link.
+///
+/// `payload` is handed back as raw JSON rather than a decoded shape on purpose:
+/// it is the customer's page, its fields differ between a quote and an order,
+/// and every field this app "knew about" would be a second opinion waiting to
+/// disagree with `lib/portal-refresh.js`. The Mac's job is to PUT these bytes,
+/// not to have views about them.
+public struct PortalRefresh: Decodable, Sendable, Equatable {
+    /// `quote` or `order`.
+    public let kind: String
+    /// The public token the customer's link is addressed by.
+    public let pubToken: String
+    public let payload: JSONValue
+    /// Links the published item to a customer's portal account; empty when the
+    /// job has no customer or the customer has no address.
+    public let customerEmail: String
+    /// The intake request the job came from (`job.intakeId`), sent top level
+    /// beside the payload so the server can email the customer their link
+    /// once. Nil for a job that did not come from a request.
+    public let intakeId: String?
+
+    /// Spelled out for the reason `OrderEmail`'s is: the implicit memberwise
+    /// initialiser of a public struct is internal, and `PortalClient`'s tests
+    /// build one to prove a refresh that cannot be addressed is reported.
+    public init(kind: String, pubToken: String, payload: JSONValue, customerEmail: String,
+                intakeId: String? = nil) {
+        self.intakeId = intakeId
+        self.kind = kind
+        self.pubToken = pubToken
+        self.payload = payload
+        self.customerEmail = customerEmail
+    }
+}
+
+/// A machine as a rule left it, or the reason it would not.
+public struct MachineWritten: Decodable, Sendable {
+    public let machine: JSONValue?
+    public let refused: String?
+
+    public init(machine: JSONValue?, refused: String?) {
+        self.machine = machine; self.refused = refused
+    }
+}
+
+/// A nozzle fitment, as `lib/nozzle-wear-data.js` describes it.
+public struct NozzleMaterial: Decodable, Sendable, Identifiable, Equatable {
+    public let key: String
+    public let label: String
+    /// What it is expected to last, in grams.
+    public let grams: Double
+    public var id: String { key }
+}
+
+/// One printer in Khayt's catalogue, as a picker offers it.
+public struct CatalogPrinter: Decodable, Sendable, Identifiable, Equatable {
+    public let id: String
+    public let name: String
+    public let vendor: String?
+    /// The bed, the nozzle, the colours, the power — what the catalogue has
+    /// checked, and by its absence what it has not.
+    public let specs: String
+    /// What the catalogue knows about the three things a sheet puts in front
+    /// of the shop the moment a model is picked — so what is saved is what was
+    /// on screen. Nil where the catalogue has not checked it.
+    public var powerDraw: Double? = nil
+    public var nozzleDiameter: Double? = nil
+    public var nozzleMaterial: String? = nil
+    /// `fdm`, `resin`… — `lib/printer-catalog.js`'s `tech`.
+    public var tech: String? = nil
+}
+
+/// A new spool, or the reason there is not one.
+public struct SpoolWritten: Decodable, Sendable {
+    public let spool: JSONValue?
+    public let refused: String?
+}
+
+/// A corrected spool, and the settings as its colour library left them.
+public struct SpoolEdited: Decodable, Sendable {
+    public let spool: JSONValue
+    public let settings: [String: JSONValue]
+    public let refused: String?
+    public let colourAdded: String?
+
+    public init(spool: JSONValue, settings: [String: JSONValue], refused: String?,
+                colourAdded: String?) {
+        self.spool = spool; self.settings = settings
+        self.refused = refused; self.colourAdded = colourAdded
+    }
+}
+
+/// A new consumable, or the reason there is not one.
+public struct ConsumableWritten: Decodable, Sendable {
+    public let consumable: JSONValue?
+    public let refused: String?
+}
+
+/// A corrected consumable, or the reason it was refused.
+public struct ConsumableEdited: Decodable, Sendable {
+    public let consumable: JSONValue
+    public let refused: String?
+
+    public init(consumable: JSONValue, refused: String?) {
+        self.consumable = consumable; self.refused = refused
+    }
+}
+
+/// What the shop is owed, aged.
+public struct Receivables: Decodable, Sendable, Equatable {
+    public let rows: [Row]
+    public let buckets: [Bucket]
+    public let total: Double
+
+    /// One unpaid amount: a whole order, or one instalment of a plan.
+    public struct Row: Decodable, Sendable, Equatable, Identifiable {
+        public let id: String
+        public let project: String
+        public let client: String
+        public let owed: Double
+        /// Whole days outstanding — from the instalment's own due date where
+        /// there is one, so a plan is not read as overdue since the order.
+        public let days: Int
+        public let bucket: String
+        public let payStatus: String
+        public let instalment: Bool
+        /// The day it falls due, `YYYY-MM-DD` — invoice date + the customer's
+        /// payment terms (`lib/payment-terms.js`), or the instalment's own.
+        /// Optional so a row from an older bundle still decodes.
+        public let due: String?
+        /// The customer's terms in days; 0 is due on receipt.
+        public let termsDays: Int?
+        /// Past its due date. A net-30 invoice is owed but not overdue for
+        /// its first thirty days.
+        public let overdue: Bool?
+
+        /// Owed but not yet due — a row on terms whose day has not come.
+        public var notYetDue: Bool { overdue == false && (termsDays ?? 0) > 0 }
+        /// For sorting a table by due date: `YYYY-MM-DD` sorts as text.
+        public var dueSortKey: String { due ?? "" }
+    }
+
+    /// One of the four ages a shop reads.
+    public struct Bucket: Decodable, Sendable, Equatable, Identifiable {
+        public let label: String
+        public let count: Int
+        public let total: Double
+        public var id: String { label }
+    }
+}
+
+/// One quarter of the shop's P&L.
+public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
+    /// "2026-Q3".
+    public let period: String
+    public let orders: Int
+    public let revenue: Double
+    public let shipping: Double
+    public let expenses: Double
+    /// The fixed overhead charged to this period — pro-rated for the quarter
+    /// in progress, so it is not billed a full quarter's rent on day three.
+    public let fixed: Double
+    /// Tax charged on this quarter's sales — money held for the authority, and
+    /// the reason `revenue` above is net of it. On every invoice ISSUED in the
+    /// period, finished or not: the invoice is the tax point, so this covers
+    /// the jobs the accountant's export lists, where `revenue` is finished
+    /// work only.
+    public let vatCollected: Double
+    /// The sales `vatCollected` was charged on, net of it — every invoice
+    /// issued in the period, where `revenue` is finished work only. Optional
+    /// because an older bundle has no such field.
+    public let taxableSales: Double?
+    /// The part of `vatCollected` charged on the FINISHED work `revenue`
+    /// counts, so `revenue + revenueVat` is what those jobs were billed.
+    /// Optional because an older bundle has no such field.
+    public let revenueVat: Double?
+    /// Revenue grossed back up by its own tax: the finished jobs as billed.
+    /// Not `revenue + vatCollected`, which adds the open invoices' tax to
+    /// sales that do not include them. An older bundle, whose VAT followed
+    /// finished jobs only, falls back to that sum.
+    public var grossRevenue: Double { revenue + (revenueVat ?? vatCollected) }
+    /// Tax the shop paid on its purchases and can reclaim. Only the expenses
+    /// that recorded one contribute; an expense entered before Khayt asked
+    /// carries none and reclaims nothing.
+    public let vatReclaimable: Double
+    /// What is actually owed for the quarter: charged less paid. NEGATIVE is a
+    /// real position — the quarter a shop buys a printer, the authority owes it.
+    public let vatDue: Double
+    /// The part of `vatCollected` that reverses an invoice from a FILED VAT
+    /// return — cancelled, voided or credited after the return went in, and
+    /// landed here, the first open period (lib/vat-periods.js). Negative for a
+    /// reversal. Nil on a row with none, and from an older bundle.
+    public let vatAdjustment: Double?
+    /// The same reversals' share of `taxableSales`.
+    public let salesAdjustment: Double?
+    /// How many reversals landed in this period.
+    public let adjustments: Int?
+    public let net: Double
+    /// What the finished work cost to make, in the shop's currency. Optional
+    /// because the rule gained it in September 2026 and an older bundle must
+    /// still decode.
+    public let cogs: Double?
+    /// (revenue − cogs) / revenue, blended over the period; nil where nothing
+    /// was billed.
+    public let marginPct: Double?
+    /// Finished jobs that were charged nothing and cost something to make —
+    /// gifts, tests, jobs nobody priced. Their material is in `cogs`, which is
+    /// why a period with a few of them can show a margin of −400%. Optional for
+    /// the same reason `cogs` is.
+    public let unpriced: Int?
+    /// Filament bought in the period, net of reclaimable tax. STOCK, not an
+    /// expense: it is in neither `expenses` nor `net`, and reaches the P&L as
+    /// `cogs` when a job uses it (lib/pnl-report.js, the shop's choice of
+    /// accrual). Optional because an older bundle has no such field.
+    public let inventory: Double?
+    /// A machine bought in the period, net of reclaimable tax, that the
+    /// depreciation line already spreads out (lib/pnl-report.js, A MACHINE IS
+    /// PAID FOR ONCE). In neither `expenses` nor `net` — the machine reaches
+    /// the P&L as `depreciation`. Optional because an older bundle has no such
+    /// field.
+    public let capital: Double?
+    /// Filament lost to failed prints in the period, at what it cost — a cost
+    /// line of its own, and `net` already has it taken off. Optional because a
+    /// bundle older than the waste line has no such field.
+    public let waste: Double?
+    /// What the shop's machines lost in value in the period — the one place
+    /// machine wear enters the P&L (lib/depreciation.js), and `net` already
+    /// has it taken off. Optional because an older bundle has no such field;
+    /// zero for a book whose machines carry no depreciation.
+    public let depreciation: Double?
+    /// What the shop's people cost for the hours they logged in the period
+    /// (`store.timeEntries`, at the rate frozen when the hours were logged) —
+    /// a line of its own, and `net` already has it taken off. Optional because
+    /// an older bundle has no such field; zero for a book with no time log.
+    public let labour: Double?
+    /// Labour was logged in a period that ALSO books pay as an expense or a
+    /// fixed cost — possibly the same money twice. The rule cannot know, so it
+    /// says so and the screen passes it on; nothing is subtracted.
+    public let labourOverlap: Bool?
+    /// The first and last book day the row holds, present only when the P&L
+    /// was asked for a span (`PnlRange`): a span shorter than the grain — this
+    /// month under the quarter view — is one row holding just the span's days,
+    /// and these say which. Nil for a whole period.
+    public let from: String?
+    public let to: String?
+    public var id: String { period }
+}
+
+/// A record the shared rule built, or the reason it would not.
+///
+/// Both halves optional because exactly one is present: a rule that refuses
+/// returns a reason and no record, and the caller must not be able to read a
+/// record that was never made.
+public struct Written: Decodable, Sendable {
+    public let expense: JSONValue?
+    public let refused: String?
+}
+
+/// A waste entry, and the shelf as deducting from it left it.
+public struct WasteWritten: Decodable, Sendable {
+    public let entry: JSONValue?
+    public let refused: String?
+    public let inventory: [JSONValue]
+}
+
+/// A waste entry taken out, and both collections as that left them.
+public struct WasteRemoved: Decodable, Sendable {
+    public let removed: Bool
+    public let wasteLog: [JSONValue]
+    public let inventory: [JSONValue]
+}
+
+/// A category that has gone past its monthly budget.
+public struct Overspend: Decodable, Sendable, Equatable {
+    public let spent: Double
+    public let budget: Double
+}
+
+/// Budget against actual for one category.
+public struct BudgetRow: Decodable, Sendable, Identifiable, Equatable {
+    public let category: String
+    public let budget: Double
+    public let spent: Double
+    public let remaining: Double
+    /// Capped at 100, for a bar.
+    public let pct: Double
+    public let over: Bool
+    public var id: String { category }
+}
+
+/// A currency a shop can price in, as `lib/currencies.js` describes it.
+public struct Currency: Codable, Sendable, Equatable {
+    public let symbol: String
+    public let label: String
+    /// Where the symbol goes: "before" the figure ($12) or "after" it (12 SAR).
+    public let pos: String
+}
+
+/// An invoice, ready to be shown or printed.
+public struct InvoiceDocument: Decodable, Sendable {
+    public let html: String
+    /// True when the shop reads Arabic-Indic digits. A string cannot rewrite
+    /// the text of elements that have not been laid out yet, so the app does it
+    /// once the document is in a view.
+    public let arabicNumerals: Bool
+    /// The elements that pass applies to.
+    public let selector: String
+
+    /// Memberwise, so a test can hand `page` a document without running the
+    /// whole rule set to get one — the wrapping is its own question.
+    public init(html: String, arabicNumerals: Bool, selector: String) {
+        self.html = html
+        self.arabicNumerals = arabicNumerals
+        self.selector = selector
+    }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "khayt-browser-extension",
+  "private": true,
+  "description": "Save to Khayt — the browser extension's source. Not an npm package; `type: module` is so Node reads src/*.js the way the browser does, for the tests and the linter.",
+  "type": "module"
+}

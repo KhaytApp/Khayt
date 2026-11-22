@@ -1,0 +1,495 @@
+'use strict';
+/**
+ * The document a customer is handed.
+ *
+ * `renderInvoice` was 425 lines of template string inside the renderer, so the
+ * only thing that could produce an invoice was the Electron window. A wrong
+ * character in it is not a crash — it is a customer's invoice with a missing
+ * VAT line, found by an auditor months later.
+ *
+ * So the HTML it produced BEFORE the move is written down in
+ * test/fixtures/invoices, for ten orders that between them reach both
+ * languages and directions, a shop with and without a tax registration,
+ * inclusive and exclusive tax, a discount, a rush fee, shipping, a paid stamp,
+ * a bank block, a quote, the ZATCA QR, and the case where the QR could not be
+ * drawn and has to say so.
+ *
+ * The fixtures are regenerated deliberately and never to make this pass:
+ * `node scripts/invoice-fixtures.mjs --write`, with the diff read.
+ */
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { render } = require('./helpers/invoice-harness.js');
+const { CASES } = require('./helpers/invoice-cases.js');
+
+const DIR = path.join(__dirname, 'fixtures', 'invoices');
+
+test('the document is the same document, byte for byte', () => {
+  for (const { name, order, opts, money } of CASES) {
+    const expected = fs.readFileSync(path.join(DIR, `${name}.html`), 'utf8');
+    const actual = render(order, opts, money);
+    assert.equal(actual, expected,
+      `the ${name} invoice changed. If that was deliberate, read the diff and `
+      + `regenerate with: node scripts/invoice-fixtures.mjs --write`);
+  }
+});
+
+test('every case is covered by a fixture, and every fixture by a case', () => {
+  // A fixture with no case is dead weight; a case with no fixture silently
+  // asserts nothing, which is the failure this whole file is about.
+  const onDisk = fs.readdirSync(DIR).filter((f) => f.endsWith('.html'))
+    .map((f) => f.replace(/\.html$/, '')).sort();
+  assert.deepEqual(onDisk, CASES.map((c) => c.name).sort());
+});
+
+/* ── Who the invoice is addressed to ──────────────────────────────────────────
+   It used to be the JOB. `order.project` is the free-text field the order
+   editor labels "Description" and the print log labels "Project / Client", and
+   the bill-to read it — so an invoice for a job linked to a customer printed
+
+       BILLED TO: Turbine bracket
+                  +966 50 123 4567
+
+   which is that customer's phone under somebody else's name, on a tax document.
+   The fallback chain below is arranged so every invoice that was already right
+   stays byte-for-byte identical: nine of the ten fixtures did not move. */
+
+const { SHOP, ORDER } = require('./helpers/invoice-cases.js');
+
+/** The text inside the bill-to block, and the meta rows beside the number. */
+function addressee(html) {
+  const block = html.match(/<div class="bill-to">[\s\S]*?<\/div>\s*<\/div>/);
+  const name = (block ? block[0] : '').match(/<div class="name">([^<]*)</);
+  // Up to the closing </div>, and then the tags out: the contact line holds a
+  // `<bdi>` per datum now, so reading to the first `<` returned nothing at all.
+  const subBlock = (block ? block[0] : '').match(/<div class="name-sub">([\s\S]*?)<\/div>/);
+  const sub = subBlock ? [subBlock[0], subBlock[1].replace(/<[^>]*>/g, '')] : null;
+  const meta = [...html.matchAll(/<span class="k">([^<]*)<\/span>\s*<span class="v">([^<]*)</g)]
+    .map((m) => [m[1], m[2]]);
+  return { name: name ? name[1] : '', sub: sub ? sub[1] : '', meta };
+}
+
+const ACME = { id: 'C1', name: 'Acme Prototyping',
+               phone: '+966 50 123 4567', email: 'shop@acme.example' };
+
+test('a job billed to a customer is addressed to the CUSTOMER', () => {
+  const out = addressee(render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                               { settings: SHOP, clients: [ACME] }));
+  assert.equal(out.name, 'Acme Prototyping');
+  assert.match(out.sub, /\+966 50 123 4567/, 'and their own contact line under it');
+});
+
+/**
+ * A phone number is not a sentence, and Arabic does not reverse it.
+ *
+ * `+966 50 123 4567` has no strongly-directional character in it — digits,
+ * spaces and a plus sign are all neutral — so inside the `dir="rtl"` invoice
+ * the bidi algorithm laid its runs out right to left and the document printed
+ *
+ *     0000 000 50 966+
+ *
+ * on the customer's copy. Same for the email, the CR and the VAT number. The
+ * fix is `<bdi>`, which is the element for exactly this, and the assertion is
+ * on the markup rather than on the pixels because the reordering happens in
+ * the renderer where a string test cannot see it.
+ */
+test('Latin contact details are isolated from the direction around them', () => {
+  const arabic = Object.assign({}, SHOP, {
+    contentLangs: ['ar', 'en'], phone: '+966 50 000 0000',
+    email: 'hello@tuwaiq.example', vat: '300000000000003',
+  });
+  const html = render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                      { settings: arabic, language: 'ar', clients: [ACME] });
+
+  assert.match(html, /dir="rtl"/, 'the document really is the right-to-left one');
+  for (const datum of ['+966 50 000 0000', 'hello@tuwaiq.example',
+                       'VAT 300000000000003', '+966 50 123 4567',
+                       'shop@acme.example']) {
+    assert.ok(html.includes(`<bdi>${datum}</bdi>`),
+              `${datum} reaches the page unisolated, so Arabic will reorder it`);
+  }
+});
+
+test("and the job's name is kept, beside the invoice number", () => {
+  // Dropping it would take the one line saying WHAT was made off a document
+  // whose line items are individual parts.
+  const out = addressee(render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                               { settings: SHOP, clients: [ACME] }));
+  assert.deepEqual(out.meta.find((m) => m[0] === 'Project'), ['Project', 'Bracket set']);
+});
+
+test('a job with no customer is addressed exactly as it always was', () => {
+  const out = addressee(render(ORDER, { settings: SHOP }));
+  assert.equal(out.name, 'Bracket set', 'the dual-purpose field is what a shop typed');
+  assert.equal(out.meta.find((m) => m[0] === 'Project'), undefined,
+               'and it is not said twice');
+});
+
+test('a job with neither is a walk-in, and says so', () => {
+  const out = addressee(render(Object.assign({}, ORDER, { project: '' }), { settings: SHOP }));
+  // `inv.walk_in` and `doc.no_specific_client`, spelled out: the harness's `t`
+  // returns Khayt's own English, and these are what a customer would read.
+  assert.equal(out.name, 'Walk-in customer');
+  assert.equal(out.sub, 'No specific client');
+});
+
+test('a linked customer with no name falls back rather than printing nothing', () => {
+  const nameless = { id: 'C1', phone: '+966 50 123 4567' };
+  const out = addressee(render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                               { settings: SHOP, clients: [nameless] }));
+  assert.equal(out.name, 'Bracket set');
+  assert.equal(out.meta.find((m) => m[0] === 'Project'), undefined);
+});
+
+test('a customer whose name IS the job name is not printed twice', () => {
+  const same = { id: 'C1', name: 'Bracket set' };
+  const out = addressee(render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                               { settings: SHOP, clients: [same] }));
+  assert.equal(out.name, 'Bracket set');
+  assert.equal(out.meta.find((m) => m[0] === 'Project'), undefined);
+});
+
+/**
+ * The same rule as `localName` in the renderer, and it matters here more than
+ * anywhere: this is the document the customer keeps. A shop writing Arabic
+ * billed in the stale English name left over from setup, on paper.
+ */
+test("the customer's name is read in the language the shop writes", () => {
+  const bilingual = { id: 'C1', nameEn: 'Acme Prototyping', nameAr: 'أكمي للنماذج' };
+  const arabicShop = Object.assign({}, SHOP, { contentLanguages: ['ar', 'en'] });
+
+  const ar = addressee(render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                              { settings: arabicShop, clients: [bilingual], language: 'ar' }));
+  assert.equal(ar.name, 'أكمي للنماذج');
+
+  const en = addressee(render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                              { settings: Object.assign({}, SHOP, { contentLanguages: ['en', 'ar'] }),
+                                clients: [bilingual], language: 'en' }));
+  assert.equal(en.name, 'Acme Prototyping');
+});
+
+/* ── What the document must never stop saying ─────────────────────────────────
+   The fixtures prove nothing CHANGED. These prove the right things are there
+   in the first place, so a regenerated fixture cannot quietly bless a document
+   that has lost its tax line. */
+
+const html = (name) => {
+  const c = CASES.find((x) => x.name === name);
+  return render(c.order, c.opts, c.money);
+};
+
+test('a tax invoice names the tax, the registration and the total', () => {
+  const doc = html('plain-en');
+  assert.match(doc, /300000000000003/, 'the seller VAT number');
+  assert.match(doc, /1150\.00/, 'the total');
+  assert.match(doc, /150\.00/, 'the tax');
+  assert.match(doc, /INV-2026-0021/, 'the invoice number');
+});
+
+test('a shop with no tax registration does not print a tax line', () => {
+  const doc = html('no-tax-registration');
+  assert.doesNotMatch(doc, /300000000000003/,
+    'an unregistered shop must not show a registration number');
+});
+
+test('a refused ZATCA QR says what is missing rather than leaving a gap', () => {
+  const doc = html('zatca-qr-refused');
+  assert.match(doc, /VAT registration number/,
+    'a code that will not scan is better than one that scans and is invalid — '
+    + 'but the document must say which');
+  assert.doesNotMatch(doc, /id="zatca-qr"/, 'and must not draw one anyway');
+});
+
+test('a paid invoice is stamped paid, and an unpaid one is not', () => {
+  assert.notEqual(html('paid-with-bank'), html('plain-en'));
+  // Printed in four-character groups, the way an IBAN is read aloud and typed
+  // into a banking app — not as the unbroken string it is stored as.
+  assert.match(html('paid-with-bank'), /SA03 8000 0000 6080 1016 7519/,
+    'the bank details for a transfer, grouped so they can be typed');
+});
+
+test('an Arabic document reads right to left', () => {
+  assert.match(html('plain-ar'), /dir="rtl"/);
+  assert.match(html('plain-en'), /dir="ltr"/);
+});
+
+test('a job with no parts still produces a document', () => {
+  // A quote for work not yet broken down is a real thing to hand somebody.
+  const doc = html('no-parts');
+  assert.ok(doc.length > 500);
+  assert.match(doc, /INV-2026-0021/);
+});
+
+test('print time is written the way a person reads it, not the way a slicer reports it', () => {
+  // ── WHY THIS CASE DID NOT EXIST ──────────────────────────────────────────
+  //
+  // Every fixture carried a round print time, so the sixteen tests above all
+  // passed against a document that said "PETG-CF · 8.745 hrs · 559 g" — the
+  // grams rounded, the hours beside them not. The case the fixtures could not
+  // reach was never drawn, so nobody saw it. This reaches it.
+  const c = CASES.find((x) => x.name === 'plain-en');
+  const order = Object.assign({}, c.order, {
+    parts: [{ name: 'Turbine bracket', material: 'PETG-CF', printTime: 8.745,
+              printWeight: 559.4, baseCost: 100, qty: 1 }],
+  });
+  const doc = render(order, c.opts, c.money);
+
+  assert.match(doc, /8\.7 hrs/, 'one decimal — a shop knows a print time to about six minutes');
+  assert.doesNotMatch(doc, /8\.745/,
+    'three decimals claim a precision nothing in the shop measured, on a '
+    + 'document a customer keeps');
+  // Its neighbour, unchanged: the point is that the two now agree.
+  assert.match(doc, /559 g/, 'the grams were always rounded');
+});
+
+test('a whole number of hours does not grow a decimal point', () => {
+  const c = CASES.find((x) => x.name === 'plain-en');
+  const order = Object.assign({}, c.order, {
+    parts: [{ name: 'Turbine bracket', material: 'PLA', printTime: 6,
+              printWeight: 120, baseCost: 100, qty: 1 }],
+  });
+  const doc = render(order, c.opts, c.money);
+  assert.match(doc, /6 hrs/, '"6 hrs" is what a person writes');
+  assert.doesNotMatch(doc, /6\.0 hrs/, '"6.0 hrs" is what a spreadsheet writes');
+});
+
+/* ── A part the customer agreed a price for ───────────────────────────────────
+   The pool of the price was shared among the parts by cost, so an agreed
+   bracket at 50 would have printed at whatever its cost share came to — the
+   one line on the document the customer can check against what they were told,
+   wrong. The agreed part prints its agreed figure; the rest share the rest. */
+test('an agreed part is billed at its agreed figure and the others share what is left', () => {
+  const agreed = CASES.find((c) => c.name === 'agreed-part');
+  const html = render(agreed.order, agreed.opts, agreed.money);
+  const amounts = [...html.matchAll(/class="amount">([0-9.]+) /g)].map((m) => m[1]);
+  assert.deepEqual(amounts.slice(0, 2), ['100.00', '32.50'], '2 × 50 agreed, and 132.50 − 100 for the lid');
+  // No agreed part: every other fixture is byte-identical, which the first test
+  // proves; here the two sums are shown to be the old ones.
+  const plain = CASES.find((c) => c.name === 'plain-en');
+  const before = [...render(plain.order, plain.opts).matchAll(/class="amount">([0-9.]+) /g)].map((m) => m[1]);
+  // The fixture's parts carry no baseCost, so the pool is split equally — as it always was.
+  assert.deepEqual(before.slice(0, 2), ['575.00', '575.00']);
+});
+
+// ── THE RULE MUST NOT REACH FOR A GLOBAL ───────────────────────────────────
+//
+// Every ingredient this document needs is named in its context — except one.
+// `getClientTier` was called as a free variable, so it found the renderer's
+// global in Electron and threw `ReferenceError` everywhere else. The native
+// Mac app could not build an invoice AT ALL for a job with a customer once
+// loyalty was switched on; the sheet read "This job's invoice could not be
+// built".
+//
+// Nothing caught it because no invoice test has ever enabled loyalty, and the
+// branch is behind `order.clientId && settings.loyaltyEnabled`. These call the
+// rule directly, in plain Node, where no renderer global exists — which is the
+// cheapest place this could ever have been found.
+
+const DOC = require('../lib/invoice-document.js');
+const { CURRENCIES: CURR } = require('../lib/currencies.js');
+// The document reads its sibling rules off the global the way both apps load
+// them — the Mac bundles every module and the renderer loads every script, so
+// requiring them here is what "no renderer in sight" actually means: the
+// shared rules, and nothing of the window.
+require('../lib/invoice-language.js');
+
+function bareContext(extra = {}) {
+  return Object.assign({
+    qrSvg: '', qrProblem: null, payQrSvg: '', total: '100.00',
+    vatAmount: '0.00', subtotal: '100.00', vatRate: 0,
+    settings: { loyaltyEnabled: true, currency: 'SAR' },
+    CURRENCIES: CURR,
+    clients: [{ id: 'c1', name: 'Najd Architects' }],
+    i18n: { current: 'en' },
+  }, extra);
+}
+
+const TIER_ORDER = { id: 'ORD-1', clientId: 'c1', project: 'Turbine bracket', price: 100, date: '2026-01-01T00:00:00.000Z' };
+
+test('the document builds with loyalty on and no renderer in sight', () => {
+  // Before the fix this threw ReferenceError: getClientTier is not defined.
+  const out = DOC.invoiceHtml(TIER_ORDER, bareContext());
+  assert.ok(out && typeof out.html === 'string' && out.html.length > 0);
+});
+
+test('a tier that is handed over is printed, and one that is not is not', () => {
+  const withTier = DOC.invoiceHtml(TIER_ORDER, bareContext({ clientTier: { name: 'Gold' } }));
+  assert.match(withTier.html, /Gold/, 'the tier badge is missing');
+
+  const without = DOC.invoiceHtml(TIER_ORDER, bareContext());
+  assert.doesNotMatch(without.html, /Gold/);
+});
+
+test('a tier record with no name prints nothing rather than an empty badge', () => {
+  // The host looks this up; a half-filled record is its problem to have, and
+  // an empty orange chip on a customer's invoice is the wrong way to say so.
+  const out = DOC.invoiceHtml(TIER_ORDER, bareContext({ clientTier: { minOrders: 3 } }));
+  assert.doesNotMatch(out.html, /background:#D88A3D/);
+});
+
+test('loyalty off means no badge, whatever the host passes', () => {
+  const out = DOC.invoiceHtml(TIER_ORDER, bareContext({
+    settings: { loyaltyEnabled: false }, clientTier: { name: 'Gold' } }));
+  assert.doesNotMatch(out.html, /Gold/);
+});
+
+/* ── The shop's logo is a settings string, and it goes into an attribute ─────
+   `safeBizLogo` checks only that the value STARTS with `data:image/`, so
+   `data:image/png" onerror="…` passed it and closed the `src` attribute — a
+   script on a document a customer opens. The document escapes it itself now,
+   rather than trusting the host's `escapeHtml`, which defaults to the identity. */
+test('a logo cannot close its own attribute', () => {
+  const { context } = require('./helpers/invoice-harness.js');
+  const evil = 'data:image/png;base64,AAAA" onerror="alert(1)';
+  const { ctx, area } = context({ settings: SHOP });
+  ctx.safeBizLogo = () => evil;
+  ctx.renderInvoice(ORDER, { qrSvg: '', qrProblem: null, payQrSvg: '', total: '1', vatAmount: '0',
+                             subtotal: '1', subtotalShown: '1', vatRate: 15, shipping: 0 });
+  const html = area.innerHTML;
+  assert.ok(!html.includes('" onerror="'), 'the logo broke out of its attribute');
+  assert.ok(html.includes('src="data:image/png;base64,AAAA&quot; onerror=&quot;alert(1)"'));
+
+  // A real logo comes out byte for byte.
+  const good = 'data:image/png;base64,iVBORw0KGgo+/=';
+  const again = context({ settings: SHOP });
+  again.ctx.safeBizLogo = () => good;
+  again.ctx.renderInvoice(ORDER, { qrSvg: '', qrProblem: null, payQrSvg: '', total: '1', vatAmount: '0',
+                                   subtotal: '1', subtotalShown: '1', vatRate: 15, shipping: 0 });
+  assert.ok(again.area.innerHTML.includes(`src="${good}"`));
+});
+
+test('a shop that adds tax on top prints it as added, not "(incl.)"', () => {
+  assert.match(html('exclusive-tax'), /VAT \(8\.875%\)<\/span>/);
+  assert.doesNotMatch(html('exclusive-tax'), /\(incl\.\)/);
+  assert.match(html('plain-en'), /VAT \(15%\) \(incl\.\)/, 'an inclusive shop still says included');
+});
+
+test('on a discounted job the rows add up to the Subtotal, before the Discount row', () => {
+  const doc = html('discount-rush-shipping');
+  const rows = [...doc.matchAll(/<td class="amount">([\d.]+) /g)].map((m) => +m[1]);
+  const shown = [...doc.matchAll(/class="v">([−\d.]+) /g)].map((m) => m[1]);
+  // Subtotal, Discount, Rush, Shipping, VAT.
+  assert.equal(shown[0], '1162.50');
+  assert.equal(shown[1], '−162.50');
+  assert.ok(Math.abs(rows.reduce((s, n) => s + n, 0) - 1162.5) < 0.005, `rows ${rows}`);
+  // The total is the price, unchanged.
+  assert.match(doc, /1150\.00<span class="unit">/);
+  // And the rule agrees with the Subtotal the case prints.
+  const { invoiceSummary } = require('../lib/invoice-document.js');
+  require('../lib/tax.js');
+  const order = { price: 1150, discountPct: 12.5, priceBeforeDiscount: 1300, rushFeeAmount: 90, shippingCost: 60 };
+  assert.equal(invoiceSummary(order, globalThis.KhaytTax.profileFromSettings({ enableVat: true, vatRate: 15 })).itemsSubtotal, 1162.5);
+});
+
+/* PAYMENT TERMS (lib/payment-terms.js). A customer on net 30 is handed an
+   invoice that says so and names the day it falls due — counted from the date
+   printed above it. Due on receipt prints nothing, so every existing document
+   is unchanged (the fixtures above prove that), and a quote prints nothing. */
+test('a customer on terms gets "Payment terms" and "Due date" under the date', () => {
+  const net30 = Object.assign({}, ACME, { paymentTermsDays: 30 });
+  const { meta } = addressee(render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                                    { settings: SHOP, clients: [net30] }));
+  const at = meta.findIndex((m) => m[0] === 'Payment terms');
+  assert.ok(at > 0, 'the terms row is printed');
+  assert.equal(meta[at][1], 'Net 30');
+  assert.equal(meta[at + 1][0], 'Due date');
+  // 2026-09-04 + 30 days = 4 October 2026, in whatever format the date prints.
+  const printedDate = meta[meta.findIndex((m) => m[0] === 'Date')][1];
+  assert.notEqual(meta[at + 1][1], printedDate);
+  assert.match(meta[at + 1][1], /2026/);
+  assert.match(meta[at + 1][1], /Oct|10/);
+});
+
+test('due on receipt, and a quote, print no terms at all', () => {
+  const none = addressee(render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                                { settings: SHOP, clients: [ACME] }));
+  assert.ok(!none.meta.some((m) => m[0] === 'Payment terms'));
+  const net30 = Object.assign({}, ACME, { paymentTermsDays: 30 });
+  const quote = addressee(render(Object.assign({}, ORDER, { clientId: 'C1', status: 'quote', id: 'QUO-1' }),
+                                 { settings: SHOP, clients: [net30] }));
+  assert.ok(!quote.meta.some((m) => m[0] === 'Payment terms'));
+});
+
+/* ── A proforma ────────────────────────────────────────────────────────────────
+   The job's paper as a request for payment before it is invoiced. Not a tax
+   invoice: no ZATCA QR, and the job's id under "No." rather than an invoice
+   number, so printing one can never look like the invoice was issued. */
+
+test('a proforma is titled and watermarked as one, with no QR and no invoice number', () => {
+  const zatca = Object.assign({}, SHOP, { enableZatca: true });
+  const numbered = Object.assign({}, ORDER, { id: 'JOB-77', invoiceNumber: 'INV-2026-0042', invoiceNum: 'INV-2026-0042' });
+  const invoice = render(numbered, { settings: zatca });
+  const proforma = render(numbered, { settings: zatca }, { proforma: true });
+  assert.match(invoice, /id="zatca-qr"/, 'the invoice carries the QR');
+  assert.doesNotMatch(proforma, /id="zatca-qr"|class="qr-box"/, 'the proforma does not');
+  assert.match(proforma, /class="proforma-watermark"/);
+  assert.doesNotMatch(invoice, /proforma-watermark/);
+  const no = (html) => addressee(html).meta.find(([k]) => /No/i.test(k));
+  assert.equal(no(proforma)[1], 'JOB-77', 'the job, not the invoice number');
+  assert.doesNotMatch(proforma, /INV-2026-0042/);
+  assert.match(proforma, /<div class="title">[^<]*PROFORMA[^<]*<\/div>/i);
+});
+
+test('without the flag the document is unchanged (the fixtures hold)', () => {
+  assert.equal(render(ORDER, { settings: SHOP }, { proforma: false }), render(ORDER, { settings: SHOP }));
+});
+
+/* ── The stamp: VOID > CREDITED > PAID ────────────────────────────────────────
+   A voided or fully credited invoice printed exactly like a live one, so the
+   customer was handed a request for money nobody was owed. Turki, Nov 7:
+   "should be stamped as void". */
+
+const { invoiceStampOf } = require('../lib/invoice-document.js');
+
+test('a void beats a credit, which beats paid', () => {
+  assert.equal(invoiceStampOf({ voidedAt: '2026-11-02', creditedAt: '2026-11-03' }, true).kind, 'void');
+  assert.equal(invoiceStampOf({ creditedAt: '2026-11-03' }, true).kind, 'credited');
+  assert.equal(invoiceStampOf({}, true).kind, 'paid');
+  assert.equal(invoiceStampOf({}, false), null);
+  assert.equal(invoiceStampOf({ voidedAt: '  ' }, false), null, 'a blank stamp is no stamp');
+});
+
+test('the reversal rule\'s own placeholder reason is not printed', () => {
+  assert.equal(invoiceStampOf({ voidedAt: '2026-11-02', voidedReason: 'Voided' }, false).reason, null);
+  assert.equal(invoiceStampOf({ voidedAt: '2026-11-02', voidedReason: ' Wrong job ' }, false).reason, 'Wrong job');
+});
+
+test('a voided invoice says so at the head of the page and across it', () => {
+  const html = render(Object.assign({}, ORDER, { voidedAt: '2026-11-02T09:00:00.000Z',
+    voidedReason: '<b>dup</b>', paidAmount: 1150, paymentStatus: 'paid' }), { settings: SHOP });
+  assert.match(html, /class="inv-reversal void"/);
+  assert.match(html, /class="inv-reversal-mark void"/);
+  assert.match(html, /data-stamp="void"/);
+  assert.doesNotMatch(html, /class="inv-stamp paid"/, 'one stamp only');
+  assert.doesNotMatch(html, /<b>dup<\/b>/, 'a typed reason is text, never markup');
+});
+
+test('a credited invoice carries CREDITED and no reason line', () => {
+  const html = render(Object.assign({}, ORDER, { creditedAt: '2026-11-03T09:00:00.000Z' }), { settings: SHOP });
+  assert.match(html, /data-stamp="credited"/);
+  assert.match(html, /class="inv-reversal credited"/);
+  assert.doesNotMatch(html, /inv-reversal-reason/);
+});
+
+test('the stamp look is in all three copies of invoice.css', () => {
+  const root = path.join(__dirname, '..');
+  const copies = ['renderer/invoice.css', 'ios/KhaytCompanion/Resources/invoice.css',
+    'mac/KhaytCore/Sources/KhaytApp/Resources/invoice.css']
+    .map((f) => fs.readFileSync(path.join(root, f), 'utf8'));
+  for (const css of copies) {
+    for (const rule of ['.inv .inv-stamp', '.inv .inv-stamp.paid', '.inv .inv-reversal', '.inv .inv-reversal-mark']) {
+      assert.ok(css.includes(rule), `${rule} is missing from a copy of invoice.css`);
+    }
+  }
+});
+
+test('every language names the stamps', () => {
+  for (const lang of ['ar', 'de', 'en', 'es', 'fr', 'ja', 'pt-BR', 'tr', 'zh']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'locales', `${lang}.js`), 'utf8');
+    for (const key of ['doc.void_stamp', 'doc.void_line', 'doc.void_reason', 'doc.credited_stamp', 'doc.credited_line']) {
+      assert.ok(src.includes(`"${key}"`), `${lang} lacks ${key}`);
+    }
+  }
+});

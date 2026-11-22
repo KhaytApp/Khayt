@@ -1,0 +1,1062 @@
+# Khayt LAN REST API
+
+Reference for the embedded HTTP server in `lib/lan-server.js`. Used by the **LAN PWA**, **kiosk**, and **iOS Companion** — not a public cloud API.
+
+**Source of truth:** `khayt-store.json` on the desktop (Mac/PC). All writes persist to disk and notify the Electron renderer via IPC.
+
+## Enable on desktop
+
+1. Khayt → **Settings** → **LAN API**
+2. Enable **LAN REST API**
+3. **Listen on all network interfaces** (required for phone/tablet on Wi‑Fi)
+4. Set **Owner LAN PIN** (required for companion queue/inventory; max 256 chars)
+5. Default port **3219** (configurable)
+
+Base URL: `http://<desktop-lan-ip>:<port>`
+
+## Versioned surface: `/v1`
+
+Every data route below is also served under **`/v1`** — the documented, stable surface for
+automation (`GET /v1/orders`, `PATCH /v1/orders/:id`, `GET /v1/inventory`, …). The original
+`/api/*` paths remain a **permanent alias** for the iOS Companion, PWA and kiosk; nothing
+about them changes. Within `/v1`, changes are additive only — new fields and endpoints never
+break existing clients.
+
+## Authentication
+
+### Scoped API tokens (automation)
+
+For scripts and automation platforms, mint a **scoped bearer token** in
+**Settings → API Tokens**:
+
+```
+Authorization: Bearer khayt_<random>
+```
+
+* A token is shown **once** at creation — only a SHA-256 hash is stored, so it cannot be
+  recovered later. Lost it? Revoke and mint a new one.
+* A token carries an explicit **scope set** and gets nothing else:
+  `orders:read`, `orders:write`, `clients:read`, `clients:write`,
+  `inventory:read`, `inventory:write`, `machines:read`.
+* Using a token outside its scopes returns **403** `{"error":"insufficient_scope","required":"orders:write"}` —
+  never a silent no-op. A read token can never write.
+* An unknown or revoked token returns **401** `{"error":"invalid_token"}`. Revocation takes
+  effect immediately (the hash is deleted; nothing is cached).
+* Repeated bad tokens hit the same per-IP lockout as bad PINs (10/min → **429**).
+* Tokens are an **addition** to the owner PIN, not a replacement — `x-khayt-pin` keeps
+  working exactly as before for humans and the iOS app.
+* **Both apps** (Nov 2026). The native Mac mints and revokes them in **Settings → Online →
+  API Tokens** (the owner only, under the staff lock), stores the same record
+  (`settings.lanApi.apiTokens[]`: `id`, `label`, `scopes`, `createdAt`, `lastUsedAt`, and the
+  SHA-256 `hash`), and its LAN server checks them with the same rules
+  (`lib/api-tokens.js requiredScope`). A token minted on either computer verifies on the other.
+* **Only the owner** creates or revokes a token on the desktop too (Nov 2026): rbac
+  `security` `edit`, as on the Mac. Under the staff lock anyone else sees the list and no
+  buttons; main refuses a mint (`not_allowed`) and puts back the token list of a save from
+  any other role (`lib/api-tokens.js mayManageTokens`, `guardTokenSave`).
+* `lastUsedAt` is stamped by the desktop's LAN server when a token is used, **at most once an
+  hour** per token (`lib/api-tokens.js markUsed`), so a busy integration is not a store write
+  per request. A save from the window keeps the later of its copy and the disk's.
+* The hash never reaches a phone: `/api/store` masks `settings.lanApi.apiTokens[].hash`
+  (`lib/store-secret-paths.js` PHONE_PRIVATE), and an export drops it.
+
+| Mechanism | Details |
+|-----------|---------|
+| Header | `x-khayt-pin: <owner-pin>` (preferred for native clients) |
+| Query | **Not accepted** on any API route, read or write, by either app (it put the PIN in every link's address, in clear over plain HTTP). The one exception is the queue page's old `/?pin=` bookmark, which is traded once for a `khayt_lan` session cookie and a redirect to a clean `/`; the page with no PIN shows a form that posts it to `/session` |
+
+**Owner PIN** is `settings.lanApi.pin` in the store — same as kiosk / queue API.
+
+### PIN rules
+
+- If an owner PIN **is configured**, sensitive `GET` routes and all mutating routes require a matching PIN.
+- If **no** owner PIN is configured, sensitive `GET` routes return **401** (queue/inventory/machines are unavailable until a PIN is set).
+- **Writes** without a configured PIN return **403**.
+- **Brute force:** 10 failed attempts per client IP → **429** for 1 minute (the native Mac app counts an IPv6 client from outside the shop's network per /64, and a link-local, unique-local or same-network IPv6 client by its own address).
+- **Both apps:** an owner PIN shorter than 8 characters opens nothing — owner routes answer **401** with `{"reason":"pin-too-short", "error": …}` until the shop sets a new one (clients should key on `reason`, not the sentence). `/calendar.ics` takes the calendar token only, never the owner PIN.
+- **Both apps:** a PIN-gated route asked under a `Host` that is not an IP address, `localhost` or a `.local` name answers **421** `{"error":"host-not-local"}` (DNS rebinding). The desktop also accepts its tunnel's own hostname while the tunnel runs.
+
+### Public routes (no owner PIN)
+
+- `GET /api/status`
+- `GET /order/:id` (customer portal)
+- Quote approval, intake (separate intake PIN/token), webhooks, static PWA assets
+- **Mac only (Oct 2026):** `POST /api/intake/estimate` also accepts the
+  **owner PIN** (`x-khayt-pin`), so the shop's own phone can price a file a
+  customer sent it. Without a PIN it is decided exactly as before (intake
+  session or intake token); a wrong PIN counts towards the owner-PIN lockout.
+  `POST /api/intake` does NOT: a submission records the customer's own PDPL
+  consent, which the shop cannot give for them. The Node server does neither.
+
+Companion apps should call `GET /api/status` first (reachability), then `GET /api/queue` with PIN to confirm pairing.
+
+## Companion v1 endpoints
+
+### `GET /api/status`
+
+Public aggregate counts for the active queue.
+
+**Response 200**
+
+```json
+{
+  "queued": 12,
+  "pending": 4,
+  "printing": 3,
+  "post": 2,
+  "qc": 3,
+  "completed_today": 7,
+  "waiting": 2
+}
+```
+
+`waiting` — active job intake / waiting-list entries (excludes declined).
+
+### `GET /api/identity` and `GET /api/proof` — is this the paired computer?
+
+Both apps (Mac #1942, desktop). A phone can check that whatever answers to the
+shop's Bonjour name holds the key it paired with, **before** sending the PIN.
+
+- `GET /api/identity` (owner PIN) → `{"alg":"ed25519","publicKey":"<base64 of the raw 32-byte key>"}`.
+  The phone keeps it at pairing.
+- `GET /api/proof?nonce=<32–128 hex>` (open) → `{"alg":"ed25519","sig":"<base64>"}`, an
+  Ed25519 signature over the ASCII bytes `khayt-proof:` + the nonce in lower case.
+  Any other nonce → **400** `{"error":"nonce"}`.
+
+The key is made once per computer and kept out of the book (sealed by the
+keychain), so a restored backup or a second computer does not claim to be this
+one. Nothing on the open route depends on the PIN.
+
+### `POST /api/devices` and signed requests — the PIN crosses the network once
+
+The LAN is plain http, so a PIN sent on every request can be read by anything
+on the same Wi-Fi. A phone that has paired with the PIN enrols once and then
+**signs** each request with a key of its own instead. Nothing it sends after
+that can be replayed or turned back into the PIN.
+
+**Enrolment** — `POST /api/devices` (owner PIN, the last time it is sent):
+
+```json
+{ "publicKey": "<base64 of a fresh raw 32-byte X25519 public key>", "name": "Turki's iPhone" }
+```
+
+**200** → `{"deviceId":"dev_…","publicKey":"<base64 X25519, the computer's, fresh per enrolment>","sig":"<base64>"}`
+
+- `deviceId`: made by the computer, `dev_` + 12–40 of `[A-Za-z0-9_-]`.
+- `sig`: Ed25519, by the `/api/identity` key, over the ASCII bytes
+  `khayt-enrol:` + deviceId + `:` + the computer's publicKey + `:` + the phone's
+  publicKey (both base64 exactly as they appear in the JSON). The phone refuses
+  an enrolment whose signature does not check against the key it pinned.
+- Both sides then hold `key = HKDF-SHA256(ikm: X25519(shared), salt: "khayt-device-v1",
+  info: deviceId, length: 32)`. The computer keeps `{deviceId, name, key,
+  createdAt, lastSeenAt}` with its identity key — sealed, out of the book, so a
+  backup or a synced second computer never carries it — and forgets its
+  X25519 private key straight away.
+- `name` is trimmed to 60 characters. At most 32 devices; a 33rd replaces the
+  one seen longest ago.
+- **Changing the PIN removes every device.** The phone also drops its enrolment
+  when the PIN is edited on it, when it is unpaired, and when the identity key
+  it pinned changes.
+- **404/405** → a computer that predates this; the phone keeps sending the PIN and asks
+  again a day later. **503** (no identity key) → the same.
+- **Native Mac only: a pairing window.** The Mac takes an enrolment only while its
+  owner has clicked **Pair a phone** (Settings ▸ Online): for 120 seconds on a
+  monotonic clock (a date change cannot extend it), until one phone has enrolled,
+  until the owner closes it, or until the LAN server stops. The button is off while
+  the server listens on loopback only. Outside the window, **403**
+  `{"reason":"pairing-closed","error":"On the Mac, click Pair a phone, then try again"}`
+  comes back before the PIN is read, so it counts towards no lockout and says nothing
+  about the PIN. While the window is open, a PIN sent without a device key (on any
+  route) is judged by the window's own count instead of the per-address and
+  whole-server lockouts, so guesses made before it cannot hold the new phone out.
+  That count is per address (an IPv4 address, or an IPv6 /64): after 5 wrong PINs an
+  address gets **429** `{"reason":"pairing-locked","error":"Too many wrong PINs from
+  this device. It can't pair until you click Pair a phone again on the Mac"}` for the
+  rest of the window, right PIN or not, while other addresses can still pair. The
+  window closes for everyone at 50 wrong PINs in all.
+- **What the 50 is, and is not.** It raises the bar from one device to ten
+  addresses; it is not a barrier against someone deliberate. One machine on the LAN
+  can take ten addresses (`ifconfig … alias`), and the 403 above tells a poller the
+  moment a window opens, so a determined guesser gets about 50 tries per window the
+  owner opens. Against an 8-digit PIN that is 50 in 10^8 (1 in 2 million) per window;
+  what actually protects the shop is the PIN's length and how rarely the window is
+  open. A guesser who closes the window early is seen: the Mac says so. The desktop
+  (`lib/lan-server.js`) has no window yet.
+
+**A signed request** carries, in place of `x-khayt-pin`:
+
+| Header | Value |
+|---|---|
+| `x-khayt-device` | the `deviceId` |
+| `x-khayt-time` | Unix seconds, an integer |
+| `x-khayt-nonce` | 32 lower-case hex, fresh per request |
+| `x-khayt-mac` | base64 HMAC-SHA256(key, canonical) |
+
+```
+canonical = "khayt-req-v1" \n METHOD \n request-target \n time \n nonce \n hex(SHA-256(body))
+```
+
+`METHOD` in upper case; `request-target` exactly as on the request line (path
+plus `?query`, still percent-encoded); the hash of the body bytes as sent, the
+hash of nothing for a request without one; lower-case hex; `\n` a single LF.
+
+A valid signature is accepted **wherever the owner PIN is**, and only there. The
+computer refuses, with **401**:
+
+| Body | When | The phone |
+|---|---|---|
+| `{"reason":"device-unknown"}` | no such device, or removed | forgets it, retries once with the PIN, enrols again |
+| `{"reason":"device-revoked"}` | the shop signed this phone out (Mac: Settings → Online → Paired phones; Windows and Linux: Settings → Online → LAN API → Paired phones) | forgets its key AND the PIN, and asks the person to pair again; never enrols by itself |
+| `{"reason":"device-clock","now":<unix seconds>}` | `time` more than 120 s from the computer's clock | keeps the difference and retries once |
+| `{"reason":"device-replay"}` | the nonce was seen for this device in the last 300 s | fails the request |
+| `{"reason":"device-auth"}` | anything else: a bad MAC, missing or malformed headers | fails the request |
+
+Compare the MAC in constant time. A request with both `x-khayt-pin` and the
+device headers is judged by the device headers alone.
+
+Shared test values for all three implementations are in
+[`lan-device-keys.vectors.json`](lan-device-keys.vectors.json): fixed X25519
+and Ed25519 keys, the derived key, an enrolment signature and two signed
+requests. Each side's tests should reproduce every value in it.
+
+### `GET /api/library`, its thumbnails, and `POST /api/library/{id}/estimate` — pricing a model from the phone
+
+The shop's library (`printFiles`) stays on the computer: it is a quarter of a
+real book and is left out of the phone's working set. These routes let the
+phone search it and have a model priced the way the intake form prices a
+customer's file, without moving the file. All three need the owner (the PIN
+or a signed request).
+
+A model archived on the Mac (`archivedAt` is a non-empty string — by the shop,
+or because its Khayt Vault file was trashed) is not in this library: it is left
+out of the items, the folder counts and the paging, and its thumbnail and
+estimate answer 404 `not-found`. The Mac's own LAN server does the same.
+
+**`GET /api/library?q=&folder=&offset=0&limit=50`**
+
+- `q` — words matched against `name`, `originalName`, `folder`, `tags` and
+  `category`, ignoring case and diacritics; every word must match. With a `q`
+  the whole library is searched and `folders` is empty.
+- `folder` — without `q`: the models filed directly in that folder path (`""`
+  is the top), and in `folders` its immediate sub-folders.
+- `limit` 1–200 (default 50). Favourites first, then by `name`.
+
+```json
+{
+  "total": 7, "offset": 0,
+  "folders": [ { "path": "Saudi Kings/Large", "name": "Large", "count": 12 } ],
+  "items": [ {
+    "id": "PF-sample-lantern", "name": "Lantern", "folder": "Home", "category": "Decor",
+    "tags": ["gift"], "material": "PLA Silk", "ext": "3mf", "size": 2400000,
+    "favorite": false, "timesPrinted": 6, "lastPrinted": "2026-08-12",
+    "thumb": true, "estimable": true,
+    "printTimeMins": 318, "grams": 154,
+    "plates": [ { "index": 1, "name": "Body", "printTimeMins": 205, "grams": 112 } ],
+    "colors": [ { "hex": "#0F5257", "grams": 88 } ],
+    "testedNotes": "…"
+  } ]
+}
+```
+
+`count` is every model at or under that folder. `printTimeMins`/`grams` are
+what a slicer recorded, or null. `estimable` means the computer has the file and
+can measure it (`stl`, `obj`, `3mf`, `gcode`). Leave out anything the book does
+not have; send null rather than a made-up 0. `timesPrinted`/`lastPrinted` count
+the finished jobs made from the model as well as the record's own counter — the
+larger of the two, and the later date (`lib/print-history.js`; one job is one
+print, whatever its quantity). Both servers answer the same.
+
+**`GET /api/library/{id}/thumb`** → the thumbnail (`image/jpeg`, `image/png` or
+`image/webp`) with `Cache-Control: private, max-age=86400`; **404** when there is none.
+
+**`POST /api/library/{id}/estimate?qty=1&plate=`** (no body) → the same answer
+as `POST /api/intake/estimate`: `{ok, reason, price, currency, qty, grams,
+hours, exact}`, plus optional `reliable` (false when a geometry estimate is
+outside the range it is good for — the phone shows a warning) and `missing`.
+`price` is for the whole `qty`; `grams` and `hours` are for one piece.
+
+- **The price is the owner's**, not the public intake figure: what the
+  computer's own "quote this model" calculator gives — the shop's spools,
+  rates, default margin, rounding and overhead. A shop that never set up
+  customer quoting still gets one. Where a computer cannot price that way it
+  answers 200 `{"ok":false,"reason":"not-configured","missing":"printer"|"material"}`
+  rather than a 0.
+- Slicer numbers recorded on the model are used as they are, with `exact:
+  true`; otherwise the file in the vault is measured.
+- `plate=N` prices that plate's recorded figures (`parsed.plates[index == N]`);
+  a plate with none is 200 `no-numbers` — the whole file is not measured for one plate.
+- On every refusal `price`, `grams` and `hours` are null and `exact` is false.
+
+Refusals: **404** `{"ok":false,"reason":"not-found"}` (no such model or plate),
+**409** `"no-file"` (nothing in the vault), **415** `"unsupported"`, **413**
+`"too-large"`, **503** `"busy"` with `Retry-After` (estimates share the intake
+limit). `{id}` is percent-encoded.
+
+### `GET /api/queue`
+
+Active kanban orders (`pending`, `printing`, `post`, `qc`). **Requires owner PIN** when configured.
+
+**Response 200** — array:
+
+```json
+[
+  {
+    "id": "ord-123",
+    "project": "Bracket v2",
+    "client": "Acme Co",
+    "status": "printing",
+    "machine": "P1S-01",
+    "dueDate": "2026-06-05",
+    "priority": "normal"
+  }
+]
+```
+
+### Discovery — `_khayt._tcp`
+
+The native Mac app advertises itself over Bonjour whenever its LAN API is bound
+to the network, so a client does not have to be told an address.
+
+| | |
+|---|---|
+| Service type | `_khayt._tcp` |
+| Service name | the shop's own name (`settings.shopName`), truncated to 63 **bytes** |
+| `TXT v` | the LAN API version — `1` |
+| `TXT store` | `1` when this server implements `GET /api/store`; absent means no |
+
+**Only when bound to the LAN.** A loopback-only server is not advertised, because
+a client that found it could never connect to it.
+
+`TXT store` is the one thing worth knowing before pairing: it separates a Mac that
+can hand over the book — so the client keeps working away from the desk — from one
+that cannot. The Electron desktop does not advertise at all.
+
+**The PIN is deliberately not advertised.** It can change while the server is up,
+and a stale "no PIN needed" is a client confidently telling a shop something
+untrue. A `401` answers it accurately for the cost of one request.
+
+Bonjour names and TXT records are broadcast in the clear to everything on the
+network. Nothing here is private: `/intake` already serves the shop's name to
+anyone on the LAN with no PIN, because it is the page customers are meant to open.
+
+On iOS, browsing requires `NSBonjourServices` in `Info.plist` alongside
+`NSLocalNetworkUsageDescription` — without it the system returns an empty result
+set rather than an error, which reads as "the Mac is not running".
+
+### `GET /api/store`
+
+The working set of the shop's book, for a client that keeps its own copy.
+**Requires owner PIN.**
+
+> **Served by the native Mac app only.** `lib/lan-server.js` does not implement
+> this route. Every other endpoint on this page answers a *question* — what is in
+> the queue, what is on the machines — which assumes the asker is a screen with a
+> live connection. This one hands over enough of the book that the asker can stop
+> asking, and it exists for the iOS companion's local store.
+
+**It is not the whole book.** `printLog` is about half of a real shop's store and
+`printFiles` another quarter — history no companion screen has ever shown. What
+travels is `BookScope.workingSet` (declared in `mac/KhaytCore/Sources/KhaytCore/BookScope.swift`,
+so the Mac and the phone cannot disagree about it):
+
+| Collection | What travels |
+|---|---|
+| `settings` | always, in full — nothing can be priced without it |
+| `printLog` | every **unfinished** order whatever its age, plus the newest 200 finished |
+| `clients`, `inventory`, `machines`, `waitingList`, `waTemplates` | in full, up to a ceiling |
+| `printers` (calculator presets), `consumables`, `suppliers` | in full, up to a ceiling — the phone's calculator and receipt scanner |
+| `expenses` | the newest 1,000 **by day** (not list position) — the receipt scanner's duplicate check |
+| everything else | stays on the Mac |
+
+An order is finished at `completed`, `shipped`, `delivered` or `cancelled`.
+Anything else travels however old it is — a job stuck in QC for two months is
+still in the shop.
+
+`?scope=whole` returns the entire store instead, for a restore or a person with
+`curl`. The companion never asks for it.
+
+**Secrets are masked** either way. The store passes through
+`KhaytCloudOutbox.forPhone(store)` — the cloud push's `forCloud`, plus one list
+more — so every path named in `lib/store-secret-paths.js` (printer access codes,
+API keys, bot tokens, refresh tokens) arrives as `"__KHAYT_MASKED__"`. The list
+more is PHONE_PRIVATE: an operator's `pinHash` and `settings.recoveryCodeHash`,
+which the shop's other computers need through the cloud and a phone never does.
+A device on the LAN is trusted with less than the cloud, never more.
+
+**Customer data is NOT masked**, because it is not a secret — it is the book. The
+response carries the shop's clients, orders and prices, which is why the owner PIN
+gates it and why the PIN lockout applies.
+
+**Response 200** — an envelope, not a bare store. The records alone cannot say what
+was left out, and a partial book that cannot say it is partial is worse than none:
+a client would count 200 orders and report a three-year-old shop as having done 200.
+
+```json
+{
+  "whole": false,
+  "scope": {
+    "collections": {
+      "printLog":  { "whole": false, "sent": 200, "available": 3140 },
+      "clients":   { "whole": true,  "sent": 31 },
+      "inventory": { "whole": true,  "sent": 13 }
+    },
+    "omitted": ["auditLog", "printFiles"],
+    "takenAt": "2026-09-18T09:00:00.000Z"
+  },
+  "store": {
+    "settings": { "shopName": "Ward", "telegram": { "botToken": "__KHAYT_MASKED__" } },
+    "printLog": [ { "id": "ord-123", "client": "Acme Co", "status": "printing" } ],
+    "clients":  [ { "id": "c-1", "name": "Sara" } ]
+  }
+}
+```
+
+`omitted` names what was withheld rather than leaving it to be inferred from
+absence: a client asking "do I have expenses?" must be told "they were not sent",
+never "there are none". A collection the shop simply does not have comes back as
+`{"whole": true, "sent": 0}` — the client has everything there is.
+
+**Response 500** — `{"error":"The book could not be prepared to send"}`. Deliberately
+not an empty book: a client that accepted `{}` would replace a shop it already had
+with nothing.
+
+### `GET /api/store/settings`
+
+The shop's settings on their own, for a client that refreshes its records
+elsewhere. **Requires owner PIN.** Also served as `/v1/store/settings`.
+
+> **Served by the native Mac app only.** Cloud deltas never carry `settings`, so
+> a phone that refreshes from Khayt Cloud learns of a connector installed on the
+> Mac (`settings.plugins`), or a currency or tax mode changed there, only from
+> this route. The phone reads it after a refresh round whenever the Mac answers.
+
+**Response 200**
+
+```json
+{ "settings": { "shopName": "…", "plugins": [ … ] }, "servedAt": "2026-11-09T14:00:00.000Z" }
+```
+
+`settings` is exactly what `GET /api/store` sends as `store.settings`: the same
+mask, so every path in `lib/store-secret-paths.js` (connector secrets, PIN hashes,
+sealed tokens) is masked or withheld here too.
+
+**Response 401 / 429** — as `GET /api/store`.
+
+**Response 500** — `{"error":"The settings could not be prepared to send"}`, also
+when the book has no settings. Never `{}`: the phone replaces its settings with
+what this returns.
+
+### `POST /api/store/deltas`
+
+A paired client's changes, folded into the shop's book. **Requires owner PIN.**
+
+> **Served by the native Mac app only.** `LanServer.Host.fold` is `nil` by
+> default — a build that has not wired it answers `405` and says so, rather than
+> failing as though something broke. The shipping Mac app wires it, so the
+> companion's offline edits land; `lib/lan-server.js` does not implement this
+> route at all.
+
+**Request** — an outbox, the shape `KhaytCloudOutbox.changesToSend` produces and
+`KhaytSync.applyDeltas` consumes:
+
+```json
+{
+  "deltas": [
+    { "collection": "clients", "record": { "id": "c-1", "name": "Sara", "rev": 2 } }
+  ],
+  "tombstones": [],
+  "cursor": null
+}
+```
+
+**Headers** — `x-khayt-pin` (a `?pin=` in the address is ignored on this route) and
+`Content-Type: application/json` (anything else is **415**, so a cross-origin page
+cannot reach this route with a preflight-free form or `text/plain` POST).
+
+Neither end invents a rule here. The client computes the payload with the same
+function the desktop pushes with, and the Mac folds it with the same function
+every device pulls with.
+
+**The book is protected by the fold, not by this route.** `applyDeltas` keeps the
+higher revision, so a client carrying a stale copy cannot undo work done at the
+desk — its record is counted in `skipped` and discarded. The host's writer does
+the rest: it reads inside the write and swaps atomically.
+
+**A partial client cannot delete history.** `changesToSend` emits a delta only for
+a record it *holds* at a higher rev, and takes tombstones only from the store's
+own `tombstones` collection. A phone carrying 200 of 3,140 orders says nothing at
+all about the 2,940 it was never given.
+
+**Response 200** — what the fold did:
+
+```json
+{ "applied": 1, "skipped": 1, "removed": 0 }
+```
+
+`skipped` is normal and not a fault: it counts records the book already held at an
+equal or higher revision. An empty outbox answers `200` with all zeros without
+writing — a write with no change still rewrites the file and still rolls `.prev`.
+
+**Response 400** — the payload is not `{deltas, tombstones, cursor}` with both
+arrays present. Checked before the engine sees it.
+
+**Response 405** — this Mac does not take changes from a client.
+
+**Response 500** — the book could not be written. Nothing was changed, and a
+client must not treat this as delivered.
+
+### The REST routes — served by both apps (Nov 2026)
+
+`/api/orders` (GET, POST), `/api/orders/:id` (PATCH), `/api/orders/:id/quote-url` (GET),
+`/api/orders/:id/approve` (POST), `/api/machines` (GET), `/api/inventory` (GET, POST),
+`/api/inventory/:id` (PATCH, DELETE), `/api/waiting-list` (GET), `/api/waiting-list/:id`
+(PATCH), `/api/clients` (GET), `/api/waste` (POST) and `/api/webhook/printer/:id` (POST)
+are answered by **both** `lib/lan-server.js` and the native Mac's `LanServer.swift`
+(`LanServer+Rest.swift`). What each one reads and writes is one module,
+`lib/lan-rest.js`, which both servers run — the Mac in JavaScriptCore — so the bodies
+and the records written are the same. Each server decides a write on the book it holds
+(a refusal costs no write) and again inside its write chain, and answers from the
+second. The same gate on both: the owner PIN (header), or a scoped API token where the
+route is in the scope model; `/api/waste` is in no scope and takes the PIN only.
+
+Where the two differ: a write the Mac cannot put on disk is **500** (the desktop says
+400), and a body that is not JSON is **400** `{"error":"Invalid JSON"}`. `/api/machines`
+answers GET only on the Mac. `POST /api/expense` and `POST /api/quote` are still
+desktop-only.
+
+### `GET /api/orders`
+
+Order log slice. **Requires owner PIN.**
+
+| Query | Description |
+|-------|-------------|
+| `limit` | Max rows (default 50, cap 200) |
+| `status` | Filter by status |
+
+**Response 200** — array with `id`, `project`, `client`, `status`, `material`, `price`, `dueDate`, `date`, `paymentStatus`.
+
+### `PATCH /api/orders/:id`
+
+Update order status. **Requires owner PIN.**
+
+**Body** (at least one field required)
+
+```json
+{ "status": "printing" }
+```
+
+```json
+{ "machineId": "m1" }
+```
+
+```json
+{ "status": "printing", "machineId": "m1" }
+```
+
+Pass `"machineId": null` to unassign a printer.
+
+**Valid status values:** `pending`, `printing`, `post`, `qc`, `completed`, `on_hold`
+
+A status change runs the shared status rule (`lib/order-status.js`), exactly as a move on
+the board does, in **both apps** (Nov 2026): `statusHistory` gains one entry, a completion
+stamps `completedAt`, a hold remembers when, a quote leaving the quote column is accepted,
+and moving back out of completed clears `completedAt`. A quote moved to any other status gets its invoice number inside the same write (the
+board's rule; a number it already has is kept), and the advanced counter is in `settingsChanged`. A move to the status the job already
+has changes nothing.
+
+**Response 200:** `{ "ok": true, "order": { "id", "status", "machineId", "machine" } }`  
+**Response 404:** order not found  
+**Response 400:** invalid status  
+**Response 409:** the rule refused the move — `{ "error": "Move refused", "code", "params" }`,
+with `code` one of `production_paused`, `wip_blocked`, `assembly_not_assembled`,
+`assembly_parts`. Nothing is written.
+
+**Desktop side effect:** `lan-order-updated` IPC with `changed` (the fields the move changed),
+`removed` and `effects` (the rule's effects, less the toasts and the save) — the window takes
+those fields and runs the effects: the filament and packaging deduction, the status webhooks,
+the customer's message, the portal. A completion over the LAN is not asked for actual time
+and grams; the estimate is booked, as on the phone.
+
+### `GET /api/inventory`
+
+Inventory as spool objects. **Requires owner PIN** (or an `inventory:read` token).
+
+**Response 200:** JSON array of spool objects, **projected** — not the raw store
+record. A spool comes back with the fields `POST` accepts (see below) plus `id`,
+`remaining`, `addedAt`, `sku`, `printTemp` and `bedTemp`, which the iOS companion
+reads.
+
+The rule is symmetry: **the API returns what the API accepts.** Reads used to
+return `store.inventory[]` verbatim, which meant any field the desktop added to a
+spool was published the moment it existed, without anyone deciding to. Over the
+tunnel this endpoint is internet-reachable behind one PIN, so that was the wrong
+default even though the caller is the owner.
+
+Fields on the store record but **not** returned: `supplier`, `invoice`,
+`costPerGram` — and anything added in future, until it is added to the allowlist
+on purpose (`LAN_SPOOL_READ_FIELDS` in `lib/lan-server.js`).
+
+### `POST /api/expense`
+
+Record an expense, with an optional photographed receipt. **Requires owner PIN.**
+
+The only endpoint that accepts binary, so most of its behaviour is what it
+refuses.
+
+**Body:** `amount` (**required**, > 0), plus optional `category`, `note`,
+`orderId`, `locationId`, and `receiptBase64` — a base64 JPEG, PNG or PDF.
+
+**The image is identified by its own first bytes**, never by a declared type or
+filename. A caller can claim anything; a file header is harder to fake, and this
+writes into a directory the desktop later hands to `shell.openPath`. A non-image
+is rejected with **415** even if it arrives named `receipt.jpg`.
+
+**The filename is generated by the desktop** (`receipt-<time>-<random>.<ext>`),
+so nothing caller-supplied can traverse out of the directory or overwrite another
+receipt. Files live in `userData/receipts/`, alongside the other attachment
+directories and inside the allow-list `hub:open-path` will open.
+
+**Limits:** 6 MB decoded, with the transport cap raised for this route alone —
+a phone photo does not fit the 1 MB that suits a JSON payload. Oversized bodies
+get **413**.
+
+**The receipt is written before the expense record**, so a failed write leaves no
+row pointing at a file that does not exist.
+
+**The `date` is set by the desktop** using the shop's calendar day, as everywhere
+else.
+
+**Response 201:** `{ "ok": true, "entry": { ... } }`
+**Response 400/413/415:** no amount / too large / not an accepted file type.
+
+An open desktop is notified over `lan-expense-added`.
+
+### `POST /api/waste`
+
+Log a failed print. **Requires owner PIN.**
+
+For recording waste at the machine rather than walking back to the desk. Writes
+the same record shape the desktop's waste form produces, so both feed one report.
+
+**Body:** `material` (**required** — an entry with no material cannot be costed
+or reconciled against a spool, so the desktop refuses it too), plus optional
+`failureType`, `weight` (grams), `cost`, `reason`, `notes`, `orderId`,
+`machineId`, and `deduct`.
+
+**`deduct: true`** subtracts `weight` from the first spool of that material,
+clamped at zero. Opt-in, because the shop may have adjusted stock already. If no
+spool matches, the waste is still logged and `deducted` comes back `null` —
+losing the record because the spool is gone would be the wrong trade.
+
+**The `date` is set by the desktop**, using the shop's calendar day. Callers do
+not send one: a phone in another timezone would otherwise file a failure under
+the wrong day, and waste-by-day is the report this record exists to feed.
+
+**Response 201:** `{ "ok": true, "entry": { ... }, "deducted": { "id", "weight" } | null }`
+**Response 400:** missing material, or a non-object body.
+
+An open desktop is notified over `lan-waste-logged` and patches its own state, so
+the two do not diverge until a reload.
+
+### `POST /api/quote`
+
+Cost a part using the desktop's own maths. **Requires owner PIN.**
+
+For quoting a walk-in customer without going back to the desk. The endpoint runs
+`lib/calculator-cost.js` against the live store, so a phone can never
+produce a different number from the desktop it is paired to — reimplementing the
+costing anywhere else would mean two costs for one part, and the wrong one would
+be whichever the shop happened to be looking at.
+
+**Body:** a part object, in the same shape the calculator tab builds —
+`spoolCost`, `spoolWeight`, `printWeight`, `supportWeight`, `printTime`,
+`wearRate`, `powerDraw`, `elecRate`, `prepTime`, `postTime`, `laborRate`,
+`failureRate`, `qty`, optional `filamentId`, `extraMaterials`, `priceTiers`.
+Missing fields are treated as zero. `qty` is clamped to 1…100000.
+
+**Response 200:**
+
+```json
+{
+  "ok": true,
+  "qty": 2,
+  "unitCost": 24.36,
+  "totalCost": 48.72,
+  "breakdown": { "material": 6, "machine": 2.2, "labor": 15, "buffer": 1.16 },
+  "priceTier": { "minQty": 10, "pricePerUnit": 25 },
+  "currency": "SAR"
+}
+```
+
+`breakdown` sums to `unitCost`. `priceTier` is `null` when the part carries no
+tiers or `qty` has not reached the lowest one.
+
+**Pricing.** Supply any of `margin` (percent), `discountPct`, `rush` (boolean),
+`shippingCost` or `extraLines` and the response gains a `price` block computed by
+`lib/pricing.js` — the same function the calculator screen runs, so a quote given
+standing next to a customer matches the one on the desk. Rush uses the shop's
+configured `rushFeePct`. With no `margin` supplied the price equals the cost,
+which is honest rather than a guess at what this shop charges.
+
+```json
+"price": { "beforeDiscount": 73.08, "discount": 7.31, "subtotal": 65.77,
+           "rushFee": 16.44, "shipping": 25, "extras": 12.5, "overhead": 0, "total": 119.71 }
+```
+
+`overhead` is the shop's fixed costs per print hour × the part's print hours ×
+`qty`, a cost under the margin like the calculator screen's Overhead line
+(`lib/overhead-rate.js`). It is 0 unless the shop turned that on in Settings, and
+0 when a price tier applies, because a tier replaces cost-plus-margin.
+
+**VAT is not included** — it is applied at invoicing, not in the calculator, so a
+quote total is pre-VAT exactly as the desktop's is.
+
+**Response 400:** empty, non-JSON, or non-object body.
+**Response 401:** no owner PIN — what a job costs the shop is not customer-facing.
+
+### `POST /api/inventory`
+
+Append a spool. **Requires owner PIN.**
+
+**Body:** spool object (partial OK). Server sets:
+
+- `id` — `spool-<timestamp>` if omitted
+- `addedAt` — ISO timestamp
+- `remaining` — from `weightRemaining` or `weightTotal` or `1000`
+
+`barcode` is the product's UPC/EAN, 8–14 digits; anything else is dropped. The
+companion looks a scanned box up on the shop's own shelf by this field before it
+asks a product database, so the next box of a filament fills the form from the
+last one.
+
+**Response 201:** `{ "ok": true, "spool": { ... } }`
+
+**Desktop side effect:** `lan-spool-added` IPC.
+
+### `PATCH /api/inventory/:id`
+
+Update spool remaining weight. **Requires owner PIN.**
+
+**Body**
+
+```json
+{ "remaining": 450 }
+```
+
+**Response 200:** `{ "ok": true, "spool": { ... } }`  
+**Desktop side effect:** `lan-spool-updated` IPC.
+
+### `DELETE /api/inventory/:id`
+
+Remove a spool. **Requires owner PIN.**
+
+**Response 200:** `{ "ok": true, "id": "spool-…" }`  
+**Desktop side effect:** `lan-spool-deleted` IPC.
+
+### `GET /api/waiting-list`
+
+Active intake / waiting-list entries (excludes declined). **Requires owner PIN.**
+
+**Response 200:** array of waiting-list objects (`id`, `project`, `clientName`, `notes`, `priority`, `status`, …).
+
+### `PATCH /api/waiting-list/:id`
+
+Update intake item status. **Requires owner PIN.**
+
+**Body:** `{ "status": "active" | "reminded" | "declined", "reminderDate"?: "YYYY-MM-DD" }`  
+Declining moves the item to `waitingListHistory`, stamped `declinedAt` (both apps).
+`reminderDate` (Nov 2026) is the field the desktop's own waiting-list editor writes: a
+calendar day, or `""`/`null` to clear it; absent leaves it alone; anything else is
+**400** `{"error":"Invalid reminderDate"}`.
+
+`PATCH /api/orders/:id`: `machineId: null` (or `""`) unassigns; a `machineId` that is
+not a string or number is **400** `{"error":"Invalid machineId"}` (Nov 2026; it used to
+unassign silently).
+
+**Desktop side effect:** `lan-waiting-updated` IPC.
+
+### `GET /api/clients`
+
+Read-only client list from store. **Requires owner PIN.**
+
+**Response 200:** array with `id`, `name`, `nameEn`, `nameAr`, `phone`, `email`.
+
+Read `name`. It is the client's name resolved through the shop's own content
+languages, and a shop may write in any two of nine — so a German-and-French shop
+has neither `nameEn` nor `nameAr` filled in, and a client reading only those two
+shows a list of blank rows. `nameEn`/`nameAr` are kept because the shipped iOS
+Companion decodes them and nothing else.
+
+### `POST /api/orders`
+
+Create a simple job or quote from the companion. **Requires owner PIN.**
+
+**Body**
+
+```json
+{
+  "project": "Bracket v2",
+  "client": "Acme Co",
+  "material": "PLA",
+  "price": 150,
+  "status": "pending",
+  "machineId": "MACH-1",
+  "dueDate": "2026-06-15",
+  "notes": "Rush job"
+}
+```
+
+Use `"status": "quote"` for a quote (sets expiry from desktop `quoteValidityDays`).
+
+The record is `lib/order-new.js newOrder`'s in **both apps** (Nov 2026) — the one the desk's
+calculator makes: numbered from the shop's counter (`INV-2026-0042-…`, `QUO-2026-0007-…`),
+with its invoice number, an estimated due date when none is sent, and every field a job
+has. `price` is taken as the job's total. The desktop also gives it a tracking token (and a
+quote its approval token).
+
+**Response 201:** `{ "ok": true, "order": { ... } }`  
+**Desktop side effect:** `lan-order-created` IPC with `{ order, settingsChanged }` — the
+window adds the job and takes the counters it advanced. Before Nov 2026 the window had no
+handler for this event, and its next save removed the job from the book; the same was true
+of `lan-spool-updated`, `lan-spool-deleted` and `lan-waiting-updated`, which it now takes too.
+
+The new order's id uses the shop's own prefix — `${invPrefix}-${year}-…`, the
+same one the desktop mints (`INV` unless the shop changed it), or `quotePrefix`
+for a quote. It used to read a setting that has never existed and always fell
+through to `ORD-`, so an order raised on the phone came out numbered unlike
+every order raised at the desk.
+
+### `GET /api/orders/:id/quote-url`
+
+Quote approval links for sharing with customers. **Requires owner PIN.**
+
+**Response 200:**
+
+```json
+{
+  "quoteUrl": "http://192.168.1.42:3219/order/QUO-2026-123/quote",
+  "statusUrl": "http://192.168.1.42:3219/order/QUO-2026-123/status",
+  "canApprove": true,
+  "expired": false,
+  "quoteExpiresAt": "2026-06-10"
+}
+```
+
+### `POST /api/orders/:id/approve`
+
+Owner approves a quote (same as customer web approval). **Requires owner PIN.**
+
+**Response 200:** `{ "ok": true, "order": { ... } }`
+
+**Response 404** no such order, **409** not awaiting approval, **410** the quote has
+expired (`{"error":"Quote has expired"}`). Before Nov 2026 an expired quote answered
+200 `ok` and was left unchanged.
+
+### `GET /api/machines`
+
+Machine list glance. **Requires owner PIN.**
+
+**Response 200** — array:
+
+```json
+[
+  { "id": "m1", "name": "P1S", "type": "fdm", "status": "printing", "hasPrinterApi": true }
+]
+```
+
+### `GET /api/machines/live`
+
+> **Served by both apps.** `lib/lan-server.js` and the native Mac's
+> `LanServer.swift` (since Sep 2026) answer the same shape; the Mac builds it
+> from `PrinterWatch.readings` in memory, so a request never polls a printer.
+
+Live printer telemetry from the app's own printer polling (OctoPrint, Moonraker, PrusaLink, Bambu, …). **Requires owner PIN.** Cheap enough for a phone to poll every few seconds.
+
+**Response 200** — one entry per `store.machines` row. The native Mac leaves
+out a retired printer (`lib/machine-status.js isRetired`); `lib/lan-server.js`
+still lists it, and the phone hides it either way:
+
+```json
+[{ "id": "M-1", "name": "U1", "hasPrinterApi": true,
+   "state": "printing", "progress": 42, "filename": "dragon.gcode",
+   "timeRemaining": 3600, "tempNozzle": 215, "tempBed": 59,
+   "error": null, "lastUpdated": "2026-09-25T04:20:00.000Z", "apiType": "moonraker" }]
+```
+
+`progress`, `timeRemaining` (seconds) and the temperatures are rounded integers. A machine never heard from has its `id`, `name` and `hasPrinterApi`, and `null` for the rest.
+
+### `POST /api/printer/{machineId}/{pause|resume|stop}`
+
+> **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it.
+
+A paired phone pausing, resuming or stopping a print. `stop` cancels the job (`cancel` is accepted too). The body is empty. The command is the Mac printer card's own path (`PrinterControl.send`), so the phone sends the printer exactly what the Mac's button would.
+
+**Requires a signed, enrolled phone** (the `x-khayt-device` headers, see
+`LanDevices`). The owner PIN sent bare is refused with
+`403 {"ok":false,"reason":"device-key-required"}`: this moves a machine
+mid-print. The usual gate runs first, so a non-local `Host` is `421` and an
+unset or short PIN is `401`.
+
+**Response 200:** `{"ok":true,"state":"paused"}`. `state` is the printer's own word, read right after a refresh, or `null`.
+
+**Refusals:** `{"ok":false,"reason":…,"message"?:…}`
+
+| Status | `reason` |
+|---|---|
+| 404 | `not-found`: no machine in use with that id |
+| 409 | `not-connected`, `not-watched` (under service / retired / another app's protocol), `unsupported` (this protocol has no such verb), `no-job` |
+| 502 | `refused`: the printer said no, and `message` is what it said |
+| 503 | `busy`: the app is starting |
+
+### `POST /api/orders/{id}/photos`
+
+> **Served by both apps** (Nov 2026): the native Mac app and `lib/lan-server.js` (Windows/Linux).
+
+A paired phone adding a photo to a job. The body is the image itself (a JPEG from the phone's camera), not JSON, up to 8 MB, the desktop's own photo cap. The Mac files it exactly as its own Add Photo does (`OrderPhoto`): a 240px thumbnail inline in `printLog[].printPhotos[]`, a 1600px copy in `order-photos/` beside the book, the desktop's `{orderId}-{index}-{base36 ms}.jpg` filename, `"source": "phone"` on the record (the optional field both apps write: `printer`, `shop` or `phone`, missing on older photos), and the file written before the record. Any job status is accepted, as with the printer's own finish photo.
+
+**Requires a signed, enrolled phone**, like the printer route. The owner PIN sent bare, or an API token, is refused with `403 {"ok":false,"reason":"device-key-required"}`. A body over 1 MB is judged from the head before it is read: over 8 MB is `413 {"ok":false,"reason":"too-large"}`, an unsigned head is the 403, and it shares the large-body slots (`503 busy`).
+
+On Windows/Linux the signed body is read whole (up to the signed-body cap) before it is judged, so there is no head check and no `503 busy`; over 8 MB is still `413 too-large`.
+
+**Response 201:** `{"ok":true,"index":0,"filename":"J1-0-mh3k9x2a.jpg"}`, where `index` is the photo's position in `printPhotos`.
+
+**Refusals:** `{"ok":false,"reason":…}`
+
+| Status | `reason` |
+|---|---|
+| 404 | `not-found`: no job with that id |
+| 409 | `read-only`: this Mac cannot write the book (Mac only) |
+| 413 | `too-large`: empty, or over 8 MB |
+| 415 | `not-an-image`: not a picture this Mac can read |
+| 500 | `write-failed`, with `message` |
+
+### `POST /api/webhook/salla` and `POST /api/webhook/zid`
+
+A storefront telling the shop it has an order. **Served by both apps** — the
+native Mac app since the storefront rule moved to `lib/storefront-webhook.js`.
+Not behind the owner PIN: the storefront proves itself with a signature
+instead.
+
+- **Signature:** `X-Salla-Signature` / `X-Zid-Signature`, `sha256=` + the hex
+  HMAC-SHA256 of the raw body, keyed with `settings.lanApi.sallaWebhookSecret`
+  / `zidWebhookSecret` (set in either app's Online / LAN settings).
+- **Answers, in order:** 429 locked out (ten bad signatures from one address,
+  per platform — its own bucket, so it never locks the owner's PIN); 403 no
+  secret configured; 401 bad signature; 409 a byte-identical replay within ten
+  minutes; 200 `{ "ok": true, "duplicate": true }` for an order the book
+  already holds (by the platform's own order id, so a retry is never a second
+  order); otherwise 200 `{ "ok": true }`.
+- **What it writes:** one `printLog` row at the top — `source`,
+  `sourceOrderId`, the platform's total as `price` — and, for items the shop
+  already has on the shelf, takes them off `settings.storefront.stockQty`. An
+  order the shelf covers in full is written `completed` and `fromStock`.
+  Each item is matched to a catalogue product by `lib/store-order-job.js` —
+  its `sku` against the product's `sku` and its variants' SKUs, then its exact
+  normalised name, else unmatched — and the row carries `storeLines` (one per
+  item, with `productId` or null), the matched products' `parts` (per-piece
+  counts times what is still to print), and `productId` / `components` when
+  the whole basket is one product. An unmatched item gets a "Not matched to a
+  product" line in `notes` and is left for the shop to place.
+
+### `POST /api/webhook/smsa`, `/aramex`, `/spl`
+
+A carrier saying where a parcel is. **Served by both apps**; the rule is
+`lib/carrier-webhook.js`.
+
+- **Signature:** `X-Khayt-Signature` (or `X-Signature`), `sha256=` + the hex
+  HMAC-SHA256 of the raw body, keyed with
+  `settings.shipping.<carrier>.webhookSecret` (Settings → Shipping, or
+  Integrations → Shipping & Fulfillment on the Mac).
+- **Answers, in order:** 429 locked out (per carrier, its own bucket); 403 no
+  secret; 401 bad signature; 409 replay; **422** a signed payload with no
+  tracking number and status Khayt can read (so it shows in the carrier's own
+  dashboard); otherwise 200 `{ "ok": true }` — **including** a tracking number
+  the shop does not hold, because a different answer would say which parcels it
+  has.
+- **What it writes:** on the job holding that tracking number, the status moved
+  forward (never back; `exception` always), a line of `shippingHistory`, and
+  `shippedAt` / `deliveredAt` by `order-status.stampFromShipping`. An event
+  that changes nothing is not written.
+
+The printer webhook (`/api/webhook/printer/:id`) is **served by both apps**
+(the Mac since Nov 2026): the `x-khayt-webhook-token` header against
+`settings.lanApi.webhookToken` (never `?token=`), compared in constant time, ten
+wrong ones per address to a one-minute lockout on its own channel. `{topic}`,
+`{event}` or `{state}` is read as print started / done / cancelled, and the job on
+that machine moves through `lib/order-status.js` (`lib/lan-rest.js printerEvent`).
+Answers `{ "ok": true, "event", "advanced" }`.
+
+### `GET /api/version` and `POST /api/files/local` — Khayt as a printer in the slicer
+
+> **Served by the native Mac app only**, and only while the shop has switched
+> on Settings → Online → "Accept files from slicers (OctoPrint upload)". Off
+> (the default), both are the ordinary **404**. `lib/lan-server.js` does not
+> implement them.
+
+The two OctoPrint routes a slicer's "Send" uses (OrcaSlicer, PrusaSlicer,
+Bambu Studio: a physical printer of host type OctoPrint, with the Mac's LAN
+address and the API key shown in that pane). They are the server side of the
+same shapes `lib/printer-upload.js` sends to a real OctoPrint.
+
+- **Auth:** `X-Api-Key: <key>`. The key is 32 upper-case hex characters,
+  minted on this Mac and kept in its login Keychain (not in the book, so it
+  never travels in `/api/store`); "Regenerate" replaces it. No key **401**,
+  wrong key **403**, ten wrong keys from one visitor **429** for a minute (its
+  own bucket — it never locks the owner PIN). Not accepted in the query.
+- **`GET /api/version`** → `200 {"api":"0.1","server":"1.10.0","text":"OctoPrint 1.10.0 (Khayt)"}`.
+- **`POST /api/files/local`** — `multipart/form-data`, the file in the field
+  `file`. Taken: `.gcode`, `.gco`, `.g`, `.bgcode`, `.gcode.3mf` (else
+  **415**); no file part **400**. The key, the `Content-Length` and the cap are
+  judged from the head **before** the body is read; over 1 GiB is **413**; at
+  most two uploads at once (**503** `busy`). The body is streamed to disk, not
+  memory. `print` and `select` are read and **ignored** — nothing here ever
+  starts a printer — and the answer says so. A full inbox (100 files) is
+  **409**.
+- **201**, `Location` the resource:
+  ```json
+  {"done":true,"effectivePrint":false,"effectiveSelect":false,
+   "files":{"local":{"name":"plate.gcode","display":"plate.gcode","path":"plate.gcode","origin":"local",
+     "refs":{"resource":"http://<host>/api/files/local/plate.gcode",
+             "download":"http://<host>/downloads/files/local/plate.gcode"}}}}
+  ```
+- **Where it goes:** the "From slicer" inbox beside the book
+  (`<book folder>/From slicer/<id>/`), with the slicer's own grams, time,
+  material and slicer name read off the file. The shop adds it to the library,
+  or starts a job or a quote from it, in the app.
+
+## Errors
+
+| HTTP | Meaning |
+|------|---------|
+| 401 | Missing or wrong PIN |
+| 403 | Write blocked (no PIN configured on server) |
+| 413 | Body &gt; 1 MB |
+| 429 | PIN lockout |
+| 404 | Unknown path or order |
+
+Body: `{ "error": "message" }`
+
+## Desktop IPC (mobile → UI sync)
+
+Defined in `preload.js`:
+
+| Event | When |
+|-------|------|
+| `lan-spool-added` | After `POST /api/inventory` |
+| `lan-spool-updated` | After `PATCH /api/inventory/:id` |
+| `lan-spool-deleted` | After `DELETE /api/inventory/:id` |
+| `lan-order-created` | After `POST /api/orders` |
+| `lan-order-updated` | After `PATCH /api/orders/:id` or quote approval |
+| `lan-waiting-updated` | After `PATCH /api/waiting-list/:id` |
+| `lan-kanban-advanced` | Printer webhooks / auto-advance |
+
+Renderer handlers: `renderer/app-boot.js` (`onLanSpoolAdded`, `onLanOrderUpdated`).
+
+## Out of scope for companion v1
+
+Calculator, ZATCA, invoicing, CRM, analytics, settings editor, cloud sync, local offline DB. Use the desktop app or LAN PWA for those flows.
+
+## Related docs
+
+- [IOS_COMPANION.md](./IOS_COMPANION.md) — SwiftUI app architecture
+- [ios/README.md](../ios/README.md) — build and run

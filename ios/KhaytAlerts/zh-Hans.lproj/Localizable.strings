@@ -1,0 +1,20 @@
+/* The notification service extension's own copy of the alert words.
+   Held to the app's by NotificationStringsTests. */
+"alert.print.finished" = "打印完成";
+"alert.print.failed" = "打印失败";
+"alert.print.cancelled" = "打印已取消";
+"alert.print.a_job" = "一个作业";
+"alert.print.move_post" = "移至后处理";
+"alert.print.reprint" = "放回队列";
+"alert.print.mark_shipped" = "标记已发货";
+"PUSH_TITLE" = "Khayt";
+"PUSH_PRINT_FINISHED" = "有一个打印已完成";
+"PUSH_INTAKE" = "新的订单请求";
+"PUSH_OVERDUE" = "有作业已逾期";
+"PUSH_LOW_STOCK" = "耗材不足";
+"PUSH_DUE_TODAY" = "有作业今天到期";
+"PUSH_QUOTE_DECISION" = "客户已答复报价";
+"PUSH_QUOTE_APPROVED" = "客户已批准报价";
+"PUSH_QUOTE_DECLINED" = "客户已拒绝报价";
+"PUSH_MESSAGE" = "客户发来一条消息";
+"PUSH_PAYMENT" = "收到一笔付款";

@@ -1,0 +1,243 @@
+/* Command theme — custom screen styles (Dashboard interior).
+   Faithful port of design/proto-b-cockpit.html's Dashboard CSS, scoped under
+   body.khayt-command and the .cmd-dash root so it never leaks to other themes.
+   Light-default; colors come from tokens.css (--cmd-*, --ink-*, --line, --accent).
+   Uses logical properties so RTL mirrors cleanly. */
+
+/* ---------- "What needs me now" ----------
+   The bar itself is shared (.dash-attn in styles.css) so the interruption line
+   reads identically across themes; only its spacing in this stack is local. */
+body.khayt-command .cmd-dash > .dash-attn {
+  margin-block-end: 14px;
+}
+
+body.khayt-command .cmd-dash {
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* ---------- KPI strip ---------- */
+body.khayt-command .cmd-kstrip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-block-end: 16px;
+}
+body.khayt-command .cmd-kpi {
+  position: relative;
+  background: var(--panel);
+  padding: 12px 14px;
+}
+body.khayt-command .cmd-kpi::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--kc, var(--accent));
+}
+body.khayt-command .cmd-kpi-l {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink-3);
+  font-weight: 700;
+}
+body.khayt-command .cmd-kpi-v {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  margin-block-start: 2px;
+  font-variant-numeric: tabular-nums;
+}
+body.khayt-command .cmd-kpi-v.muted {
+  color: var(--ink-3);
+  font-weight: 700;
+}
+body.khayt-command .cmd-kpi-d {
+  font-size: 10.5px;
+  font-weight: 700;
+  margin-block-start: 1px;
+  min-height: 14px;
+  color: var(--ink-3);
+}
+body.khayt-command .cmd-kpi-d.up { color: var(--cmd-ok); }
+body.khayt-command .cmd-kpi-d.down { color: var(--cmd-danger); }
+
+@media (max-width: 1180px) {
+  body.khayt-command .cmd-kstrip { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 620px) {
+  body.khayt-command .cmd-kstrip { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ---------- Dashboard grid ---------- */
+body.khayt-command .cmd-dgrid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+body.khayt-command .cmd-stack {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+@media (max-width: 1180px) {
+  body.khayt-command .cmd-dgrid { grid-template-columns: 1fr; }
+}
+
+/* ---------- Panel ---------- */
+body.khayt-command .cmd-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+body.khayt-command .cmd-panel-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-block-end: 1px solid var(--line-2);
+  font-weight: 700;
+  font-size: 12px;
+}
+body.khayt-command .cmd-panel-ac {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  flex: none;
+}
+body.khayt-command .cmd-panel-more {
+  margin-inline-start: auto;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+body.khayt-command .cmd-panel-bd { padding: 0; }
+
+/* ---------- List rows ---------- */
+body.khayt-command .cmd-lrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 12px;
+  border-block-end: 1px solid var(--line-2);
+  font-size: 12px;
+  background: transparent;
+  border-inline: 0;
+  border-top: 0;
+  color: var(--ink);
+  text-align: start;
+  cursor: pointer;
+  font-family: inherit;
+}
+body.khayt-command button.cmd-lrow { width: 100%; }
+body.khayt-command .cmd-lrow:last-child { border-block-end: 0; }
+body.khayt-command .cmd-lrow:hover { background: var(--panel-2); }
+body.khayt-command div.cmd-lrow { cursor: default; }
+body.khayt-command .cmd-grow {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+}
+body.khayt-command .cmd-lrow-t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.khayt-command .cmd-sub { color: var(--ink-3); font-size: 11px; }
+body.khayt-command .cmd-lrow-t .cmd-sub { font-weight: 400; }
+body.khayt-command .cmd-money { font-family: var(--mono); font-weight: 700; color: var(--cmd-ok); flex: none; }
+body.khayt-command .cmd-pct {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 11px;
+  min-width: 34px;
+  text-align: end;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+body.khayt-command .cmd-dotc {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+body.khayt-command .cmd-empty {
+  display: grid;
+  place-items: center;
+  padding: 28px 12px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+/* ---------- Gauge ---------- */
+body.khayt-command .cmd-gauge {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--panel-3);
+  overflow: hidden;
+  flex: none;
+  width: 80px;
+  display: inline-block;
+}
+body.khayt-command .cmd-gauge > i {
+  display: block;
+  height: 100%;
+  background: var(--gc, var(--accent));
+}
+
+/* ---------- Badges ---------- */
+body.khayt-command .cmd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  line-height: 1.6;
+  flex: none;
+}
+body.khayt-command .cmd-b-blue { background: var(--cmd-info-bg); color: var(--cmd-info); }
+body.khayt-command .cmd-b-green { background: var(--cmd-ok-bg); color: var(--cmd-ok); }
+body.khayt-command .cmd-b-amber { background: var(--cmd-warn-bg); color: var(--cmd-warn); }
+body.khayt-command .cmd-b-red { background: var(--cmd-danger-bg); color: var(--cmd-danger); }
+body.khayt-command .cmd-b-gray { background: var(--panel-3); color: var(--ink-2); }
+
+/* ---------- Small button ---------- */
+body.khayt-command .cmd-btn-xs {
+  height: 21px;
+  padding: 0 8px;
+  font-size: 11px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+  flex: none;
+}
+body.khayt-command .cmd-btn-xs:hover { background: var(--panel-2); }
+
+/* ---------- Inspector content helpers (used by shell.js openInspector) ---------- */
+body.khayt-command .cmd-insp-prog {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+body.khayt-command .cmd-insp-prog .cmd-gauge { flex: 1; width: auto; }

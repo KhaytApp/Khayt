@@ -1,0 +1,239 @@
+/* Studio phase 5 — calculator breakdown, inventory tbl, queue folds */
+
+/* Calculator live breakdown */
+.khayt-calc-breakdown {
+  margin: 14px 0;
+  padding: 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.khayt-calc-breakdown-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.khayt-calc-breakdown-head .sec-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.khayt-calc-breakdown-live {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.khayt-calc-breakdown-body {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.khayt-donut-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.khayt-donut-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  line-height: 1.1;
+  pointer-events: none;
+}
+.khayt-donut-center .metric {
+  font-size: 19px;
+}
+.khayt-calc-legend {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.khayt-calc-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.khayt-calc-legend-row .metric {
+  font-size: 12px;
+  color: var(--text);
+}
+.khayt-calc-margin-strip {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline, var(--border));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.khayt-calc-margin-strip strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.bedready-ui .card.summary #costBreakdown.khayt-bd-legacy-hidden {
+  display: none !important;
+}
+
+/* Inventory design table */
+.bedready-ui #inventoryTable.tbl,
+.bedready-ui #inventoryTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+.bedready-ui #inventoryTable tbody tr[data-inv-id] td:first-child {
+  display: table-cell;
+}
+.khayt-inv-mat-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.khayt-inv-mat-cell .khayt-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+}
+.khayt-inv-mat-cell .col {
+  min-width: 0;
+}
+.khayt-inv-mat-cell strong {
+  font-size: 13px;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.khayt-inv-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 2px;
+}
+.khayt-inv-type-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--surface-3, var(--bg-2));
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.khayt-inv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.khayt-inv-unit-price {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+/* Queue collapsible folds */
+.khayt-fold {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+.khayt-fold-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-2);
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+.khayt-fold-head:hover {
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-2));
+}
+.khayt-fold-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.khayt-fold-count {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+.khayt-fold-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+.khayt-fold.is-collapsed .khayt-fold-chevron {
+  transform: rotate(-90deg);
+}
+.khayt-fold.is-collapsed .khayt-fold-body {
+  display: none;
+}
+.khayt-fold-body {
+  padding: 12px 16px 16px;
+}
+.khayt-fold-body .quotes-section-header {
+  display: none;
+}
+.khayt-queue .quotes-section.khayt-fold-inner {
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+.khayt-fold-head .khayt-fold-add {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+}
+.bedready-ui .table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.bedready-ui .kanban-col.kanban-col-collapsed {
+  flex: 0 0 44px;
+  min-width: 44px;
+  max-width: 44px;
+}
+.bedready-ui .kanban-col.kanban-col-collapsed .khayt-kcol-body,
+.bedready-ui .kanban-col.kanban-col-collapsed .kanban-col-meta,
+.bedready-ui .kanban-col.kanban-col-collapsed .count {
+  display: none !important;
+}
+.bedready-ui .kanban-col.kanban-col-collapsed h3 {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  justify-content: center;
+  padding: 12px 6px;
+}

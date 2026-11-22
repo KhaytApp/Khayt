@@ -1,0 +1,44 @@
+/* The widget's own words. Every literal Text("…") in KhaytQueueWidget.swift
+   is a key here; an interpolated Int is "%lld", a String "%@". Held to the
+   Arabic table by LocalizationCompletenessTests. */
+"Queue" = "Queue";
+"Print" = "Print";
+"Printing" = "Printing";
+"QC" = "QC";
+"Done" = "Done";
+"Nothing printing right now" = "Nothing printing right now";
+"Offline" = "Offline";
+"LAN connected" = "Connected";
+"%lld queued · %lld printing" = "%lld queued · %lld printing";
+"ETA %@" = "Done in %@";
+"Open app on shop Wi‑Fi" = "Open Khayt on the shop's Wi‑Fi";
+"%lld%%" = "%lld%%";
+"Paused" = "Paused";
+"Failed" = "Failed";
+"Cancelled" = "Cancelled";
+"Paused at %@" = "Paused at %@";
+"Ready to collect" = "Ready to collect";
+"Print failed" = "Print failed";
+"Print stopped" = "Print stopped";
+"Ends %@" = "Ends %@";
+"Log a failed print" = "Log a failed print";
+"Scan a spool" = "Scan a spool";
+"Opens Khayt on the failed-print form." = "Opens Khayt on the failed-print form.";
+"Opens Khayt on booking in a spool." = "Opens Khayt on booking in a spool.";
+
+"Price a part" = "Price a part";
+"Opens Khayt on the calculator." = "Opens Khayt on the calculator.";
+
+/* Live Activity buttons */
+"Move to post-processing" = "Move to post-processing";
+"Print it again" = "Print it again";
+
+/* Money widget (KhaytMoneyWidget.swift, MoneyWidgetViews.swift) */
+"Earned today" = "Earned today";
+"Owed" = "Owed";
+"Low stock" = "Low stock";
+"%lld unpaid" = "%lld unpaid";
+"to reorder" = "to reorder";
+"Pair Khayt with your shop to see its money here." = "Pair Khayt with your shop to see its money here.";
+"Khayt Money" = "Khayt Money";
+"Today's takings, what customers owe and low stock. Hidden while your iPhone is locked." = "Today's takings, what customers owe and low stock. Hidden while your iPhone is locked.";

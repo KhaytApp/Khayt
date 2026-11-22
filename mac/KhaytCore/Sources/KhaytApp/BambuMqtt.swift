@@ -1,0 +1,658 @@
+import Foundation
+import CryptoKit
+import Security
+import Network
+
+/// Enough MQTT 3.1.1 to ask a Bambu printer what it is doing.
+///
+/// ── WHY THIS IS SWIFT AND NOT A SHARED MODULE ─────────────────────────────
+///
+/// Every other protocol this app speaks is HTTP, so the request is `URLSession`
+/// and the MEANING is a shared `lib/` module. Bambu has no HTTP at all: it
+/// speaks MQTT over TLS on 8883 and FTPS on 990, and nothing else on the LAN.
+///
+/// The other app hand-rolls the same small slice of MQTT in `lib/bambu.js`,
+/// over Node's `Buffer` and `node:tls` — which is why that file cannot be
+/// loaded here at all: `Buffer` is in its module scope from the first line, so
+/// it throws before a single function is reachable. The part that decides what
+/// a shop SEES was lifted out to `lib/bambu-report.js` and both apps run it.
+/// This is the transport underneath, and a transport is each app's own.
+///
+/// `BambuCodecParityTests` checks these bytes against the ones `lib/bambu.js`
+/// writes, packet for packet. Two hand-rolled codecs that agree by inspection
+/// are two codecs that will diverge; ones that agree by test are one codec.
+///
+/// ── TWO SWITCHES ON THE PRINTER, AND THE SECOND IS USUALLY OFF ────────────
+///
+/// LAN-only Mode is what the guides say to turn on and it is not enough. Bambu
+/// gates MQTT behind a separate **Developer Mode** in the same menu. With LAN
+/// on and Developer off the printer accepts the TLS connection AND the CONNACK
+/// and then never speaks — nothing is refused, so there is no error to report
+/// and the attempt simply runs out its clock. That is why the timeout message
+/// names Developer Mode first: any message naming IP, access code and LAN mode
+/// would be listing three things that are all correct.
+enum BambuMqtt {
+
+    static let defaultPort: UInt16 = 8883
+
+    // MARK: - The wire codec
+
+    /// MQTT's variable-byte "Remaining Length".
+    static func remainingLength(_ n: Int) -> [UInt8] {
+        precondition(n >= 0)
+        var value = n
+        var out: [UInt8] = []
+        repeat {
+            var byte = UInt8(value % 128)
+            value /= 128
+            if value > 0 { byte |= 0x80 }
+            out.append(byte)
+        } while value > 0
+        return out
+    }
+
+    /// Decode one, from `offset`. Nil when the buffer does not hold it yet —
+    /// which is the normal case on a stream, not an error.
+    static func readRemainingLength(_ buf: [UInt8], at offset: Int) throws -> (value: Int, bytes: Int)? {
+        var multiplier = 1, value = 0, bytes = 0
+        while true {
+            guard offset + bytes < buf.count else { return nil }
+            let b = buf[offset + bytes]
+            value += Int(b & 0x7f) * multiplier
+            bytes += 1
+            if b & 0x80 == 0 { break }
+            multiplier *= 128
+            if multiplier > 128 * 128 * 128 { throw Trouble.malformed }
+        }
+        return (value, bytes)
+    }
+
+    /// A length-prefixed UTF-8 string: two big-endian bytes, then the bytes.
+    static func string(_ s: String) -> [UInt8] {
+        let bytes = Array(s.utf8)
+        return [UInt8(bytes.count >> 8), UInt8(bytes.count & 0xff)] + bytes
+    }
+
+    static func packet(_ typeFlags: UInt8, _ body: [UInt8]) -> [UInt8] {
+        [typeFlags] + remainingLength(body.count) + body
+    }
+
+    /// CONNECT. The username is always `bblp`; the password is the printer's
+    /// LAN access code, from its own screen.
+    static func connect(clientId: String, username: String, password: String,
+                        keepalive: UInt16 = 60) -> [UInt8] {
+        var body = string("MQTT")
+        body.append(0x04)                                   // protocol level 4 = 3.1.1
+        body.append(0xC2)                                   // username + password + clean session
+        body.append(UInt8(keepalive >> 8))
+        body.append(UInt8(keepalive & 0xff))
+        body += string(clientId)
+        body += string(username)
+        body += string(password)
+        return packet(0x10, body)
+    }
+
+    static func subscribe(packetId: UInt16, topic: String) -> [UInt8] {
+        var body: [UInt8] = [UInt8(packetId >> 8), UInt8(packetId & 0xff)]
+        body += string(topic)
+        body.append(0x00)                                   // QoS 0
+        return packet(0x82, body)                           // SUBSCRIBE requires flags 0b0010
+    }
+
+    static func publish(topic: String, payload: String) -> [UInt8] {
+        packet(0x30, string(topic) + Array(payload.utf8))   // QoS 0, so no packet id
+    }
+
+    /// The largest packet this app will wait for. A `pushall` report is tens
+    /// of kilobytes; 4 MB is two orders of magnitude of headroom.
+    static let maxPacket = 4 * 1024 * 1024
+
+    static let pingreq: [UInt8] = [0xC0, 0x00]
+    static let disconnect: [UInt8] = [0xE0, 0x00]
+
+    struct Packet: Equatable {
+        let type: UInt8
+        let body: [UInt8]
+    }
+
+    /// Split whole packets off the front of a stream, returning what is left.
+    /// A TLS read is not a message boundary — a report arrives in pieces and
+    /// two small ones arrive together.
+    static func packets(from buf: [UInt8]) throws -> (packets: [Packet], rest: [UInt8]) {
+        var out: [Packet] = []
+        var at = 0
+        while at < buf.count {
+            guard let length = try readRemainingLength(buf, at: at + 1) else { break }
+            // The length is the PEER's claim, and MQTT lets it claim 256 MB.
+            // Buffering toward that is memory anyone answering for the printer
+            // can make this app hold; a Bambu's fullest report is tens of KB.
+            guard length.value <= maxPacket else { throw Trouble.malformed }
+            let start = at + 1 + length.bytes
+            let end = start + length.value
+            guard end <= buf.count else { break }
+            out.append(Packet(type: buf[at] >> 4, body: Array(buf[start..<end])))
+            at = end
+        }
+        return (out, Array(buf[at...]))
+    }
+
+    /// The topic and payload of a QoS-0 PUBLISH.
+    static func decodePublish(_ body: [UInt8]) -> (topic: String, payload: String)? {
+        guard body.count >= 2 else { return nil }
+        let length = Int(body[0]) << 8 | Int(body[1])
+        guard body.count >= 2 + length else { return nil }
+        let topic = String(decoding: body[2..<(2 + length)], as: UTF8.self)
+        let payload = String(decoding: body[(2 + length)...], as: UTF8.self)
+        return (topic, payload)
+    }
+
+    // MARK: - What can go wrong
+
+    /// A typed failure and NO prose.
+    ///
+    /// The words a shop reads live in `PrinterWatch.say`, with every other
+    /// printer diagnostic — a transport that owns user-facing copy is a
+    /// transport that has to be opened to change a sentence, and the message
+    /// about Developer Mode is one somebody will want to reword.
+    enum Trouble: Error, Equatable {
+        case malformed
+        /// The printer turned the access code down. The CONNACK code it gave.
+        case refused(UInt8)
+        /// It accepted the connection and then said nothing. This is what
+        /// Developer Mode being off looks like, and ONLY that: a wrong access
+        /// code is refused with a CONNACK and a wrong address never connects.
+        case silent
+        case closed(String)
+        /// The printer presented a different certificate from the one it
+        /// presented the first time — see `BambuPin`. Raised only for a
+        /// printer whose certificate Bambu Lab's CAs do not vouch for.
+        case certificateChanged
+        /// The certificate does not chain to Bambu Lab's CAs: whatever
+        /// answered is not a Bambu printer, so the access code was not sent.
+        case notBambu(String)
+        /// A genuine Bambu, but its certificate names another serial — the
+        /// address now belongs to a different printer.
+        case otherPrinter(String)
+        /// A printer that HAD been talking on a held connection stopped for
+        /// longer than the watchdog allows, and is being reconnected. Not
+        /// `silent`: that one means Developer Mode, and this printer has
+        /// already proved Developer Mode is on.
+        case wentQuiet
+        /// The printer answered a command with `result: "fail"`. Its reason,
+        /// verbatim (may be empty).
+        case commandRefused(String)
+        /// A command went out and no reply naming it came back in time. It
+        /// may or may not have happened — the printer has to be looked at.
+        case unconfirmed
+    }
+}
+
+/// ── THE FALLBACK SINCE OCT 2026 ───────────────────────────────────────────
+///
+/// A printer whose certificate chains to Bambu Lab's CAs and names its serial
+/// is trusted by `BambuTrust` and never reaches this. A printer whose
+/// certificate does not chain falls back to this pin
+/// (`BambuMqtt.trustDecision`), so no model or firmware the bundled CAs miss
+/// is cut off.
+///
+/// ── TRUST ON FIRST USE, FOR A CERTIFICATE NOTHING CAN VERIFY ──────────────
+///
+/// A Bambu's certificate is self-signed for a name that is not its address,
+/// so there is nothing to check it against — and accepting ANY certificate
+/// meant anyone on the shop's network who answered for the printer's address
+/// received the access code in the MQTT CONNECT, which is full control of the
+/// printer. Sep 2026 scan.
+///
+/// So the printer's certificate is remembered the first time (by SHA-256,
+/// per printer, on this Mac) and a DIFFERENT one afterwards is refused, with
+/// a message saying so. A printer that really did change — replaced, reset —
+/// is re-trusted by saving its access code again on the machine sheet.
+///
+/// ── IN THE KEYCHAIN, NOT USER DEFAULTS (Oct 2026) ──────────────────────────
+///
+/// The pin is what decides who receives the access code, so it must not be
+/// something any other process of this user can rewrite: a defaults plist is
+/// exactly that (`defaults write` is enough), and rewriting the pin to an
+/// attacker's fingerprint — or deleting it, to be trusted "first" — defeats
+/// it. A login-Keychain item is readable and writable by this app's
+/// signature only. A pin already in defaults is moved across ONCE, the first
+/// time this version runs, and never read from defaults again (see
+/// `Store.guarded`). Where there is no Keychain to write to (a CI runner) it
+/// falls back to defaults rather than to trusting every certificate.
+enum BambuPin {
+    /// Where pins live. A seam so tests do not write the login Keychain.
+    struct Store: Sendable {
+        var read: @Sendable (String) -> String?
+        var write: @Sendable (String, String) -> Void
+        var remove: @Sendable (String) -> Void
+    }
+
+    nonisolated(unsafe) static var store: Store = .keychain
+
+    static func key(serial: String, host: String) -> String {
+        "bambu.certpin." + (serial.isEmpty ? host.lowercased() : serial)
+    }
+    static func stored(_ key: String) -> String? { store.read(key) }
+    static func remember(_ key: String, _ fingerprint: String) { store.write(key, fingerprint) }
+    static func forget(serial: String, host: String) {
+        store.remove(key(serial: serial, host: host))
+    }
+
+    /// Accept this fingerprint for this printer? The first one is kept.
+    static func accept(_ fingerprint: String, key: String, in store: Store = BambuPin.store) -> Bool {
+        if let pinned = store.read(key) { return pinned == fingerprint }
+        store.write(key, fingerprint)
+        return true
+    }
+
+    /// The leaf certificate's SHA-256, from the handshake's trust object.
+    static func fingerprint(_ trust: sec_trust_t) -> String? {
+        let ref = sec_trust_copy_ref(trust).takeRetainedValue()
+        guard let chain = SecTrustCopyCertificateChain(ref) as? [SecCertificate], let leaf = chain.first else { return nil }
+        let der = SecCertificateCopyData(leaf) as Data
+        return SHA256.hash(data: der).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+extension BambuPin.Store {
+    static let service = "Khayt Printer Certificate"
+
+    private static func query(_ key: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service,
+         kSecAttrAccount as String: key,
+         kSecAttrSynchronizable as String: false]
+    }
+
+    static func keychainRead(_ key: String) -> String? {
+        var q = query(key)
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess,
+              let data = out as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    @discardableResult
+    static func keychainWrite(_ key: String, _ value: String) -> Bool {
+        SecItemDelete(query(key) as CFDictionary)
+        var add = query(key)
+        add[kSecValueData as String] = Data(value.utf8)
+        add[kSecAttrLabel as String] = "Khayt printer certificate pin"
+        return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+    }
+
+    /// The Keychain primitives a guarded store is built on — a seam, so the
+    /// migration below is tested without touching the login Keychain.
+    struct Backend: Sendable {
+        var read: @Sendable (String) -> String?
+        var write: @Sendable (String, String) -> Bool
+        var remove: @Sendable (String) -> Void
+
+        static let login = Backend(read: { keychainRead($0) },
+                                   write: { keychainWrite($0, $1) },
+                                   remove: { SecItemDelete(query($0) as CFDictionary) })
+    }
+
+    /// The Keychain item that says defaults pins were moved across once.
+    /// In the Keychain, not defaults, so another process cannot forge it —
+    /// and forging it the other way (deleting it) needs this app's signature.
+    static let migratedMarker = "bambu.certpin.__migrated-to-keychain.v1"
+
+    /// The login Keychain. See `guarded`.
+    static let keychain = guarded(.login, defaults: .standard)
+
+    /// A pin store on `keychain`, with defaults used ONLY where the Keychain
+    /// cannot be written at all (a CI runner).
+    ///
+    /// ── DEFAULTS ARE MIGRATED ONCE, NEVER READ AFTER ──────────────────────
+    ///
+    /// The read used to fall back to defaults and MOVE whatever it found
+    /// there into the Keychain — every time a printer had no Keychain pin.
+    /// So any process of this user could `defaults write` an attacker's
+    /// fingerprint for a printer not yet pinned (or one whose pin was just
+    /// cleared by saving its access code), and the next connect promoted it
+    /// into the Keychain as the trusted certificate. Now the move happens
+    /// once, the first time this version runs, and is recorded in the
+    /// Keychain (`migratedMarker`); after that a pin in defaults is never
+    /// read, let alone trusted. Oct 2026 review.
+    ///
+    /// The data-protection keychain (`kSecUseDataProtectionKeychain`) would
+    /// also shut out same-user processes by access group, but it needs a
+    /// keychain-access-groups entitlement the unsigned SwiftPM build and its
+    /// tests do not have, and moving to it would orphan every existing pin.
+    static func guarded(_ keychain: Backend, defaults: UserDefaults) -> BambuPin.Store {
+        // UserDefaults is thread-safe and not marked Sendable; the box says so.
+        final class Once: @unchecked Sendable {
+            let lock = NSLock()
+            var usable: Bool?
+            let defaults: UserDefaults
+            init(_ defaults: UserDefaults) { self.defaults = defaults }
+        }
+        let once = Once(defaults)
+        let prefix = "bambu.certpin."
+        // True when the Keychain is usable; migrates on the first call only.
+        let keychainUsable: @Sendable () -> Bool = {
+            once.lock.withLock {
+                if let usable = once.usable { return usable }
+                let usable: Bool
+                if keychain.read(migratedMarker) != nil {
+                    usable = true
+                } else if keychain.write(migratedMarker, "1") {
+                    usable = true
+                    for (key, value) in once.defaults.dictionaryRepresentation()
+                    where key.hasPrefix(prefix) && key != migratedMarker {
+                        guard let pin = value as? String else { continue }
+                        if keychain.read(key) != nil || keychain.write(key, pin) {
+                            once.defaults.removeObject(forKey: key)
+                        }
+                    }
+                } else {
+                    usable = false
+                }
+                once.usable = usable
+                return usable
+            }
+        }
+        return BambuPin.Store(
+            read: { key in
+                keychainUsable() ? keychain.read(key) : once.defaults.string(forKey: key)
+            },
+            write: { key, value in
+                if keychainUsable() { _ = keychain.write(key, value) } else { once.defaults.set(value, forKey: key) }
+            },
+            remove: { key in
+                keychain.remove(key)
+                once.defaults.removeObject(forKey: key)
+            })
+    }
+
+    /// In memory, for tests.
+    static func memory() -> BambuPin.Store {
+        final class Box: @unchecked Sendable { var map: [String: String] = [:]; let lock = NSLock() }
+        let box = Box()
+        return BambuPin.Store(
+            read: { k in box.lock.withLock { box.map[k] } },
+            write: { k, v in box.lock.withLock { box.map[k] = v } },
+            remove: { k in _ = box.lock.withLock { box.map.removeValue(forKey: k) } })
+    }
+}
+
+/// Set by the TLS verify block, read when the connection fails, so the failure
+/// is reported as the certificate refusal it was and not as a dropped socket.
+final class PinVerdict: @unchecked Sendable {
+    private let lock = NSLock()
+    private var refusal: BambuMqtt.Trouble?
+    private var verified: Bool?
+    func refuse(_ why: BambuMqtt.Trouble) { lock.withLock { refusal = why } }
+    var refused: BambuMqtt.Trouble? { lock.withLock { refusal } }
+    /// True when Bambu Lab's CAs vouched for the printer, false when it was
+    /// let in by the first-use pin instead, nil before the handshake.
+    func markVerified(_ v: Bool) { lock.withLock { verified = v } }
+    var byBambu: Bool? { lock.withLock { verified } }
+}
+
+extension BambuMqtt {
+    /// A TLS connection to a Bambu's MQTT port, trusted by `trustDecision`.
+    /// One place, so the one-shot conversation and the held session
+    /// (`BambuSession`) cannot trust certificates differently.
+    static func connection(host: String, port: UInt16, serial: String,
+                           verdict: PinVerdict) -> NWConnection {
+        let options = NWProtocolTLS.Options()
+        sec_protocol_options_set_verify_block(
+            options.securityProtocolOptions,
+            { _, trust, complete in
+                let ref = sec_trust_copy_ref(trust).takeRetainedValue()
+                let pinKey = BambuPin.key(serial: serial, host: host)
+                complete(trustDecision(BambuTrust.evaluate(ref, serial: serial),
+                                       fingerprint: { BambuPin.fingerprint(trust) },
+                                       pinKey: pinKey, verdict: verdict))
+            },
+            DispatchQueue.global(qos: .userInitiated))
+        return NWConnection(
+            host: NWEndpoint.Host(host),
+            port: NWEndpoint.Port(rawValue: port) ?? .init(integerLiteral: 8883),
+            using: NWParameters(tls: options))
+    }
+
+    /// Whether to let the printer in, given what `BambuTrust` said.
+    ///
+    /// ── STRICT WHERE IT CAN BE, LENIENT WHERE IT MUST ─────────────────────
+    ///
+    ///   - Chains to Bambu Lab's CAs and names this serial: trusted, verified.
+    ///   - Chains to Bambu Lab's CAs and names ANOTHER serial: refused. That
+    ///     is a genuine Bambu that is not this machine, and the access code
+    ///     must not go to it.
+    ///   - Does not chain: let in by the trust-on-first-use pin (`BambuPin`,
+    ///     the rule before Oct 2026), marked unverified, and the machine sheet
+    ///     says so quietly. Only one P2S has been seen to chain to the bundled
+    ///     CAs (rolottr/bambu-bar). Nothing on this bench proves that every X1,
+    ///     P1, A1 and H2 on every firmware does, and refusing outright could
+    ///     cut off a printer that works. A pin mismatch is still refused.
+    static func trustDecision(_ said: BambuTrust.Verdict, fingerprint: () -> String?,
+                              pinKey: String, verdict: PinVerdict,
+                              pins: BambuPin.Store = BambuPin.store) -> Bool {
+        switch said {
+        case .trusted:
+            // Pinned too. A printer that has once proved itself to Bambu's CAs
+            // must not later be let in by an unverified certificate: without
+            // this, an impostor on its address with a self-signed one would be
+            // the FIRST use the pin ever saw, and would get the access code.
+            if let print = fingerprint() { pins.write(pinKey, print) }
+            verdict.markVerified(true)
+            return true
+        case .otherPrinter(let name):
+            verdict.refuse(.otherPrinter(name))
+            return false
+        case .notBambu(let why):
+            guard let print = fingerprint() else { verdict.refuse(.notBambu(why)); return false }
+            guard BambuPin.accept(print, key: pinKey, in: pins) else {
+                verdict.refuse(.certificateChanged)
+                return false
+            }
+            verdict.markVerified(false)
+            return true
+        }
+    }
+
+    /// The `pushall` request: the object ha-bambulab sends
+    /// (`pybambu/commands.py` PUSH_ALL) and OpenBambuAPI documents, written
+    /// compactly (Python's `json.dumps` adds spaces; the printer parses JSON).
+    static let pushall = #"{"pushing":{"sequence_id":"0","command":"pushall"}}"#
+}
+
+// MARK: - The live connection
+
+/// One conversation with a Bambu printer: connect, subscribe, ask, take the
+/// first real answer, hang up.
+///
+/// An actor because the thing it guards is a socket and a buffer of bytes that
+/// arrive on the network queue while the caller waits on a continuation.
+///
+/// ── SELF-SIGNED, AND WHY THAT IS NOT A HOLE HERE ──────────────────────────
+///
+/// A Bambu printer presents a certificate it signed itself, for a name that is
+/// not its LAN address. It is verified against Bambu Lab's own CAs and the
+/// machine's serial instead (`BambuTrust`, Oct 2026; trust-on-first-use
+/// `BambuPin` before that).
+///
+/// What makes that acceptable is what is sent: the access code goes only to the
+/// address the shop typed, the channel is still encrypted against a passive
+/// listener, and the printer is on the shop's own LAN. What would NOT be
+/// acceptable is following the printer somewhere else — which is the camera bug
+/// this app already fixed — and MQTT has no redirect to follow.
+actor BambuConversation {
+    private let host: String
+    private let port: UInt16
+    private let accessCode: String
+    private let serial: String
+    private let timeout: Duration
+
+    init(host: String, port: UInt16, accessCode: String, serial: String,
+         timeout: Duration = .seconds(8)) {
+        self.host = host
+        self.port = port == 0 ? BambuMqtt.defaultPort : port
+        self.accessCode = accessCode
+        self.serial = serial
+        self.timeout = timeout
+    }
+
+    /// Ask for a full snapshot and return the first report that carries one.
+    ///
+    /// `pushall` rather than waiting: a Bambu pushes small deltas continuously
+    /// and a full state only when asked. Waiting for one to arrive by itself
+    /// means waiting for a change, so an idle printer would time out — which
+    /// looks exactly like Developer Mode being off and is not.
+    func status() async throws -> String {
+        try await run(
+            ask: { BambuMqtt.publish(topic: "device/\(self.serial)/request",
+                                     payload: BambuMqtt.pushall) },
+            take: { payload in
+                // A delta is not an answer. The shared module returns nil for
+                // one, and taking the first message regardless would report a
+                // printer as Idle because the delta it happened to send carried
+                // no state at all.
+                payload.contains("gcode_state") || payload.contains("mc_percent")
+                    || payload.contains("subtask_name") ? payload : nil
+            })
+    }
+
+    /// Start a file already on the printer. The upload is FTPS and is not this.
+    func startPrint(fileName: String) async throws -> String {
+        let command: [String: Any] = ["print": [
+            "sequence_id": "0", "command": "project_file",
+            "param": "Metadata/plate_1.gcode",
+            "url": "file:///sdcard/\(fileName)", "subtask_name": fileName,
+            "use_ams": false, "timelapse": false, "bed_leveling": true,
+            "flow_cali": false, "vibration_cali": false, "layer_inspect": false,
+        ]]
+        let body = String(decoding: try JSONSerialization.data(withJSONObject: command),
+                          as: UTF8.self)
+        return try await run(
+            ask: { BambuMqtt.publish(topic: "device/\(self.serial)/request", payload: body) },
+            take: { $0.contains("\"print\"") ? $0 : nil })
+    }
+
+    private func run(ask: @escaping @Sendable () -> [UInt8],
+                     take: @escaping @Sendable (String) -> String?) async throws -> String {
+        let verdict = PinVerdict()
+        let connection = BambuMqtt.connection(host: host, port: port, serial: serial, verdict: verdict)
+
+        let box = Mailbox()
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                let id = "khayt-" + String(Int(Date().timeIntervalSince1970) % 10_000_000, radix: 36)
+                connection.send(content: Data(BambuMqtt.connect(
+                    clientId: id, username: "bblp",
+                    password: self.accessCode)), completion: .idempotent)
+            case .failed(let error):
+                let trouble: BambuMqtt.Trouble = verdict.refused ?? .closed(error.localizedDescription)
+                Task { await box.fail(trouble) }
+            case .cancelled:
+                Task { await box.fail(BambuMqtt.Trouble.closed("cancelled")) }
+            default:
+                break
+            }
+        }
+        connection.start(queue: .global(qos: .userInitiated))
+        defer {
+            connection.send(content: Data(BambuMqtt.disconnect), completion: .idempotent)
+            connection.cancel()
+        }
+
+        receive(on: connection, into: box, ask: ask, take: take)
+
+        // The clock runs from here rather than from `.ready`, so a printer that
+        // never finishes its handshake is bounded too.
+        return try await withThrowingTaskGroup(of: String.self) { group in
+            group.addTask { try await box.wait() }
+            group.addTask {
+                try await Task.sleep(for: self.timeout)
+                throw BambuMqtt.Trouble.silent
+            }
+            let first = try await group.next()!
+            group.cancelAll()
+            return first
+        }
+    }
+
+    /// Drain the socket, feeding whole packets through the state machine.
+    private nonisolated func receive(on connection: NWConnection, into box: Mailbox,
+                                     ask: @escaping @Sendable () -> [UInt8],
+                                     take: @escaping @Sendable (String) -> String?) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { data, _, done, error in
+            if let error {
+                Task { await box.fail(BambuMqtt.Trouble.closed(error.localizedDescription)) }
+                return
+            }
+            if let data, !data.isEmpty {
+                Task {
+                    do {
+                        for packet in try await box.take(Array(data)) {
+                            switch packet.type {
+                            case 2:     // CONNACK
+                                let code = packet.body.count >= 2 ? packet.body[1] : 0xff
+                                guard code == 0 else {
+                                    await box.fail(BambuMqtt.Trouble.refused(code)); return
+                                }
+                                connection.send(content: Data(BambuMqtt.subscribe(
+                                    packetId: 1, topic: "device/\(self.serial)/report")),
+                                                completion: .idempotent)
+                            case 9:     // SUBACK — the printer is listening
+                                connection.send(content: Data(ask()), completion: .idempotent)
+                            case 3:     // PUBLISH
+                                if let decoded = BambuMqtt.decodePublish(packet.body),
+                                   let answer = take(decoded.payload) {
+                                    await box.deliver(answer)
+                                }
+                            default:
+                                break
+                            }
+                        }
+                    } catch {
+                        await box.fail(error)
+                    }
+                }
+            }
+            if done {
+                Task { await box.fail(BambuMqtt.Trouble.closed("hungUp")) }
+                return
+            }
+            self.receive(on: connection, into: box, ask: ask, take: take)
+        }
+    }
+
+    /// The answer, the bytes still waiting for the rest of themselves, and
+    /// whoever is waiting on either.
+    private actor Mailbox {
+        private var pending: [UInt8] = []
+        private var answer: Result<String, Error>?
+        private var waiting: CheckedContinuation<String, Error>?
+
+        func take(_ chunk: [UInt8]) throws -> [BambuMqtt.Packet] {
+            pending += chunk
+            let read = try BambuMqtt.packets(from: pending)
+            pending = read.rest
+            return read.packets
+        }
+
+        func deliver(_ value: String) { settle(.success(value)) }
+        func fail(_ error: Error) { settle(.failure(error)) }
+
+        private func settle(_ result: Result<String, Error>) {
+            guard answer == nil else { return }
+            answer = result
+            if let waiting { self.waiting = nil; waiting.resume(with: result) }
+        }
+
+        func wait() async throws -> String {
+            if let answer { return try answer.get() }
+            return try await withCheckedThrowingContinuation { continuation in
+                if let answer { continuation.resume(with: answer) }
+                else { waiting = continuation }
+            }
+        }
+    }
+}

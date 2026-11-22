@@ -1,0 +1,620 @@
+import Foundation
+import KhaytCore
+
+/// Folders the library INDEXES WHERE THEY ARE — a NAS, an external drive, a
+/// Dropbox folder — instead of copying their models into the vault.
+///
+/// Asked for by the shop (Sep 2026) after looking at LayerMate, which works
+/// this way. Kept in `settings.printLibrary.linked` (a list of paths).
+///
+/// ── THE FILES ARE THE SHOP'S, AND STAY WHERE THEY ARE ──────────────────
+///
+/// A linked model's record points at its file (`externalPath`); only its
+/// picture goes into the vault. Nothing here copies, moves or removes a
+/// linked file: deleting the model deletes the RECORD (the vault folder holds
+/// only the picture, and the path is remembered in `notAdopted` so the next
+/// scan does not index it again), unlinking a folder removes its records,
+/// and online storage and library moves walk the vault and never see a
+/// linked file.
+extension Shop {
+
+    /// The folders linked on this book.
+    var linkedFolders: [String] {
+        guard case .object(let l)? = settingsDict["printLibrary"], case .array(let rows)? = l["linked"] else { return [] }
+        return rows.compactMap { if case .string(let s) = $0, !s.isEmpty { s } else { nil } }
+    }
+
+    private func writeLinked(_ paths: [String]) async throws {
+        guard permitted("settings", "edit") else { throw Shop.MoveRefused(sentence: moveProblem ?? "") }
+        guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
+        try await StoreWriter.updateOffMain(build) { root in
+            var settings = Self.settings(root)
+            var library: [String: JSONValue] = [:]
+            if case .object(let l)? = settings["printLibrary"] { library = l }
+            library["linked"] = .array(paths.map(JSONValue.string))
+            settings["printLibrary"] = .object(library)
+            root["settings"] = .object(settings)
+        }
+    }
+
+    /// Link a folder and index what is in it.
+    func linkFolder(_ url: URL) async {
+        libraryMoveProblem = nil
+        let path = url.standardizedFileURL.path
+        guard !linkedFolders.contains(path) else { await rescanLinkedFolders(); return }
+        // Not inside the library's own folders, nor around them: those are
+        // the vault, and linking them would index every model twice.
+        if let roots = libraryRoots, roots.roots.contains(where: {
+            LibraryMove.under(path, $0) || LibraryMove.under($0, path)
+        }) {
+            libraryMoveProblem = words.callIt("mac.linked_not_vault"); return
+        }
+        do { try await writeLinked(linkedFolders + [path]) }
+        catch { libraryMoveProblem = ErrorText.plain(error); return }
+        await load(source)
+        await rescanLinkedFolders()
+    }
+
+    /// Stop indexing a folder. Its models leave the library; its FILES are
+    /// not touched.
+    ///
+    /// Not while a scan or a move runs (`libraryMoveBusy`): a linked scan
+    /// that walked the folder before it was unlinked went on to add its
+    /// models after, as records under a folder the book no longer links.
+    func unlinkFolder(_ path: String) async {
+        guard permitted("settings", "edit") else { return }
+        guard !libraryMoveBusy else { libraryMoveProblem = words.callIt("mac.linked_unlink_busy"); return }
+        libraryMoveProblem = nil
+        guard let build = source.build else { return }
+        let remaining = linkedFolders.filter { $0 != path }
+        // Held for the whole unlink: a Rescan started during its write read
+        // the folders as they were and indexed this one's models again.
+        libraryMoveBusy = true
+        defer { libraryMoveBusy = false }
+        do {
+            // ONE write: the list, the records and what the deletes
+            // remembered, together. Two writes left a refused second one with
+            // the folder unlinked and its records still in the book.
+            let gone = try await StoreWriter.updateOffMain(build) { root in
+                Self.unlink(path, remaining: remaining, in: &root)
+            }
+            // The vault folders of those records hold only their pictures.
+            if let roots = libraryRoots {
+                for id in gone {
+                    let dir = URL(fileURLWithPath: roots.primary).appending(path: LibraryLocation.itemDirName(id))
+                    let inside = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+                    if inside.allSatisfy({ ["png", "jpg", "jpeg"].contains(($0 as NSString).pathExtension.lowercased()) }) {
+                        try? Self.trash(dir)
+                    }
+                }
+            }
+            await load(source)
+            libraryMoveNote = words.callIt("mac.linked_unlinked", ["n": .number(Double(gone.count))])
+        } catch {
+            libraryMoveProblem = ErrorText.plain(error)
+        }
+    }
+
+    /// The unlink itself, on the book as it is on disk: `path` leaves the
+    /// linked list, and so do the records under it — except those under a
+    /// folder that STAYS linked inside it. Unlinking `Drive` while
+    /// `Drive/Prints` is linked too took the models of `Drive/Prints` with
+    /// it. The deleted paths remembered under `path` are let go, so linking
+    /// it again indexes what is there. Returns the ids taken out.
+    nonisolated static func unlink(_ path: String, remaining: [String],
+                                   in root: inout [String: JSONValue]) -> Set<String> {
+        var settings = Self.settings(root)
+        var library: [String: JSONValue] = [:]
+        if case .object(let l)? = settings["printLibrary"] { library = l }
+        library["linked"] = .array(remaining.map(JSONValue.string))
+        func underPath(_ p: String) -> Bool {
+            LibraryMove.under(p, path) && !remaining.contains { LibraryMove.under(p, $0) }
+        }
+        if case .array(let remembered)? = library["notAdopted"] {
+            library["notAdopted"] = .array(remembered.filter {
+                if case .string(let p) = $0 { !underPath(p) } else { true }
+            })
+        }
+        settings["printLibrary"] = .object(library)
+        root["settings"] = .object(settings)
+
+        var gone = Set<String>()
+        var rows = Self.rows(root, "printFiles")
+        rows.removeAll { row in
+            guard case .object(let o) = row, case .string(let p)? = o["externalPath"], !p.isEmpty,
+                  underPath(p), let id = Self.recordId(row) else { return false }
+            gone.insert(id)
+            return true
+        }
+        root["printFiles"] = .array(rows)
+        return gone
+    }
+
+    /// Index what is new in every linked folder, in place. A file already
+    /// indexed (by its path) is left alone; one whose bytes the library
+    /// already holds is counted as a duplicate, as an import would.
+    ///
+    /// `byPerson: false` is the once-per-book pass on load (`rescanLinkedIfDue`),
+    /// which indexes folders the owner already linked and runs whoever is at
+    /// the Mac. A person pressing Rescan adds to the library: inventory/create.
+    ///
+    /// ── A DRIVE OF TEN THOUSAND MODELS (Oct 2026) ────────────────────────
+    ///
+    /// Four things the shop's linked Google Drive needed, in the order they
+    /// run here:
+    ///
+    ///   * STOP (`stopLibraryScan`): the walk and the indexing look at the
+    ///     flag between files; what was indexed before stays, and the busy
+    ///     flag is let go by the `defer` whatever happens.
+    ///   * NO DOWNLOADS: an online-only file is indexed from its listing
+    ///     (`LibraryImport.prepareOnline`), and filled in once it is here
+    ///     (`fillNowLocal`).
+    ///   * THE LINKED FOLDER'S NAME IS NOT A GROUP, and the grouping rule is
+    ///     smarter (`ImportGrouping.folded`, `fitting`).
+    ///   * THE RECORDS ALREADY THERE are filed again by the same rule, once
+    ///     per book (`LinkedRegroup`), from the same walk.
+    func rescanLinkedFolders(byPerson: Bool = true) async {
+        if byPerson { guard permitted("inventory", "create") else { return } }
+        // lock: system — when !byPerson: indexing folders the owner linked,
+        // once per book on load.
+        guard let build = source.build, StoreLock.weOwnIt(build), let roots = libraryRoots, let engine else { return }
+        let folders = linkedFolders.filter { FileManager.default.fileExists(atPath: $0) }
+        guard !folders.isEmpty, !libraryMoveBusy else { return }
+        libraryMoveBusy = true
+        let stop = ScanStop()
+        libraryScanStop = stop
+        defer { libraryMoveBusy = false; libraryMoveProgress = nil; libraryScanStop = nil }
+        let stopped = { stop.isStopped || Task.isCancelled }
+        let owns: @Sendable () -> Bool = { StoreLock.weOwnIt(build) }
+        let who: @Sendable () -> String? = { StoreLock.describe(StoreLock.verdict(for: build)) }
+        // ── NOTHING ON THE MAIN ACTOR THAT GROWS WITH THE DRIVE (Oct 2026) ──
+        //
+        // A linked Google Drive of ten thousand models beachballed the window
+        // for as long as this ran: every model it indexed wrote the whole
+        // 16 MB book on the main actor, and every pass after it decoded the
+        // book again to reload it. Now the walk, the planning and every write
+        // run on a dispatch queue (`PinWork`, `StoreWriter.updateOffMain`),
+        // the new models are written a batch at a time (`LibraryImport.addMany`),
+        // the progress is drawn a few times a second (`ScanProgress`), and the
+        // library is reloaded only when the book was written — so a scan that
+        // finds nothing new reloads nothing. `LibraryScanPerfTests` holds it.
+        var bookAt = Self.bookStamp(build.storeURL)
+        // Indexed already, or deleted by the shop since (`notAdopted`): a
+        // deleted linked model keeps its file, and without the second it
+        // came back at the next launch.
+        let externals = files.compactMap(\.externalPath) + Array(notAdopted)
+        // An archive's members by `memberKey` — indexed, or deleted since.
+        let knownMembers = Set(files.compactMap(\.archiveKey)).union(notAdopted)
+        let indexedArchives = Self.indexedArchives(files)
+        let vaults = roots.roots + [roots.primary]
+
+        // THE WALK, metadata only, on a dispatch queue (`PinWork`) — not a
+        // detached Task holding a cooperative thread for a whole Drive.
+        let settings = settingsDict
+        let walked = await PinWork.run {
+            let known = Set(externals.map { URL(fileURLWithPath: $0).standardizedFileURL.path })
+            return Shop.linkedWalk(folders.map { URL(fileURLWithPath: $0) }, skippingAll: vaults, known: known,
+                                   settings: settings, stop: stop)
+        }
+        if stopped() { libraryMoveNote = words.callIt("mac.scan_stopped", ["n": .number(0)]); return }
+
+        // THE RECORDS ALREADY HERE, filed again once per book.
+        var regrouped = 0
+        if LinkedRegroup.doneVersion(settingsDict) < LinkedRegroup.version {
+            let plans = walked.map(\.plan), linked = linkedFolders, storeURL = build.storeURL
+            regrouped = await PinWork.run {
+                (try? Shop.regroupLinked(plans, linked: linked, storeURL: storeURL, owns: owns, whoHasIt: who)) ?? 0
+            }
+        }
+        // THE ONES THAT WERE ONLINE AND ARE HERE NOW, filled in.
+        await fillNowLocal(storeURL: build.storeURL, engine: engine, owns: owns, whoHasIt: who, stop: stop)
+
+        let fresh = walked.flatMap(\.fresh)
+        var report = LibraryImport.Report()
+        if !fresh.isEmpty, !stopped() {
+            let progress = ScanProgress()
+            report = await LibraryImport.addMany(
+                fresh, storeURL: build.storeURL, libraryRoot: URL(fileURLWithPath: roots.primary),
+                knownHashes: Set(files.compactMap(\.contentHash)),
+                nameOfExisting: { [files] hash in files.first { $0.contentHash == hash }?.title },
+                engine: engine, keepOriginal: true, inPlace: true,
+                knownNameSizes: LibraryImport.nameSizes(of: files),
+                isOnline: linkedIsOnline,
+                owns: owns, whoHasIt: who,
+                shouldStop: stopped,
+                progress: { [weak self] done, total, url in
+                    guard progress.due(done, of: total) else { return }
+                    self?.libraryMoveProgress = (done, total, url.lastPathComponent)
+                })
+        }
+        // THE COMPRESSED FILES, as folders: each one's models extracted to the
+        // cache and indexed like loose ones (`indexArchives`).
+        var archived = ArchiveScan()
+        let packs = walked.filter { !$0.archives.isEmpty }.map { (root: $0.root, archives: $0.archives) }
+        if !packs.isEmpty, !stopped() {
+            archived = await Self.indexArchives(packs, known: knownMembers, storeURL: build.storeURL,
+                                                libraryRoot: URL(fileURLWithPath: roots.primary), engine: engine,
+                                                isOnline: linkedIsOnline, owns: owns, whoHasIt: who, stop: stop,
+                                                indexed: indexedArchives)
+        }
+        // Reloaded only when something above wrote to the book.
+        await reloadIfWritten(since: &bookAt)
+
+        // INDEXED FIRST, REFINED AFTER: the library is already filed by the
+        // heuristic and on screen; the assistant (when the shop turned it on)
+        // and the prints' pictures only improve on that, and Stop ends both.
+        var plans = walked.map(\.plan)
+        var assistant: SortAsk?
+        if !stopped(), aiLibraryAllowed {
+            let asked = await askAssistantToSort(plans, stop: stop)
+            assistant = asked
+            if asked.sorted > 0 || asked.loose > 0, !stopped() {
+                // The answers were just written to the book, not to this
+                // Shop's copy of its settings: read them back first, or the
+                // plan is the one before them and nothing is regrouped until
+                // the next scan (review of #1844; the preview already did).
+                // Stamped BEFORE the load: a write landing while it decodes
+                // is still seen by the check at the end.
+                bookAt = Self.bookStamp(build.storeURL)
+                await load(source)
+                plans = await PinWork.run { [settingsDict] in
+                    walked.map { Shop.sortedPlan(root: $0.root, models: $0.models, images: $0.images,
+                                                 settings: settingsDict, births: $0.plan.births) }
+                }
+                let again = plans, linked = linkedFolders, storeURL = build.storeURL
+                regrouped += await PinWork.run {
+                    (try? Shop.regroupLinked(again, linked: linked, storeURL: storeURL, owns: owns, whoHasIt: who)) ?? 0
+                }
+            }
+        }
+        var pictures = stopped() ? 0 : await fetchPrintPictures(plans, stop: stop)
+        // "Check pictures" (its own switch): the ones the assistant confirms
+        // against a print's own preview go on; the rest wait in the sheet.
+        if !stopped(), aiPicturesAllowed {
+            pictures += await checkPictures(plans, stop: stop).attached
+        }
+        // What is remembered about pictures and folders that are gone, let go.
+        if !stopped() { await prunePictureMaps(plans) }
+        await reloadIfWritten(since: &bookAt)
+
+        var lines: [String] = []
+        if report.stopped || stopped() {
+            lines.append(words.callIt("mac.scan_stopped", ["n": .number(Double(report.moved))]))
+        } else if fresh.isEmpty {
+            if archived.added == 0 { lines.append(words.callIt("mac.linked_up_to_date")) }
+        } else {
+            lines.append(words.callIt("mac.linked_scanned", ["n": .number(Double(report.moved)),
+                                                             "same": .number(Double(report.duplicates))]))
+        }
+        if report.online > 0 { lines.append(words.callIt("mac.linked_online", ["online": .number(Double(report.online))])) }
+        lines += archiveScanLines(archived)
+        if regrouped > 0 { lines.append(words.callIt("mac.linked_regrouped", ["n": .number(Double(regrouped))])) }
+        if pictures > 0 { lines.append(words.callIt("mac.sort_pictures_added", ["n": .number(Double(pictures))])) }
+        if let line = assistant?.line(words) { lines.append(line) }
+        libraryMoveNote = lines.joined(separator: " ")
+        let failures = report.failures + archived.failures + archived.refused
+        if !failures.isEmpty {
+            libraryMoveProblem = failures.prefix(3).joined(separator: "\n")
+        }
+    }
+
+    /// The book on disk as it is now — its size and when it was last written
+    /// — so a pass can tell whether anything wrote to it. A stat, not a read.
+    nonisolated static func bookStamp(_ url: URL) -> String? {
+        guard let a = try? FileManager.default.attributesOfItem(atPath: url.path) else { return nil }
+        let size = (a[.size] as? NSNumber)?.int64Value ?? -1
+        let when = (a[.modificationDate] as? Date)?.timeIntervalSinceReferenceDate ?? 0
+        return "\(size)|\(when)"
+    }
+
+    /// Reload the book — only when it was written since `stamp`. A reload
+    /// decodes the whole book and works out every screen's figures again,
+    /// and a scan that found nothing new has no reason to pay for that.
+    /// Returns whether it reloaded.
+    ///
+    /// `stamp` moves to the book as it was just BEFORE the load: a write that
+    /// lands while the load decodes (a sync, a LAN fold, the scan's own next
+    /// step) then still differs at the next check. Stamped after the load,
+    /// that write was taken for one already on screen and skipped (review of
+    /// #1860).
+    @discardableResult
+    func reloadIfWritten(since stamp: inout String?) async -> Bool {
+        guard let build = source.build else { return false }
+        let now = Self.bookStamp(build.storeURL)
+        guard now != stamp else { return false }
+        stamp = now
+        await load(source)
+        return true
+    }
+
+    /// Stop the linked or storage scan that is running, keeping what it has
+    /// done. The load-time passes do not start again by themselves on this
+    /// book this launch — see `rescanStorageIfDue`.
+    func stopLibraryScan() {
+        // Nothing running, nothing stopped: a Stop pressed as a scan ends (the
+        // button is drawn a frame late) must not mark the book stopped and so
+        // keep its load-time storage pass from running at all.
+        guard let running = libraryScanStop else { return }
+        running.stop()
+        libraryScanStopping = true
+        linkedScan?.cancel()
+        storageScan?.cancel()
+        if case .store(let build) = source { libraryScanStoppedBooks.insert(build.rawValue) }
+    }
+
+    /// "Regroup from folders": file the linked models by their folders again,
+    /// with the groups the shop chose left alone (`LinkedRegroup`). The same
+    /// refile the scan does once per book, on demand.
+    func regroupLinkedFolders() async {
+        guard permitted("inventory", "edit") else { return }
+        guard let build = source.build, StoreLock.weOwnIt(build), let roots = libraryRoots else { return }
+        let folders = linkedFolders.filter { FileManager.default.fileExists(atPath: $0) }
+        guard !folders.isEmpty, !libraryMoveBusy else { return }
+        libraryMoveProblem = nil
+        libraryMoveBusy = true
+        let stop = ScanStop()
+        libraryScanStop = stop
+        defer { libraryMoveBusy = false; libraryMoveProgress = nil; libraryScanStop = nil }
+        let vaults = roots.roots + [roots.primary]
+        let settings = settingsDict
+        let walked = await PinWork.run {
+            Shop.linkedWalk(folders.map { URL(fileURLWithPath: $0) }, skippingAll: vaults, known: [],
+                            settings: settings, stop: stop)
+        }
+        if stop.isStopped || Task.isCancelled { return }
+        do {
+            let linked = linkedFolders
+            // The refile — the whole book read and written — off the main actor.
+            let n = try await PinWork.run { () -> Result<Int, any Error> in
+                Result {
+                    try Shop.regroupLinked(walked.map(\.plan), linked: linked, storeURL: build.storeURL,
+                                           owns: { StoreLock.weOwnIt(build) },
+                                           whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
+                }
+            }.get()
+            await load(source)
+            libraryMoveNote = words.callIt("mac.linked_regrouped", ["n": .number(Double(n))])
+        } catch {
+            libraryMoveProblem = ErrorText.plain(error)
+        }
+    }
+
+    /// One linked folder as the walk found it.
+    struct LinkedFound: Sendable {
+        let root: URL
+        /// Every model under it, indexed or not.
+        let models: [URL]
+        /// Every picture under it — names only, nothing read.
+        var images: [URL] = []
+        /// The folder sorted into prints (`PrintSort`), with whatever the
+        /// shop's assistant already said laid over the heuristic.
+        let plan: PrintSort.Plan
+        /// The ones not indexed yet, grouped and with their photos.
+        let fresh: [LibraryImport.Incoming]
+        /// Every compressed file under it (`ArchiveFolder`) — names only,
+        /// nothing opened. Indexed by `indexArchives`, after the loose models.
+        var archives: [URL] = []
+    }
+
+    /// Every model and picture under each linked folder, the folder sorted
+    /// into prints (`PrintSort`, with the assistant's cached answers from
+    /// `settings` laid over it), and the new models placed by that sort. Reads
+    /// names and listings only — no file's bytes, so nothing online is
+    /// fetched — and looks at `stop` every few hundred entries.
+    nonisolated static func linkedWalk(_ folders: [URL], skippingAll roots: [String], known: Set<String>,
+                                       settings: [String: JSONValue] = [:],
+                                       stop: ScanStop?) -> [LinkedFound] {
+        let vaults = roots.filter { !$0.isEmpty }.map { URL(fileURLWithPath: $0).standardizedFileURL.path }
+        func isInVault(_ path: String) -> Bool {
+            vaults.contains { path == $0 || path.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }
+        }
+        // NESTED LINKED FOLDERS: a model is the INNERMOST linked folder's,
+        // and only that one walks it. Walked by both, it was filed by the outer
+        // one at index time and judged by both at refile time — and each
+        // "Regroup from folders" moved it from one's group to the other's and
+        // back (alpha.66 review).
+        let linkedPaths = folders.map { $0.standardizedFileURL.path }
+        var out: [LinkedFound] = []
+        for root in folders where !isInVault(root.standardizedFileURL.path) {
+            if stop?.isStopped == true { break }
+            let mine = root.standardizedFileURL.path
+            let inner = linkedPaths.filter { $0 != mine && LibraryMove.under($0, mine) }
+            func isInner(_ path: String) -> Bool { inner.contains { LibraryMove.under(path, $0) } }
+            let walker = FileManager.default.enumerator(at: root,
+                                                        includingPropertiesForKeys: LibraryImport.fileKeys + [.creationDateKey],
+                                                        options: [.skipsHiddenFiles, .skipsPackageDescendants])
+            var models: [URL] = []
+            var images: [URL] = []
+            var archives: [URL] = []
+            var seen = 0
+            while let next = walker?.nextObject() as? URL {
+                seen += 1
+                if seen % 256 == 0, stop?.isStopped == true { break }
+                // A COMPRESSED FILE is a folder of models (`ArchiveFolder`):
+                // kept by name for `indexArchives`, never walked into here.
+                if ArchiveFolder.kind(of: next.lastPathComponent) != nil {
+                    let path = next.standardizedFileURL.path
+                    if LibraryImport.isRegularFile(next), !isInVault(path), !isInner(path) { archives.append(next) }
+                    continue
+                }
+                // Regular files only, as the import walk: a symlink named
+                // `x.stl` is a pointer elsewhere, not a model kept here.
+                let ext = next.pathExtension.lowercased()
+                let isModel = LibraryImport.kinds.contains(ext)
+                guard isModel || ModelPhoto.kinds.contains(ext) else { continue }
+                let path = next.standardizedFileURL.path
+                guard LibraryImport.isRegularFile(next), !isInVault(path), !isInner(path) else { continue }
+                if isModel { models.append(next) } else { images.append(next) }
+            }
+            models.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+            images.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+            let births = Self.births(of: models + images, under: root)
+            let plan = sortedPlan(root: root, models: models, images: images, settings: settings, births: births)
+            let new = models.filter { !known.contains($0.standardizedFileURL.path) }
+            let photos = ModelPhoto.candidates(for: new, everyModel: models, boundary: root)
+            let fresh = new.map { url -> LibraryImport.Incoming in
+                let p = plan.placement(of: url)
+                var file = LibraryImport.Incoming(url: url, group: p?.group, title: p?.title)
+                file.tags = p?.collection.map { [$0] } ?? []
+                file.photos = photos[url] ?? []
+                return file
+            }
+            archives.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+            out.append(LinkedFound(root: root, models: models, images: images, plan: plan, fresh: fresh,
+                                   archives: archives))
+        }
+        return out
+    }
+
+    /// One linked folder sorted: the heuristic, then — when the book holds
+    /// answers from the shop's assistant for any of its top-level folders,
+    /// still matching what is on disk — again with those laid over it.
+    nonisolated static func sortedPlan(root: URL, models: [URL], images: [URL],
+                                       settings: [String: JSONValue],
+                                       births: [String: Double] = [:]) -> PrintSort.Plan {
+        let first = PrintSort.plan(root: root, models: models, images: images, births: births)
+        var answers = SortCache.answers(settings, for: SortCache.units(first))
+        answers.loose = LooseCache.answers(settings, root: root, present: LooseCache.present(first))
+        guard answers != PrintSort.Answers() else { return first }
+        return PrintSort.plan(root: root, models: models, images: images, answers: answers, births: births)
+    }
+
+    /// When each file directly inside `root` was created — its birth time,
+    /// read from the listing (`creationDateKey`), never from the file's
+    /// bytes — the order a copy job dropped the loose models in.
+    nonisolated static func births(of urls: [URL], under root: URL) -> [String: Double] {
+        var out: [String: Double] = [:]
+        for url in urls {
+            guard let rel = PrintSort.rel(url, under: root), !rel.contains("/"),
+                  let made = try? url.resourceValues(forKeys: [.creationDateKey]).creationDate else { continue }
+            out[rel] = made.timeIntervalSince1970
+        }
+        return out
+    }
+
+    /// File the linked records again by their folders and mark the book as
+    /// refiled, in ONE write through the store's chain. Returns how many
+    /// records moved.
+    ///
+    /// `linked` is every folder linked on the book, here or not: the book is
+    /// marked refiled only when all of them were walked (`LinkedRegroup.complete`).
+    nonisolated static func regroupLinked(_ walked: [(root: URL, models: [URL])], linked: [String] = [],
+                                          storeURL: URL,
+                                          owns: @escaping @Sendable () -> Bool,
+                                          whoHasIt: @escaping @Sendable () -> String?) throws -> Int {
+        try regroupLinked(walked.map { PrintSort.plan(root: $0.root, models: $0.models, images: []) },
+                          linked: linked, storeURL: storeURL, owns: owns, whoHasIt: whoHasIt)
+    }
+
+    /// The refile itself, over linked folders already sorted.
+    nonisolated static func regroupLinked(_ plans: [PrintSort.Plan], linked: [String] = [],
+                                          storeURL: URL,
+                                          owns: @escaping @Sendable () -> Bool,
+                                          whoHasIt: @escaping @Sendable () -> String?) throws -> Int {
+        var moved = 0
+        let walked = plans.map { (root: $0.root, models: $0.models) }
+        // lock: callers — rescanLinkedFolders, regroupLinkedFolders, applyLinkedSort
+        try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
+            // Judged against the rows ON DISK NOW, inside the chain, so a
+            // group the shop changed a moment ago is seen as the shop's.
+            var rows: [JSONValue] = []
+            if case .array(let r)? = root["printFiles"] { rows = r }
+            var changes: [LinkedRegroup.Change] = []
+            for plan in plans {
+                changes += LinkedRegroup.changes(rows: rows, plan: plan)
+            }
+            LinkedRegroup.apply(changes, to: &root)
+            if LinkedRegroup.complete(linked: linked.isEmpty ? walked.map(\.root.path) : linked,
+                                      walked: walked, rows: rows) {
+                LinkedRegroup.markDone(&root)
+            }
+            moved = changes.count
+        }
+        return moved
+    }
+
+    /// Linked models indexed online only whose file is on this Mac now — the
+    /// shop opened one, or made a folder available offline — measured,
+    /// hashed and pictured the way a bucket model brought down is
+    /// (`fillDownloaded`), with the picture in the record's vault folder.
+    /// Stops when the scan is stopped.
+    func fillNowLocal(storeURL: URL, engine: KhaytEngine, owns: @escaping @Sendable () -> Bool,
+                      whoHasIt: @escaping @Sendable () -> String?, stop: ScanStop?) async {
+        // lock: system — fills in models the library already lists, from files now on this Mac; part of the linked pass, adds and removes nothing.
+        guard let roots = libraryRoots else { return }
+        // Only a file in a folder this book links, or in its own library
+        // folder (`prepareOnline` from the storage pass): `externalPath` arrives
+        // by sync from the shop's other devices, and this pass reads what it
+        // names unasked — a path anywhere else on this Mac is not read.
+        let places = linkedFolders + roots.roots + [roots.primary]
+        let rows = fileRows
+        let isOnline = linkedIsOnline
+        // Every record looked at, and every file stat'ed, on a dispatch queue:
+        // thousands of them on a linked drive.
+        let here = await PinWork.run { () -> [(id: String, path: String)] in
+            let waiting: [(id: String, path: String)] = rows.compactMap { row in
+                guard case .object(let o) = row, let mark = o["indexedOnline"], mark != .null,
+                      case .string(let id)? = o["id"], case .string(let p)? = o["externalPath"], !p.isEmpty,
+                      places.contains(where: { !$0.isEmpty && LibraryMove.under(p, $0) }) else { return nil }
+                return (id, p)
+            }
+            return waiting.filter { FileManager.default.fileExists(atPath: $0.path)
+                && !isOnline(URL(fileURLWithPath: $0.path)) }
+        }
+        guard !here.isEmpty else { return }
+        // Written a batch at a time, as Measure Online writes (`OnlineMeasure.batch`):
+        // one write per model was the whole 16 MB book again for each one a
+        // shop made available offline.
+        var pending: [String: DownloadedRead] = [:]
+        func writeFilled() async {
+            guard !pending.isEmpty else { return }
+            let batch = pending
+            pending = [:]
+            // lock: callers — fillNowLocal
+            try? await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
+                Shop.applyDownloaded(batch, to: &book)
+            }
+        }
+        for item in here {
+            if stop?.isStopped == true || Task.isCancelled { break }
+            let pictures = Self.vaultFolder(item.id, roots: roots)
+            try? FileManager.default.createDirectory(at: pictures, withIntermediateDirectories: true)
+            if let read = try? await Self.readDownloaded(file: URL(fileURLWithPath: item.path), pictures: pictures,
+                                                         engine: engine) {
+                pending[item.id] = read
+            }
+            if pending.count >= OnlineMeasure.batch { await writeFilled() }
+        }
+        // What was read before a Stop is still written.
+        await writeFilled()
+    }
+
+    /// A record's vault folder — the one it already has, in whichever of the
+    /// library's folders that is (it moves with the library), or a new one in
+    /// the primary. Where a linked model's picture goes; never the shop's own
+    /// folder the model sits in.
+    static func vaultFolder(_ id: String, roots: LibraryLocation.Roots) -> URL {
+        LibraryLocation.directory(for: id, roots: roots.roots)
+            ?? URL(fileURLWithPath: roots.primary).appending(path: LibraryLocation.itemDirName(id))
+    }
+
+    /// A linked model the cloud has not downloaded, brought down by reading
+    /// it — which is what makes a File Provider fetch a file — and filled
+    /// in. Bring Back's answer for a linked model (`bringBack`).
+    func bringDownLinked(_ file: LibraryFile) async {
+        guard let path = file.externalPath, let build = source.build, let engine, let roots = libraryRoots else { return }
+        let pictures = Self.vaultFolder(file.id, roots: roots)
+        try? FileManager.default.createDirectory(at: pictures, withIntermediateDirectories: true)
+        do {
+            // lock: system — reads a model the library already lists, as Bring Back does.
+            if let same = try await Self.fillDownloaded(id: file.id, file: URL(fileURLWithPath: path), pictures: pictures,
+                                                        storeURL: build.storeURL, engine: engine,
+                                                        owns: { StoreLock.weOwnIt(build) },
+                                                        whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) {
+                cloudLibraryProblem = words.callIt("mac.storage_downloaded_duplicate", ["name": .string(same)])
+            }
+        } catch {
+            cloudLibraryProblem = words.callIt("mac.cloudlib_bring_back_failed") + " " + ErrorText.plain(error)
+        }
+    }
+}

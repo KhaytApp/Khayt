@@ -1,0 +1,376 @@
+import Foundation
+import KhaytCore
+
+/// The one place shop data leaves this Mac.
+///
+/// ── WHAT IS HERE AND WHAT DELIBERATELY IS NOT ─────────────────────────────
+///
+/// Here: a `URLSession` call, and opening the shop's sealed key.
+///
+/// Not here: which provider, how that provider spells a request, whether the
+/// feature may run at all, how long to wait after a 429, or what sentence a
+/// shop reads for a 401. Every one of those is `lib/` — `ai-providers`,
+/// `ai-privacy`, `ai-tools` — and `main.js` drives its own transport from
+/// exactly the same three. Two apps that disagree about what a 429 means is
+/// the failure this shape exists to prevent, and it is the kind nobody notices
+/// until a shop is told two different things on two machines.
+///
+/// ── THE KEY IS OPENED PER CALL AND NEVER HELD ─────────────────────────────
+///
+/// `settings.ai.apiKey` is sealed on disk — it is a registered path in
+/// `lib/store-secret-paths.js`, so the store this syncs, backs up and exports
+/// never carries it in the clear. It is opened here, handed to the request
+/// builder, and goes out of scope. A cached copy would be a plaintext key
+/// living as long as the app does, for no gain: this is a button a person
+/// presses, not a poll.
+@MainActor
+enum AiClient {
+
+    /// Sixty seconds, not thirty. `main.js` says why, and it is not arbitrary:
+    /// the default model thinks before it answers and the thinking happens
+    /// before the first byte, so a thirty-second ceiling — set when the default
+    /// model did not think — aborts a good answer mid-flight, and the shop sees
+    /// a network error for a request that was working.
+    static let timeout: TimeInterval = 60
+
+    /// Three, the same as the other app.
+    static let attempts = 3
+
+    enum Failure: Error, LocalizedError {
+        /// The owner has not agreed to this feature. Not a network fault and
+        /// not retryable — and the only outcome here that must never be
+        /// softened into "try again".
+        case notConsented
+        case noKey
+        /// The provider cannot take images ("Check pictures").
+        case noVision
+        case refused(String)
+        var errorDescription: String? {
+            switch self {
+            case .notConsented: return "AI_FEATURE_NOT_CONSENTED"
+            case .noKey: return "No API key"
+            case .noVision: return "AI_NO_VISION"
+            case .refused(let why): return why
+            }
+        }
+    }
+
+    /// Draft the physical facts of a job from a description.
+    ///
+    /// Returns the model's draft, already validated by the shared rule. The
+    /// caller turns it into a part — this does not, because the part depends on
+    /// the shop's shelf and its tax position and those belong to the screen.
+    static func draftQuote(_ description: String, shop: Shop) async throws -> JSONValue {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+
+        // Opened here, used once, never stored.
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiQuoteRequest(
+                settings: settings, description: description,
+                materials: shop.inventoryRows, apiKey: key)
+        } catch {
+            // `buildRequest` throws for a missing key or model — a
+            // CONFIGURATION fault the shop has to see, not something to retry.
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+
+        let data = try await send(request, engine: engine)
+        let read = try await engine.aiQuoteRead(settings: settings, response: data)
+        guard read.ok, let draft = read.draft else {
+            throw Failure.refused(read.problem ?? "no draft")
+        }
+        return draft
+    }
+
+    /// Ask a question about the shop's own book.
+    ///
+    /// The model is given a SUMMARY — a few hundred bytes of totals and counts
+    /// that `buildShopContext` reduces the whole book to — and the system
+    /// prompt forbids it to answer with anything not in that summary. So what
+    /// leaves the building is a known payload, not "your data".
+    static func ask(_ question: String, history: [JSONValue],
+                    shop: Shop) async throws -> String {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        // The book's money leaves for the provider here: asked again at the door.
+        guard shop.lockAllows("analytics", "view") else { throw Failure.refused("not allowed") }
+        let settings = shop.settingsDict
+
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+
+        let summary = try await engine.shopSummary(collections: shop.bookForAssistant,
+                                                   now: Date())
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiAssistantRequest(
+                settings: settings, summary: summary, question: question,
+                history: history, shopName: shop.shopName,
+                language: shop.words.language, apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+
+        let data = try await send(request, engine: engine)
+        let read = try await engine.aiAssistantRead(settings: settings, response: data)
+        guard read.ok, let answer = read.answer else {
+            throw Failure.refused(read.problem ?? "no answer")
+        }
+        return answer
+    }
+
+    /// Draft a message to a customer about one job.
+    ///
+    /// ── WHAT IS HANDED OVER, AND WHAT IS NOT ──────────────────────────────
+    ///
+    /// The disclosure on the settings screen names it: the customer's name, the
+    /// order reference, project, status and due date, and the amount and
+    /// outstanding balance. The customer record sitting right here also has an
+    /// email address, a phone number, a tax registration and an address — none
+    /// of which is the shop's to send on that person's behalf, and none of
+    /// which is passed.
+    ///
+    /// It DRAFTS. Nothing is sent to anyone: the message comes back for the
+    /// shop to read, change and send itself, which is also the only honest
+    /// scope while this app cannot email.
+    static func draftReply(order: JSONValue, clientName: String, intent: String,
+                           note: String, shop: Shop) async throws -> String {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiReplyRequest(
+                settings: settings, order: order, clientName: clientName,
+                intent: intent, note: note, currency: shop.currency,
+                shopName: shop.shopName, language: shop.words.language, apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+
+        let data = try await send(request, engine: engine)
+        let read = try await engine.aiReplyRead(settings: settings, response: data)
+        guard read.ok, let message = read.answer else {
+            throw Failure.refused(read.problem ?? "no message")
+        }
+        return message
+    }
+
+    /// Ask the model to weigh the shop's own comparables and recommend a margin.
+    ///
+    /// ── THE COMPARABLES ARE ALREADY ON SCREEN ─────────────────────────────
+    ///
+    /// This is the smaller half of the feature and the optional one. The shop
+    /// has already been shown its own median, computed here, net of tax, with
+    /// no model and no network. What this adds is a second opinion that can
+    /// weigh outliers and a thin sample and say so in a sentence — and if it
+    /// gives nothing usable, `pickPrice` falls back to that same median, which
+    /// is a real answer rather than a failure.
+    static func recommendMargin(comparables: JSONValue, job: JSONValue,
+                                fallback: Double?, shop: Shop) async throws
+        -> KhaytEngine.PriceSuggestion {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiPriceRequest(
+                settings: settings, comparables: comparables, job: job,
+                shopName: shop.shopName, language: shop.words.language, apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+
+        let data = try await send(request, engine: engine)
+        return try await engine.aiPriceRead(settings: settings, response: data,
+                                            fallbackMargin: fallback)
+    }
+
+    /// Ask what each folder of a linked folder is (`lib/ai-library.js`).
+    ///
+    /// ── NAMES, AND NOTHING ELSE ───────────────────────────────────────────
+    ///
+    /// `entries` are folder paths, model counts, sub-folder names and up to
+    /// five file names a folder — the disclosure in Settings ▸ Assistant
+    /// says so. No file is opened to build them and no picture is sent.
+    ///
+    /// Returns the validated answer (paths that were not sent and roles that
+    /// do not exist are already gone) and what the call cost, for the ledger.
+    static func sortFolders(_ entries: [SortCache.Entry], shop: Shop) async throws
+        -> (answers: PrintSort.Answers, usage: JSONValue?, model: String) {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiLibraryRequest(settings: settings, entries: entries.map(\.json), apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+        // A long answer — one line per folder, up to 150 — after thinking:
+        // twice the usual ceiling.
+        let data = try await send(request, engine: engine, timeout: timeout * 2)
+        let read = try await engine.aiLibraryRead(settings: settings, response: data,
+                                                  sentPaths: entries.map(\.path))
+        guard read.ok else { throw Failure.refused(read.problem ?? "no answer") }
+        var answers = PrintSort.Answers()
+        for (path, role) in read.roles {
+            if let r = PrintSort.Role(rawValue: role) { answers.roles[path] = r }
+        }
+        answers.names = read.names
+        return (answers, read.usage, request.model)
+    }
+
+    /// Ask which prints the loose files at the top of a linked folder make
+    /// (`lib/ai-library.js buildLooseRequest`). `names` are the files' own
+    /// names below the linked folder, in copy order, at most 300 — nothing
+    /// else is sent. Returns the validated prints (indices into `names`)
+    /// and what the call cost.
+    static func groupLoose(_ names: [String], shop: Shop) async throws
+        -> (prints: [KhaytEngine.AiLooseAnswer.Print], usage: JSONValue?, model: String) {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiLooseRequest(settings: settings, names: names, apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+        let data = try await send(request, engine: engine, timeout: timeout * 2)
+        let read = try await engine.aiLooseRead(settings: settings, response: data, count: names.count)
+        guard read.ok else { throw Failure.refused(read.problem ?? "no answer") }
+        return (read.prints, read.usage, request.model)
+    }
+
+    /// "Check pictures": does this photo show this print? `photo` and
+    /// `reference` are already redrawn (`PictureSend.jpeg`) — no metadata.
+    static func checkPicture(printName: String, photo: Data, reference: Data?, shop: Shop) async throws
+        -> (answer: KhaytEngine.AiPictureAnswer, model: String) {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiPictureRequest(settings: settings, printName: printName,
+                                                        photo: photo.base64EncodedString(),
+                                                        reference: reference?.base64EncodedString(), apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("AI_NO_VISION") { throw Failure.noVision }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+        let data = try await send(request, engine: engine)
+        let read = try await engine.aiPictureRead(settings: settings, response: data, hasReference: reference != nil)
+        return (read, request.model)
+    }
+
+    /// The session every AI request goes through. Ephemeral, and a redirect
+    /// is followed only to the same scheme, host and port: the provider's API
+    /// key is in a header, and `URLSession.shared` would carry it along a 30x
+    /// to wherever that pointed. Oct 2026 security review.
+    nonisolated static let session = URLSession(configuration: .ephemeral,
+                                                delegate: SameHostRedirects(), delegateQueue: nil)
+
+    /// POST it, retrying only what the shared policy says is transient.
+    private static func send(_ shaped: KhaytEngine.AiRequest,
+                             engine: KhaytEngine,
+                             timeout: TimeInterval = AiClient.timeout) async throws -> JSONValue {
+        guard let url = URL(string: shaped.url) else { throw Failure.refused("bad address") }
+        var req = URLRequest(url: url, timeoutInterval: timeout)
+        req.httpMethod = "POST"
+        for (name, value) in shaped.headers { req.setValue(value, forHTTPHeaderField: name) }
+        req.httpBody = try JSONEncoder().encode(shaped.body)
+
+        var last = "AI request failed"
+        for attempt in 0..<attempts {
+            let body: Data
+            let response: URLResponse
+            do {
+                (body, response) = try await Self.session.data(for: req)
+            } catch {
+                // A network fault or a timeout — transient by nature, so it
+                // retries like a 5xx does.
+                last = error.localizedDescription
+                if attempt + 1 >= attempts { throw Failure.refused(last) }
+                try await pause(status: 0, attempt: attempt, retryAfter: nil, engine: engine)
+                continue
+            }
+
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if (200..<300).contains(status) {
+                return (try? JSONValue.decode(JSONValue.self, from: body)) ?? .object([:])
+            }
+
+            // The SHARED sentence, and the shared decision about whether this
+            // is worth trying again.
+            let parsed = (try? JSONValue.decode(JSONValue.self, from: body)) ?? .null
+            last = (try? await engine.aiHttpError(status: status, body: parsed)) ?? last
+            let after = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "retry-after")
+            let policy = try? await engine.aiRetry(status: status, attempt: attempt, retryAfter: after)
+            guard policy?.retry == true, attempt + 1 < attempts else { throw Failure.refused(last) }
+            try await Task.sleep(for: .milliseconds(Int(policy?.afterMs ?? 1000)))
+        }
+        throw Failure.refused(last)
+    }
+
+    private static func pause(status: Int, attempt: Int, retryAfter: String?,
+                              engine: KhaytEngine) async throws {
+        let policy = try? await engine.aiRetry(status: status, attempt: attempt, retryAfter: retryAfter)
+        try await Task.sleep(for: .milliseconds(Int(policy?.afterMs ?? 1000)))
+    }
+}

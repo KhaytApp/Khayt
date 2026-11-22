@@ -1,0 +1,488 @@
+import Foundation
+import AppKit
+import CoreImage
+import CoreImage.CIFilterBuiltins
+import KhaytCore
+
+/// The invoice a customer is handed.
+///
+/// The document is `lib/invoice-document.js` — the same four hundred lines the
+/// Electron window prints, so the two apps cannot hand out different papers for
+/// the same job. This assembles what it needs and turns the result into a PDF.
+///
+/// WHAT IS ASSEMBLED HERE, and why each piece is not in the module:
+///
+/// * The money, through `KhaytTax` — whether a price includes the tax or the
+///   tax is added on top is the shop's setting, and the document is handed the
+///   answer rather than the question.
+/// * The ZATCA QR, because drawing one needs a graphics framework. The
+///   PAYLOAD is shared; only the pixels are native.
+/// * The words, from `Words`, which is where this app's language lives.
+@MainActor
+enum Invoice {
+
+    /// Everything the document needs, gathered from the shop.
+    ///
+    /// Gathering and building are separate on purpose: a test can hand this the
+    /// awkward shop — no tax registration, a missing ZATCA field, a job with no
+    /// parts — without opening a book to get one.
+    static func html(for job: Order, shop: Shop, proforma: Bool = false,
+                     milestone: Milestone? = nil) async -> InvoiceDocument? {
+        guard let engine = shop.engine else { return nil }
+        // The tax split, by the shop's own rule. A shop with no tax
+        // registration has nothing to split: the whole price is what it keeps,
+        // and the document prints no tax line.
+        let money = await shop.taxSplit(job.price)
+        let row = shop.orderRow(job.id) ?? .object([:])
+        // THE MOMENT, not the day. ZATCA's tag 3 is the invoice's date AND
+        // time; this passed `job.date`, "2026-07-02", where Khayt passes the
+        // order's `timestamp`. The order's own stamp when it has one, its day
+        // otherwise — and `KhaytZatcaQr.issueTimestamp` turns a bare day into
+        // a full ISO 8601 stamp either way.
+        var stamp = job.date
+        if case .object(let fields) = row, let ts = Shop.plainString(fields["timestamp"]), !ts.isEmpty {
+            stamp = ts
+        }
+        let paper = Ingredients(
+            row: row,
+            settings: shop.settingsDict,
+            clients: shop.clientRows,
+            orders: shop.orderRows,
+            currencies: currencyTable(shop),
+            language: shop.words.language,
+            sellerName: shop.shopName,
+            sellerAddress: shop.shopAddress,
+            sellerFields: shop.shopDocumentFields,
+            price: job.price,
+            subtotal: money?.subtotal ?? job.price,
+            taxTotal: money?.taxTotal ?? 0,
+            vatRate: await shop.taxPercent(),
+            timestamp: stamp,
+            proforma: proforma,
+            milestone: proforma ? milestone : nil)
+        return await document(paper, engine: engine, words: shop.words)
+    }
+
+    /// What the document is built from.
+    ///
+    /// `subtotal` and `taxTotal` are the shop's tax rule already applied —
+    /// whether a price includes the tax or the tax is added on top is a setting,
+    /// and the document is handed the answer rather than the question.
+    struct Ingredients: Sendable {
+        var row: JSONValue
+        var settings: [String: JSONValue]
+        var clients: [JSONValue]
+        /// The whole print log, for the one ingredient that cannot be worked
+        /// out from this order alone: what the customer has spent, and so
+        /// which loyalty tier they are in.
+        var orders: [JSONValue] = []
+        var currencies: [String: JSONValue]
+        var language: String
+        var sellerName: String
+        var sellerAddress: String
+        /// Every field the document asks the shop for — see
+        /// `Shop.shopDocumentFields`. `sellerName` and `sellerAddress` stay
+        /// because the ZATCA payload and the readiness check want them on their
+        /// own, spelled as those rules spell them.
+        var sellerFields: [String: JSONValue]
+        /// What the job is priced at, before tax is split out of it.
+        var price: Double
+        var subtotal: Double
+        var taxTotal: Double
+        var vatRate: Double
+        /// When the job was taken — the moment the QR is stamped with.
+        var timestamp: String
+        /// A proforma: titled and watermarked as one, no ZATCA QR, the job's
+        /// id for a number (`proforma` in `lib/invoice-document.js`).
+        var proforma = false
+        /// With `proforma`: ONE part of the job, printed as a single line at its
+        /// own amount (`milestone` in `lib/invoice-document.js`).
+        var milestone: Milestone? = nil
+    }
+
+    /// The document itself.
+    static func document(_ paper: Ingredients, engine: KhaytEngine,
+                         words: Words) async -> InvoiceDocument? {
+        // The QR, when the shop is registered AND every required field is
+        // there. A refusal is passed to the document so it can say WHICH field
+        // is missing, rather than printing an empty box.
+        var qrSvg = ""
+        var qrProblem: String?
+        // No QR on a proforma: it is not a tax invoice, and the document
+        // leaves the box out for one.
+        if !paper.proforma, case .bool(true)? = paper.settings["enableZatca"] {
+            // `try?` on a call returning an optional gives an optional
+            // optional; flattened once so "the call failed" and "the shop is
+            // ready" are not the same value.
+            let refusal = (try? await engine.zatcaReadiness(
+                settings: paper.settings, sellerName: paper.sellerName)).flatMap { $0 }
+            // Tags 4 and 5 are RIYALS. A job saved in a client's currency is
+            // converted at the rate stored on it when it was saved; with no
+            // rate there is no honest figure and no QR (`qrAmounts`).
+            let riyals = try? await engine.zatcaAmounts(
+                order: paper.row, settings: paper.settings,
+                total: paper.subtotal + paper.taxTotal, vatAmount: paper.taxTotal)
+            if let refusal {
+                qrProblem = words.zatcaRefusal(refusal)
+            } else if case .refused(let why)? = riyals {
+                qrProblem = words.zatcaRefusal(why)
+            } else if case .amounts(let total, let vat)? = riyals,
+                let payload = try? await engine.zatcaPayload(
+                sellerName: paper.sellerName,
+                vatNumber: Shop.plainString(paper.settings["vat"]) ?? "",
+                timestamp: paper.timestamp,
+                total: Self.amount(total),
+                vatAmount: Self.amount(vat)),
+                let image = qrImage(payload) {
+                qrSvg = "<img src=\"\(image)\" width=\"120\" height=\"120\" alt=\"ZATCA\">"
+            } else {
+                qrProblem = words.callIt("inv.qr_failed")
+            }
+        }
+
+        // The lines under the table, by the shared rule: the Subtotal row is
+        // the ITEMS, so Subtotal + Rush + Shipping − Discount is the total
+        // printed under them. This printed the whole price there, and a 280
+        // job of 225 goods, 25 rush and 30 shipping read Subtotal 280.
+        let summary = try? await engine.invoiceSummary(order: paper.row, settings: paper.settings)
+        var money: [String: JSONValue] = [
+            "qrSvg": .string(qrSvg),
+            "qrProblem": qrProblem.map(JSONValue.string) ?? .null,
+            "payQrSvg": .string(""),
+            "total": .string(Self.amount(paper.subtotal + paper.taxTotal)),
+            "vatAmount": .string(Self.amount(paper.taxTotal)),
+            "subtotal": .string(Self.amount(paper.subtotal)),
+            // What the items came to before rush, shipping and the discount —
+            // the figure the document reconciles its own table against.
+            "subtotalShown": .string(Self.amount(summary?.itemsSubtotal ?? paper.price)),
+            "vatRate": .number(paper.vatRate),
+            "shipping": .number(0),
+            "proforma": .bool(paper.proforma),
+        ]
+        if let part = paper.milestone, paper.proforma {
+            money["milestone"] = part.document(of: paper.price)
+        }
+        return try? await engine.invoiceHtml(
+            order: paper.row, settings: paper.settings, clients: paper.clients,
+            currencies: paper.currencies, language: paper.language,
+            money: money, sellerFields: paper.sellerFields, orders: paper.orders)
+    }
+
+    /// The currency table the document formats against.
+    static func currencyTable(_ shop: Shop) -> [String: JSONValue] {
+        guard case .object(let table) = shop.currencyTable else { return [:] }
+        return table
+    }
+
+    /// Two decimals, the way an invoice states money.
+    static func amount(_ n: Double) -> String {
+        String(format: "%.2f", n.isFinite ? n : 0)
+    }
+
+    /// The QR itself, as a data URL.
+    ///
+    /// CoreImage rather than a library: the payload is the shared rule and the
+    /// pixels are the platform's. `M` correction is what ZATCA's own samples
+    /// use — higher correction makes a denser code that a phone camera reads
+    /// worse at the size an invoice prints it.
+    static func qrImage(_ payload: String) -> String? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(payload.utf8)
+        filter.correctionLevel = "M"
+        guard let output = filter.outputImage else { return nil }
+        // Scaled before rasterising: a 25-module code is 25 points across, and
+        // an invoice printed from a 25-pixel image is a grey smudge.
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
+        let context = CIContext()
+        guard let cg = context.createCGImage(scaled, from: scaled.extent) else { return nil }
+        let rep = NSBitmapImageRep(cgImage: cg)
+        guard let png = rep.representation(using: .png, properties: [:]) else { return nil }
+        return "data:image/png;base64," + png.base64EncodedString()
+    }
+}
+
+
+import SwiftUI
+import WebKit
+
+/// An invoice on screen, and on paper.
+///
+/// A WebView because the document IS html — the same html Khayt prints — and
+/// rendering it any other way would mean a second layout engine and a second
+/// answer to what an invoice looks like.
+///
+/// `createPDF` is WebKit's own, so the file a customer receives is what the
+/// window showed rather than a second run of the layout at a different size.
+@MainActor
+final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
+
+    let document: InvoiceDocument
+    let webView: WKWebView
+    /// False until WebKit says the document is laid out. Asking for a PDF
+    /// before that returns a blank page, so the button waits.
+    @Published private(set) var drawn = false
+    /// What the last save did, in the shop's language. Shown under the paper.
+    @Published var note: String?
+
+    /// `wholePage`: the document is a page of its own, styles and all — the
+    /// packing slip (`lib/shop-documents.js`) — and is drawn as it is rather
+    /// than inside the invoice's stylesheet.
+    init(document: InvoiceDocument, wholePage: Bool = false) {
+        self.document = document
+        self.webView = DocumentWeb.view()
+        super.init()
+        webView.navigationDelegate = self
+        webView.loadHTMLString(wholePage ? document.html : Self.page(document), baseURL: nil)
+    }
+
+    func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
+        // ── THE DIGITS, AND ONLY THEN `drawn` ─────────────────────────────
+        //
+        // `drawn` is what the Save button waits on, so flipping it before the
+        // rewrite has run would let a fast hand save a PDF with the digits
+        // still in 0–9. The pass is awaited first.
+        guard document.arabicNumerals else { drawn = true; return }
+        Task { @MainActor in
+            _ = try? await view.evaluateJavaScript(Self.digitPass(document.selector))
+            drawn = true
+        }
+    }
+
+    /// Rewrite the document's digits to Arabic-Indic, AS THE APP rather than
+    /// as the page.
+    ///
+    /// ── WHY THIS IS NOT A `<script>` IN THE DOCUMENT ANY MORE ─────────────
+    ///
+    /// It was one, and it never ran. `DocumentWeb` switches page scripts off —
+    /// deliberately, so that an escaping slip in some future field is a visible
+    /// `<script>` on the paper rather than code running — and a `<script>`
+    /// written into the page is inert under that setting. So a shop that asked
+    /// for Arabic digits on its invoices got 0–9, on every invoice, with
+    /// nothing failing anywhere. The test that covered it asserted the script
+    /// was in the STRING, which it was.
+    ///
+    /// `evaluateJavaScript` is the host asking WebKit to run something, which
+    /// is a different permission from the page carrying its own script: it
+    /// works with `allowsContentJavaScript` off, and the document still cannot
+    /// bring any script of its own. So the guard stays exactly as strong and
+    /// the feature works.
+    ///
+    /// The selector is the module's — `.v, .amount` and so on — and it is
+    /// placed in a JSON string rather than pasted between quotes, so a
+    /// selector carrying a quote cannot end the literal.
+    static func digitPass(_ selector: String) -> String {
+        let quoted = (try? String(data: JSONEncoder().encode(selector), encoding: .utf8))
+            ?? "\"\""
+        return """
+        (function () {
+          var A = '\u{0660}\u{0661}\u{0662}\u{0663}\u{0664}\u{0665}\u{0666}\u{0667}\u{0668}\u{0669}';
+          // TEXT NODES, not `textContent`. Assigning `el.textContent` replaces
+          // everything inside the element with one flat string — so it did not
+          // only change the digits, it deleted the markup. `.biz-meta` holds
+          // the address in its own paragraphs and the contact line in another,
+          // and they came out as one run; `.amount` holds a span for the
+          // currency and lost its styling; and the `<bdi>` that keeps a phone
+          // number the right way round went with them, putting the number back
+          // to front for exactly the shops that had asked for Arabic digits.
+          document.querySelectorAll(\(quoted)).forEach(function (el) {
+            var walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            for (var n = walk.nextNode(); n; n = walk.nextNode()) {
+              n.nodeValue = n.nodeValue.replace(/[0-9]/g, function (d) { return A[+d]; });
+            }
+          });
+        })();
+        """
+    }
+
+    /// Nothing but the document itself is allowed to load.
+    ///
+    /// Without this an absolute link, a `<meta refresh>` or a redirect inside
+    /// a shop's own invoice could put a remote page in the app's window. The
+    /// other app refuses the same thing in `will-navigate`; this had no
+    /// equivalent until now.
+    func webView(_ view: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        decisionHandler(DocumentWeb.allows(action.request.url, alreadyLoaded: drawn)
+                        ? .allow : .cancel)
+    }
+
+    /// The document as a PDF, on A4, drawn by the engine that drew the window.
+    ///
+    /// A PRINT OPERATION, not `createPDF`. `createPDF` photographs the view at
+    /// whatever size it happens to be, so an invoice saved from a narrow sheet
+    /// came out as one endless 480-point-wide strip with the totals running off
+    /// the edge — a picture of a window rather than a page. Printing renders in
+    /// print media instead, which is the half of `renderer/invoice.css` written
+    /// for paper: `@page { size: A4 }`, the margins, and the black-on-white the
+    /// shop's colours give way to.
+    func pdf() async throws -> Data {
+        let info = Self.a4Info()
+        info.jobDisposition = .save
+
+        let file = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "khayt-invoice-\(UUID().uuidString).pdf")
+        info.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] = file
+
+        let operation = webView.printOperation(with: info)
+        operation.showsPrintPanel = false
+        operation.showsProgressPanel = false
+        guard await run(operation, over: nil) else { throw Failure.printFailed }
+
+        defer { try? FileManager.default.removeItem(at: file) }
+        return try Data(contentsOf: file)
+    }
+
+    /// File ▸ Print… — the document, on the shop's printer, through the
+    /// system's print panel. The same A4 page `pdf()` draws, so what comes out
+    /// of the printer is what the saved PDF holds.
+    ///
+    /// Waits for WebKit to lay the document out first: a print asked for
+    /// before that is a blank page. The wait is a hang guard, not a speed
+    /// limit. Returns false when the shop cancelled the panel.
+    @discardableResult
+    func printWithPanel(title: String, over window: NSWindow?) async -> Bool {
+        for _ in 0..<6000 where !drawn { try? await Task.sleep(for: .milliseconds(100)) }
+        guard drawn else { return false }
+        let operation = webView.printOperation(with: Self.a4Info())
+        operation.showsPrintPanel = true
+        operation.showsProgressPanel = true
+        operation.jobTitle = title
+        return await run(operation, over: window)
+    }
+
+    /// A4, portrait, with no margins of AppKit's own.
+    ///
+    /// Zero margins because the document sets its own in `@page`. Adding
+    /// AppKit's on top of the stylesheet's would indent every invoice by two
+    /// margins and lose the last line off the foot of the page.
+    static func a4Info() -> NSPrintInfo {
+        let info = NSPrintInfo()
+        info.paperSize = Self.a4
+        info.orientation = .portrait
+        info.topMargin = 0; info.bottomMargin = 0
+        info.leftMargin = 0; info.rightMargin = 0
+        info.horizontalPagination = .fit
+        info.verticalPagination = .automatic
+        info.isHorizontallyCentered = false
+        info.isVerticallyCentered = false
+        return info
+    }
+
+    /// Run a print operation of this paper's web view to the end.
+    ///
+    /// `over` is the window a print panel hangs from; nil runs it on the
+    /// paper's own window.
+    private func run(_ operation: NSPrintOperation, over window: NSWindow?) async -> Bool {
+        // The view has to be in a window to print. A sheet's web view already
+        // is; one built to export without ever being shown is not, and prints
+        // an empty page in silence.
+        if webView.window == nil { Self.offscreen.contentView = webView }
+        let host = window ?? webView.window ?? Self.offscreen
+
+        // `runModal(for:…)`, NOT `run()`. WebKit's print operation is
+        // asynchronous — the pages are laid out in the web process — and
+        // `run()` waits for them on the very run loop they need, forever. The
+        // documentation for `printOperation(with:)` says so in as many words;
+        // it was read after the first attempt hung a test for ten minutes.
+        let printed = Printed()
+        return await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
+            printed.done = done
+            operation.runModal(for: host, delegate: printed,
+                               didRun: #selector(Printed.printOperationDidRun(_:success:contextInfo:)),
+                               contextInfo: nil)
+        }
+    }
+
+    /// The print operation's way of saying it finished: an Objective-C
+    /// selector, on an object that holds the continuation waiting for it.
+    private final class Printed: NSObject {
+        var done: CheckedContinuation<Bool, Never>?
+        @objc func printOperationDidRun(_ op: NSPrintOperation, success: Bool,
+                                        contextInfo: UnsafeMutableRawPointer?) {
+            done?.resume(returning: success)
+            done = nil
+        }
+    }
+
+    enum Failure: Error { case printFailed }
+
+    /// A4 in points, which is what `NSPrintInfo` measures paper in.
+    static let a4 = NSSize(width: 595.28, height: 841.89)
+
+    /// A window for a document nobody is looking at.
+    ///
+    /// Off the screen deliberately: printing needs a window, and a real one
+    /// would flash up in front of the shop on its way to a saved file.
+    static let offscreen: NSWindow = {
+        let w = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: 620, height: 800),
+                         styleMask: [.borderless], backing: .buffered, defer: false)
+        w.isReleasedWhenClosed = false
+        return w
+    }()
+
+    /// The invoice's own stylesheet — `renderer/invoice.css`, bundled.
+    ///
+    /// The same file the Electron window links, synced by `mac/sync-js.sh`
+    /// alongside the shared modules. Rewriting these rules in Swift would make
+    /// a second document that agreed with the first until one of them was
+    /// edited.
+    static let stylesheet: String = {
+        guard let url = AppResources.bundle.url(forResource: "invoice", withExtension: "css"),
+              let css = try? String(contentsOf: url, encoding: .utf8) else { return "" }
+        return css
+    }()
+
+    /// The document, wrapped in the page it is printed on.
+    ///
+    /// `#invoice-print-area` is the wrapper the stylesheet is written around:
+    /// in the Electron window it is hidden on screen and revealed for
+    /// `window.print()`. Here the document IS the window, so the screen half is
+    /// overridden and the print half left exactly as it is — which is also why
+    /// the wrapper is kept rather than dropped. Whichever media WebKit renders
+    /// in, the rules that apply are the shop's own.
+    static func page(_ doc: InvoiceDocument) -> String {
+        // NOTHING IS ADDED TO THE PAGE. See `digitPass` — the rewrite is run
+        // by the app after the document is laid out, because page scripts are
+        // switched off in `DocumentWeb` and a `<script>` written in here was
+        // inert.
+
+        return """
+        <!doctype html><html><head><meta charset="utf-8">
+        <style>\(Self.stylesheet)</style>
+        <style>
+        @media print {
+          /* The shared stylesheet lifts the document out of the window with
+             `position: absolute; width: 100%`, to print it over an app that
+             is hidden underneath. Here there is no app underneath, and WebKit
+             measures that 100% against the whole sheet of paper rather than
+             the area inside the margins — so the right margin was lost and
+             the totals ran off the page. In flow, it is laid out where the
+             margins say. */
+          #invoice-print-area { position: static; width: auto; }
+        }
+        @media screen {
+          html, body { margin: 0; background: #f2efe9; }
+          #invoice-print-area {
+            display: block;
+            background: #fff;
+            color: #1a1a1a;
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 28px 30px 40px;
+            font-family: "SF Pro Text", "Segoe UI", "Tajawal", "Cairo", Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.55;
+          }
+        }
+        </style>
+        </head><body><div id="invoice-print-area">\(doc.html)</div></body></html>
+        """
+    }
+}
+
+/// The paper itself, in a window.
+struct InvoicePaperView: NSViewRepresentable {
+    let paper: InvoicePaper
+    func makeNSView(context: Context) -> WKWebView { paper.webView }
+    func updateNSView(_ view: WKWebView, context: Context) {}
+}

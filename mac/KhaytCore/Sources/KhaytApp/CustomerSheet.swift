@@ -1,0 +1,626 @@
+import SwiftUI
+import KhaytCore
+
+/// Writing a customer down.
+///
+/// Both names, because a Saudi shop keeps both and an invoice may need either —
+/// and either one alone is enough, which is Khayt's own rule. The registration
+/// numbers are here because they go on an invoice and there is nowhere else in
+/// this app to put them.
+///
+/// Below the contact details, the two things that follow a customer into every
+/// job: what they have agreed to pay for particular things, and a standing
+/// order. Both used to be "edited in the other app"; a Mac that could store
+/// them and not show them was a Mac that lost a shop its price list the day
+/// the Windows PC was switched off.
+///
+/// The communications log is NOT on this sheet. A note about a call is written
+/// the moment it is made, in the customer's pane — see `CustomerInspector`.
+struct CustomerSheet: View {
+    /// How wide this sheet is. A CONSTANT rather than a number in the body,
+    /// because `SnapshotTests` photographs the sheet at a size of its own and
+    /// the two silently disagreed: the sheet grew and the picture kept the old
+    /// width, so the render came back cropped down the middle with no failure.
+    static let width: CGFloat = 480
+
+    let shop: Shop
+    let existing: Client
+
+    @State private var draft: Client
+    @State private var agreements: [AgreementRow]
+    /// The address book being edited (`Client.addresses`).
+    @State private var addresses: [ClientAddress]
+    @State private var schedule: Recurring
+    @State private var hasEnd: Bool
+    /// The terms are a number of days the presets do not offer, so the field
+    /// for typing it is showing.
+    @State private var customTerms: Bool
+    @State private var started = false
+    /// The sources the picker offers, asked of the shared rule on appear.
+    @State private var sources: [String] = []
+    /// The phone number as WhatsApp would take it, or why it would not.
+    @State private var phoneCheck: WhatsAppChat?
+    @FocusState private var focused: Bool
+
+    /// A price agreement as the sheet holds it while it is being typed.
+    ///
+    /// The price is TEXT here: a `Double` behind a text field reformats "12."
+    /// to "12" under the cursor. It becomes a number on Save. `raw` is
+    /// carried so a field the other app wrote survives the round trip.
+    struct AgreementRow: Identifiable {
+        let id = UUID()
+        var raw: [String: JSONValue]
+        var product: String
+        var priceText: String
+        var note: String
+
+        init(_ a: PriceAgreement) {
+            raw = a.raw; product = a.product; note = a.note
+            priceText = a.price > 0 ? Money.fieldValue(a.price) : ""
+        }
+        init() { raw = [:]; product = ""; priceText = ""; note = "" }
+
+        var agreement: PriceAgreement {
+            var out = PriceAgreement(raw: raw)
+            out.product = product
+            out.price = Double(priceText.replacingOccurrences(of: ",", with: "")) ?? 0
+            out.note = note
+            return out
+        }
+    }
+
+    init(shop: Shop, existing: Client) {
+        self.shop = shop
+        self.existing = existing
+        let opened = Self.opening(existing)
+        _draft = State(initialValue: opened.draft)
+        _agreements = State(initialValue: opened.agreements)
+        _addresses = State(initialValue: opened.addresses)
+        _schedule = State(initialValue: opened.schedule)
+        _hasEnd = State(initialValue: opened.schedule.endDate != nil)
+        _customTerms = State(initialValue: !PaymentTerms.presets.contains(existing.paymentTermsDays))
+    }
+
+    /// What the sheet holds while a customer is open.
+    struct Opened {
+        var draft: Client
+        var agreements: [AgreementRow]
+        var schedule: Recurring
+        var addresses: [ClientAddress] = []
+    }
+
+    /// A customer, as this sheet opens it. The one mapping from the record to
+    /// the form — `Shop.customerRecord` runs it again over the stored row to
+    /// learn what an untouched save would write.
+    static func opening(_ client: Client) -> Opened {
+        Opened(draft: client,
+               agreements: client.priceList.map(AgreementRow.init),
+               schedule: client.recurring ?? .fresh,
+               addresses: client.addresses)
+    }
+
+    /// The customer Save hands the shop — blank price rows dropped, as the
+    /// other app drops them.
+    static func saving(_ opened: Opened) -> Client {
+        opened.draft
+            .replacing(priceList: opened.agreements.map(\.agreement).filter { !$0.isBlank })
+            .replacing(recurring: opened.schedule)
+            // Blank rows dropped, as the desktop's save drops them.
+            .replacing(addresses: opened.addresses.filter { !$0.isBlank })
+    }
+
+    private var isNew: Bool { shop.clients.allSatisfy { $0.id != existing.id } }
+
+    private var canSave: Bool {
+        !draft.nameEn.trimmingCharacters(in: .whitespaces).isEmpty
+            || !draft.nameAr.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    var body: some View {
+        // Four sections now, so it fits the screen the way the product sheet
+        // does: the content scrolls, the buttons do not. See `SheetFrame`.
+        SheetFrame(width: Self.width) {
+            Text(shop.words.callIt(isNew ? "mac.new_customer" : "mac.edit_customer"))
+                .font(.headline)
+            details
+            Divider()
+            addressBook
+            Divider()
+            priceAgreements
+            Divider()
+            standingOrder
+        } footer: {
+            HStack {
+                if !canSave {
+                    Text(shop.words.callIt("ce.need_name"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(shop.words.callIt("common.cancel")) { shop.editingCustomer = nil }
+                    .keyboardShortcut(.cancelAction)
+                Button(shop.words.callIt("common.save")) {
+                    let saving = Self.saving(Opened(draft: draft, agreements: agreements,
+                                                    schedule: schedule, addresses: addresses))
+                    // The customer as it opened, for what an untouched save writes:
+                    // a new one has nothing to compare with.
+                    let opened = isNew ? nil : existing
+                    Task { await shop.saveCustomer(saving, opened: opened) }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canSave)
+            }
+        }
+        .onAppear {
+            guard !started else { return }
+            started = true
+            focused = true
+        }
+        .task {
+            // Empty on failure, not a hardcoded fallback list: a second copy
+            // of these seven written down here is the exact fault that lost
+            // every intake-form customer from the report. The picker then
+            // offers only what the customer already has, which is visibly
+            // wrong rather than quietly wrong.
+            sources = (try? await shop.engine?.clientSourceNames()) .flatMap { $0 } ?? []
+        }
+    }
+
+    // MARK: - Who they are
+
+    private var details: some View {
+        Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+            GridRow {
+                Text(shop.words.callIt("ce.name_en")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                TextField("", text: binding(\.nameEn)).textFieldStyle(.roundedBorder)
+                    .focused($focused)
+            }
+            GridRow {
+                Text(shop.words.callIt("ce.name_ar")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                // Right to left whatever the app is set to: the field holds
+                // Arabic by definition, and typing into a left-aligned box
+                // puts the cursor in the wrong place.
+                TextField("", text: binding(\.nameAr)).textFieldStyle(.roundedBorder)
+                    .environment(\.layoutDirection, .rightToLeft)
+            }
+            GridRow {
+                Text(shop.words.callIt("ce.phone")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    TextField("+966 5x xxx xxxx", text: binding(\.phone))
+                        .textFieldStyle(.roundedBorder)
+                    // What WhatsApp will dial, worked out as it is typed — so
+                    // `0712345678` from abroad is caught here, not at the
+                    // moment a customer is waiting for their update.
+                    if let phoneCheck, !draft.phone.trimmingCharacters(in: .whitespaces).isEmpty {
+                        Text(phoneCheck.ok
+                             ? shop.words.callIt("mac.wa_number_ok",
+                                                 ["number": .string("\u{2066}" + phoneCheck.e164 + "\u{2069}")])
+                             : shop.whatsAppReason(phoneCheck.reason))
+                            .font(.caption)
+                            .foregroundStyle(phoneCheck.ok ? AnyShapeStyle(.secondary)
+                                                           : AnyShapeStyle(Khayt.attention))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .task(id: draft.phone) {
+                    phoneCheck = await shop.whatsAppRecipient(phone: draft.phone)
+                }
+            }
+            GridRow {
+                // The language WhatsApp updates go out in. Automatic reads the
+                // names and then the shop's language.
+                Text(shop.words.callIt("mac.wa_messages_in")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: binding(\.messageLang)) {
+                    Text(shop.words.callIt("mac.wa_lang_auto")).tag("")
+                    Text(shop.words.callIt("mac.wa_lang_ar")).tag("ar")
+                    Text(shop.words.callIt("mac.wa_lang_en")).tag("en")
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+            // ── AGREED TO ORDER UPDATES ON WHATSAPP ───────────────────────
+            //
+            // What lets the shop's WhatsApp Business account write to them on
+            // its own (Settings › Integrations). Its own consent, apart from
+            // the marketing opt-out below, and it says when and how it was
+            // given, because Meta can ask a business to show it.
+            GridRow {
+                Color.clear.frame(height: 0)
+                consentRow("mac.wab_opt_in", draft.whatsAppConsent) { agreed, how in
+                    draft = draft.optedIntoWhatsApp(agreed, how: how, at: Date())
+                }
+            }
+            // ── AGREED TO OFFERS ON WHATSAPP ──────────────────────────────
+            //
+            // A third consent, which the desktop's WhatsApp campaigns send to
+            // (`lib/campaigns.js whatsappOffersOptedIn`). Order updates are not
+            // offers, so the box above never stands in for this one. The word
+            // is the other app's (`ce.wab_offers`).
+            GridRow {
+                Color.clear.frame(height: 0)
+                VStack(alignment: .leading, spacing: 4) {
+                    consentRow("ce.wab_offers", draft.whatsAppOffersConsent) { agreed, how in
+                        draft = draft.optedIntoWhatsAppOffers(agreed, how: how, at: Date())
+                    }
+                    // The opt-out below wins, as it does in the campaigns.
+                    if draft.whatsAppOffersConsent != nil && draft.marketingOptOut {
+                        Text(shop.words.callIt("mac.wab_offers_opted_out"))
+                            .font(.caption).foregroundStyle(Khayt.attention)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            GridRow {
+                Text(shop.words.callIt("ce.email")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                TextField("", text: binding(\.email)).textFieldStyle(.roundedBorder)
+            }
+            GridRow {
+                Text(shop.words.callIt("ce.cr")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                TextField("", text: binding(\.cr)).textFieldStyle(.roundedBorder)
+            }
+            GridRow {
+                Text(shop.words.callIt("ce.vat")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                TextField("", text: binding(\.vat)).textFieldStyle(.roundedBorder)
+            }
+            GridRow {
+                // ── WHERE THEY CAME FROM ──────────────────────────────────
+                //
+                // The one field on this sheet that is not about reaching the
+                // customer. It is here because nothing else can put it there:
+                // the Reports screen counts customers by source, and with no
+                // way to set one every shop that does not also run the other
+                // app read "Other" for all of them.
+                //
+                // The list is the RULE's, fetched rather than written down —
+                // this is the field that broke by having two lists of it, one
+                // of which had never heard of the intake form's `online`.
+                Text(shop.words.callIt("cl.source")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: binding(\.source)) {
+                    // A customer whose source was never asked. Not the same as
+                    // "Other", which is a shop saying it asked and none of
+                    // these fitted — so the report can tell them apart.
+                    Text(shop.words.callIt("mac.cs_unset")).tag("")
+                    if !sources.isEmpty { Divider() }
+                    ForEach(sources, id: \.self) { source in
+                        Text(shop.words.callIt("cl.source_" + source)).tag(source)
+                    }
+                    // A value this build does not know — written by a newer
+                    // Khayt, or by hand. Shown as itself and kept on save
+                    // rather than silently becoming "Other".
+                    if !draft.source.isEmpty, !sources.contains(draft.source) {
+                        Divider()
+                        Text(draft.source).tag(draft.source)
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+            GridRow {
+                // ── PAYMENT TERMS ─────────────────────────────────────────
+                //
+                // When this customer's invoices fall due: on receipt (the
+                // default), net 7…90, or a custom number of days. The rule is
+                // `lib/payment-terms.js` / `PaymentTerms`; receivables, the
+                // invoice and the reminders all count from it.
+                Text(shop.words.callIt("mac.payment_terms")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Picker("", selection: termsChoice) {
+                            Text(shop.words.callIt("mac.terms_receipt")).tag(0)
+                            ForEach(PaymentTerms.presets.filter { $0 > 0 }, id: \.self) { n in
+                                Text(shop.words.callIt("mac.terms_net", ["n": .number(Double(n))])).tag(n)
+                            }
+                            Divider()
+                            Text(shop.words.callIt("mac.terms_custom")).tag(Self.customTag)
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                        if customTerms {
+                            TextField("", value: Binding(
+                                get: { draft.paymentTermsDays },
+                                set: { draft = draft.onTerms($0) }), format: .number.locale(Money.digits))
+                                .textFieldStyle(.roundedBorder).frame(width: 64).monospacedDigit()
+                        }
+                    }
+                    if draft.paymentTermsDays > 0 {
+                        Text(shop.words.counting(draft.paymentTermsDays, "mac.terms_days"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            GridRow {
+                // The most this customer may owe; 0 is no limit. The list and
+                // the customer's page flag anyone over it, as the desktop does.
+                Text(shop.words.callIt("ce.credit_limit")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        TextField("", value: Binding(
+                            get: { draft.creditLimit },
+                            set: { draft = draft.limited(to: $0) }), format: .number.locale(Money.digits))
+                            .textFieldStyle(.roundedBorder).frame(width: 110).monospacedDigit()
+                        Text(shop.currency).foregroundStyle(.secondary)
+                    }
+                    Text(shop.words.callIt("ce.credit_limit_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            GridRow {
+                // The currency this customer is invoiced in; "Default" is the
+                // shop's own and is stored as "". A code the shop does not
+                // list but the book holds stays in the menu, so opening and
+                // saving never replaces it.
+                Text(shop.words.callIt("ce.currency")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Picker("", selection: Binding(get: { draft.currency },
+                                                  set: { draft = draft.inCurrency($0) })) {
+                        Text(shop.words.callIt("mac.currency_default",
+                                               ["code": .string(shop.currency)])).tag("")
+                        ForEach(shop.words.currencyChoices(shop.currencies.mapValues(\.label),
+                                                           current: draft.currency), id: \.code) {
+                            Text($0.label).tag($0.code)
+                        }
+                    }
+                    .labelsHidden().frame(maxWidth: 300, alignment: .leading)
+                    Text(shop.words.callIt("ce.currency_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            GridRow {
+                Text(shop.words.callIt("ce.notes")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                TextField("", text: binding(\.notes), axis: .vertical)
+                    .textFieldStyle(.roundedBorder).lineLimit(2...4)
+            }
+            // ── ASKED NOT TO BE MARKETED TO ───────────────────────────────
+            //
+            // `lib/campaigns.js` has always refused to put this customer on a
+            // list, whatever the segment says. What was missing is that this
+            // app could not SET it — so a shop that sent a campaign from here
+            // and then read "please stop emailing me" had to open the other
+            // app to honour it. Sending in one place and recording consent in
+            // another is the wrong way round, and it is the sort of thing a
+            // shop discovers only after the second email.
+            //
+            // The word is the other app's (`camp.opt_out`), which carries it
+            // in nine languages; a Mac-only phrasing would be English for
+            // seven of them.
+            GridRow {
+                Color.clear.frame(height: 0)
+                Toggle(shop.words.callIt("camp.opt_out"), isOn: Binding(
+                    get: { draft.marketingOptOut },
+                    set: { draft = draft.marketed(!$0) }))
+                    .toggleStyle(.checkbox)
+            }
+        }
+    }
+
+    // MARK: - What they pay
+
+    /// What this customer pays for particular things.
+    ///
+    /// A row is a product WORD, a price and a note. The word is matched
+    /// against a part's name when a job is taken for them, by the shared rule
+    /// — "bracket" covers "Wall bracket, steel" — and the figure becomes what
+    /// that part costs on the job. Rows with neither a word nor a price are
+    /// dropped on Save, as the other app drops them.
+    // MARK: - The address book
+
+    /// Where this customer receives things: label and address per row, the
+    /// first being the default — what a courier connector sends as the
+    /// customer's address. Until Nov 10 only the desktop could write it, so a
+    /// shop on the Mac could not ship to anyone through Lamha.
+    private var addressBook: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(shop.words.callIt("ce.address_book")).font(.subheadline.weight(.semibold))
+            ForEach($addresses.byID) { $row in
+                HStack(spacing: 8) {
+                    TextField(shop.words.callIt("ce.addr_label"), text: $row.label)
+                        .textFieldStyle(.roundedBorder).frame(width: 150)
+                    TextField(shop.words.callIt("ce.addr_address"), text: $row.address)
+                        .textFieldStyle(.roundedBorder)
+                    Button {
+                        addresses.removeAll { $0.id == row.id }
+                    } label: { Image(systemName: "minus.circle") }
+                        .buttonStyle(.plain)
+                        .help(shop.words.callIt("common.delete"))
+                }
+            }
+            Button(shop.words.callIt("ce.addr_add")) { addresses.append(ClientAddress()) }
+        }
+    }
+
+    private var priceAgreements: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(shop.words.callIt("ce.price_list")).font(.subheadline.weight(.semibold))
+            if agreements.isEmpty {
+                Text(shop.words.callIt("ce.price_list_empty"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach($agreements.byID) { $row in
+                HStack(spacing: 8) {
+                    TextField(shop.words.callIt("ce.pl_product"), text: $row.product)
+                        .textFieldStyle(.roundedBorder)
+                    TextField(shop.words.callIt("ce.pl_price"), text: $row.priceText)
+                        .textFieldStyle(.roundedBorder).frame(width: 84).monospacedDigit()
+                    TextField(shop.words.callIt("ce.pl_note"), text: $row.note)
+                        .textFieldStyle(.roundedBorder).frame(width: 120)
+                    Button {
+                        agreements.removeAll { $0.id == row.id }
+                    } label: { Image(systemName: "minus.circle") }
+                        .buttonStyle(.plain)
+                        .help(shop.words.callIt("common.delete"))
+                }
+            }
+            Button(shop.words.callIt("common.add")) { agreements.append(AgreementRow()) }
+            Text(shop.words.callIt("ce.price_list_hint"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: - The standing order
+
+    /// The same job again, on a schedule.
+    ///
+    /// Switching it on shows the schedule; the record keeps the schedule
+    /// either way, so a shop that pauses a customer for the summer and
+    /// switches them back on in September gets September's dates, not a
+    /// blank form. "Skip next cycle" moves the date on by the shared rule —
+    /// the one that knows the 31st of January is followed by the 28th of
+    /// February.
+    private var standingOrder: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle(shop.words.callIt("rec.enable"), isOn: $schedule.enabled)
+                .font(.subheadline.weight(.semibold))
+            if schedule.enabled {
+                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+                    GridRow {
+                        Text(shop.words.callIt("rec.interval")).gridColumnAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                        Picker("", selection: $schedule.interval) {
+                            ForEach(Recurring.intervals, id: \.self) { interval in
+                                Text(shop.words.callIt("rec.interval.\(interval)")).tag(interval)
+                            }
+                            // A schedule set to `daily` or `yearly` elsewhere
+                            // keeps its word rather than being silently
+                            // changed to the first thing in the menu.
+                            if !Recurring.intervals.contains(schedule.interval) {
+                                Text(schedule.interval).tag(schedule.interval)
+                            }
+                        }
+                        .labelsHidden().frame(width: 170, alignment: .leading)
+                    }
+                    GridRow {
+                        Text(shop.words.callIt("rec.next_due")).gridColumnAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 10) {
+                            DatePicker("", selection: dayBinding(\.nextDue), displayedComponents: .date)
+                                .labelsHidden()
+                            Button(shop.words.callIt("rec.skip_next")) {
+                                let from = schedule.nextDue ?? Recurring.string(Date())
+                                let interval = schedule.interval
+                                Task {
+                                    if let next = await shop.nextCycle(after: from, interval: interval) {
+                                        schedule.nextDue = next
+                                    }
+                                }
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                    GridRow {
+                        Color.clear.frame(width: 0, height: 0)
+                        Toggle(shop.words.callIt("rec.paused"), isOn: $schedule.paused)
+                    }
+                    GridRow {
+                        Color.clear.frame(width: 0, height: 0)
+                        HStack(spacing: 10) {
+                            Toggle(shop.words.callIt("rec.end_date"), isOn: $hasEnd)
+                                .onChange(of: hasEnd) { _, on in
+                                    if !on { schedule.endDate = nil }
+                                    else if schedule.endDate == nil { schedule.endDate = Recurring.string(Date()) }
+                                }
+                            if hasEnd {
+                                DatePicker("", selection: dayBinding(\.endDate), displayedComponents: .date)
+                                    .labelsHidden()
+                            }
+                        }
+                    }
+                }
+                Text(shop.words.callIt("rec.hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// A text binding onto one field of the draft.
+    ///
+    /// `Client` is a value with `let` fields — it is a record, not a form — so
+    /// editing rebuilds it. That keeps the record's shape in one place rather
+    /// than growing a second mutable copy of it.
+    /// One WhatsApp consent: the box, and once ticked, how it was given and
+    /// since when — because Meta can ask a business to show it.
+    @ViewBuilder
+    private func consentRow(_ label: String, _ consent: (at: String, how: String)?,
+                            set: @escaping (Bool, String) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle(isOn: Binding(
+                get: { consent != nil },
+                set: { set($0, consent?.how ?? "asked") })) {
+                // Wraps rather than truncating: "Agreed to order updates on
+                // WhatsApp" is longer than the column (beta.6 UI review).
+                Text(shop.words.callIt(label)).fixedSize(horizontal: false, vertical: true)
+            }
+            .toggleStyle(.checkbox)
+            if let consent {
+                // The date on its own line, under the picker: beside it, the
+                // picker took the width and the date was drawn a letter a line.
+                VStack(alignment: .leading, spacing: 2) {
+                    Picker("", selection: Binding(
+                        get: { consent.how },
+                        set: { set(true, $0) })) {
+                        ForEach(["asked", "form", "customer_wrote", "other"], id: \.self) { how in
+                            Text(shop.words.callIt("mac.wab_how_" + how)).tag(how)
+                        }
+                        if !["asked", "form", "customer_wrote", "other", ""].contains(consent.how) {
+                            Text(consent.how).tag(consent.how)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    Text(shop.words.callIt("mac.wab_opt_in_since",
+                                           ["day": .string(Calendar.localDay(ofInstant: consent.at))]))
+                        .font(.caption).foregroundStyle(.secondary).fixedSize()
+                }
+            }
+        }
+    }
+
+    /// The picker's tag for "a number of days of my own".
+    static let customTag = -1
+
+    /// What the terms picker shows: a preset, or Custom for anything else.
+    /// Choosing Custom keeps the days already set, so the field opens on them.
+    private var termsChoice: Binding<Int> {
+        Binding(
+            get: { customTerms ? Self.customTag : draft.paymentTermsDays },
+            set: { choice in
+                if choice == Self.customTag {
+                    customTerms = true
+                } else {
+                    customTerms = false
+                    draft = draft.onTerms(choice)
+                }
+            })
+    }
+
+    private func binding(_ key: KeyPath<Client, String>) -> Binding<String> {
+        Binding(
+            get: { draft[keyPath: key] },
+            set: { draft = draft.with(key, $0) }
+        )
+    }
+
+    /// A date picker onto a `YYYY-MM-DD` field of the schedule. An unset day
+    /// shows today, and picking writes the day — never an instant.
+    private func dayBinding(_ key: WritableKeyPath<Recurring, String?>) -> Binding<Date> {
+        Binding(
+            get: { schedule[keyPath: key].flatMap(Recurring.day) ?? Date() },
+            set: { schedule[keyPath: key] = Recurring.string($0) }
+        )
+    }
+}

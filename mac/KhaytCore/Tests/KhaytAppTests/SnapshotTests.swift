@@ -1,0 +1,1838 @@
+import Testing
+import SwiftUI
+import AppKit
+import KhaytCore
+@testable import KhaytApp
+
+/// Renders the interface to PNGs so it can be looked at.
+///
+/// Not assertions about pixels — a screenshot test that fails on a one-pixel
+/// shift is a chore, not a guard. This exists because judging a design by
+/// reading its source is guessing, and `screencapture` needs a screen-recording
+/// grant this process does not have.
+///
+/// Writes to KHAYT_SNAPSHOT_DIR when set, and does nothing otherwise, so it
+/// costs nothing on a normal run.
+///
+/// WITH the directory set, the process crashes on the way out — "no current
+/// update to enqueue action to", from inside SwiftUI, after every test has
+/// passed and every picture is written. It predates the sheet renders below
+/// and CI never sets the variable. Read the PNGs, not the exit code.
+@Suite @MainActor struct SnapshotTests {
+
+    static var outputDir: URL? {
+        ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0) }
+    }
+
+    func renderDark(_ view: some View, _ name: String, size: CGSize) throws {
+        try render(view.environment(\.colorScheme, .dark)
+                       .background(Khayt.ground)
+                       .environment(\.colorScheme, .dark),
+                   name, size: size)
+    }
+
+    func render(_ view: some View, _ name: String, size: CGSize) throws {
+        guard let dir = Self.outputDir else { return }
+        // ── AND THE WRITING DIRECTION, WHICH THIS DID NOT SET ─────────────
+        //
+        // `KHAYT_LANG=ar` switched the WORDS and nothing else, so every Arabic
+        // picture this harness has ever written showed Arabic text in a
+        // left-to-right layout: the title still on the left, the trailing
+        // figure still on the right, an `HStack` of buttons still in English
+        // order. That is not a picture of the Arabic app, and it is a
+        // convincing one — the words are right, so nothing looks wrong.
+        //
+        // `Direction` already owns the question for the real window; this asks
+        // it the same way rather than testing the variable a second time.
+        let rtl = Direction.rtlLanguages.contains(Direction.shopLanguage())
+        let renderer = ImageRenderer(content:
+            view.frame(width: size.width, height: size.height)
+                .environment(\.colorScheme, .light)
+                .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+                // A photograph cannot see inside a ScrollView, and six sheets
+                // sit in one (`SheetFrame`). Laid flat for the picture only —
+                // see `photographFlat`.
+                .environment(\.photographFlat, true)
+        )
+        renderer.scale = 2
+        guard let image = renderer.nsImage,
+              let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else {
+            Issue.record("could not render \(name)")
+            return
+        }
+        try png.write(to: dir.appending(path: name + ".png"))
+        expectInkInTheMiddle(rep, name)
+        expectItRendered(rep, name)
+    }
+
+    /// Did `ImageRenderer` actually render this, or refuse it?
+    ///
+    /// What it draws for a view it cannot host is a flat yellow field with a
+    /// red "no entry" sign across it — and `01-shop` was that, edge to edge,
+    /// for as long as this file has existed: `ImageRenderer` will not host a
+    /// `NavigationSplitView`, so the picture of the whole window was a picture
+    /// of nothing, and it passed every run because writing a PNG cannot fail on
+    /// what is not in it. The placeholder is a specific colour, so say so.
+    private func expectItRendered(_ rep: NSBitmapImageRep, _ name: String) {
+        var placeholder = 0, seen = 0
+        for y in stride(from: 0, to: rep.pixelsHigh, by: 8) {
+            for x in stride(from: 0, to: rep.pixelsWide, by: 8) {
+                guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                seen += 1
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                c.getRed(&r, green: &g, blue: &b, alpha: &a)
+                // The field is around #FFCC00 and the sign around #F5333F.
+                if a > 0.5, r > 0.9, b < 0.35, g > 0.7 || (g < 0.35 && r > 0.9) { placeholder += 1 }
+            }
+        }
+        guard seen > 0 else { return }
+        let fraction = Double(placeholder) / Double(seen)
+        #expect(fraction < 0.5,
+                "\(name) is mostly ImageRenderer's refusal — \(Int(fraction * 100))% of it is the placeholder, so it is a picture of nothing")
+    }
+
+    /// Is there anything on the middle of the page?
+    ///
+    /// The one assertion this file makes, and it is not about pixels shifting.
+    /// `ImageRenderer` draws nothing inside a `ScrollView`, so the New Job
+    /// sheet rendered as a title, two rules and three buttons over an empty
+    /// page — and the test passed, every time, because writing a PNG cannot
+    /// fail on what is not in it. A blank band down the middle of a sheet is
+    /// never right, and it is the shape every "rendered nothing" bug takes.
+    ///
+    /// ── AND IT WAS NOT CATCHING THEM ──────────────────────────────────────
+    ///
+    /// It asked whether a pixel was darker than 0.92 in its weakest channel.
+    /// `Khayt.ground` is a warm off-white — near enough #EFEBE6 — whose weakest
+    /// channel is 0.90, so EVERY PIXEL OF AN EMPTY PAGE counted as ink and the
+    /// fraction came out at 1.0. On the dark ground it is worse: every pixel is
+    /// far below 0.92, so the check could not fail there either. A picture of
+    /// the board rendered edge-to-edge blank and passed.
+    ///
+    /// It asks a different question now: how much of this page is NOT the
+    /// colour most of it is? That needs to know nothing about the palette, it
+    /// works the same in both appearances, and a page of one flat colour scores
+    /// zero however light or dark that colour happens to be.
+    private func expectInkInTheMiddle(_ rep: NSBitmapImageRep, _ name: String) {
+        let top = rep.pixelsHigh / 4, bottom = rep.pixelsHigh * 3 / 4
+        // Every fourth pixel each way: enough to find a line of text, and a
+        // sixteenth of the work on a 2x bitmap.
+        var samples: [(CGFloat, CGFloat, CGFloat)] = []
+        var histogram: [Int: Int] = [:]
+        /// Quantised to 32 levels a channel, so antialiasing along one edge of
+        /// one glyph does not become thirty different "backgrounds".
+        func bucket(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> Int {
+            (Int(r * 31) << 10) | (Int(g * 31) << 5) | Int(b * 31)
+        }
+        for y in stride(from: top, to: bottom, by: 4) {
+            for x in stride(from: 0, to: rep.pixelsWide, by: 4) {
+                guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                c.getRed(&r, green: &g, blue: &b, alpha: &a)
+                guard a > 0.1 else { continue }
+                samples.append((r, g, b))
+                histogram[bucket(r, g, b), default: 0] += 1
+            }
+        }
+        // NO OPAQUE PIXELS AT ALL is the blankest a page can be, and returning
+        // early on it — which this did — skips the one assertion in the file on
+        // exactly the case it exists for. A view `ImageRenderer` will not host
+        // comes back fully transparent and reads as white only because whatever
+        // opens the PNG composites it onto white.
+        guard !samples.isEmpty else {
+            Issue.record("\(name) rendered nothing at all — every sampled pixel is transparent")
+            return
+        }
+        guard let ground = histogram.max(by: { $0.value < $1.value })?.key else { return }
+        let gr = CGFloat((ground >> 10) & 31) / 31
+        let gg = CGFloat((ground >> 5) & 31) / 31
+        let gb = CGFloat(ground & 31) / 31
+        // Far enough from the ground to be something drawn, loose enough that a
+        // one-level rounding difference is not.
+        let ink = samples.filter { max(abs($0.0 - gr), max(abs($0.1 - gg), abs($0.2 - gb))) > 0.08 }.count
+        let fraction = Double(ink) / Double(samples.count)
+        #expect(fraction > 0.002,
+                "\(name) is blank down the middle — \(ink) of \(samples.count) sampled pixels are anything other than the background")
+    }
+
+    @Test("the sample shop loads and renders")
+    func shopWindow() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.orders.count == 42, "the sample shop did not load")
+        #expect(shop.problem == nil)
+        #expect(shop.owed > 0, "a sample with nothing owed cannot show the design working")
+        #expect(shop.taxSummary != nil, "the tax line comes from lib/tax.js and is the proof the core is live")
+
+        // NO PICTURES HERE, and that is the finding rather than a gap.
+        //
+        // This test rendered the whole window three times and every one of the
+        // three was `ImageRenderer`'s yellow refusal, edge to edge, because it
+        // will not host a `NavigationSplitView`. Rendering the halves instead
+        // gets the same refusal for the sidebar, which is a `List`, and a
+        // blank page for the dashboard, which is a `ScrollView`. What
+        // `ImageRenderer` can draw is plain SwiftUI layout — the sheets below
+        // — and the window belongs to the app's own capture, which draws
+        // AppKit views properly. The assertions above are what this test is
+        // for; they check the sample shop is worth photographing at all.
+        shop.selection = shop.shown.first { !$0.isSettled }?.id
+        shop.shelf = .jobs(.printing)
+
+        #expect(!shop.files.isEmpty, "the sample shop has no models, so the library cannot be judged")
+        #expect(shop.groups.contains("Saudi Kings"), "the grouped-models case must be in the sample")
+        #expect(shop.ungroupedCount > 0, "so must the ungrouped one")
+        shop.shelf = .library(nil)
+        #expect(shop.shownFiles.count == shop.files.count)
+    }
+
+    /// The sheets, with their words in them.
+    ///
+    /// `ImageRenderer` renders SwiftUI properly; the running app's own capture
+    /// cannot (see `Snapshot.captureSheet`), so every sheet photographed from
+    /// the app is missing every label on it. What `ImageRenderer` CANNOT do is
+    /// host a WKWebView, so the invoice's paper comes out blank here and is
+    /// photographed from the app instead. Between the two there is a picture of
+    /// the whole of each sheet.
+    /// The settings panes, which have never been photographed at all.
+    ///
+    /// The snapshot RUNNER cannot reach them: opening the settings window hangs
+    /// it, and `captureSheet` says so in as many words — "which is why those
+    /// six panes stayed unphotographed". So a whole class of screen in this app
+    /// has only ever been judged by reading its source.
+    ///
+    /// That is how the email pane shipped its first draft with a hand-rolled
+    /// `HStack { Text; Spacer; control }` where every other row in the window
+    /// uses `LabeledContent`. It reads the same and does not look the same:
+    /// one puts the label in the platform's own aligned column and the other
+    /// aligns with nothing. Found by reading two files side by side, which is
+    /// not a method — this is.
+    ///
+    /// THREE PICTURES, because the pane is a different screen per provider: a
+    /// key for SendGrid, a key and a domain for Mailgun, six fields for a
+    /// relay. A branch the pictures do not cover is a branch nobody has
+    /// looked at.
+    ///
+    /// ── WHAT THESE PICTURES CANNOT SHOW ───────────────────────────────────
+    ///
+    /// Two things, and knowing which is the difference between reading them
+    /// and being misled by them:
+    ///
+    /// - Every text field comes back as `ImageRenderer`'s yellow refusal.
+    ///   `TextField` and `SecureField` are AppKit-backed and it will not draw
+    ///   them, which is the same limit that keeps the whole settings WINDOW
+    ///   out of the snapshot runner. Layout, labels, order and wording are
+    ///   real; the boxes are placeholders.
+    /// - The trigger checkboxes are absent, because the list is fetched from
+    ///   the shared rule in `.task` and `ImageRenderer` runs no tasks. That is
+    ///   also why the group hides itself until the list arrives — the first
+    ///   render of this pane showed "Send email when" with nothing under it,
+    ///   which is exactly what a shop would have seen for the same reason.
+    ///
+    /// They are still worth having. This pane's first draft hand-rolled an
+    /// `HStack { Text; Spacer; control }` where every other row in the window
+    /// uses `LabeledContent`, put "Forget the stored API key" between the key
+    /// and the domain so it read as belonging to the domain, and gave two
+    /// adjacent toggles different type sizes. None of that is visible in
+    /// source and all of it is visible here.
+    @Test("the email settings render, in each provider's shape")
+    func emailSettings() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+
+        // Rendered inside the `Form` they live in, because a `Section` outside
+        // one draws as a bare `VStack` — a picture of a control group that
+        // does not exist anywhere in the app.
+        //
+        // The config goes into the SHOP rather than into the view: the pane
+        // reads `shop.settingsDict`, so a local copy would have rendered the
+        // same empty screen four times over and looked like four pictures.
+        func shoot(_ name: String, _ height: CGFloat, _ config: [String: JSONValue]) throws {
+            shop.pretendEmailConfig(config)
+            // On the ground the app draws — see `fixedCosts` below for what a
+            // transparent page does to the ink check.
+            try render(VStack(alignment: .leading) { EmailSettings(shop: shop) }
+                        .padding(20)
+                        .frame(width: 560, height: height)
+                        .background(Khayt.ground),
+                       name, size: CGSize(width: 560, height: height))
+        }
+
+        // `none` is NOT photographed: it draws one picker and the blank-page
+        // guard below rightly refuses a picture that is almost all paper. Its
+        // shape is covered by `EmailSettingsTests.draftReadsNothing`.
+        // `mailto` draws one sentence and nothing else, and until this it was a
+        // branch no picture reached — the same hole that let an invoice bug
+        // sit behind `settings.loyaltyEnabled` for weeks because no fixture
+        // ever switched loyalty on. A branch the pictures do not cover is a
+        // branch nobody has read.
+        try shoot("30-email-mailto", 190, ["provider": .string("mailto")])
+        try shoot("31-email-sendgrid", 620, [
+            "provider": .string("sendgrid"),
+            "fromEmail": .string("orders@acme3d.test"),
+            "fromName": .string("Acme 3D"),
+            "apiKey": .string("__enc__x"),
+            "triggers": .array([.string("completed")]),
+        ])
+        try shoot("32-email-mailgun", 660, [
+            "provider": .string("mailgun"),
+            "fromEmail": .string("orders@acme3d.test"),
+            "domain": .string("mg.acme3d.test"),
+            "apiKey": .string("__enc__x"),
+        ])
+        try shoot("33-email-smtp", 860, [
+            "provider": .string("custom"),
+            "fromEmail": .string("orders@acme3d.test"),
+            "fromName": .string("Acme 3D"),
+            "smtpHost": .string("smtp.acme3d.test"),
+            "smtpPort": .number(587),
+            "smtpUser": .string("orders@acme3d.test"),
+            "smtpPassword": .string("__enc__x"),
+            "triggers": .array([.string("completed"), .string("quote")]),
+        ])
+    }
+
+    /// The Telegram pane, for the reason the email one is here: a settings
+    /// pane the runner cannot reach is a pane nobody has looked at.
+    ///
+    /// TWO PICTURES, because the pane is two screens — the switches stay
+    /// hidden until there is a token and a chat to send to, since a switch
+    /// that cannot fire is a switch that misleads.
+    @Test("the Telegram settings render, before and after a bot is set up")
+    func telegramSettings() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+
+        func shoot(_ name: String, _ height: CGFloat, _ config: [String: JSONValue]) throws {
+            shop.pretendTelegram(config)
+            // On the ground the app draws — see `fixedCosts` below.
+            try render(VStack(alignment: .leading) { TelegramSettings(shop: shop) }
+                        .padding(20)
+                        .frame(width: 560, height: height)
+                        .background(Khayt.ground),
+                       name, size: CGSize(width: 560, height: height))
+        }
+
+        try shoot("34-telegram-empty", 320, [:])
+        try shoot("35-telegram-set", 700, [
+            "botToken": .string("__enc__x"),
+            "chatId": .string("-1001234567890"),
+            "notifyOnComplete": .bool(true),
+            "notifyOnLowStock": .bool(true),
+        ])
+    }
+
+    /// Beta.8 review: a print's own news to Telegram and ntfy is opt-in per
+    /// channel, and names the job and the file only when ticked. The two
+    /// switches, as each pane draws them — off, then on with names off.
+    @Test("the print notice switches each channel pane draws")
+    func printNoticeSwitches() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        func shoot(_ name: String, on: Bool, names: Bool) throws {
+            try render(VStack(alignment: .leading, spacing: 4) {
+                Text(shop.words.callIt("mac.tg_when")).font(.callout.weight(.medium))
+                Toggle(shop.words.callIt("mac.tg_printer_error"), isOn: .constant(true))
+                PrintNoticeSwitches(shop: shop, on: .constant(on), names: .constant(names))
+            }
+            .padding(20).frame(width: 560, alignment: .leading).background(Khayt.ground),
+                       name, size: CGSize(width: 560, height: on ? 200 : 120))
+        }
+        try shoot("b8-notice-switches-off", on: false, names: false)
+        try shoot("b8-notice-switches-on", on: true, names: false)
+    }
+
+    /// The export panel's choices (the save panel itself is the system's and
+    /// cannot be drawn), and the notes an export or import leaves behind.
+    @Test("the model bundle's export choices, and what an export or import says after")
+    func bundleExportAndNotes() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let w = shop.words
+        let model = BundleExportOptions.Model(
+            hasPrice: true, group: "Customers/Noura",
+            papers: [.init(path: "settings/brief.pdf", name: "brief.pdf"),
+                     .init(path: "settings/profile.ini", name: "profile.ini")])
+        model.ticked = ["settings/profile.ini"]
+        try render(BundleExportOptions(model: model, words: w).background(Khayt.ground),
+                   "b8-bundle-export-options", size: CGSize(width: 420, height: 200))
+        try render(VStack(spacing: 0) {
+            Banner(text: w.callIt("mac.mb_packing", ["name": .string("Dragon"), "done": .number(2), "total": .number(5)]),
+                   symbol: "shippingbox", tint: Khayt.brand) {
+                ProgressView(value: 2, total: 5).progressViewStyle(.linear).frame(width: 120)
+            }
+            Banner(text: w.callIt("mac.mb_exported", ["name": .string("Dragon.khaytbundle")]),
+                   symbol: "checkmark.circle", tint: Khayt.done)
+            Banner(text: w.callIt("mac.mb_imported", ["name": .string("Dragon")]),
+                   symbol: "checkmark.circle", tint: Khayt.done)
+            Banner(text: w.callIt("mac.sim_none", ["name": .string("Dragon")]),
+                   symbol: "checkmark.circle", tint: Khayt.done)
+            ForEach([w.callIt("mac.mb_not_bundle"),
+                     w.callIt("mac.mb_bad_name", ["name": .string("model/../../escape.stl")]),
+                     w.callIt("mac.mb_encrypted", ["name": .string("model/dragon.stl")]),
+                     w.callIt("mac.mb_no_model"), w.callIt("mac.mb_too_big")], id: \.self) { problem in
+                Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention)
+            }
+        }.frame(width: 720), "b8-bundle-notes", size: CGSize(width: 720, height: 380))
+    }
+
+    /// The monthly costs, empty and filled.
+    ///
+    /// The empty one is the picture that matters: it is what a shop sees after
+    /// following break-even's instruction to come here, so it has to explain
+    /// itself rather than show a bare Add button.
+    @Test("the monthly costs render, empty and filled")
+    func fixedCosts() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+
+        func shoot(_ name: String, _ height: CGFloat, _ rows: [JSONValue]) throws {
+            shop.pretendFixedCosts(rows)
+            // ON THE GROUND THE APP DRAWS, not on nothing. Without it the page
+            // is transparent everywhere it is not written on, the ink check
+            // samples only the opaque pixels — the text — and decides the
+            // text IS the background, so a perfectly good render reports
+            // "0 of 744 sampled pixels are anything other than the
+            // background". The panes beside this one pass only because their
+            // controls are coloured.
+            try render(VStack(alignment: .leading) { FixedCostsSettings(shop: shop) }
+                        .padding(20)
+                        .frame(width: 560, height: height)
+                        .background(Khayt.ground),
+                       name, size: CGSize(width: 560, height: height))
+        }
+
+        // Sized to the CONTENT, not rounded up: the ink check samples a
+        // band down the middle, so a frame taller than what is drawn is
+        // "blank down the middle" and it is right to say so.
+        try shoot("36-fixed-empty", 150, [])
+        try shoot("37-fixed-filled", 290, [
+            .object(["id": .string("a"), "name": .string("Workshop rent"),
+                     "amount": .number(3000)]),
+            .object(["id": .string("b"), "name": .string("Electricity"),
+                     "amount": .number(450)]),
+            .object(["id": .string("c"), "name": .string("Slicer subscription"),
+                     "amount": .number(60)]),
+        ])
+    }
+
+    /// Online storage, in the three states a shop meets it: not connected,
+    /// waiting for Google's sign-in, and connected. Light and dark each, in
+    /// whichever language the run is in (run once more with KHAYT_LANG=ar).
+    ///
+    /// A test build carries no Google client of its own, so the not-connected
+    /// picture is given a client id; the shipped app has Khayt's built in and
+    /// draws the same screen. The connected card is handed its account and
+    /// usage, because a picture cannot ask Google.
+    /// The quote form pane (khayt-cloud #144) in the states a shop can meet:
+    /// not connected, not available yet, and shown — for an owner, and for a
+    /// sign-in that can only read it. Handed its state: nothing asks the cloud.
+    @Test("the quote form pane renders, not connected, not available and shown")
+    func quoteFormPane() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        defer { shop.pretendsOwner = false }
+        let lang = Direction.shopLanguage()
+        let state = try JSONDecoder().decode(QuoteFormEmbed.State.self, from: Data(QuoteFormEmbedTests.full.utf8))
+
+        func shoot(_ name: String, _ height: CGFloat, _ shown: Shop.QuoteFormPane) throws {
+            func pane() -> some View {
+                QuoteFormEmbedSection(shop: shop, shown: shown, flat: true)
+                    .padding(20)
+                    .frame(width: 600, height: height, alignment: .top)
+            }
+            try render(pane().background(Khayt.ground), "\(name)-\(lang)-light", size: CGSize(width: 600, height: height))
+            try renderDark(pane(), "\(name)-\(lang)-dark", size: CGSize(width: 600, height: height))
+        }
+        try shoot("64-quote-form-needs-cloud", 140, .needsCloud)
+        try shoot("65-quote-form-not-available", 140, .notAvailable)
+        try shoot("66-quote-form-read-only", 900, .shown(state))
+        shop.pretendsOwner = true
+        try shoot("67-quote-form-owner", 900, .shown(state))
+    }
+
+    @Test("the online storage pane renders, before, during and after connecting Drive")
+    func onlineStorage() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let lang = Direction.shopLanguage()
+
+        func shoot(_ name: String, _ height: CGFloat, status: CloudLibrary.DriveStatus? = nil) throws {
+            func pane() -> some View {
+                VStack(alignment: .leading, spacing: 12) { CloudLibrarySettings(shop: shop, status: status) }
+                    .padding(20)
+                    .frame(width: 600, height: height, alignment: .top)
+            }
+            try render(pane().background(Khayt.ground), "\(name)-\(lang)-light", size: CGSize(width: 600, height: height))
+            try renderDark(pane(), "\(name)-\(lang)-dark", size: CGSize(width: 600, height: height))
+        }
+
+        shop.pretendPrintLibrary(["gdrive": .object(["clientId": .string("123-shop.apps.googleusercontent.com")])])
+        try shoot("60-storage-not-connected", 210)
+
+        shop.googleSignInURL = URL(string: "https://accounts.google.com/o/oauth2/v2/auth?client_id=x")
+        try shoot("61-storage-waiting", 210)
+        shop.googleSignInURL = nil
+
+        shop.pretendPrintLibrary(OnlineStoragePaneTests.connectedLibrary)
+        try shoot("62-storage-connected", 380,
+                  status: .init(email: "atharstudio@gmail.com", used: "41.2 GB", limit: "100 GB", fraction: 0.412))
+        shop.pretendPrintLibrary(nil)
+    }
+
+    @Test("the sheets render, with their words")
+    func sheets() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let job = try #require(shop.orders.first { !$0.parts.isEmpty } ?? shop.orders.first)
+        let subject = Shop.PendingHold(id: job.id, project: job.project)
+
+        // The WIDTH comes from the sheet, never from a number typed here. A
+        // sheet that grew was photographed at its old width and the picture
+        // came back cropped through the middle, which no test noticed because
+        // a snapshot has nothing to assert. The height is this test's own
+        // choice — the sheets size themselves vertically to their contents.
+        try render(PaymentSheet(shop: shop, subject: subject),
+                   "20-payment-words", size: CGSize(width: PaymentSheet.width, height: 281))
+        try render(EditJobSheet(shop: shop, subject: subject),
+                   "21-edit-job-words", size: CGSize(width: EditJobSheet.width, height: 330))
+        try render(QcFailSheet(shop: shop, subject: subject),
+                   "22-qc-fail-words", size: CGSize(width: QcFailSheet.width, height: 228))
+        // The paper rather than the whole sheet: `ImageRenderer` draws nothing
+        // inside the ScrollView the sheet wraps it in, so photographing the
+        // sheet here gave a title and three buttons over an empty page. The
+        // chrome around it is in the app's own capture, `14-new-job`.
+        try render(NewJobSheet(shop: shop).paper,
+                   "23-new-job-words", size: CGSize(width: NewJobSheet.width, height: 420))
+        // As "Quote this model…" opens it: a sliced line and an estimated one,
+        // each saying which it is.
+        var sliced = NewJobSheet.Draft()
+        sliced.name = "Dallah"; sliced.grams = "146.3"; sliced.hours = "5.25"; sliced.qty = 2
+        sliced.cost = 38.4; sliced.source = .sliced
+        var estimated = NewJobSheet.Draft()
+        estimated.name = "Vase"; estimated.grams = "62"; estimated.hours = "3.1"
+        estimated.cost = 14.2; estimated.source = .estimated
+        try render(NewJobSheet(shop: shop, seed: .init(project: "Dallah + Vase",
+                                                       parts: [sliced, estimated],
+                                                       preferQuote: true)).paper,
+                   "23b-quote-from-model-words", size: CGSize(width: NewJobSheet.width, height: 470))
+        // The footer, opened for a quote and for a job, so its default button
+        // can be checked in each language (alpha.74 review N8): Save as quote
+        // is the default only when a quote was asked for. (The whole sheet
+        // draws nothing here — see above.)
+        for (asQuote, name) in [(true, "23c-quote-sheet-footer"), (false, "23d-job-sheet-footer")] {
+            try render(NewJobSheet(shop: shop, seed: .init(project: "Dallah + Vase",
+                                                           parts: [sliced, estimated],
+                                                           preferQuote: asQuote)).footer,
+                       name, size: CGSize(width: NewJobSheet.width, height: 70))
+        }
+        try render(CustomerSheet(shop: shop, existing: Shop.newCustomer()),
+                   "24-new-customer-words", size: CGSize(width: CustomerSheet.width, height: 640))
+        try render(ExpenseSheet(shop: shop),
+                   "26-expense-words", size: CGSize(width: ExpenseSheet.width, height: 380))
+        try render(WasteSheet(shop: shop),
+                   "27-waste-words", size: CGSize(width: WasteSheet.width, height: 460))
+        try render(SpoolSheet(shop: shop, existing: shop.spools.first),
+                   "28-spool-words", size: CGSize(width: SpoolSheet.width, height: 520))
+        try render(MachineSheet(shop: shop, existing: shop.machines.first),
+                   "29-machine-words", size: CGSize(width: MachineSheet.width, height: 560))
+    }
+    /// Adding an expense from a receipt's QR: the reader with three codes read
+    /// (one matched to a supplier, one already filed, one not a tax invoice),
+    /// and the expense sheet it fills in.
+    @Test("the receipt reader and the filled-in expense sheet render")
+    func receiptSheets() async throws {
+        guard Self.outputDir != nil else { return }
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        func qr(_ seller: String, _ total: String, _ vat: String, _ vatNo: String = "310122393500003") async throws -> String {
+            try await engine.zatcaPayload(sellerName: seller, vatNumber: vatNo, timestamp: "2026-10-09T14:30:00Z",
+                                          total: total, vatAmount: vat)
+        }
+        let matched = try await qr("مؤسسة طويق لخيوط الطباعة", "1150.00", "150.00")
+        let filedQr = try await qr("Riyadh Hardware", "92.00", "12.00", "300000000000003")
+        let first = try #require(try await engine.receiptDraft(matched, suppliers: shop.supplierRows,
+                                                              expenses: shop.expenseRows, reclaimsTax: true))
+        let ref = try #require(try await engine.receiptDraft(filedQr, suppliers: [], expenses: [], reclaimsTax: true))
+        let dup = try #require(try await engine.receiptDraft(
+            filedQr, suppliers: [],
+            expenses: [.object(["id": .string("E1"), "receiptRef": .string(ref.draft.receiptRef)])],
+            reclaimsTax: true))
+        // A seller the book does not know: offered as a supplier, with its number.
+        let strangerQr = try await qr("مؤسسة نجد للبراغي", "57.50", "7.50", "302345678900003")
+        let stranger = try #require(try await engine.receiptDraft(strangerQr, suppliers: shop.supplierRows,
+                                                                 expenses: shop.expenseRows, reclaimsTax: true))
+        let found: [ReceiptReaderSheet.Found] = [
+            .init(text: matched, draft: first, reason: nil),
+            .init(text: strangerQr, draft: stranger, reason: nil),
+            .init(text: filedQr, draft: dup, reason: nil),
+            .init(text: "https://pay.example/invoice/2026/10/0042", draft: nil, reason: "not_base64"),
+        ]
+        try render(ReceiptReaderSheet(shop: shop), "receipt-reader-empty", size: CGSize(width: 460, height: 260))
+        // The cards, laid flat: `ImageRenderer` draws nothing inside the
+        // sheet's ScrollView, so the words are photographed here and the sheet
+        // itself in a real window below.
+        let cards = VStack(alignment: .leading, spacing: 10) {
+            ForEach(found) { ReceiptFoundRow(shop: shop, item: $0, use: { _ in }) }
+        }.padding(18).frame(width: 460)
+        try render(cards.background(Khayt.surface), "receipt-reader-found", size: CGSize(width: 460, height: 560))
+        try renderDark(cards, "receipt-reader-found-dark", size: CGSize(width: 460, height: 560))
+        // The whole sheet in a window, ScrollView and all — and on a short
+        // screen (560 points, a 13-inch with the Dock up and a big text size):
+        // the codes scroll and Cancel stays in the picture.
+        let many = found + found.map { ReceiptReaderSheet.Found(text: $0.text, draft: $0.draft, reason: $0.reason) }
+        Self.hosted(ReceiptReaderSheet(shop: shop, found: found, screenHeight: 1000), "receipt-reader-window",
+                    CGSize(width: 460, height: 720))
+        Self.hosted(ReceiptReaderSheet(shop: shop, found: many, screenHeight: 560), "receipt-reader-short",
+                    CGSize(width: 460, height: 560))
+        Self.hosted(ReceiptReaderSheet(shop: shop, found: many, screenHeight: 560), "receipt-reader-short-dark",
+                    CGSize(width: 460, height: 560), dark: true)
+        shop.receiptPrefill = first
+        try render(ExpenseSheet(shop: shop), "receipt-expense-prefilled",
+                   size: CGSize(width: ExpenseSheet.width, height: 440))
+        shop.receiptPrefill = first
+        try renderDark(ExpenseSheet(shop: shop), "receipt-expense-prefilled-dark",
+                       size: CGSize(width: ExpenseSheet.width, height: 440))
+        // The supplier sheet with the VAT number a receipt is matched by.
+        var withVat = try #require(shop.suppliers.first { !$0.vat.isEmpty } ?? shop.suppliers.first)
+        if withVat.vat.isEmpty { withVat.vat = "310122393500003" }
+        let supplierSize = CGSize(width: SheetMetrics.outerWidth(SupplierSheet.width), height: 600)
+        // In a window, so the fields show what is in them.
+        Self.hosted(SupplierSheet(shop: shop, supplier: withVat), "supplier-vat", supplierSize)
+        Self.hosted(SupplierSheet(shop: shop, supplier: withVat), "supplier-vat-dark", supplierSize, dark: true)
+        shop.receiptPrefill = first
+        Self.hosted(ExpenseSheet(shop: shop), "receipt-expense-window", CGSize(width: ExpenseSheet.width, height: 480))
+        shop.receiptPrefill = first
+        Self.hosted(ExpenseSheet(shop: shop), "receipt-expense-window-dark", CGSize(width: ExpenseSheet.width, height: 480),
+                    dark: true)
+    }
+
+    /// A sheet photographed in a real window rather than by `ImageRenderer`,
+    /// which draws nothing inside a ScrollView (MoveIntoGroupTests.hosted).
+    static func hosted(_ view: some View, _ name: String, _ size: CGSize, dark: Bool = false) {
+        guard let dir = outputDir else { return }
+        let rtl = Direction.rtlLanguages.contains(Direction.shopLanguage())
+        let host = NSHostingView(rootView: view
+            .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+            .frame(width: size.width, height: size.height, alignment: .top)
+            .background(Khayt.surface))
+        host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = host
+        host.frame = NSRect(origin: .zero, size: size)
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
+        host.cacheDisplay(in: host.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: dir.appending(path: name + ".png"))
+    }
+
+    /// The supplier sheets, which no picture has ever been taken of.
+    ///
+    /// Three of them, and the last is the one worth looking at: a purchase log
+    /// is a list of small numbers in mixed units, and the question a photograph
+    /// answers is whether a row with nothing typed on it still reads as a row.
+    @Test("the supplier sheets render, with their words")
+    func supplierSheets() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        // The one with the most behind it: a sheet photographed against the
+        // emptiest record in the book is a picture of the empty state, and
+        // there is a separate one of that below.
+        let supplier = try #require(shop.suppliers.max { $0.purchases.count < $1.purchases.count })
+        #expect(supplier.purchases.count > 1, "the sample supplier has nothing to draw")
+
+        // `SheetFrame` takes the CONTENT width and adds its own margin, so a
+        // picture taken at the sheet's `width` comes back cropped through the
+        // trailing column.
+        // ON A BACKGROUND, and not only for looks. A sheet draws none of its
+        // own — the window behind it does — so `ImageRenderer` returns a page
+        // whose only opaque pixels are the glyphs. The blank-page guard then
+        // finds one colour (the text) and reports a sheet full of words as
+        // blank, which is exactly what it did here first time round.
+        try render(SupplierSheet(shop: shop, supplier: supplier).background(Khayt.surface),
+                   "60-supplier-words",
+                   size: CGSize(width: SheetMetrics.outerWidth(SupplierSheet.width), height: 560))
+        try render(PurchaseLogSheet(shop: shop, supplier: supplier).background(Khayt.surface),
+                   "61-log-purchase-words",
+                   size: CGSize(width: SheetMetrics.outerWidth(PurchaseLogSheet.width),
+                                height: 420))
+        try render(PurchaseHistorySheet(shop: shop, supplier: supplier).background(Khayt.surface),
+                   "62-purchase-history-words",
+                   size: CGSize(width: SheetMetrics.outerWidth(PurchaseHistorySheet.width),
+                                height: 320))
+
+        // And the card they are reached from, including the supplier nothing
+        // has been bought from — the row that draws a dash rather than 0.00.
+        try render(SuppliersCard(shop: shop)
+                       .card(padding: 14)
+                       .frame(width: 720).padding(Metric.screen).background(Khayt.ground),
+                   "63-suppliers-card", size: CGSize(width: 760, height: 260))
+    }
+
+    /// The import banner, which nobody had looked at.
+    ///
+    /// A batch of five hundred models is minutes of work behind one line of
+    /// text, so that line and its Stop button are most of what a shop sees of
+    /// this feature. `Banner` is plain SwiftUI, so `ImageRenderer` can host it —
+    /// unlike the window it sits in.
+    @Test("the import banner, running and finished")
+    func importBanners() throws {
+        let shop = Shop()
+        try render(VStack(spacing: 0) {
+            Banner(text: "Importing 137 of 490 — Fallen AT-AT Remote Holder.stl",
+                   symbol: "gearshape.arrow.trianglehead.2.clockwise.rotate.90",
+                   tint: Khayt.brand) {
+                // THE YELLOW BLOCK IN THIS PICTURE IS NOT A BUG. A linear
+                // `ProgressView` is an `NSProgressIndicator`, and
+                // `ImageRenderer` draws every AppKit-backed control as that
+                // placeholder — the same refusal `expectItRendered` looks for,
+                // which only fires when it covers the whole view. Kept in the
+                // shot rather than left out, so the layout around it is the
+                // real one and nobody removes the bar to make the picture tidy.
+                // What the bar looks like has to be judged in the running app.
+                ProgressView(value: 137, total: 490)
+                    .progressViewStyle(.linear).frame(width: 120)
+                Button("Stop") {}
+            }
+            Banner(text: "471 moved in · 18 already there · 1 failed.",
+                   symbol: "checkmark.circle", tint: Khayt.done)
+            Banner(text: "universal-filament-clip-v2.stl: could not be read",
+                   symbol: "exclamationmark.triangle", tint: Khayt.attention)
+            Banner(text: "Moved Turbine bracket into the library — 13,754 triangles.",
+                   symbol: "checkmark.circle", tint: Khayt.done)
+        }.frame(width: 720), "30-import-banners", size: CGSize(width: 720, height: 160))
+        _ = shop
+    }
+
+    /// The kept-both vault banner (beta.8 UI review): three copies drawn and
+    /// "And 1 more", each saying the other copy goes to the Trash.
+    @Test("the kept-both vault banners, with how many more")
+    func vaultKeptBanners() throws {
+        let shop = Shop()
+        let folder = URL(fileURLWithPath: "/tmp/khayt-kept")
+        shop.vaultKeptCopies = (1...4).map { n in
+            VaultKeptCopy(recordId: "PF-\(n)", title: "Model \(n)", mine: folder.appending(path: "m\(n).stl"),
+                          copy: folder.appending(path: "m\(n) (vault v2).stl"), version: 2)
+        }
+        let text = shop.words.callIt("mac.vault_kept_both", ["name": .string("Model 1"), "copy": .string("m1 (vault v2).stl")])
+        #expect(text.contains("Trash"))
+        try render(VStack(spacing: 0) { VaultKeptBanners(shop: shop) }.frame(width: 820),
+                   "30b-vault-kept-banners", size: CGSize(width: 820, height: 260))
+    }
+
+    /// The state a search leaves behind, on the two screens that reach it
+    /// differently — a shelf, where the word is the only filter, and the jobs
+    /// table, where the sidebar's stage is narrowing too.
+    ///
+    /// Drawn beside the ORDINARY empty state on purpose. The whole claim of the
+    /// absent mark is that a shop can tell "no spools yet" from "no spool
+    /// called petg", and that claim can only be judged in a picture with both
+    /// in it.
+    @Test("a search that matched nothing, beside a screen with nothing on it")
+    func searchedIntoNothing() async throws {
+        // THE SAMPLE BOOK IS LOADED, and that is not incidental. A stage's
+        // name comes from the shared Khayt catalogue, which an unopened `Shop`
+        // has not read — so the first version of this picture said "…showing
+        // only queue.delivered", the raw key, and nothing in the source could
+        // have told me. A screen that names a filter has to be photographed
+        // with the words that name it.
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.search = "petg"
+        try render(HStack(spacing: 0) {
+            NothingMatched(shop: shop, mark: .filament)
+            Divider()
+            EmptyHere(title: "No spools yet", message: "Add one at the shelf.", mark: .filament)
+        }.frame(width: 900), "32-nothing-matched", size: CGSize(width: 900, height: 300))
+
+        let jobs = Shop()
+        await jobs.load(.sample)
+        jobs.search = "bracket"
+        jobs.shelf = .jobs(.delivered)
+        #expect(jobs.words.callIt(Stage.delivered.key) != Stage.delivered.key,
+                "the stage would be named by its raw key on this screen")
+        try render(NothingMatched(shop: jobs, mark: .jobs).frame(width: 560),
+                   "33-nothing-matched-stage", size: CGSize(width: 560, height: 300))
+        // And on the dark ground. `render` forces light, because a picture
+        // taken in whatever appearance the machine happens to be in is not a
+        // picture of anything — so dark has to be asked for.
+        try renderDark(NothingMatched(shop: jobs, mark: .jobs).frame(width: 560),
+                       "34-nothing-matched-dark", size: CGSize(width: 560, height: 300))
+    }
+
+    /// What the shop's models really cost against what it quotes for them.
+    ///
+    /// The whole page, from the sample book — which had to be given actuals
+    /// before this could be drawn at all: all 42 of its jobs carried estimates
+    /// and not one an actual, so the panel and every other measured-actuals
+    /// feature drew nothing whatever book you opened.
+    @Test("what a model really costs, against the quote")
+    func quotingPanel() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let rows = try await engine.estimateVariance(orders: shop.orderRows, minSamples: 1)
+        #expect(!rows.isEmpty, "the sample cannot reach this screen — nothing to look at")
+        var said: [String: KhaytEngine.VarianceAdvice] = [:]
+        for row in rows {
+            if let one = try await engine.varianceAdvice(row) { said[row.printFileId] = one }
+        }
+        #expect(!said.isEmpty, "no row earned a sentence, so the sentence is undrawn")
+        // `.list`, not the screen: `ImageRenderer` draws nothing inside a
+        // `ScrollView` and returns a fully transparent bitmap for it.
+        try render(Quoting(shop: shop, rows: rows, said: said).list
+                    .frame(width: 640).background(Khayt.ground),
+                   "35-quoting", size: CGSize(width: 640, height: 620))
+    }
+
+    /// The sheet a finished job now opens, both with and without QC notes.
+    ///
+    /// Its whole job is to be dismissed quickly by a shop whose print ran as
+    /// quoted, and to make correcting a figure obvious to one whose did not —
+    /// which is a thing to look at rather than reason about.
+    @Test("what did it take, with and without the QC question")
+    func completionSheet() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let finishing = Shop.PendingCompletion(id: "ORD-01008", project: "Falcon hood — Najd Architects",
+                                               estHours: 23.86, estGrams: 184.6, leavingQC: false)
+        try render(CompletionSheet(shop: shop, subject: finishing),
+                   "36-completion", size: CGSize(width: 420, height: 300))
+        var fromQC = finishing
+        fromQC = Shop.PendingCompletion(id: finishing.id, project: finishing.project,
+                                        estHours: finishing.estHours, estGrams: finishing.estGrams,
+                                        leavingQC: true)
+        try render(CompletionSheet(shop: shop, subject: fromQC),
+                   "37-completion-qc", size: CGSize(width: 420, height: 400))
+
+        // AND WITH THE PRINTER'S OWN FIGURES, which is the state the whole
+        // chain exists for and the one a shop with a linked machine sees. A
+        // mixed answer on purpose: PrusaLink reports a duration and never
+        // filament, so one axis is measured and the other is not, and the sheet
+        // has to say which without making the other look wrong.
+        func prefill(_ json: String) throws -> KhaytEngine.ActualsPrefill {
+            try JSONDecoder().decode(KhaytEngine.ActualsPrefill.self, from: Data(json.utf8))
+        }
+        var measured = finishing
+        measured.measured = try prefill(#"{"timeH":26.5,"weightG":184.6,"timeMeasured":true,"weightMeasured":false,"measured":true,"source":"prusalink","filename":"falcon-hood-v4.bgcode","staleReason":null}"#)
+        try render(CompletionSheet(shop: shop, subject: measured),
+                   "38-completion-measured", size: CGSize(width: 420, height: 360))
+    }
+
+    /// The camera tile, in the four states a shop actually sees.
+    ///
+    /// The picture case is a drawn image rather than a real JPEG so the shot
+    /// does not depend on a printer being on this Mac's network — what is being
+    /// looked at is the frame, the corner note and the rounding, not the photo.
+    @Test("a camera tile: a picture, warming up, failed, and none")
+    func cameraTiles() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let cam = Machine.Webcam(enabled: true, snapshotUrl: "http://x/1.jpg",
+                                 streamUrl: "", streamType: "mjpeg",
+                                 rotate: 0, flipH: false, flipV: false)
+        // A plate-ish rectangle, so the tile has something with edges in it.
+        let drawn = NSImage(size: NSSize(width: 320, height: 180), flipped: false) { rect in
+            NSColor(red: 0.24, green: 0.35, blue: 0.44, alpha: 1).setFill(); rect.fill()
+            NSColor(red: 0.94, green: 0.92, blue: 0.90, alpha: 1).setFill()
+            NSRect(x: 60, y: 30, width: 200, height: 120).fill()
+            return true
+        }
+        let bytes: Data = drawn.tiffRepresentation
+            .flatMap { NSBitmapImageRep(data: $0) }
+            .flatMap { $0.representation(using: NSBitmapImageRep.FileType.png, properties: [:]) } ?? Data()
+
+        try render(VStack(spacing: 10) {
+            CameraTile(frame: .picture(bytes), webcam: cam, words: shop.words)
+            CameraTile(frame: .waiting, webcam: cam, words: shop.words)
+            CameraTile(frame: .failed("unreachable"), webcam: cam, words: shop.words)
+        }.frame(width: 320).padding(Metric.screen).background(Khayt.ground),
+                   "39-camera-tiles", size: CGSize(width: 320, height: 430))
+    }
+
+    /// The band with a machine booked out for maintenance in it.
+    ///
+    /// `downtimeBlocks` had been editable in Khayt for releases and nothing
+    /// that plans work read them, so this state has never been drawn anywhere.
+    /// What is being looked at: that the window is visible without reading like
+    /// a fault, and that the queue behind it starts AFTER it rather than
+    /// through it.
+    @Test("a band with a maintenance window")
+    func bandWithDowntime() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        // A WHOLE SECOND. `ISO8601DateFormatter` drops the fraction, so a
+        // `Date()` with sub-second precision comes back a hair different and
+        // the window measures 359.99999999999994 minutes — a fixture artefact
+        // that reads exactly like an off-by-one in the module.
+        let now = Date(timeIntervalSince1970: (Date().timeIntervalSince1970).rounded())
+        let iso = ISO8601DateFormatter()
+        // Two machines: one out of action this afternoon with work queued
+        // behind it, one ordinary, so the two read side by side.
+        let machines: [JSONValue] = [
+            .object(["id": .string("M1"), "name": .string("Prusa CORE One"),
+                     "downtimeBlocks": .array([.object([
+                        "from": .string(iso.string(from: now.addingTimeInterval(3 * 3600))),
+                        "to": .string(iso.string(from: now.addingTimeInterval(9 * 3600))),
+                        "note": .string("Belt change"),
+                     ])])]),
+            .object(["id": .string("M2"), "name": .string("Bambu X1C")]),
+        ]
+        let orders: [JSONValue] = [
+            .object(["id": .string("A"), "status": .string("pending"),
+                     "machineId": .string("M1"), "printTime": .number(5),
+                     "project": .string("Falcon hood"), "parts": .array([])]),
+            .object(["id": .string("B"), "status": .string("pending"),
+                     "machineId": .string("M2"), "printTime": .number(7),
+                     "project": .string("Ramadan lantern"), "parts": .array([])]),
+        ]
+        let band = try await engine.machineBand(
+            machines: machines, orders: orders, inventory: [],
+            live: ["M1": .object([:]), "M2": .object([:])],
+            now: now, hours: 48)
+        let down = try #require(band.rows.first).downMinutes
+        #expect(down == 360, "the window is on the band as \(down) minutes, not 360")
+
+        try render(MachineBandView(shop: shop, band: band).frame(width: 820),
+                   "40-band-downtime", size: CGSize(width: 820, height: 260))
+    }
+
+    /// What a machine is due for, in all four states at once.
+    ///
+    /// The sample book reaches every one of them (see `SampleShopTests`), which
+    /// is the only reason there is anything to look at. What is being judged
+    /// here is whether the row can be READ at a glance: whether "overdue" is
+    /// distinguishable from "due" without reading the word, and whether the
+    /// remaining figure — negative once it is late — says which of two late
+    /// machines to service first.
+    ///
+    /// THE "DONE" BUTTON DOES NOT PHOTOGRAPH, and that is the renderer rather
+    /// than the row: `ImageRenderer` draws a yellow prohibition sign for any
+    /// `Button` at all, verified with a bare `Button("Done") {}` beside this
+    /// one. What the picture is for is the four rows either side of it.
+    /// The other shelf: what is about to run out that is not filament.
+    ///
+    /// Four rows, four different reasons to be on the list — out of stock,
+    /// below minimum, forecast to run out inside the lead time, and one the
+    /// rule refuses to put a number against. What is being judged is whether
+    /// those four read as different situations rather than one repeated.
+    /// What a print is known to work at, and what it exists as.
+    ///
+    /// Three verdicts on one file, and beside it a file where nothing has
+    /// worked — which is the case the panel exists for, because the answer
+    /// there is "change something" rather than the least broken setup. What is
+    /// being judged is whether an untried setup reads as untried rather than as
+    /// a score of nought.
+    /// Whether an invoice has been reported to the tax authority.
+    ///
+    /// Four states, drawn together so they read as four different situations.
+    /// The states are per-invoice records, so they are built here rather than
+    /// taken from the sample: the sample shop has not enabled ZATCA, which is
+    /// the honest default for a book with no VAT number on it, and turning it
+    /// on there would rewrite every invoice in the sample as well.
+    @Test("whether an invoice has been reported")
+    func zatcaLine() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let at = "2026-09-02T10:15:00.000Z"
+
+        let read = try await engine.zatcaReporting(
+            settings: ["enableZatca": .bool(true),
+                       "zatcaPhase2": .object(["enabled": .bool(true),
+                                               "pcsid": .string("cert")])],
+            orders: [
+                .object(["id": .string("ORD-1"), "status": .string("completed"),
+                         "zatcaSubmission": .object([
+                            "status": .string("accepted"), "icv": .number(41),
+                            "at": .string(at), "message": .string("OK")])]),
+                .object(["id": .string("ORD-2"), "status": .string("completed")]),
+                .object(["id": .string("ORD-3"), "status": .string("completed"),
+                         "zatcaSubmission": .object([
+                            "status": .string("rejected"), "icv": .number(42),
+                            "at": .string(at),
+                            "message": .string("BR-KSA-40: VAT category code does not match the rate")])]),
+                .object(["id": .string("ORD-4"), "status": .string("completed"),
+                         "zatcaSubmission": .object([
+                            "status": .string("error"), "icv": .number(43),
+                            "at": .string(at),
+                            "message": .string("Network unreachable")])]),
+            ])
+        #expect(read.unreported == 3, "only the accepted one is settled")
+
+        try render(
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(read.invoices) { ZatcaLine(state: $0, shop: shop) }
+            }
+            .padding(16)
+            .frame(width: 460),
+            "44-zatca", size: CGSize(width: 460, height: 300))
+    }
+
+    /// The files one print is made of.
+    ///
+    /// Three kits side by side: an ordinary one, one whose total refuses to add
+    /// up because a part was never measured, and one that disagrees with itself
+    /// after a sync. What is being judged is whether the unmeasured part reads
+    /// as unmeasured rather than as zero, and whether the starred primary is
+    /// legible as meaning something.
+    @Test("the files one print is made of")
+    func partsPanel() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+
+        func row(_ name: String) throws -> JSONValue {
+            try #require(shop.fileRows.first {
+                if case .object(let f) = $0, case .string(let n)? = f["name"] {
+                    return n.contains(name)
+                }
+                return false
+            })
+        }
+
+        let kit = try await engine.printParts(try row("Robot gripper"))
+        let unmeasured = try await engine.printParts(try row("Ramadan lantern"))
+        let disagreeing = try await engine.printParts(try row("Dental model set — upper"))
+        #expect(kit.totalSize != nil)
+        #expect(unmeasured.totalSize == nil, "the unmeasured case must be in the picture")
+        #expect(disagreeing.parts.count == 3)
+
+        try render(
+            VStack(alignment: .leading, spacing: 18) {
+                PartsSection(parts: kit, shop: shop)
+                PartsSection(parts: unmeasured, shop: shop)
+                PartsSection(parts: disagreeing, shop: shop)
+            }
+            .padding(16)
+            .frame(width: 440),
+            "45-parts", size: CGSize(width: 440, height: 420))
+    }
+
+    @Test("what a print is known to work at")
+    func setupsPanel() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+
+        let bracket = try #require(shop.fileRows.first {
+            if case .object(let f) = $0, case .string(let n)? = f["name"] {
+                return n.contains("Turbine bracket")
+            }
+            return false
+        })
+        let gripper = try #require(shop.fileRows.first {
+            if case .object(let f) = $0, case .string(let n)? = f["name"] {
+                return n.contains("Robot gripper")
+            }
+            return false
+        })
+        let lantern = try #require(shop.fileRows.first {
+            if case .object(let f) = $0, case .string(let n)? = f["name"] {
+                return n.contains("Ramadan lantern")
+            }
+            return false
+        })
+
+        let works = try await engine.printSetups(bracket)
+        let broken = try await engine.printSetups(gripper)
+        let sizes = try await engine.printVersions(lantern)
+        #expect(works.recommendedId != nil)
+        #expect(broken.recommendedId == nil, "the nothing-works case must be in the picture")
+        #expect(sizes.many)
+
+        try render(
+            VStack(alignment: .leading, spacing: 18) {
+                SetupsSection(setups: works, shop: shop)
+                SetupsSection(setups: broken, shop: shop)
+                VersionsSection(versions: sizes, shop: shop)
+            }
+            .padding(16)
+            .frame(width: 460),
+            "43-setups", size: CGSize(width: 460, height: 430))
+    }
+
+    @Test("what is about to run out that is not filament")
+    func consumablesCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        // TODAY, because the book is rebased to today.
+        //
+        // This was pinned to a literal, and a literal clock against a book
+        // that MOVES is the decay itself: `SampleShopTests.book()` rebases to
+        // `Date()`, so every day widened the gap by one until a consumable
+        // crossed a threshold and the shelf no longer had four things on it.
+        // It went red on 22 Sep 2026 having passed on the same commit the
+        // evening before, on `main`, for every open PR at once.
+        let now = Date()
+        let needs = try await engine.consumableNeeds(
+            consumables: shop.consumableRows, orders: shop.orderRows, now: now)
+        #expect(needs.count >= 4, "not enough on the shelf to judge the card")
+
+        try render(
+            ConsumablesCard(needs: needs, shop: shop)
+                .padding(14)
+                .frame(width: 440),
+            "42-consumables", size: CGSize(width: 440, height: 210))
+    }
+
+    @Test("what each machine is due for")
+    func maintenanceRows() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let machine = try #require(shop.machines.first { $0.id == "MACH-x1c" })
+
+        // Every status on one card, so they are compared rather than described.
+        // The intervals are chosen against the sample's own meter.
+        let hours = 96.5
+        let tasks: [JSONValue] = [
+            .object(["id": .string("A"), "machineId": .string(machine.id),
+                     "name": .string("Lubricate linear rails"),
+                     "intervalHours": .number(400), "lastDoneHours": .number(0)]),
+            .object(["id": .string("B"), "machineId": .string(machine.id),
+                     "name": .string("Replace nozzle"),
+                     "intervalHours": .number(100), "lastDoneHours": .number(0)]),
+            .object(["id": .string("C"), "machineId": .string(machine.id),
+                     "name": .string("Check belt tension"),
+                     "intervalHours": .number(90), "lastDoneHours": .number(0)]),
+            .object(["id": .string("D"), "machineId": .string(machine.id),
+                     "name": .string("Clean build plate"),
+                     "intervalHours": .number(50), "lastDoneHours": .number(0)]),
+        ]
+        let jobs: [JSONValue] = [.object([
+            "id": .string("J"), "machineId": .string(machine.id),
+            "status": .string("completed"), "printTime": .number(hours),
+        ])]
+        let card = try await engine.maintenance(
+            machineId: machine.id, tasks: tasks, jobs: jobs,
+            machine: .object(["id": .string(machine.id)]), now: Date())
+        #expect(Set(card.tasks.map(\.status)) == ["ok", "warning", "due", "overdue"],
+                "the four states have to be side by side or there is nothing to compare")
+
+        try render(
+            VStack(alignment: .leading, spacing: 7) {
+                ForEach(card.tasks) { Upkeep(task: $0, machine: machine, shop: shop) }
+            }
+            .padding(14)
+            .frame(width: 420),
+            "41-maintenance", size: CGSize(width: 420, height: 190))
+    }
+
+    /// What each machine earned, from the sample book.
+    ///
+    /// The arithmetic has its own tests. What is being looked at here is
+    /// whether the row can be FOLLOWED — revenue, then the three things taken
+    /// off it, then the net — rather than trusted, and whether a machine that
+    /// earned nothing reads as having no margin rather than as breaking even.
+    @Test("what each machine earned")
+    func machineProfitPage() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let done = shop.orderRows.filter {
+            if case .object(let o) = $0, case .string(let s)? = o["status"] { return s == "completed" }
+            return false
+        }
+        let report = try await engine.machineProfit(
+            machines: shop.machineRows, completed: done,
+            expenses: [], maintenance: [
+                // One serviced machine, so the column is not a row of dashes —
+                // the sample keeps no maintenance log.
+                // A REAL ID. The first version used "MACH-1", which no sample
+                // machine has, so the 420 landed nowhere and the column drew
+                // 0.00 on every row — a fixture that demonstrated nothing and
+                // looked like it had.
+                .object(["machineId": .string("MACH-core-one"), "cost": .number(420)]),
+            ],
+            settings: shop.settingsDict, clients: shop.clientRows,
+            unassigned: shop.words.callIt("dash.unassigned"))
+        #expect(!report.rows.isEmpty, "the sample cannot reach this page")
+
+        // `.rows`, not the page: `ImageRenderer` returns a fully transparent
+        // bitmap for a `ScrollView`, which the ink check now catches.
+        try render(MachineProfitPage(shop: shop, report: report).rows(report)
+                    .frame(width: 900).background(Khayt.ground),
+                   "41-machine-profit", size: CGSize(width: 900, height: 560))
+    }
+
+    /// Where a model came from, both ways round.
+    ///
+    /// The line a shop is looking for is "may not be sold", and it has to read
+    /// as a fact rather than an alarm — and the model beside it, the shop's own
+    /// work, must not look like it is missing something. Drawn together because
+    /// that is how they are judged.
+    @Test("provenance: a downloaded model and the shop's own")
+    func provenanceRows() throws {
+        try render(VStack(alignment: .leading, spacing: 18) {
+            DetailSection("Where it came from") {
+                DetailLine("Source", "https://www.printables.com/model/remb-forest-dragon")
+                DetailLine("Licence", "CC BY-NC — not for sale", warn: true)
+            }
+            DetailSection("Where it came from") {
+                DetailLine("Source", "Commissioned — Athar Tuwaiq")
+                DetailLine("Licence", "My own design")
+            }
+        }.frame(width: 380), "31-provenance", size: CGSize(width: 380, height: 300))
+    }
+
+    /// The report builder, in the two pieces that can be laid out wrongly.
+    ///
+    /// The chips wrap through a `Layout` written for this screen, and the
+    /// alternative — an adaptive `LazyVGrid` — is one of the two shapes that
+    /// has hung this app. A hang does not show up in a passing test; it shows
+    /// up here, as a render that never returns.
+    @Test("a report a shop asked for, and the chips it asked with")
+    func reportBuilder() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let fields = try await engine.reportFields()
+        var chosen: Set<String> = ["id", "date", "client", "status", "price", "paymentStatus"]
+        // Through the screen's own label rule, not `field.label` — the module's
+        // English headers would render in every language and the Arabic picture
+        // would be a picture of an app that does not exist.
+        var labels: [String: JSONValue] = [:]
+        for f in fields { labels[f.key] = .string(CustomReportPage.label(for: f, shop.words)) }
+        let report = try await engine.buildReport(
+            orders: shop.orderRows, clients: shop.clientRows, machines: shop.machineRows,
+            settings: shop.settingsDict, language: shop.words.language,
+            fields: fields.map(\.key).filter { chosen.contains($0) },
+            statusIn: [], from: "", to: "", labels: labels)
+        #expect(!report.rows.isEmpty, "the sample cannot reach this page")
+
+        let saved = try await engine.addSavedReport(
+            [], name: "August, finished", fields: ["id", "price"],
+            statusIn: ["completed"], from: "", to: "", id: "RPT-1")
+
+        try render(VStack(alignment: .leading, spacing: 16) {
+            // A saved report, which is the row that carries a second control
+            // inside the chip — the one place the shape can go wrong.
+            FlowChips(items: saved.map { ($0.id, $0.name) },
+                      isOn: { _ in false }, toggle: { _ in },
+                      remove: { _ in }, removeHelp: "Remove")
+            // Every column on offer, which is the widest the chips ever get —
+            // the row that wraps is the one worth photographing.
+            FlowChips(items: fields.map { ($0.key, CustomReportPage.label(for: $0, shop.words)) },
+                      isOn: { chosen.contains($0) }, toggle: { _ in })
+            // The first rows only. The sample's book is longer than any frame
+            // this can be rendered at, and a `VStack` taller than its frame
+            // CENTRES — so photographing the whole table photographs its
+            // middle, with the controls above it cropped off the top.
+            ReportTable(report: KhaytEngine.Report(
+                headers: report.headers, keys: report.keys,
+                rows: Array(report.rows.prefix(8)), total: report.total),
+                        currency: shop.currency, words: shop.words)
+            Spacer(minLength: 0)
+        }
+        .padding(Metric.screen)
+        .frame(width: 900).background(Khayt.ground),
+                   "42-report-builder", size: CGSize(width: 900, height: 620))
+    }
+
+    /// What the shop must bill before any of it is profit.
+    ///
+    /// Rendered in both states the sample can reach — a month still short of
+    /// the line and a month past it — because the card changes colour, wording
+    /// and direction between them, and a screen only reviewed on one side of a
+    /// threshold has only half been reviewed.
+    @Test("the break-even card, short of the line and past it")
+    func breakEvenCard() async throws {
+        let shop = Shop()
+        // As of the sample's own day: the months below are pinned, and the
+        // book moves with the calendar (see InputVatTests.rows).
+        await shop.load(.sample, asOf: try #require(SampleBook.anchor))
+        let engine = try #require(shop.engine)
+        let completed = shop.orderRows.filter {
+            if case .object(let o) = $0, case .string(let s)? = o["status"] { return s == "completed" }
+            return false
+        }
+        var costs: [JSONValue] = []
+        if case .array(let stored)? = shop.settingsDict["fixedCosts"] { costs = stored }
+        #expect(!costs.isEmpty, "the sample shop cannot reach this card")
+
+        // The sample's own book has a month on each side of the line, so both
+        // are drawn from real arithmetic rather than from a doctored figure:
+        // September billed 1,081 against a target near 7,100, and June billed
+        // 10,191. The first draft of this used August and September — two quiet
+        // months — and drew the same red card twice while claiming to show both
+        // states.
+        let short = try await engine.breakEven(
+            fixedCosts: costs, completed: completed, since: "2026-01-01",
+            month: "2026-09", settings: shop.settingsDict, clients: shop.clientRows)
+        let ahead = try await engine.breakEven(
+            fixedCosts: costs, completed: completed, since: "2026-01-01",
+            month: "2026-06", settings: shop.settingsDict, clients: shop.clientRows)
+        #expect((short.surplus ?? 0) < 0 && (ahead.surplus ?? 0) > 0,
+                "both cards are the same state, so only one has been reviewed")
+
+        try render(HStack(alignment: .top, spacing: 16) {
+            BreakEvenCard(shop: shop, report: short)
+                .card(rail: (short.surplus ?? 0) < 0 ? Khayt.late : Khayt.brand, padding: 14)
+            BreakEvenCard(shop: shop, report: ahead)
+                .card(rail: (ahead.surplus ?? 0) < 0 ? Khayt.late : Khayt.brand, padding: 14)
+            // And the state a shop starts in, which is the one it sees first.
+            BreakEvenCard(shop: shop, report: nil)
+                .card(rail: Khayt.brand, padding: 14)
+        }
+        .frame(width: 900).padding(Metric.screen).background(Khayt.ground),
+                   "43-break-even", size: CGSize(width: 940, height: 420))
+    }
+
+    /// What reached the bank, against what was earned.
+    ///
+    /// In above the line and out below it, on one shared scale — the thing to
+    /// look at is whether a month with a tall green column also has a tall red
+    /// one, which is the month a shop was busy and no better off.
+    @Test("cash in and cash out, on one baseline")
+    func cashFlowChart() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let flow = try await engine.cashFlow(
+            orders: shop.orderRows, expenses: shop.expenseRows,
+            endMonth: "2026-09", months: 6,
+            settings: shop.settingsDict, clients: shop.clientRows)
+        #expect(flow.totals.anyMovement, "the sample cannot reach this chart")
+
+        try render(VStack(spacing: 16) {
+            CashFlowChart(shop: shop, flow: flow)
+                .card(rail: Khayt.brand, padding: 14)
+            // And the state a quiet shop sees, which is the one it sees first.
+            CashFlowChart(shop: shop, flow: nil)
+                .card(rail: Khayt.brand, padding: 14)
+        }
+        .frame(width: 620).padding(Metric.screen).background(Khayt.ground),
+                   "44-cash-flow", size: CGSize(width: 660, height: 480))
+    }
+
+    /// Which customers are worth keeping.
+    ///
+    /// The sentence above the table is the part worth looking at — a ranked
+    /// list is something a shop already knows, and how much of the business
+    /// rests on the first row is not.
+    @Test("what each customer has been worth, and who has stopped coming back")
+    func clientValueTable() async throws {
+        let shop = Shop()
+        // At the anchor, so the book is as written for the fixed `now` below:
+        // loaded at today it shifts forward and drifts away from that date.
+        await shop.load(.sample, asOf: try #require(SampleBook.anchor))
+        let engine = try #require(shop.engine)
+        let worth = try await engine.clientValue(
+            clients: shop.clientRows, orders: shop.orderRows,
+            now: Date(timeIntervalSince1970: 1_789_084_800),   // 2026-09-11
+            quietDays: 90, limit: 8,
+            settings: shop.settingsDict, language: shop.words.language)
+        #expect(!worth.rows.isEmpty, "the sample cannot reach this table")
+        // A screen only reviewed with every row in one state has half been
+        // reviewed: the amber line only appears on a customer that stopped.
+        #expect(worth.totals.quiet > 0, "no quiet customer, so that row is undrawn")
+
+        try render(ClientValueTable(shop: shop, report: worth)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "45-client-value", size: CGSize(width: 600, height: 560))
+    }
+
+    /// Can the shop take this job, and when would it start?
+    ///
+    /// Drawn in the two states that matter and are easy to confuse: a machine
+    /// with room, and a machine three weeks behind. The other app drew those
+    /// identically, because it clamped the load at 100%.
+    @Test("capacity, with room and overbooked")
+    func capacityCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+
+        let real = try await engine.capacity(
+            machines: shop.machineRows, orders: shop.orderRows, days: 7,
+            unassigned: shop.words.callIt("dash.unassigned"))
+        #expect(!real.rows.isEmpty, "the sample cannot reach this card")
+        #expect(!real.totals.noTargets,
+                "no sample machine has a daily target, so only the empty state is ever drawn")
+
+        // And the state the sample cannot reach on its own. Built from the
+        // sample's OWN machines rather than invented ones, so the row still
+        // carries a real name and colour.
+        let piled = shop.machineRows.enumerated().map { index, row -> JSONValue in
+            guard case .object(var m) = row else { return row }
+            // A short day on every machine, so the SHOP is behind and not just
+            // one printer — the card colours its rail off the total, and a
+            // first draft that only overbooked one machine drew a calm rail
+            // above a red row.
+            m["targetHoursPerDay"] = .number(index == 0 ? 4 : 2)
+            return .object(m)
+        }
+        let heavy = try await engine.capacity(
+            machines: piled,
+            orders: piled.prefix(1).flatMap { row -> [JSONValue] in
+                guard case .object(let m) = row, case .string(let id)? = m["id"] else { return [] }
+                return (1...6).map { n in
+                    .object(["id": .string("Q\(n)"), "machineId": .string(id),
+                             "status": .string("pending"), "printTime": .number(22)])
+                }
+            },
+            days: 7, unassigned: shop.words.callIt("dash.unassigned"))
+        #expect(heavy.totals.overbooked, "the overbooked state is undrawn")
+        #expect(heavy.rows.contains { $0.overbooked }, "no row is drawn overbooked")
+
+        try render(VStack(spacing: 16) {
+            CapacityCard(shop: shop, report: real)
+                .card(rail: Khayt.brand, padding: 14)
+            CapacityCard(shop: shop, report: heavy)
+                .card(rail: Khayt.late, padding: 14)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "46-capacity", size: CGSize(width: 600, height: 620))
+    }
+
+    /// How many quotes turn into work, and how much of the money does.
+    ///
+    /// The two rates side by side are the thing to look at: when they are far
+    /// apart, the gap IS the finding.
+    @Test("the quote funnel, both rates and the open ones")
+    func quoteFunnelCard() async throws {
+        let shop = Shop()
+        // At the anchor, so the book is as written for the fixed `now` below:
+        // loaded at today it shifts forward and drifts away from that date.
+        await shop.load(.sample, asOf: try #require(SampleBook.anchor))
+        let engine = try #require(shop.engine)
+        let funnel = try await engine.quoteFunnel(
+            orders: shop.orderRows,
+            now: Date(timeIntervalSince1970: 1_789_084_800),   // 2026-09-11
+            settings: shop.settingsDict, clients: shop.clientRows)
+        #expect(funnel.totals.winRateByCount != nil, "the sample cannot reach this card")
+
+        try render(VStack(spacing: 16) {
+            QuoteFunnelCard(shop: shop, report: funnel)
+                .card(rail: Khayt.brand, padding: 14)
+            // And the state a shop that has never quoted sees.
+            QuoteFunnelCard(shop: shop, report: nil)
+                .card(rail: Khayt.brand, padding: 14)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "47-quote-funnel", size: CGSize(width: 600, height: 540))
+    }
+
+    /// How long a job takes: six months of the average, and the products that
+    /// take longest — and the empty state a shop that has finished nothing sees.
+    @Test("the cycle-time card, by month and by product")
+    func cycleTimeCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let cycle = try await engine.cycleTime(orders: shop.orderRows, now: Date(), months: 6)
+        let lead = try await engine.leadTimeByProduct(orders: shop.orderRows, top: 10)
+        #expect(cycle.jobs >= 3, "the sample cannot reach this card")
+
+        try render(VStack(spacing: 16) {
+            CycleTimeCard(shop: shop, cycle: cycle, lead: lead)
+                .card(rail: Khayt.brand, padding: 14)
+            CycleTimeCard(shop: shop, cycle: nil, lead: nil)
+                .card(rail: Khayt.brand, padding: 14)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "54-cycle-time", size: CGSize(width: 600, height: 620))
+    }
+
+    /// What an hour earned and what a gram cost, month by month — with the
+    /// gaps where a month had no reading.
+    @Test("the trends card, both rows, gaps included")
+    func trendsChart() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let trends = try await engine.costTrends(
+            orders: shop.orderRows, spools: shop.inventoryRows,
+            settings: shop.settingsDict, clients: shop.clientRows, now: Date(), months: 12)
+        #expect(trends.anyReading, "the sample cannot reach this card")
+        try render(TrendsChart(shop: shop, trends: trends)
+                       .frame(width: 720).padding(Metric.screen).background(Khayt.ground),
+                   "55-trends", size: CGSize(width: 760, height: 260))
+    }
+
+    /// What was thrown away, stacked by why — and the empty state.
+    @Test("the waste trend card, stacked, with its key")
+    func wasteTrendCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let trend = try await engine.wasteTrend(wasteLog: shop.wasteRows, now: Date(), months: 6, named: 3)
+        #expect(trend.total > 0, "the sample cannot reach this card")
+        try render(VStack(spacing: 16) {
+            WasteTrendCard(shop: shop, trend: trend).card(rail: Khayt.brand, padding: 14)
+            WasteTrendCard(shop: shop, trend: nil).card(rail: Khayt.brand, padding: 14)
+        }
+        .frame(width: 320).padding(Metric.screen).background(Khayt.ground),
+                   "56-waste-trend", size: CGSize(width: 360, height: 360))
+    }
+
+    /// Whether the shop keeps its promises — and the empty state.
+    @Test("the on-time card, with the promises missed")
+    func onTimeCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let report = try await engine.onTime(orders: shop.orderRows)
+        #expect(report.late > 0, "the sample cannot reach the lower half of this card")
+        try render(VStack(spacing: 16) {
+            OnTimeCard(shop: shop, report: report).card(rail: Khayt.brand, padding: 14)
+            OnTimeCard(shop: shop, report: nil).card(rail: Khayt.brand, padding: 14)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "57-on-time", size: CGSize(width: 600, height: 420))
+    }
+
+    /// Which of the things the shop sells actually earns.
+    ///
+    /// The sentence at the top is the point: the best use of a machine hour is
+    /// usually NOT the top row, and a reader scanning down the table will not
+    /// find it.
+    @Test("what earns, ranked by profit rather than by revenue")
+    func productProfitTable() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let earns = try await engine.productProfit(
+            orders: shop.orderRows, products: shop.productRows,
+            expenses: shop.expenseRows, untagged: shop.words.callIt("an.untagged"),
+            settings: shop.settingsDict, clients: shop.clientRows,
+            language: shop.words.language)
+        #expect(earns.rows.count > 1, "the sample cannot reach this table")
+
+        // The first rows only. The sample sells twenty things and a `VStack`
+        // taller than its frame CENTRES — so photographing all of them
+        // photographs the middle, with the heading cropped off the top, which
+        // is exactly what the first version of this did.
+        let top = KhaytEngine.ProductProfit(rows: Array(earns.rows.prefix(7)),
+                                            totals: earns.totals)
+        try render(VStack {
+            ProductProfitTable(shop: shop, report: top)
+                .card(rail: Khayt.brand, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "48-product-profit", size: CGSize(width: 600, height: 520))
+    }
+
+    /// Growing, or serving the same people?
+    @Test("where the work comes from, new against returning")
+    func customerMixCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let mix = try await engine.customerMix(
+            orders: shop.orderRows, from: "", to: "",
+            settings: shop.settingsDict, clients: shop.clientRows)
+        #expect(mix.fresh.jobs > 0 && mix.returning.jobs > 0,
+                "the sample reaches only one half, so the card is half reviewed")
+
+        try render(VStack(spacing: 16) {
+            CustomerMixCard(shop: shop, report: mix)
+                .card(rail: Khayt.brand, padding: 14)
+            CustomerMixCard(shop: shop, report: nil)
+                .card(rail: Khayt.brand, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 520).padding(Metric.screen).background(Khayt.ground),
+                   "49-customer-mix", size: CGSize(width: 560, height: 400))
+    }
+
+    /// Which machine is costing the shop, and what it keeps doing wrong.
+    @Test("what gets scrapped, by machine")
+    func machineReliabilityCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let scrap = try await engine.machineReliability(
+            machines: shop.machineRows, orders: shop.orderRows, waste: shop.wasteRows,
+            from: "", to: "", unassigned: shop.words.callIt("dash.unassigned"))
+        #expect(scrap.rows.filter { $0.scraps > 0 }.count > 1,
+                "only one machine scraps, so the ranking shows nothing")
+
+        try render(VStack(spacing: 16) {
+            MachineReliabilityCard(shop: shop, report: scrap)
+                .card(rail: Khayt.brand, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "50-machine-scrap", size: CGSize(width: 600, height: 400))
+    }
+
+    /// When the shop actually finishes work.
+    ///
+    /// The findings are above the grid on purpose: at the volume a small shop
+    /// generates, a 168-cell grid of mostly-empty cells looks exactly like a
+    /// pattern, and a reader will find one in it.
+    @Test("when work finishes, and how much of it on a closed day")
+    func throughputCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let open = try await engine.openDays(settings: shop.settingsDict)
+        let when = try await engine.throughput(
+            orders: shop.orderRows, openDays: open, minimum: 10)
+        #expect(when.totals.enough, "the sample only draws the thin state")
+
+        // And the thin state, which is what a shop sees in its first month.
+        let thin = try await engine.throughput(
+            orders: Array(shop.orderRows.prefix(3)), openDays: open, minimum: 10)
+
+        try render(VStack(spacing: 16) {
+            ThroughputCard(shop: shop, report: when)
+                .card(rail: Khayt.brand, padding: 14)
+            ThroughputCard(shop: shop, report: thin)
+                .card(rail: Khayt.brand, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 620).padding(Metric.screen).background(Khayt.ground),
+                   "51-throughput", size: CGSize(width: 660, height: 520))
+    }
+
+    /// What the shelf costs, and whether that has moved.
+    @Test("what materials cost, in their own units")
+    func materialCostCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let prices = try await engine.materialCost(inventory: shop.inventoryRows, minimum: 2)
+        #expect(prices.totals.anyChangeKnown, "no price change is drawn")
+
+        try render(VStack(spacing: 16) {
+            MaterialCostCard(shop: shop, report: prices)
+                .card(rail: Khayt.brand, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 520).padding(Metric.screen).background(Khayt.ground),
+                   "52-material-cost", size: CGSize(width: 560, height: 620))
+    }
+
+    /// How much passes inspection, and how much first time.
+    ///
+    /// The two rates side by side are the point: a shop that reprints until it
+    /// passes has a pass rate near 100% and a quality problem, and only the
+    /// first figure says so.
+    @Test("quality, in the two rates that disagree")
+    func qualityCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let quality = try await engine.qcMetrics(orders: shop.orderRows)
+        #expect(quality.qcd > 0, "the sample cannot reach this card")
+        #expect(try #require(quality.firstPassYield) < #require(quality.passRate),
+                "the two rates agree, so the gap that is the point is undrawn")
+
+        try render(VStack(spacing: 16) {
+            QualityCard(shop: shop, report: quality)
+                .card(rail: Khayt.brand, padding: 14)
+            // And the state a shop sees before it has inspected anything.
+            QualityCard(shop: shop, report: nil)
+                .card(rail: Khayt.brand, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 520).padding(Metric.screen).background(Khayt.ground),
+                   "53-quality", size: CGSize(width: 560, height: 420))
+    }
+
+    /// The machine P&L row, which gained the two figures the money alone
+    /// cannot carry: how many hours the printer actually ran, and how that
+    /// compares with what the shop wanted of it.
+    @Test("a machine row shows what it earned AND how hard it worked")
+    func machineRowWithHours() async throws {
+        let shop = Shop()
+        // This month's rows: read on the sample's own day, not the 1st.
+        await shop.load(.sample, asOf: SampleBook.anchor)
+        let engine = try #require(shop.engine)
+        let done = await shop.completedInPeriod()
+        let report = try await engine.machineProfit(
+            machines: shop.machineRows, completed: done.orders,
+            expenses: done.expenses, maintenance: done.maintenance,
+            settings: shop.settingsDict, clients: shop.clientRows,
+            unassigned: shop.words.callIt("dash.unassigned"),
+            days: shop.periodDays(dates: done.orders.compactMap { row in
+                if case .object(let o) = row, case .string(let d)? = o["date"] { return d }
+                return nil
+            }))
+        #expect(!report.rows.isEmpty, "no machine finished anything — the page draws its empty state")
+        #expect(report.totals.hours > 0, "every sample machine ran for no time at all")
+        #expect(report.rows.contains { $0.utilisationPct != nil },
+                "no sample machine has a target, so utilisation is always a dash")
+        // The ROWS, not the page: `ImageRenderer` draws nothing inside a
+        // `ScrollView` and does not say so, which is exactly why the page
+        // already splits them out. The blankness guard caught this.
+        try render(MachineProfitPage(shop: shop, report: report).rows(report)
+                    .frame(width: 900).background(Khayt.ground),
+                   "59-machine-pl-hours", size: CGSize(width: 900, height: 420))
+    }
+
+    /// The five cards Reports gained, drawn from the sample book.
+    ///
+    /// These exist to be LOOKED AT. The arithmetic has its own tests and the
+    /// spread has its own tests; what neither can tell you is whether the card
+    /// reads — and the rating card's bars were drawn against a fixed scale of
+    /// five with nothing on the card saying so until one of these pictures
+    /// made it obvious. The `#expect`s here only guard against photographing
+    /// an empty card and calling it reviewed.
+    @Test("the five reports Reports gained")
+    func newCards() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let cal = Calendar.book
+
+        let spending = try await engine.expenseCategories(shop.expenseRows,
+                                                          reclaimsTax: shop.reclaimsTax)
+        #expect(shop.reclaimsTax, "an unregistered sample never draws the reclaimed-tax line")
+        #expect(spending.reclaimed > 0)
+        try render(ExpenseCategoriesCard(shop: shop, report: spending)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 490).padding(Metric.screen).background(Khayt.ground),
+                   "54-expenses-by-category", size: CGSize(width: 530, height: 270))
+
+        let sources = try await engine.clientSources(clients: shop.clientRows,
+                                                     orders: shop.orderRows,
+                                                     settings: shop.settingsDict)
+        #expect(sources.rows.count > 1, "one source draws the prompt, not the chart")
+        try render(ClientSourcesCard(shop: shop, report: sources)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 490).padding(Metric.screen).background(Khayt.ground),
+                   "55-clients-by-source", size: CGSize(width: 530, height: 250))
+
+        var months: [String] = []
+        for back in stride(from: 5, through: 0, by: -1) {
+            guard let d = cal.date(byAdding: .month, value: -back, to: Date()),
+                  let y = cal.dateComponents([.year], from: d).year,
+                  let m = cal.dateComponents([.month], from: d).month else { continue }
+            months.append(String(format: "%04d-%02d", y, m))
+        }
+        let ratings = try await engine.ratingTrend(orders: shop.orderRows, months: months)
+        #expect(ratings.responses > 0, "no ratings draws the empty state, not the chart")
+        try render(RatingTrendCard(shop: shop, trend: ratings)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 490).padding(Metric.screen).background(Khayt.ground),
+                   "56-rating-trend", size: CGSize(width: 530, height: 210))
+
+        let year = MachineProfitPage.thisYear()
+        let maint = try await engine.maintenanceCost(machines: shop.machineRows,
+                                                     entries: shop.maintenanceRows, year: year)
+        #expect(!maint.isEmpty, "nothing serviced this year draws the empty state")
+        try render(MaintenanceCostCard(shop: shop, rows: maint, year: year)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 490).padding(Metric.screen).background(Khayt.ground),
+                   "57-maintenance-cost", size: CGSize(width: 530, height: 230))
+
+        var periods: [(from: Date, to: Date)] = []
+        var keys: [String] = []
+        for back in stride(from: 2, through: 0, by: -1) {
+            guard let d = cal.date(byAdding: .month, value: -back, to: Date()),
+                  let iv = cal.dateInterval(of: .month, for: d) else { continue }
+            periods.append((from: iv.start, to: iv.end))
+            let p = cal.dateComponents([.year, .month], from: d)
+            if let y = p.year, let m = p.month { keys.append(String(format: "%04d-%02d", y, m)) }
+        }
+        let down = try await engine.downtimeHours(machines: shop.machineRows, months: periods)
+        #expect(!down.isEmpty, "no machine out of action draws the empty state")
+        try render(DowntimeCard(shop: shop, rows: down, months: keys)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 540).padding(Metric.screen).background(Khayt.ground),
+                   "58-machine-downtime", size: CGSize(width: 580, height: 200))
+    }
+
+}
+
+/// The queue a storefront fills, and what the shelf makes of it.
+///
+/// ── WHY THIS ONE IS PLANTED ───────────────────────────────────────────────
+///
+/// The orders live in the cloud, so on a sample book this screen is always
+/// empty — and an empty state is not what needs looking at. Four readings go
+/// in, because those four are every branch the card can draw: an order the
+/// shelf answers in full, one it answers in part, one naming nothing this shop
+/// sells, and one of each mixed. A picture of one of them says nothing about
+/// the other three. (See `Sample data must span its cases`.)
+///
+/// Built out of the sample book's own catalogue and its own shelf counts, and
+/// read through the real shared rule — so the figures on screen are figures
+/// this book could really produce, rather than a fixture's.
+@Suite @MainActor struct OnlineOrdersSnapshot {
+
+    func shop() async -> Shop {
+        let shop = Shop()
+        await shop.load(.sample)
+        return shop
+    }
+
+    @Test("the incoming-orders sheet, with every reading it can show")
+    func theSheet() async throws {
+        let shop = await self.shop()
+        let engine = try #require(shop.engine)
+        let stocked = shop.shownProducts.compactMap { row in
+            shop.stockCount(of: row.id).map { (row.name, $0) }
+        }
+        let full = try #require(stocked.first { $0.1 >= 2 },
+                                "the sample book stocks nothing, so this draws an empty sheet")
+        let part = stocked.first { $0.0 != full.0 && $0.1 >= 1 }
+
+        var baskets: [(String, String, String, String)] = [
+            ("Salla order — SL-2291", "• \(full.0) × 2", "salla", "Nora Al-Otaibi"),
+            ("Shopify order — #1042", "• A lamp nobody here makes × 1", "shopify", "Reem S."),
+        ]
+        if let part {
+            baskets.insert(("Zid order — ZD-88", "• \(part.0) × \(part.1 + 3)", "zid", "Faisal H."),
+                           at: 1)
+            baskets.append(("Medusa order — #204",
+                            "• \(full.0) × 1\n• A keyring nobody here makes × 4",
+                            "medusa", "Turki A."))
+        }
+
+        let stock = Shop.stockCounts(shop.settingsDict)
+        var orders: [Shop.OnlineOrder] = []
+        for (index, basket) in baskets.enumerated() {
+            let payload = JSONValue.object([
+                "title": .string(basket.0), "description": .string(basket.1),
+                "source": .string(basket.2), "name": .string(basket.3),
+            ])
+            orders.append(Shop.OnlineOrder(
+                item: CloudIntake.Item(id: "planted-\(index)", payload: payload,
+                                       createdAt: Date()),
+                reading: try await engine.shelfSaleReading(
+                    payload: payload, products: shop.productRows, stock: stock)))
+        }
+        #expect(orders.contains { $0.allFromShelf }, "no card draws the finished-sale branch")
+        #expect(orders.contains { $0.unmatched > 0 }, "no card draws the unmatched branch")
+        #expect(orders.contains { $0.fromShelf > 0 && $0.toPrint > 0 },
+                "no card draws the part-shelf-part-print branch")
+        // A visitor's request from the quote form: its own card (notes,
+        // contact, link, what the form showed), Delete and Import as quote.
+        let request = JSONValue.object([
+            "title": .string("Quote request — bracket.stl"), "source": .string("quote-form"),
+            "name": .string("Sara A."), "contact": .string("sara@example.com"), "qty": .number(2),
+            "description": .string("Two of these in black PETG, please."),
+            "link": .string("https://example.com/models/bracket"),
+            "quote": .object(["price": .number(65.88), "currency": .string("SAR"), "qty": .number(2),
+                              "grams": .number(20), "hours": .number(1.5), "verified": .bool(true)]),
+            "file": .object(["name": .string("bracket.stl"), "bytes": .number(684),
+                             "sha256": .string(String(repeating: "a", count: 64)),
+                             "expiresAt": .string("2026-11-12T16:00:00.000Z")]),
+        ])
+        let requestItem = CloudIntake.Item(id: "planted-qf", payload: request, createdAt: Date())
+        orders.insert(Shop.OnlineOrder(item: requestItem,
+                                       reading: try await Shop.reading(requestItem, products: shop.productRows,
+                                                                       stock: stock, engine: engine)), at: 0)
+        shop.onlineOrders = orders
+        shop.onlineMade = ("QUO-2026-0007", "Nora")
+        shop.onlineNotice = shop.words.callIt("mac.qfe_imported_held")
+
+        let renderer = SnapshotTests()
+        try renderer.render(OnlineOrdersSheet(shop: shop),
+                            "29b-online-orders",
+                            size: CGSize(width: SheetMetrics.outerWidth(520), height: 1000))
+    }
+}

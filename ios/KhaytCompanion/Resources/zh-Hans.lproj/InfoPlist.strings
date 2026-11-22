@@ -1,0 +1,3 @@
+"NSCameraUsageDescription" = "Khayt 使用相机读取料盘标签和条形码、拍摄收据，以及为完成的打印件拍照。";
+"NFCReaderUsageDescription" = "Khayt 读取并写入耗材料盘上的 NFC 标签。";
+"NSLocalNetworkUsageDescription" = "Khayt 会连接同一 Wi‑Fi 下 Mac 或电脑上的 Khayt，以显示队列、库存和打印机状态。";

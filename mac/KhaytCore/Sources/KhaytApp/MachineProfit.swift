@@ -1,0 +1,476 @@
+import SwiftUI
+import KhaytCore
+
+/// What each machine earned, and what it cost to keep earning it.
+///
+/// ── THE QUESTION AN OWNER ASKS AFTER BUYING A MACHINE ────────────────────
+///
+/// "Was it worth it." The P&L page answers that for the SHOP; the unit the
+/// money was spent on is the machine, and until now nothing here answered for
+/// one. This shop has five, two of them bought recently and neither of them a
+/// filament printer, so the question is live.
+///
+/// Every figure is `lib/machine-pl.js`'s, with revenue from `order-money` and
+/// part cost from `calculator-cost` — the same two rules the rest of this app's
+/// money comes from, so a machine's share of a quarter cannot disagree with the
+/// quarter.
+struct MachineProfitPage: View {
+    let shop: Shop
+    let report: KhaytEngine.MachineProfitReport?
+    /// How far each machine runs from the time it was quoted at, and the shop's
+    /// own figure. Beside the money on purpose: "this printer earned 4,000" and
+    /// "this printer takes 20% longer than you quote" are the same sentence
+    /// read twice, and a shop deciding what to charge needs both at once.
+    ///
+    /// Drawn even when the P&L above it is empty — the periods are different.
+    /// The money is filtered to the chosen range; accuracy is every measured
+    /// print there has ever been, because a machine's calibration is not a
+    /// property of this quarter.
+    var accuracy: [KhaytEngine.MachineAccuracy] = []
+    var shopAccuracy: KhaytEngine.MachineAccuracy?
+    /// Electricity quoted against electricity a smart plug metered, per
+    /// machine (`lib/print-energy.js`). The ACTUALS side only: the P&L keeps
+    /// the shop's real electricity bill as an expense, and counting metered
+    /// power there too would charge it twice.
+    var power: [KhaytEngine.MachinePower] = []
+    /// What servicing each machine cost this year. Not filtered to the chosen
+    /// range either: the rule buckets by calendar year, and a year is the
+    /// period a shop budgets maintenance over.
+    var maintenance: [KhaytEngine.MaintenanceCostRow] = []
+    /// How long each machine stood idle, over the last three months. Beside
+    /// what servicing cost, because a repair costs money AND time and the
+    /// second is usually the larger number.
+    var downtime: [KhaytEngine.DowntimeRow] = []
+    var downtimeMonths: [String] = []
+    /// The shop's P&L by site, when it has sites. Under the machines, because
+    /// a site is where machines stand.
+    var sites: KhaytEngine.LocationPl?
+
+    var body: some View {
+        let words = shop.words
+        if let report, !report.rows.isEmpty {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    rows(report)
+                    if let sites {
+                        LocationPlCard(shop: shop, report: sites)
+                            .card(padding: 14)
+                            .padding(Metric.screen)
+                    }
+                    Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
+                    PowerActuals(shop: shop, rows: power)
+                    // Under the money and the calibration, because it is the
+                    // follow-up to both: the P&L already took maintenance off
+                    // each machine's profit, and this says how much of it
+                    // there was.
+                    MaintenanceCostCard(shop: shop, rows: maintenance,
+                                        year: Self.thisYear())
+                        .card(padding: 14)
+                        .padding(Metric.screen)
+                    DowntimeCard(shop: shop, rows: downtime, months: downtimeMonths)
+                        .card(padding: 14)
+                        .padding(Metric.screen)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else if !accuracy.isEmpty || !power.isEmpty {
+            // The money is empty and the calibration is not, which happens
+            // whenever a shop looks at a quiet month. Showing the empty state
+            // over figures this screen HAS would be hiding them.
+            ScrollView {
+                Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
+                PowerActuals(shop: shop, rows: power)
+                MaintenanceCostCard(shop: shop, rows: maintenance, year: Self.thisYear())
+                    .card(padding: 14)
+                    .padding(Metric.screen)
+                DowntimeCard(shop: shop, rows: downtime, months: downtimeMonths)
+                    .card(padding: 14)
+                    .padding(Metric.screen)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
+            // NOT "no data". A shop reaches this by having finished no work in
+            // the period it is looking at, which is a thing it can change by
+            // looking at another one.
+            EmptyHere(title: words.callIt("mac.mpl_empty"),
+                      message: words.callIt("mac.mpl_empty_why"), mark: .machines)
+                .frame(maxHeight: .infinity)
+        }
+    }
+
+    /// Nobody has told this shop's machines what they are meant to run.
+    ///
+    /// Only when NO machine has a target: with one set, a dash beside the
+    /// others explains itself. Empty rows are excluded because the page draws
+    /// its own empty state then and a note under nothing says nothing.
+    static func noTargetsAnywhere(_ report: KhaytEngine.MachineProfitReport) -> Bool {
+        !report.rows.isEmpty && report.rows.allSatisfy { $0.utilisationPct == nil }
+    }
+
+    /// The calendar year the maintenance figures cover.
+    ///
+    /// Read off an ISO day rather than from `DateComponents`, for the reason
+    /// `lib/maintenance-cost.js` gives about its own bucketing: a date parsed
+    /// as UTC and read back in the shop's timezone can answer with last year.
+    /// The shop's LOCAL day, not UTC's: in Riyadh the first three hours of
+    /// 1 January were still last year by `StoreWriter.iso`.
+    static func thisYear() -> Int {
+        Int(Shop.localDay().prefix(4)) ?? 0
+    }
+
+    /// The rows, OUTSIDE the `ScrollView` that holds them.
+    ///
+    /// Split out so the harness can photograph them: `ImageRenderer` draws
+    /// nothing inside a `ScrollView` and does not say so — the view comes back
+    /// fully transparent, which reads as a white page in anything that opens
+    /// the PNG. `Quoting.list` is split for the same reason.
+    @ViewBuilder func rows(_ report: KhaytEngine.MachineProfitReport) -> some View {
+        let words = shop.words
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(report.rows) { row in
+                Row(shop: shop, row: row)
+            }
+            // The rows, added up — and they ARE the rows: the rule returns both
+            // so a screen cannot show a sum that is not in the table above it.
+            HStack {
+                Text(words.callIt("mac.mpl_all_machines")).font(.callout.weight(.semibold))
+                Spacer()
+                Text(Money.text(report.totals.net, shop.currency))
+                    .font(.title3.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(report.totals.net >= 0 ? Khayt.done : Khayt.late)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(Khayt.recessed, in: RoundedRectangle(cornerRadius: 10))
+
+            // ── WHAT THIS FIGURE IS NOT ──────────────────────────────────
+            //
+            // These margins run high — ninety per cent on the sample — because
+            // what is taken off is what the JOB consumed: its filament, the
+            // expenses filed against it, and the machine's own servicing. The
+            // shop's labour, power, rent and everything else are in the P&L
+            // and deliberately not here, because they are not a machine's to
+            // carry and splitting them between five would be an invention.
+            //
+            // A shop that reads 90% as profit has been misled by a screen that
+            // was accurate. So the screen says so.
+            Text(words.callIt("mac.mpl_not_net"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 2)
+
+            // ── WHY THE UTILISATION COLUMN IS ALL DASHES ──────────────────
+            //
+            // Hours run against hours WANTED needs somebody to have said what
+            // was wanted, and `targetHoursPerDay` is unset on a machine until
+            // the shop fills it in. Every row then shows an em dash, correctly
+            // — and a column of dashes explains nothing, so a shop reads it as
+            // a figure the app failed to work out rather than one it was never
+            // given.
+            //
+            // The field's own hint says what it is for, but it lives on the
+            // machine sheet and the dashes are here. Said once, under the
+            // table, and only when NO machine has a target: with one set, the
+            // dashes beside it are self-explaining.
+            if Self.noTargetsAnywhere(report) {
+                Text(words.callIt("mac.mpl_no_target"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 2)
+            }
+        }
+        .padding(Metric.screen)
+    }
+
+    private struct Row: View {
+        let shop: Shop
+        let row: KhaytEngine.MachineProfit
+
+        var body: some View {
+            let words = shop.words
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    // The colour the shop gave this machine, which is how it is
+                    // recognised on every other screen.
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Swatch.rgb(fromHex: row.color).map {
+                            Color(red: $0.r, green: $0.g, blue: $0.b)
+                        } ?? Color.secondary)
+                        .frame(width: 4, height: 15)
+                    Text(row.name.isEmpty ? row.machineId : row.name)
+                        .font(.headline)
+                    Text(words.counting(row.jobs, "mac.jobs_word"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(Money.text(row.net, shop.currency))
+                        .font(.title3.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(row.net >= 0 ? Khayt.done : Khayt.late)
+                }
+                // What it earned, and the three things taken off it — laid out
+                // so the arithmetic can be followed rather than trusted.
+                HStack(alignment: .top, spacing: 20) {
+                    Figure(label: words.callIt("an.revenue"), amount: row.revenue,
+                           shop: shop, negative: false)
+                    Figure(label: words.callIt("an.mat_cost_col"), amount: row.materialCost,
+                           shop: shop, negative: true)
+                    Figure(label: words.callIt("an.linked_exp_col"), amount: row.linkedExpenses,
+                           shop: shop, negative: true)
+                    Figure(label: words.callIt("an.maint_cost_col"), amount: row.maintenance,
+                           shop: shop, negative: true)
+                    // What the machine lost in value over the range — its
+                    // wear, counted here and nowhere else. Only for a machine
+                    // whose price the shop has written down.
+                    if let lost = row.depreciation, lost > 0 {
+                        Figure(label: words.callIt("mac.pnl_depreciation"), amount: lost,
+                               shop: shop, negative: true)
+                    }
+                    // The hours logged on its jobs, at the operator's rate.
+                    // Only for a machine whose jobs carry any.
+                    if let labour = row.labour, labour > 0 {
+                        Figure(label: words.callIt("mac.pnl_col_labour"), amount: labour,
+                               shop: shop, negative: true)
+                    }
+                    Spacer()
+                    // ── AND HOW HARD IT WORKED FOR IT ─────────────────────
+                    //
+                    // Beside the money because the two together are the
+                    // reading: a printer that earned little in three hours and
+                    // one that earned little in three hundred are the same
+                    // figure on the left and completely different machines.
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(words.callIt("mac.mpl_hours")).font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(Money.quantity(row.hours, decimals: 1)
+                             + words.callIt("common.hours_short"))
+                            .font(.callout.monospacedDigit())
+                        // Only when some of it was estimated rather than
+                        // measured — a figure built from quotes should not
+                        // imply the machine was timed.
+                        if row.measured < row.jobs {
+                            Text(words.callIt("mac.mpl_estimated",
+                                              ["n": .number(Double(row.jobs - row.measured))]))
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(words.callIt("an.utilization_pct")).font(.caption)
+                            .foregroundStyle(.secondary)
+                        // NOT CAPPED. A machine running half as much again as
+                        // it is meant to is the finding — it is how a shop
+                        // learns which printer to buy a second of. An em dash
+                        // where no target is set, because zero reads as idle.
+                        Text(row.utilisationPct.map { Money.quantity($0, decimals: 0) + "%" } ?? "—")
+                            .font(.callout.monospacedDigit())
+                            .foregroundStyle(Self.utilisationTint(row.utilisationPct))
+                    }
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(words.callIt("an.margin")).font(.caption).foregroundStyle(.secondary)
+                        // AN EM DASH, NOT 0%. A machine that earned nothing has
+                        // no margin, and zero reads as "broke even".
+                        Text(row.marginPct.map { Money.quantity($0, decimals: 1) + "%" } ?? "—")
+                            .font(.callout.monospacedDigit())
+                            .foregroundStyle(tint(row.marginPct))
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card(padding: 14)
+        }
+
+        /// Over target is amber, not green: a printer past what the shop wanted
+        /// it to run is not a success to celebrate, it is a queue forming on one
+        /// machine. Well-used is green, and a quiet machine is stated plainly
+        /// rather than alarmed about — nobody needs a red number to notice a
+        /// printer that is not running.
+        static func utilisationTint(_ pct: Double?) -> Color {
+            guard let pct else { return .secondary }
+            if pct > 105 { return Khayt.attention }
+            if pct >= 60 { return Khayt.done }
+            return .primary
+        }
+
+        /// Green at a healthy margin, amber at a thin one, red below — the same
+        /// three bands Khayt's own table uses, so a shop reading both sees one
+        /// judgement rather than two.
+        private func tint(_ pct: Double?) -> Color {
+            guard let pct else { return .secondary }
+            if pct >= 30 { return Khayt.done }
+            if pct >= 10 { return Khayt.attention }
+            return Khayt.late
+        }
+    }
+
+    /// What the machines said about themselves.
+    ///
+    /// Split out of `rows` for the same reason that is: `ImageRenderer` draws
+    /// nothing inside a `ScrollView` and does not say so, so anything the
+    /// harness must photograph has to exist outside one.
+    struct Accuracy: View {
+        let shop: Shop
+        let rows: [KhaytEngine.MachineAccuracy]
+        let all: KhaytEngine.MachineAccuracy?
+
+        var body: some View {
+            let words = shop.words
+            if !rows.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(words.callIt("an.machine_accuracy"))
+                            .font(.callout.weight(.semibold))
+                        Spacer()
+                        if let all, let pct = all.hoursDeltaPct {
+                            // The shop's own figure, off the same readings as
+                            // the rows beneath it. The two used to be computed
+                            // separately and nothing made them agree.
+                            Text(signed(pct))
+                                .font(.callout.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(tint(pct))
+                            Text(words.counting(all.sampled, "mac.acc_prints"))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    ForEach(rows) { row in Line(shop: shop, row: row) }
+
+                    // ── WHAT IS NOT COUNTED, AND WHY THE PANEL CAN LOOK THIN ─
+                    //
+                    // Only prints a PRINTER timed. The completion dialog
+                    // pre-fills the estimate, so a typed actual is usually the
+                    // estimate confirmed — counting those would compare an
+                    // estimate to itself and report every machine as perfectly
+                    // calibrated. A shop seeing two prints here rather than
+                    // twenty is seeing the truth about its evidence.
+                    Text(words.callIt("mac.acc_measured_only"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 2)
+                }
+                .padding(Metric.screen)
+            }
+        }
+
+        /// Over is what costs a shop money. Under is worth knowing and is not a
+        /// fault, so it does not get a warning colour — a machine that finishes
+        /// early painted red teaches people to ignore the colour.
+        private func tint(_ pct: Double) -> Color {
+            if pct >= 25 { return Khayt.late }
+            if pct >= 10 { return Khayt.attention }
+            return Khayt.done
+        }
+
+        private func signed(_ pct: Double) -> String {
+            (pct >= 0 ? "+" : "−") + Money.quantity(abs(pct), decimals: 1) + "%"
+        }
+
+        private struct Line: View {
+            let shop: Shop
+            let row: KhaytEngine.MachineAccuracy
+
+            var body: some View {
+                let words = shop.words
+                let machine = shop.machines.first { $0.id == row.machineId }
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Swatch.rgb(fromHex: machine?.color).map {
+                            Color(red: $0.r, green: $0.g, blue: $0.b)
+                        } ?? Color.secondary)
+                        .frame(width: 4, height: 15)
+                    Text(machine?.name ?? row.machineId)
+                        .font(.callout.weight(.medium))
+                    Text(words.counting(row.sampled, "mac.acc_prints"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    // Quoted, then measured, then the gap — in that order,
+                    // because the gap is only readable if the two figures it
+                    // came from are on the same line.
+                    Text(hours(row.estHours)).font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "arrow.forward").font(.caption).foregroundStyle(.secondary)
+                    Text(hours(row.actHours)).font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Text(row.hoursDeltaPct.map(signed) ?? "—")
+                        .font(.callout.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(row.hoursDeltaPct.map(tint) ?? .secondary)
+                        .frame(minWidth: 56, alignment: .trailing)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .card(padding: 12)
+            }
+
+            private func hours(_ h: Double?) -> String {
+                guard let h else { return "—" }
+                return Money.quantity(h, decimals: 1) + shop.words.callIt("common.hours_short")
+            }
+
+            private func tint(_ pct: Double) -> Color {
+                if pct >= 25 { return Khayt.late }
+                if pct >= 10 { return Khayt.attention }
+                return Khayt.done
+            }
+
+            private func signed(_ pct: Double) -> String {
+                (pct >= 0 ? "+" : "−") + Money.quantity(abs(pct), decimals: 1) + "%"
+            }
+        }
+    }
+
+    /// What each machine's electricity was quoted at, against what its plug
+    /// metered, over the prints it metered. Drawn only when there are some.
+    struct PowerActuals: View {
+        let shop: Shop
+        let rows: [KhaytEngine.MachinePower]
+
+        var body: some View {
+            if !rows.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(shop.words.callIt("mac.acc_power_title"))
+                        .font(.callout.weight(.semibold))
+                    ForEach(rows) { row in
+                        let machine = shop.machines.first { $0.id == row.machineId }
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text(machine?.name ?? row.machineId).font(.callout.weight(.medium))
+                            Text(shop.words.counting(row.sampled, "mac.acc_prints"))
+                                .font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Text(Money.quantity(row.wh / 1000, decimals: 2) + " " + shop.words.callIt("mac.unit_kwh"))
+                                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                            Text(Money.text(row.estCost, shop.currency))
+                                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                            Image(systemName: "arrow.forward").font(.caption).foregroundStyle(.secondary)
+                            Text(Money.text(row.actCost, shop.currency))
+                                .font(.caption.monospacedDigit())
+                            Text(row.deltaPct.map { ($0 >= 0 ? "+" : "−") + Money.quantity(abs($0), decimals: 1) + "%" } ?? "—")
+                                .font(.callout.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(row.deltaPct.map { $0 >= 25 ? Khayt.late : ($0 >= 10 ? Khayt.attention : Khayt.done) } ?? .secondary)
+                                .frame(minWidth: 56, alignment: .trailing)
+                        }
+                        .card(padding: 12)
+                    }
+                    Text(shop.words.callIt("mac.acc_power_note"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 2)
+                }
+                .padding(Metric.screen)
+            }
+        }
+    }
+
+    private struct Figure: View {
+        let label: String
+        let amount: Double
+        let shop: Shop
+        let negative: Bool
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+                // The minus sign belongs to the figure, not to a separate
+                // label: `Money.text` of a negative already writes one, and a
+                // cost stored positive has to be SHOWN as what it takes away.
+                Text((negative && amount > 0 ? "−" : "") + Money.text(amount, shop.currency))
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(negative && amount > 0 ? Khayt.late : .primary)
+            }
+        }
+    }
+}

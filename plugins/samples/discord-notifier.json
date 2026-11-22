@@ -1,0 +1,50 @@
+{
+  "khayt": {
+    "manifest": 1
+  },
+  "id": "app.khayt.samples.discord",
+  "name": {
+    "en": "Discord alerts",
+    "ar": "تنبيهات Discord"
+  },
+  "description": {
+    "en": "Posts to a Discord channel when a job comes in or ships."
+  },
+  "publisher": "Khayt",
+  "version": "1.0.0",
+  "domains": [
+    "discord.com"
+  ],
+  "secrets": [
+    {
+      "name": "webhookPath",
+      "label": {
+        "en": "Webhook path (the part after /api/webhooks/)"
+      },
+      "kind": "url"
+    }
+  ],
+  "events": [
+    {
+      "event": "order_created",
+      "url": "https://discord.com/api/webhooks/{secret.webhookPath}",
+      "body": {
+        "format": "json-template",
+        "template": {
+          "content": "New job {order.number}: {order.title}"
+        }
+      }
+    },
+    {
+      "event": "order_shipped",
+      "url": "https://discord.com/api/webhooks/{secret.webhookPath}",
+      "body": {
+        "format": "json-template",
+        "template": {
+          "content": "Shipped {order.number} with {order.carrier} ({order.trackingNumber})"
+        }
+      }
+    }
+  ],
+  "signature": "Vd1Q81R/dqZDYlOscYdx9eDGTGI0z6xdI68dn2bnVXdkiXSrgahQ5fO3OPtSeFJFwpXAGYreUsNNe3abkBGAAw=="
+}

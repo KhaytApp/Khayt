@@ -1,0 +1,1058 @@
+import Foundation
+import CryptoKit
+import KhaytCore
+
+/// Adding a model to the shop's library.
+///
+/// The last piece: `Zip` opens the container, `Mesh` measures what is in it,
+/// `geometry-key` and `thumbnail-extract` turn that into the fields a record
+/// carries. This puts the file where Khayt puts it and writes the record Khayt
+/// would have written.
+///
+/// ── IT WRITES WHAT THE OTHER APP READS ────────────────────────────────────
+///
+/// The folder is `<root>/<PF-id>/`, the same `itemDirName` sanitising, and the
+/// record carries the same fields `renderer/printfiles.js` builds on import. A
+/// record made here opens in Khayt with its thumbnail, its colours and its
+/// identity — the `geometryKey` is proven byte-identical to Khayt's own in
+/// `Mesh3MFTests`, so a model added on the Mac is recognised as the same model
+/// by the app next to it.
+///
+/// ── IT MOVES THE FILE IN ───────────────────────────────────────────────────
+///
+/// The original is taken in, not duplicated: a shop importing what it has
+/// downloaded does not want two copies of thirty gigabytes, and the vault is
+/// meant to become the one place a model lives. Pass `keepOriginal` for a
+/// source that is not the shop's to consume.
+///
+/// The removal is the LAST thing that happens, after the bytes are at the
+/// destination, have been read back and compared, and the book holds a record
+/// pointing at them. Nothing above it deletes anything, so every refusal —
+/// a duplicate, an unreadable file, a book that will not take the write —
+/// returns with the original exactly as it was. That ordering is the whole
+/// safety argument, and `theOriginalSurvivesEveryFailure` is what holds it.
+@MainActor
+enum LibraryImport {
+
+    nonisolated static let fileKeys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey]
+
+    /// A regular file and not a symlink — read from the item itself (lstat),
+    /// so a link to a model is not taken for one.
+    nonisolated static func isRegularFile(_ url: URL) -> Bool {
+        guard let v = try? url.resourceValues(forKeys: Set(fileKeys)) else { return false }
+        return v.isRegularFile == true && v.isSymbolicLink != true
+    }
+
+    enum Failure: Error, CustomStringConvertible, Equatable {
+        case notOurs
+        case noLibrary
+        case unknownKind(String)
+        case alreadyHere(String)
+        case failed(String)
+
+        var description: String {
+            switch self {
+            case .notOurs: return "Another app has this book open."
+            case .noLibrary: return "This Mac has no print library folder."
+            case .unknownKind(let ext): return "Khayt does not read .\(ext) files."
+            case .alreadyHere(let name): return "\(name) is already in the library."
+            case .failed(let why): return "Could not add the file: \(why)"
+            }
+        }
+
+        /// The same, in the shop's language. A system reason after "could not
+        /// add" stays as the system wrote it.
+        @MainActor func said(_ words: Words) -> String {
+            switch self {
+            case .notOurs: words.callIt("mac.lib_err_not_ours")
+            case .noLibrary: words.callIt("mac.lib_err_no_library")
+            case .unknownKind(let ext): words.callIt("mac.lib_err_unknown_kind", ["ext": .string(ext)])
+            case .alreadyHere(let name): words.callIt("mac.lib_err_already_here", ["name": .string(name)])
+            case .failed(let why): words.callIt("mac.lib_err_failed", ["why": .string(why)])
+            }
+        }
+    }
+
+    /// What was added, for the sentence afterwards.
+    struct Added: Equatable, Sendable {
+        let id: String
+        let name: String
+        let triangleCount: Int?
+        let colours: Int
+        /// What the bytes hash to. Carried out so a batch can measure the next
+        /// file against this one without reading it a second time.
+        let contentHash: String?
+        /// True when the original was taken in rather than copied. False for
+        /// `keepOriginal`, and false when the removal did not work — a file on
+        /// a read-only volume is still imported, it just also stays put.
+        var movedIn: Bool
+        /// True when a photo found beside the file became its `userPhoto` —
+        /// see `ModelPhoto`.
+        var photo: Bool = false
+        /// True when the model was measured. A gcode has no mesh and is not a
+        /// failure — it simply has no geometry to key on.
+        var measured: Bool { triangleCount != nil }
+    }
+
+    /// What a print library holds. `zip` is deliberately absent: Khayt unpacks
+    /// an archive into several records and that is a decision with a dialog
+    /// attached, not a file copy.
+    ///
+    /// ── CATALOGUING IS NOT MEASURING ──────────────────────────────────────
+    ///
+    /// Half of these carry no mesh this app can read, and that is fine: a
+    /// `gcode` has been in this list since it was written and is a list of
+    /// moves, not a model. `Mesh.readGeometry` returns nil, the record has no
+    /// bounds, and every screen that needs bounds skips it — which is already
+    /// how the library treats a model it could not measure.
+    ///
+    /// What the shop gets is the file FILED: named, grouped, tagged,
+    /// searchable, and beside the job it belongs to. A STEP a client emailed
+    /// could not be put in the library at all, so it lived in Downloads and
+    /// the library was not the whole library.
+    ///
+    /// STEP first, because it is what engineering customers send. Reading one
+    /// properly means tessellating NURBS surfaces — a B-rep kernel, not a
+    /// parser — so this app does not pretend to have measured it.
+    nonisolated static let kinds: Set<String> = [
+        // Meshes it can read and measure.
+        "stl", "3mf", "obj",
+        // CAD a customer sends. Filed, not measured.
+        "step", "stp", "iges", "igs", "sldprt", "f3d", "ipt", "scad",
+        // Meshes other tools write, which a shop keeps beside the print.
+        "fbx", "ply", "amf",
+        // Machine files.
+        "gcode", "gco", "g", "bgcode", "ufp", "nc",
+        // Resin, which a resin shop's library is entirely made of.
+        "ctb", "cbddlp", "photon", "pwmx", "goo", "lys",
+    ]
+
+    /// A name for the file inside the record's folder.
+    ///
+    /// Derived from the file's own name, as `main.js` does it — unique by
+    /// construction rather than by timing, and readable when somebody opens the
+    /// vault in the Finder: `head.stl` beside `left-arm.stl` rather than two
+    /// base36 stamps. Arabic is kept; separators and control characters are not.
+    static func vaultFilename(in dir: URL, originalName: String, ext: String) -> String {
+        var stem = originalName
+        if let dot = stem.lastIndex(of: "."), dot != stem.startIndex {
+            stem = String(stem[stem.startIndex..<dot])
+        }
+        stem = String(String.UnicodeScalarView(stem.unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0) || $0 == "_" || $0 == " "
+                || $0 == "." || $0 == "-" || (0x0600...0x06FF).contains(Int($0.value))
+        }))
+        stem = stem.split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ")
+        stem = String(stem.prefix(60))
+            .trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+        let base = stem.isEmpty ? "model" : stem
+
+        var name = "\(base).\(ext)"
+        var n = 2
+        while FileManager.default.fileExists(atPath: dir.appending(path: name).path) {
+            name = "\(base)-\(n).\(ext)"
+            n += 1
+        }
+        return name
+    }
+
+    /// Run a file-reading step on a background thread and wait for it.
+    ///
+    /// On a dispatch queue (`PinWork`), not a detached task: hashing a
+    /// gigabyte, measuring and drawing a model are seconds of BLOCKING work,
+    /// and a detached task holds a thread of Swift's cooperative pool for all
+    /// of it — three threads on a CI runner, every other task waiting on them
+    /// (memory: swift-pool-starvation).
+    nonisolated static func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await PinWork.run(work)
+    }
+
+    /// SHA-256 of a file, read in pieces.
+    ///
+    /// `lib/model-identity.js` calls this the certain claim — "the bytes are
+    /// identical. Same file." — so it has to be over the whole file, and the
+    /// whole file is up to a gigabyte. Nothing is held.
+    nonisolated static func contentHash(of url: URL) throws -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        var digest = SHA256()
+        var any = false
+        while let chunk = try handle.read(upToCount: 4 << 20), !chunk.isEmpty {
+            digest.update(data: chunk)
+            any = true
+        }
+        // An empty file is not a model, and hashing it would give every empty
+        // file the same identity — which would then "already exist" for the
+        // next one. The shared module refuses it the same way.
+        guard any else { return nil }
+        return digest.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    // MARK: - Adding
+
+    static func add(_ source: URL, shop: Shop, keepOriginal: Bool = false) async throws -> Added {
+        guard let build = shop.source.build, StoreLock.weOwnIt(build) else { throw Failure.notOurs }
+        guard let roots = shop.libraryRoots else { throw Failure.noLibrary }
+        guard let engine = shop.engine else { throw Failure.failed("the engine is not loaded") }
+
+        let added = try await add(source,
+                                  storeURL: build.storeURL,
+                                  libraryRoot: URL(fileURLWithPath: roots.primary),
+                                  knownHashes: Set(shop.files.compactMap(\.contentHash)),
+                                  nameOfExisting: { hash in
+                                      shop.files.first { $0.contentHash == hash }?.title
+                                  },
+                                  engine: engine,
+                                  keepOriginal: keepOriginal,
+                                  analyseRisk: shop.analysesRiskAtImport,
+                                  owns: { StoreLock.weOwnIt(build) },
+                                  whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
+        await shop.load(shop.source)
+        return added
+    }
+
+    /// The import itself, addressed by path.
+    ///
+    /// NOT a convenience: it is the seam the test needs. Everything below —
+    /// moving a real file, measuring it, writing a real record into a real
+    /// store — runs against a throwaway directory in the tests, because an
+    /// import whose only trial run was on a shop's live library has not been
+    /// tested, it has been risked. `StoreWriter` splits itself the same way and
+    /// says the same thing.
+    static func add(_ source: URL, storeURL: URL, libraryRoot: URL,
+                    knownHashes: Set<String>,
+                    nameOfExisting: (String) -> String?,
+                    engine: KhaytEngine,
+                    keepOriginal: Bool = false,
+                    inPlace: Bool = false,
+                    group: String? = nil,
+                    documents: [URL] = [],
+                    title: String? = nil,
+                    tags: [String] = [],
+                    photos: [URL] = [],
+                    analyseRisk: Bool = false,
+                    online: Bool = false,
+                    owns: @escaping @Sendable () -> Bool,
+                    whoHasIt: @escaping @Sendable () -> String?) async throws -> Added {
+        let made = try await prepare(source, libraryRoot: libraryRoot, knownHashes: knownHashes,
+                                     nameOfExisting: nameOfExisting, engine: engine,
+                                     inPlace: inPlace, group: group, documents: documents, title: title,
+                                     tags: tags, photos: photos, analyseRisk: analyseRisk, online: online)
+        do {
+            // lock: callers — convertModel, convertModelPlates, convertBatch, addModelToLibrary, addModelsToLibrary, addMany, importModelBundle
+            try await write([made], storeURL: storeURL, owns: owns, whoHasIt: whoHasIt)
+        } catch {
+            // The book refused it, so the copy has no record to belong to.
+            try? FileManager.default.removeItem(at: made.dir)
+            throw Failure.failed(ErrorText.plain(error))
+        }
+
+        // THE LAST THING, AFTER EVERYTHING ELSE HAS SUCCEEDED.
+        //
+        // The original is removed here and nowhere else, and only once all
+        // three things are true: the bytes are at the destination, they have
+        // been read back and match, and the book has a record pointing at them.
+        // Every failure above returns with the source exactly as it was, which
+        // is why none of them needs a way to put it back.
+        //
+        // `keepOriginal` is for a source that is not the shop's to consume — a
+        // USB stick, a customer's share, a read-only volume. A failure to
+        // remove is NOT a failed import: the file is in the library and in the
+        // book, and the worst case is one duplicate left in a downloads folder,
+        // which is the recoverable half of the rule above.
+        var added = made.added
+        // To the TRASH, not deleted. The copy is verified and recorded by now,
+        // but the original may be in iCloud Drive or Dropbox, where deleting
+        // it deletes it on every device; the Trash is the Finder's own undo.
+        // A source the Trash will not take is simply left where it was.
+        // NEVER for a linked model: its file is the shop's, where it put it.
+        if !keepOriginal && !inPlace {
+            do { try FileManager.default.trashItem(at: source, resultingItemURL: nil); added.movedIn = true }
+            catch { added.movedIn = false }
+        }
+        return added
+    }
+
+    /// A model made ready to go into the book — its record, and its folder in
+    /// the vault — with nothing written to the book yet.
+    struct Prepared: Sendable {
+        let dir: URL
+        let record: [String: JSONValue]
+        var added: Added
+    }
+
+    /// Put prepared records into the book: ONE write for all of them, newest
+    /// first as the other app does (a shop that has just added something
+    /// looks for it at the top), and off the main actor. A 16 MB book takes
+    /// seconds to write, and a scan that wrote once per model held the window
+    /// for all of them (Oct 2026).
+    static func write(_ made: [Prepared], storeURL: URL,
+                      owns: @escaping @Sendable () -> Bool,
+                      whoHasIt: @escaping @Sendable () -> String?) async throws {
+        // lock: callers — add, flush, writeHeld, downloadFromMakerRun
+        guard !made.isEmpty else { return }
+        let records = made.reversed().map { JSONValue.object($0.record) }
+        try await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
+            var rows: [JSONValue] = []
+            if case .array(let existing)? = root["printFiles"] { rows = existing }
+            rows.insert(contentsOf: records, at: 0)
+            root["printFiles"] = .array(rows)
+        }
+        // The vault folder of a model indexed ONLINE is made only now that
+        // its record is in the book (`prepareOnline` leaves it). A batch is
+        // held for the whole of a drive kept online, so a quit, a crash or a
+        // force-quit before its write left one empty `PF-…` folder per model
+        // in the library — thousands, every launch the scan was cut short
+        // (review of #1860). A folder that is already there is left alone.
+        let dirs = made.map(\.dir)
+        await PinWork.run {
+            for dir in dirs { try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
+        }
+    }
+
+    /// Everything an import does short of writing the record: hashed,
+    /// refused if the library has it, copied in (or, linked, left in place),
+    /// measured and pictured. The caller writes the record — at once for a
+    /// single import, a batch at a time for a scan (`addMany`).
+    static func prepare(_ source: URL, libraryRoot: URL,
+                        knownHashes: Set<String>,
+                        nameOfExisting: (String) -> String?,
+                        engine: KhaytEngine,
+                        inPlace: Bool = false,
+                        group: String? = nil,
+                        documents: [URL] = [],
+                        title: String? = nil,
+                        tags: [String] = [],
+                        photos: [URL] = [],
+                        analyseRisk: Bool = false,
+                        online: Bool = false,
+                        id fixedId: String? = nil,
+                        archive: ArchiveRef? = nil) async throws -> Prepared {
+        // lock: callers — add, addMany, indexArchives, attachWebDownload, recordQuoteForm, downloadFromMakerRun
+        let ext = source.pathExtension.lowercased()
+        guard kinds.contains(ext) else { throw Failure.unknownKind(ext) }
+
+        // A member of a compressed file is read from its extracted copy, and
+        // named as the ARCHIVE names it — see `ArchiveFolder`.
+        let originalName = archive?.member.leaf ?? source.lastPathComponent
+        // The item ITSELF must be a plain file: a device (`/dev/zero`), a
+        // pipe or a directory wearing a model's name hashes for ever or not at
+        // all. The walkers already skip symlinks; this is the last door.
+        //
+        // Read with lstat, on the source as given. It used to be asked of
+        // `resolvingSymlinksInPath()` — so a symlink to any regular file, picked
+        // on its own, passed, and an import that MOVES then took a file from
+        // wherever the link pointed: outside every folder the shop chose.
+        // Oct 2026 review.
+        guard isRegularFile(source) else {
+            throw Failure.failed("\(originalName) is not a file")
+        }
+        // A LINKED file the cloud has not downloaded: named, sized and filed
+        // from what the drive lists, and never read — see `LinkedCloud`.
+        if inPlace && online {
+            return try await prepareOnline(source, libraryRoot: libraryRoot, group: group, title: title,
+                                           tags: tags, photos: photos, id: fixedId)
+        }
+
+        // THE SOURCE IS HASHED FIRST, and that is the whole shape of this.
+        //
+        // It used to copy, then hash the copy, then delete the copy again if the
+        // hash turned out to be one the library already had. That is a lot of
+        // disk for a question that can be answered before touching anything —
+        // and once the import MOVES rather than copies, "delete it again" stops
+        // being a tidy-up and starts being the shop's only copy.
+        //
+        // So: know the bytes, refuse duplicates while the file is still sitting
+        // untouched where its owner put it, and only then begin.
+        guard let hash = await PinWork.run({ try? LibraryImport.contentHash(of: source) }) ?? nil else {
+            throw Failure.failed("could not read \(originalName)")
+        }
+        if knownHashes.contains(hash) {
+            throw Failure.alreadyHere(nameOfExisting(hash) ?? originalName)
+        }
+
+        // `uid` supplies the dash itself, as every other caller relies on —
+        // `Shop.uid("SL")` is `SL-…`. Passing "PF-" and an empty prefix made
+        // `PF--mtppyk14XFK`, beside Khayt's own `PF-mtjwvj1w05A`. Nothing reads
+        // the shape, so it broke nothing; it just did not match the book it was
+        // writing into, and every folder in the vault wore the extra dash.
+        let id = fixedId ?? Shop.uid("PF")
+        let dir = libraryRoot.appending(path: LibraryLocation.itemDirName(id))
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch { throw Failure.failed(error.localizedDescription) }
+
+        // ── IN PLACE: LINKED, NOT COPIED ─────────────────────────────────
+        //
+        // A model in a folder the shop LINKED (a NAS, an external drive) is
+        // indexed where it sits: measured, read and pictured from there, and
+        // the record points at it. Nothing is copied and — below — nothing is
+        // ever removed; the vault folder holds only its picture.
+        let filename = inPlace ? originalName : vaultFilename(in: dir, originalName: originalName, ext: ext)
+        let destination = inPlace ? source : dir.appending(path: filename)
+        if !inPlace {
+            let copied: String? = await PinWork.run {
+                do { try FileManager.default.copyItem(at: source, to: destination); return nil }
+                catch { return error.localizedDescription }
+            }
+            if let copied {
+                try? FileManager.default.removeItem(at: dir)
+                throw Failure.failed(copied)
+            }
+
+            // COPY, READ BACK, COMPARE — never on the strength of the copy call
+            // returning. `lib/print-library-migrate.js` states the rule this
+            // follows: "a duplicate is recoverable, a deletion is not", and a short
+            // write to a share that dropped mid-transfer returns without throwing
+            // exactly like a good one does.
+            guard await PinWork.run({ try? LibraryImport.contentHash(of: destination) }) == hash else {
+                try? FileManager.default.removeItem(at: dir)
+                throw Failure.failed("\(originalName) did not arrive intact")
+            }
+        }
+
+        // THE GUIDES, beside the model. Best-effort and after the model is in
+        // place: an import must not fail because a PDF would not copy, and a
+        // model with no instructions is a model, while no model at all is
+        // nothing. A linked model's guides are already beside it.
+        for paper in documents where !inPlace {
+            let into = destination.deletingLastPathComponent()
+                .appending(path: paper.lastPathComponent)
+            guard !FileManager.default.fileExists(atPath: into.path) else { continue }
+            try? FileManager.default.copyItem(at: paper, to: into)
+        }
+
+        let a = await analyse(destination, ext: ext, dir: dir, engine: engine, analyseRisk: analyseRisk)
+        let size = a.size, said = a.provenance, geometry = a.geometry, riskAnalysis = a.riskAnalysis
+        let key = a.key, colours = a.colours, swapCount = a.swapCount, thumbFile = a.thumbFile
+
+        // The folder's name when the folder named it (a model alone in
+        // `King Abdulaziz/` is "King Abdulaziz", not "crown"); the file's name
+        // otherwise. The file's own name is kept either way, as originalName.
+        let name = title.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+            ?? originalName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
+        var record = self.record(id: id, name: name, originalName: originalName,
+                                 filename: filename, ext: ext, size: size,
+                                 hash: hash, key: key,
+                                 reader: a.reader, colours: colours,
+                                 swapCount: swapCount, thumbFile: thumbFile, group: group,
+                                 provenance: said, riskAnalysis: riskAnalysis,
+                                 parsed: a.parsed,
+                                 externalPath: archive?.path ?? (inPlace ? source.standardizedFileURL.path : nil))
+        if let archive { archive.stamp(&record) }
+        // The group the APP gave a linked model, so refiling it later can
+        // tell it from one the shop chose (`LinkedRegroup`) — and the name.
+        if inPlace {
+            record["autoGroup"] = .string(group ?? "")
+            record["autoName"] = .string(name)
+        }
+        if !tags.isEmpty { record["tags"] = .array(tags.map(JSONValue.string)) }
+        // THE PHOTO THAT CAME WITH IT, when there was one — see `ModelPhoto`.
+        // The record is new, so there is no photo of the shop's to keep; and a
+        // picture that will not decode is passed over, never a failed import.
+        // Read before the original goes to the Trash, though only the model is
+        // ever taken: the picture stays where it was.
+        let photo = await PinWork.run { firstPhoto(photos) }
+        if let photo { record["userPhoto"] = .string(photo) }
+        return Prepared(dir: dir, record: record,
+                        added: Added(id: id, name: name, triangleCount: geometry?.triangleCount,
+                                     colours: colours.count, contentHash: hash, movedIn: false,
+                                     photo: photo != nil))
+    }
+
+    /// Where a model inside a compressed file came from: the archive (its
+    /// path, standardised, and its hash) and the member as listed.
+    struct ArchiveRef: Sendable {
+        let path: String
+        let member: ArchiveFolder.Member
+        let hash: String?
+        var locked = false
+        /// The archive's size and modification time, as hashed.
+        var bytes: Int? = nil
+        var modified: Double? = nil
+
+        /// The fields that make a record a member (`LibraryFile.archiveMember`).
+        func stamp(_ record: inout [String: JSONValue]) {
+            record["archiveMember"] = .string(member.path)
+            record["archiveHash"] = hash.map(JSONValue.string) ?? .null
+            if locked { record["archiveLocked"] = .bool(true) }
+            if let bytes { record["archiveBytes"] = .number(Double(bytes)) }
+            if let modified { record["archiveModified"] = .number(modified) }
+        }
+    }
+
+    /// A LOCKED member: an encrypted file inside a compressed one, listed by
+    /// name and size and never opened — no hash, no measurement, no picture,
+    /// and no password asked for, ever.
+    static func prepareLocked(_ archive: ArchiveRef, libraryRoot: URL, group: String?,
+                              id fixedId: String? = nil) -> Prepared {
+        let originalName = archive.member.leaf
+        let ext = archive.member.ext
+        let id = fixedId ?? Shop.uid("PF")
+        let dir = libraryRoot.appending(path: LibraryLocation.itemDirName(id))
+        let name = originalName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
+        var record = self.record(id: id, name: name, originalName: originalName, filename: originalName,
+                                 ext: ext, size: archive.member.size ?? 0, hash: nil, key: nil,
+                                 colours: [], swapCount: 0, thumbFile: nil, group: group,
+                                 externalPath: archive.path)
+        record["autoGroup"] = .string(group ?? "")
+        record["autoName"] = .string(name)
+        var locked = archive
+        locked.locked = true
+        locked.stamp(&record)
+        return Prepared(dir: dir, record: record,
+                        added: Added(id: id, name: name, triangleCount: nil, colours: 0, contentHash: nil,
+                                     movedIn: false, photo: false))
+    }
+
+    /// A linked model that is online only, indexed without a byte of it read.
+    ///
+    /// What the record carries is what the drive LISTS: the name, the size,
+    /// the folder it is in. No hash, no measurements, no colours, no picture
+    /// drawn from its triangles — each of those is a read, and a read is a
+    /// download. `indexedOnline` says so, and is what `Shop.fillNowLocal`
+    /// looks for once the file is on this Mac (the shop opened it, or set it
+    /// to "available offline"); `fillDownloaded` then writes the rest, as it
+    /// does for a bucket model brought down. A photo only from a picture
+    /// that is itself here — the caller has already left the others out.
+    /// The record is made here and written by the caller (`prepare`).
+    static func prepareOnline(_ source: URL, libraryRoot: URL,
+                              group: String?, title: String?, tags: [String] = [], photos: [URL],
+                              id fixedId: String? = nil) async throws -> Prepared {
+        let originalName = source.lastPathComponent
+        let ext = source.pathExtension.lowercased()
+        let id = fixedId ?? Shop.uid("PF")
+        // The record's vault folder, as for any linked model: where its
+        // picture goes once it has one, and what "on this Mac" is read from.
+        // NOT made here: nothing goes into it until the file is on this Mac,
+        // and `write` makes it once the record is in the book — so a scan
+        // cut short before its batch was written leaves no empty folders.
+        let dir = libraryRoot.appending(path: LibraryLocation.itemDirName(id))
+        let name = title.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+            ?? originalName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
+        var record = self.record(id: id, name: name, originalName: originalName, filename: originalName,
+                                 ext: ext, size: LinkedCloud.listedSize(source), hash: nil, key: nil,
+                                 colours: [], swapCount: 0, thumbFile: nil, group: group,
+                                 externalPath: source.standardizedFileURL.path)
+        record["autoGroup"] = .string(group ?? "")
+        record["autoName"] = .string(name)
+        if !tags.isEmpty { record["tags"] = .array(tags.map(JSONValue.string)) }
+        record["indexedOnline"] = .string(StoreWriter.iso(Date()))
+        let photo = photos.isEmpty ? nil : await PinWork.run { firstPhoto(photos) }
+        if let photo { record["userPhoto"] = .string(photo) }
+        return Prepared(dir: dir, record: record,
+                        added: Added(id: id, name: name, triangleCount: nil, colours: 0, contentHash: nil,
+                                     movedIn: false, photo: photo != nil))
+    }
+
+    /// `size|name` — how a file the cloud has not downloaded is recognised
+    /// as one the library already holds, since its bytes cannot be hashed
+    /// without fetching them. Lowercased: a drive may change a name's case.
+    nonisolated static func nameSize(_ size: Int, _ name: String) -> String {
+        "\(size)|\(name.lowercased())"
+    }
+
+    /// The `nameSize` of every record that says both.
+    nonisolated static func nameSizes(of files: [LibraryFile]) -> Set<String> {
+        Set(files.compactMap { f in
+            guard let size = f.size, size > 0,
+                  let name = f.originalName ?? f.sourceFile?.originalName, !name.isEmpty else { return nil }
+            return nameSize(Int(size), name)
+        })
+    }
+
+    /// The first of these pictures that decodes, as a `userPhoto` data URI.
+    /// Blocking work: call it through `PinWork.run`, never on the main actor
+    /// and never inside a `Task.detached` (the cooperative pool).
+    nonisolated static func firstPhoto(_ candidates: [URL]) -> String? {
+        for url in candidates {
+            if let uri = try? LibraryPhoto.dataURI(of: url) { return uri }
+        }
+        return nil
+    }
+
+    /// What reading a model's bytes tells the record: its size, who made it,
+    /// its measurements and identity, its colours, its picture and the
+    /// slicer's own figures. Shared by an import and by a cloud-only model
+    /// brought down for the first time (`LibraryStorage`), so a file that came
+    /// in either way is described the same way.
+    struct Analysis {
+        var size: Int
+        var provenance: Mesh.Provenance?
+        var geometry: Mesh.Measurement?
+        var riskAnalysis: [String: JSONValue]?
+        var key: String?
+        var reader: Int?
+        var colours: [JSONValue]
+        var swapCount: Int
+        var thumbFile: String?
+        var parsed: [String: JSONValue]
+    }
+
+    static func analyse(_ destination: URL, ext: String, dir: URL, engine: KhaytEngine,
+                        analyseRisk: Bool) async -> Analysis {
+        let size = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size]
+                    as? Int) ?? 0
+
+        // ── WHO MADE IT, WHICH THE FILE HAS BEEN SAYING ALL ALONG ────────
+        //
+        // Read here, while the file is open and warm, and used below only
+        // where the shop has not already written something itself. `ModelLicence`
+        // answers whether a print may be SOLD, and until now it had no data
+        // on any book: a licence was recorded only when somebody opened a
+        // menu and chose one. Twenty-one of this shop's ninety models name a
+        // designer in the file, and three of those are non-commercial.
+        // ── OFF THE MAIN THREAD ───────────────────────────────────────────
+        //
+        // Everything below that reads the whole file. This type is
+        // @MainActor, so these ran on the main thread: a large 3MF took the
+        // window with it, and the shop saw a spinning ball over a frozen
+        // library ("I tried adding a file and it is stuck with a loading
+        // ball"). The book is still written on the main actor, afterwards.
+        let said = await offMain { Mesh.provenance(of: destination) }
+
+        let geometry: Mesh.Measurement? = await offMain {
+            switch ext {
+            case "3mf": return try? Mesh.measure3MF(destination)
+            case "stl": return try? Mesh.measureSTL(destination)
+            case "obj": return try? Mesh.measureOBJ(destination)
+            default: return nil          // gcode carries no mesh this reads
+            }
+        }
+
+        // THE OVERHANG WALK, when the shop has asked for it at import.
+        //
+        // A SECOND pass over the file, which cannot be folded into the first:
+        // the bed is the model's own lowest point, so no triangle can be judged
+        // against it until every triangle has been seen.
+        //
+        // Here rather than at the end because this is the moment the shop is
+        // already waiting and the file is already warm in the cache — and it is
+        // best-effort, because a mesh this cannot walk is still a model. An
+        // import must not fail over a warning.
+        var riskAnalysis: [String: JSONValue]?
+        if analyseRisk, geometry != nil {
+            riskAnalysis = await offMain { try? Mesh.overhangs(of: destination) }
+        }
+
+        var key: String?
+        if let g = geometry {
+            key = try? await engine.geometryKey(triangleCount: g.triangleCount,
+                                                volumeMm3: g.volumeMm3,
+                                                x: g.x, y: g.y, z: g.z)
+        }
+
+        var colours: [JSONValue] = []
+        var swapCount = 0
+        var thumbFile: String?
+        if ext == "3mf" {
+            let found = try? await readPreviewAndColours(destination, dir: dir, engine: engine)
+            colours = found?.colours ?? []
+            swapCount = found?.swapCount ?? 0
+            thumbFile = found?.thumbFile
+        }
+        // AN STL HAS NO PREVIEW, so one is drawn from its own triangles.
+        //
+        // Only a 3MF carries a picture its slicer made. Importing a downloads
+        // folder therefore filled this shop's library with 445 identical grey
+        // cubes — on the one screen whose whole job is showing what it has. The
+        // geometry was read a moment ago to measure it; drawing it costs one
+        // more pass over the same bytes.
+        //
+        // Best effort: a model that will not draw is still a model, and an
+        // import must not fail over a picture.
+        if thumbFile == nil, ext == "stl" || ext == "obj",
+           let drawn = await offMain({ try? MeshPreview.png(of: destination) }),
+           (try? drawn.write(to: dir.appending(path: "thumb.png"))) != nil {
+            // Drawn by today's projection: never redrawn (`Shop+ThumbnailRedraw`).
+            MeshPreview.markCurrent(dir.appending(path: "thumb.png"))
+            thumbFile = "thumb.png"
+        }
+        return Analysis(size: size, provenance: said, geometry: geometry, riskAnalysis: riskAnalysis,
+                        key: key, reader: try? await engine.geometryReader(), colours: colours,
+                        swapCount: swapCount, thumbFile: thumbFile,
+                        parsed: await SlicerFigures.read(destination, engine: engine) ?? [:])
+    }
+
+    // MARK: - Many at once
+
+    /// What a batch did, in the three numbers a shop wants afterwards.
+    struct Report: Equatable, Sendable {
+        var moved = 0
+        /// The ids of the models that came in, for backing them up.
+        var addedIds: [String] = []
+        /// Which sources came in, and which were duplicates — so a caller
+        /// keeping a ledger of what it has looked at knows each file's fate.
+        var addedURLs: [URL] = []
+        var duplicateURLs: [URL] = []
+        var duplicates = 0
+        /// How many of the models that came in brought a photo with them.
+        var photos = 0
+        var failures: [String] = []
+        /// The sources that went to the Trash once their copy was checked —
+        /// so the window can say so, rather than leave a shop to find out.
+        var trashed: [URL] = []
+        /// True when the caller asked it to stop and it did.
+        var stopped = false
+        /// Of `moved`, the linked files indexed online only — see `LinkedCloud`.
+        var online = 0
+        var total: Int { moved + duplicates + failures.count }
+    }
+
+    /// Import a list of files, carrying the library's identity forward as it goes.
+    ///
+    /// SHARED, because there are two callers and they must not drift: the File
+    /// menu, which shows a banner and a Stop button, and `--import`, which
+    /// prints lines and returns an exit code. Everything either of them needs to
+    /// decide is here; what is left outside is only how to SAY it.
+    ///
+    /// `known` grows with each success, so two copies of one model inside a
+    /// single selection do not both get in — the second is a duplicate of the
+    /// first, which is the answer a shop would give.
+    ///
+    /// One unreadable file does not end a run of three thousand. It is named in
+    /// `failures` and the batch carries on; a refusal leaves its original
+    /// exactly where it was, so nothing has to be undone to retry it.
+    /// A file to import, with the group its folder says it belongs to.
+    ///
+    /// A pair rather than two parallel arrays: the group has to survive the
+    /// sort, and a `[URL]` sorted beside a `[String?]` is one edit away from
+    /// filing every model under its neighbour's name.
+    struct Incoming: Sendable, Equatable {
+        let url: URL
+        /// Nil for ungrouped — see `ImportGrouping`.
+        let group: String?
+        /// The guides that came out of the same pack — assembly instructions,
+        /// a colour guide. Copied into the model's own folder.
+        ///
+        /// ── WHY A COPY PER MODEL AND NOT ONE SHARED ONE ───────────────────
+        ///
+        /// The vault is one folder per model, deliberately: a model's folder
+        /// holds everything about it, so a shop can move, export or hand one
+        /// model to somebody and nothing is left behind. A guide stored once
+        /// under the pack would break that, and there is no pack folder on
+        /// disk to store it in — there are only model folders.
+        ///
+        /// So a pack of forty models carrying a two-megabyte guide costs
+        /// eighty megabytes rather than two. That is the trade, stated rather
+        /// than discovered: the alternative is a guide reachable from one
+        /// arbitrary model of the forty, which is the same as not having it.
+        var documents: [URL] = []
+        /// What to call the model, when the folder it came in named it better
+        /// than its file does — see `ImportGrouping.placements`. Nil: the
+        /// file's name, as always.
+        var title: String? = nil
+        /// Pictures found beside it, best first — see `ModelPhoto`. The first
+        /// that decodes becomes the new record's `userPhoto`.
+        var photos: [URL] = []
+        /// Tags the new record starts with — a linked model's collection
+        /// (`PrintSort.Placement.collection`): where it came from.
+        var tags: [String] = []
+        /// Never to the Trash, whatever the import's `keepOriginal` says: a
+        /// scratch copy out of an archive, which is not the shop's file and
+        /// which its caller deletes. "Move originals" put every model of a
+        /// zip into ~/.Trash, one scratch copy at a time.
+        var keepOriginal = false
+
+        /// Files with no grouping — what `--import` of a bare list means, and
+        /// what most tests want. Spelled out at the call site so a caller that
+        /// SHOULD have carried a group cannot lose it to a quiet conversion.
+        static func ungrouped(_ urls: [URL]) -> [Incoming] {
+            urls.map { Incoming(url: $0, group: nil) }
+        }
+    }
+
+    /// When a scan writes the models it indexed IN PLACE: once this many are
+    /// held, or once this long has passed since the last write — never once
+    /// per model. A linked drive of ten thousand models wrote its 16 MB book
+    /// ten thousand times, two to three seconds each, on the main actor (Oct
+    /// 2026). A drive kept online is indexed from its listing in seconds, so
+    /// it is ONE write; models that have to be read and measured are written
+    /// a minute's worth at a time, so a crash loses little (what was not
+    /// written is found again by the next scan) and the book's chain is not
+    /// held for most of a long scan, which every other write would wait on.
+    static let writeBatch = 5000
+    static let writeEvery: TimeInterval = 60
+
+    static func addMany(_ files: [Incoming],
+                        storeURL: URL, libraryRoot: URL,
+                        knownHashes: Set<String>,
+                        nameOfExisting: @escaping (String) -> String?,
+                        engine: KhaytEngine,
+                        keepOriginal: Bool = false,
+                        inPlace: Bool = false,
+                        analyseRisk: Bool = false,
+                        knownNameSizes: Set<String> = [],
+                        isOnline: ((URL) -> Bool)? = nil,
+                        owns: @escaping @Sendable () -> Bool,
+                        whoHasIt: @escaping @Sendable () -> String?,
+                        shouldStop: (() -> Bool)? = nil,
+                        progress: ((Int, Int, URL) -> Void)? = nil) async -> Report {
+        // lock: callers — rescanLinkedFolders, adoptFromStorage, addModelsToLibrary, run
+        var report = Report()
+        var known = knownHashes
+        // Online-only files are recognised by name and size (`nameSize`);
+        // every file indexed here joins the set, so a placeholder of a model
+        // just indexed from a local copy is a duplicate too.
+        var knownNames = knownNameSizes
+        // Optional rather than defaulted to a closure: a `{ … }` in a
+        // parameter list reads as the body to `WritersAreGatedTests`.
+        let isOnline: (URL) -> Bool = isOnline ?? { _ in false }
+
+        // ── IN PLACE, A BATCH AT A TIME ────────────────────────────────────
+        //
+        // A model indexed in place (a linked folder, the library's own
+        // folder) is not moved, so nothing waits on its record being written:
+        // records are held and written `writeBatch` at a time, and whatever
+        // is held when the scan ends or is stopped is written then — what was
+        // indexed before a Stop stays. A copy (`!inPlace`) is still written
+        // one at a time, because its original goes to the Trash only after
+        // the book holds its record.
+        var held: [Held] = []
+        var ids = Set<String>()
+        var wroteAt = Date()
+
+        for (i, file) in files.enumerated() {
+            // Between files, never inside one: a file is indexed whole or not
+            // at all, and everything before the Stop stays indexed.
+            if shouldStop?() == true { report.stopped = true; break }
+            progress?(i, files.count, file.url)
+            // A file kept online is indexed without one suspension, so ten
+            // thousand of them in a row would hold the main actor for seconds:
+            // let the window draw between every few dozen.
+            if i % 50 == 49 { await Task.yield() }
+            // Only a LINKED file is ever left online: an import or a past
+            // location is copied, and a copy is a read.
+            let online = inPlace && isOnline(file.url)
+            let sig = nameSize(online ? LinkedCloud.listedSize(file.url)
+                                      : ((try? file.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0),
+                               file.url.lastPathComponent)
+            if online, knownNames.contains(sig) {
+                report.duplicates += 1
+                report.duplicateURLs.append(file.url)
+                continue
+            }
+            do {
+                // Never a picture the cloud would have to download.
+                let photos = inPlace ? file.photos.filter { !isOnline($0) } : file.photos
+                if inPlace {
+                    // Two models prepared in the same millisecond can draw the
+                    // same id (`Shop.uid`); one batch must not hold both.
+                    var id = Shop.uid("PF")
+                    while !ids.insert(id).inserted { id = Shop.uid("PF") }
+                    let made = try await prepare(file.url, libraryRoot: libraryRoot,
+                                                 knownHashes: known, nameOfExisting: nameOfExisting,
+                                                 engine: engine, inPlace: true,
+                                                 group: file.group, documents: file.documents,
+                                                 title: file.title, tags: file.tags, photos: photos,
+                                                 analyseRisk: analyseRisk, online: online, id: id)
+                    knownNames.insert(sig)
+                    if let hash = made.added.contentHash { known.insert(hash) }
+                    held.append((made, file.url, online))
+                    if held.count >= writeBatch || Date().timeIntervalSince(wroteAt) >= writeEvery {
+                        await flush(held, storeURL: storeURL, owns: owns, whoHasIt: whoHasIt, into: &report)
+                        held = []
+                        wroteAt = Date()
+                    }
+                    continue
+                }
+                let added = try await add(file.url, storeURL: storeURL, libraryRoot: libraryRoot,
+                                          knownHashes: known, nameOfExisting: nameOfExisting,
+                                          engine: engine, keepOriginal: keepOriginal || file.keepOriginal,
+                                          inPlace: false,
+                                          group: file.group, documents: file.documents,
+                                          title: file.title,
+                                          tags: file.tags,
+                                          photos: photos,
+                                          analyseRisk: analyseRisk,
+                                          online: false,
+                                          owns: owns, whoHasIt: whoHasIt)
+                knownNames.insert(sig)
+                report.moved += 1
+                report.addedIds.append(added.id)
+                report.addedURLs.append(file.url)
+                if added.photo { report.photos += 1 }
+                if added.movedIn { report.trashed.append(file.url) }
+                if let hash = added.contentHash { known.insert(hash) }
+            } catch Failure.alreadyHere {
+                report.duplicates += 1
+                report.duplicateURLs.append(file.url)
+            } catch {
+                report.failures.append("\(file.url.lastPathComponent): \(error)")
+            }
+        }
+        await flush(held, storeURL: storeURL, owns: owns, whoHasIt: whoHasIt, into: &report)
+        return report
+    }
+
+    /// A model `addMany` has prepared and is holding until its batch is written.
+    typealias Held = (made: Prepared, url: URL, online: Bool)
+
+    /// Write what `addMany` holds, in ONE write, and count it in — or, when the
+    /// book refuses, take its vault folders away again and name each file.
+    private static func flush(_ batch: [Held], storeURL: URL,
+                              owns: @escaping @Sendable () -> Bool,
+                              whoHasIt: @escaping @Sendable () -> String?,
+                              into report: inout Report) async {
+        // lock: callers — addMany
+        guard !batch.isEmpty else { return }
+        do {
+            try await write(batch.map(\.made), storeURL: storeURL, owns: owns, whoHasIt: whoHasIt)
+            for item in batch {
+                if item.online { report.online += 1 }
+                report.moved += 1
+                report.addedIds.append(item.made.added.id)
+                report.addedURLs.append(item.url)
+                if item.made.added.photo { report.photos += 1 }
+            }
+        } catch {
+            // The book refused them: their vault folders have no record to
+            // belong to. Each is named, and the next scan finds it again.
+            for item in batch {
+                try? FileManager.default.removeItem(at: item.made.dir)
+                report.failures.append("\(item.url.lastPathComponent): \(Failure.failed(ErrorText.plain(error)))")
+            }
+        }
+    }
+
+    /// The record itself.
+    ///
+    /// Separated from the copying so it can be checked without a book, a lock
+    /// and a library folder — the three things a full import needs and a test
+    /// should not have to build to find out whether a field is misspelled.
+    ///
+    /// The field names are `renderer/printfiles.js`'s, exactly: `colors` and not
+    /// `colours`, `thumbFile` and not `thumb`, `favorite` and not `favourite`. A
+    /// record with one of them wrong loads in both apps and shows a model with
+    /// no colours and no picture, which reads as a bad file rather than as a bad
+    /// record.
+    static func record(id: String, name: String, originalName: String,
+                       filename: String, ext: String, size: Int,
+                       hash: String?, key: String?, reader: Int? = nil,
+                       colours: [JSONValue],
+                       swapCount: Int, thumbFile: String?,
+                       group: String? = nil,
+                       provenance: Mesh.Provenance? = nil,
+                       riskAnalysis: [String: JSONValue]? = nil,
+                       parsed: [String: JSONValue] = [:],
+                       externalPath: String? = nil,
+                       now: Double = Date().timeIntervalSince1970 * 1000)
+        -> [String: JSONValue] {
+        var out: [String: JSONValue] = [
+            "id": .string(id),
+            "name": .string(name.isEmpty ? "Untitled" : name),
+            "originalName": .string(originalName),
+            // TWO DIFFERENT SHAPES, and that is what the book holds rather
+            // than an oversight to tidy: `createdAt` is epoch milliseconds and
+            // `updatedAt` is an ISO string, because the second one is written
+            // by the store's stamping and the first by whoever made the record.
+            // `LibraryFile.updatedAt` is a `String?`, so a number there decodes
+            // as nothing and the model shows no date at all.
+            "createdAt": .number(now),
+            "updatedAt": .string(iso(now)),
+            "sourceFile": .object([
+                "filename": .string(filename), "originalName": .string(originalName),
+                "size": .number(Double(size)), "ext": .string(ext),
+                // `model` or `gcode`, the same two words the other app writes.
+                "kind": .string(["stl", "3mf", "obj"].contains(ext) ? "model" : "gcode"),
+            ]),
+            "parsed": .object(parsed),
+            // Where a LINKED model's file is. Absent for a model in the vault.
+            "externalPath": externalPath.map(JSONValue.string) ?? .null,
+            "colors": .array(colours),
+            "swapCount": .number(Double(swapCount)),
+            "thumbFile": thumbFile.map(JSONValue.string) ?? .null,
+            "thumbSource": thumbFile == nil ? .null : .string("embedded"),
+            "userPhoto": .null,
+            "slicerProfileId": .null, "testedNotes": .string(""),
+            "tags": .array([]), "material": .string(""),
+            // WHAT THE FILE SAID, and nothing more. The designer goes in
+            // `source`, which is documented as "a URL, a designer, or my own
+            // design"; the licence only when `fromFile` could translate it,
+            // which it refuses to do for a platform's own terms. An empty
+            // string here is the same "nobody has said" every record written
+            // before this carried, so nothing is being claimed on their
+            // behalf.
+            "source": .string(provenance?.designer ?? ""),
+            "licence": .string(provenance.flatMap {
+                ModelLicence.fromFile($0.licence)?.id
+            } ?? ""),
+            // BOTH KEYS, and that is not belt and braces. `group` is the name
+            // the field has had since 3.7.0-beta.25 and `folder` is what it was
+            // called before; nothing was migrated, so a build older than that
+            // reads only `folder` and a record written with one of them is
+            // ungrouped in whichever app the shop opens next. `LibraryFile`
+            // reads both for the same reason.
+            "group": .string(group ?? ""), "folder": .string(group ?? ""),
+            "favorite": .bool(false),
+            "contentHash": hash.map(JSONValue.string) ?? .null,
+            "geometryKey": key.map(JSONValue.string) ?? .null,
+            // Which reader measured it. A record without this is read again
+            // the next time the book opens, which is what an import that
+            // could not even ask should get.
+            "geometryReader": reader.map { .number(Double($0)) } ?? .null,
+        ]
+        // Absent rather than null when the walk did not happen. A null here
+        // would be indistinguishable from a walk that found nothing, and the
+        // inspector has to be able to offer the button for the first and not
+        // for the second.
+        if let riskAnalysis, !riskAnalysis.isEmpty {
+            out["printRisk"] = .object([
+                "analysis": .object(riskAnalysis),
+                // The bytes it was measured from: a model replaced later keeps
+                // its id, and a summary of the old mesh must not read as current.
+                "contentHash": hash.map(JSONValue.string) ?? .null,
+                "at": .number(now),
+            ])
+        }
+        return out
+    }
+
+    /// Epoch milliseconds as the store writes a timestamp: ISO-8601 in UTC, to
+    /// the millisecond, exactly as `2026-09-05T15:34:26.189Z`.
+    static func iso(_ millis: Double) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter.string(from: Date(timeIntervalSince1970: millis / 1000))
+    }
+
+    /// The embedded preview and the filament colours, from a 3MF.
+    private static func readPreviewAndColours(_ file: URL, dir: URL, engine: KhaytEngine)
+        async throws -> (thumbFile: String?, colours: [JSONValue], swapCount: Int) {
+        let entries = try Zip.entries(of: file)
+        func text(_ name: String) -> String {
+            guard let entry = entries.first(where: { $0.name.lowercased() == name.lowercased() }),
+                  let data = try? Zip.data(of: entry, in: file) else { return "" }
+            return String(decoding: data, as: UTF8.self)
+        }
+
+        // THE BIGGEST PNG IS NOT THE PICTURE. What stood here took the largest
+        // `Metadata/*.png`, and on two of the ten files in one real library that
+        // is `top_1.png` or `top_3.png` — the slicer's top-down plan view, which
+        // is 111 KB against the plate render's 56 KB because a plan view of a
+        // flat object compresses badly. Those two models have been sitting in
+        // the library under a picture of themselves from directly above.
+        //
+        // `ThreeMF.preview` picks by name instead of by weight, and says why.
+        var thumbFile: String?
+        if let name = ThreeMF.preview(among: entries.map(\.name)),
+           let entry = entries.first(where: { $0.name == name }),
+           let png = try? Zip.data(of: entry, in: file) {
+            // `thumb.png`, not `thumb.jpg`. The record names the file, both apps
+            // read the name, and re-encoding a PNG the slicer already made into
+            // a JPEG would cost quality for a filename.
+            let named = "thumb.png"
+            try? png.write(to: dir.appending(path: named))
+            thumbFile = named
+        }
+
+        let found = (try? await engine.coloursFromConfigs(
+            sliceInfo: text("Metadata/slice_info.config"),
+            projectSettings: text("Metadata/project_settings.config"),
+            modelSettings: text("Metadata/model_settings.config"),
+            prusa: text("Metadata/Slic3r_PE.config").isEmpty
+                ? text("Metadata/Prusa_Slicer.config") : text("Metadata/Slic3r_PE.config")))
+        return (thumbFile, found?.colors ?? [], found?.swapCount ?? 0)
+    }
+}

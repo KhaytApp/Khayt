@@ -1,0 +1,35 @@
+{
+  "name": "@khayt/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Khayt's design language for the web — the Mac app's palette, type scale and card, as React components a design tool can render.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./src/styles.css"
+  },
+  "files": [
+    "dist",
+    "src/styles.css",
+    "src/tokens"
+  ],
+  "scripts": {
+    "tokens": "node ../.design-sync/extract-tokens.mjs",
+    "build": "npm run tokens && node build-css.mjs && tsc -p tsconfig.json --emitDeclarationOnly && esbuild src/index.ts --bundle --format=esm --external:react --external:react-dom --external:react/jsx-runtime --outfile=dist/index.js"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3"
+  }
+}

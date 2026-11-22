@@ -1,0 +1,159 @@
+/* Vivid — bold, colorful productivity tokens (Khayt direction C "Vivid").
+   Light by default; cool-violet window backdrop, white panels, indigo accent.
+   The signature mechanic is a PER-MODULE hue: the colored toolbar band and
+   screen accents recolor per active tab via --hue / --hue-2 (set by shell.js).
+   A dark variant follows via [data-theme="dark"]. Token names mirror the
+   contract the shared renderer expects (see workbench/cockpit tokens.css). */
+
+html[data-design="vivid"] {
+  /* ---- Surfaces (cool-violet wash → white panels) ---- */
+  --bg:        #f4f5fb;   /* window backdrop */
+  --bg-2:      #eef0f9;   /* sidebar wash */
+  --surface:   #ffffff;   /* primary panel */
+  --surface-1: #ffffff;
+  --surface-2: #f8f9fe;   /* subtle panel / hover */
+  --surface-3: #eef0f7;
+  --panel:     #ffffff;
+  --panel-2:   #f8f9fe;
+
+  /* ---- Ink ---- */
+  --ink:       #181a2b;
+  --ink-2:     #5b607a;
+  --ink-3:     #696e86;
+  --ink-4:     #a9aec4;
+
+  /* ---- Lines ---- */
+  --line:      #e7e9f3;
+  --line-2:    #eef0f7;
+  --line-soft: #eef0f7;
+  --hairline:  rgba(17,24,39,0.06);
+
+  /* ---- Accent (indigo) — HSL channels so applyAccent() can swap them ---- */
+  --accent-h: 244;
+  --accent-s: 84%;
+  --accent-l: 65%;
+  --accent:      hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  --accent-ink:  #ffffff;
+  --on-accent:   #ffffff;
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.14);
+  --accent-2:    #8b5cf6; /* gradient partner for the brand mark / bars */
+
+  /* ---- Per-module hue (recolored live by shell.js on tab change) ----
+     Defaults to the Dashboard (indigo) pair; every gradient band / chart
+     reads these so a single var swap recolors the whole module. */
+  --hue:    #6366f1;
+  --hue-2:  #8b5cf6;
+  --hue-ink:#ffffff;
+
+  /* ---- Per-module hue pairs (one per tab; consumed by shell.js) ---- */
+  --vivid-dashboard:   #6366f1;  --vivid-dashboard-2: #8b5cf6;  /* indigo  */
+  --vivid-queue:       #3b82f6;  --vivid-queue-2:     #06b6d4;  /* blue    */
+  --vivid-calculator:  #f59e0b;  --vivid-calculator-2:#ef4444;  /* amber   */
+  --vivid-fleet:       #0ea5a4;  --vivid-fleet-2:     #22c55e;  /* teal    */
+  --vivid-inventory:   #a855f7;  --vivid-inventory-2: #ec4899;  /* violet  */
+  --vivid-catalog:     #a855f7;  --vivid-catalog-2:   #6366f1;  /* violet  */
+  --vivid-waste:       #f97316;  --vivid-waste-2:     #ef4444;  /* orange  */
+  --vivid-clients:     #ec4899;  --vivid-clients-2:   #f43f5e;  /* pink    */
+  --vivid-gift:        #14b8a6;  --vivid-gift-2:      #22c55e;  /* teal-grn*/
+  --vivid-portfolio:   #8b5cf6;  --vivid-portfolio-2: #6366f1;  /* grape   */
+  --vivid-money:       #10b981;  --vivid-money-2:     #84cc16;  /* green   */
+  --vivid-analytics:   #06b6d4;  --vivid-analytics-2: #3b82f6;  /* cyan    */
+  --vivid-settings:    #6366f1;  --vivid-settings-2:  #8b5cf6;  /* indigo (was washed slate) */
+
+  /* ---- Status palette (text + soft fill pairs) ---- */
+  /* foregrounds darkened to clear WCAG AA (~4.5:1) on their soft -bg fills */
+  --vv-blue:#1565d8;   --vv-blue-bg:#e7f0ff;
+  --vv-green:#107a52;  --vv-green-bg:#e3f7ed;
+  --vv-red:#c92020;    --vv-red-bg:#fdeaea;
+  --vv-amber:#8a6000;  --vv-amber-bg:#fdf3da;
+  --vv-violet:#8a3dd1; --vv-violet-bg:#f3e9fd;
+  --vv-teal:#0d7878;   --vv-teal-bg:#def7f6;
+  --vv-pink:#c22a72;   --vv-pink-bg:#fde7f1;
+  --vv-cyan:#0b7286;   --vv-cyan-bg:#def6fb;
+
+  /* ---- Shadows ---- */
+  --shadow-1: 0 1px 2px rgba(17,24,39,.06), 0 2px 8px rgba(17,24,39,.05);
+  --shadow-2: 0 6px 24px rgba(17,24,39,.10), 0 1px 2px rgba(17,24,39,.05);
+  --shadow-pop: var(--shadow-2);
+
+  /* ---- Radii ---- */
+  --radius:    16px;
+  --radius-sm: 10px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+
+  /* ---- Fonts ---- */
+  --font-ui: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-ar: "IBM Plex Sans Arabic", var(--font-ui);
+  --font-sans: var(--font-ui);
+  --font-num: var(--font-mono);
+  --mono: var(--font-mono);
+
+  /* ---- Aliases used across shared renderer ---- */
+  --text: var(--ink);
+  --text-dim: var(--ink-2);
+  --text-muted: var(--ink-3);
+  --text-faint: var(--ink-4);
+  --border: var(--line);
+  --border-2: var(--line);
+  --border-soft: var(--line-2);
+  --primary: var(--accent);
+  --success: var(--vv-green);
+  --warning: var(--vv-amber);
+  --danger: var(--vv-red);
+  --ok: var(--vv-green);
+  --bg-elev: var(--surface-2);
+  --bg-card: var(--surface);
+
+  --nav-w: 236px;
+  --vv-statusbar-h: 30px;
+}
+
+html[data-design="vivid"][data-theme="dark"] {
+  --bg:        #0c0e1a;
+  --bg-2:      #0a0c16;
+  --surface:   #151829;
+  --surface-1: #151829;
+  --surface-2: #1b1f33;
+  --surface-3: #202440;
+  --panel:     #151829;
+  --panel-2:   #1b1f33;
+
+  --ink:       #eef0fb;
+  --ink-2:     #a4a9c8;
+  --ink-3:     #7b80a4;
+  --ink-4:     #565b7d;
+
+  --line:      #262a44;
+  --line-2:    #202440;
+  --line-soft: #202440;
+  --hairline:  rgba(255,255,255,0.06);
+
+  --accent-l: 70%;
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.24);
+
+  --vv-blue-bg:#16294d; --vv-green-bg:#143226; --vv-red-bg:#3a1c1a; --vv-amber-bg:#352b12;
+  --vv-violet-bg:#2a1f44; --vv-teal-bg:#0e3133; --vv-pink-bg:#3a1f2e; --vv-cyan-bg:#0d3340;
+  /* lighten foregrounds for AA on the dark soft fills */
+  --vv-blue:#5b9bff; --vv-green:#2fcb8c; --vv-red:#f56b6b; --vv-amber:#f0a92a;
+  --vv-violet:#bd8af9; --vv-teal:#1fc6c4; --vv-pink:#f56fad; --vv-cyan:#2fcae0;
+
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-2: 0 8px 26px rgba(0,0,0,.5);
+}
+
+html[data-design="vivid"],
+html[data-design="vivid"] body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+html[data-design="vivid"][dir="rtl"],
+html[data-design="vivid"][dir="rtl"] body {
+  font-family: var(--font-ar);
+}

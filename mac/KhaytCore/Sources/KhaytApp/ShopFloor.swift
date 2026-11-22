@@ -1,0 +1,2139 @@
+import SwiftUI
+import KhaytCore
+
+/// The machines.
+///
+/// A card each rather than a table: a shop has a handful of printers, not four
+/// hundred, and what you want from a machine — its bed, its nozzle, how many
+/// colours — does not line up into columns worth scanning.
+struct Machines: View {
+    let shop: Shop
+    @Environment(\.openWindow) private var openWindow
+
+    // `alignment: .top` AND `fills: true` on the card, and they are two halves
+    // of one thing. A `GridItem` with no alignment centres its cell in the row,
+    // so a short card floated in the middle of the gap — the Roland sat a
+    // hundred and eighty points below its neighbours and read as a card that
+    // had come loose. Top alignment moved it up; it was still short.
+    //
+    // These cards are not naturally the same height and cannot be made so: a
+    // laser cutter has no nozzle, no extruder and no colour count, so its card
+    // has three fewer lines in it and nothing should be invented to pad them
+    // out. What is wrong is not that one machine has less to say — it is that
+    // the BOX around it was drawn to fit. So the surface fills the row and the
+    // contents stay at the top, which is four boxes of one size holding four
+    // different amounts of information.
+    private let columns = [GridItem(.adaptive(minimum: 280, maximum: 420), spacing: 16, alignment: .top)]
+
+    /// Recomputed when the printers say something new, and once a minute
+    /// regardless — the now-line and every gap move with the clock, and a band
+    /// five minutes stale is wrong in the one place it must not be.
+    @State private var band: KhaytEngine.MachineBand?
+    /// Whether the shop can take another job, and when it would start. Here
+    /// rather than buried in the reports because that is a decision made at the
+    /// machines, usually with somebody on the phone.
+    @State private var load: KhaytEngine.Capacity?
+    /// Which machine scraps the most of what it prints. Here rather than in the
+    /// reports because it is a fact about a machine, and this is the screen a
+    /// shop is on when it is deciding what to do about one.
+    @State private var scrap: KhaytEngine.MachineReliability?
+    @State private var minute = 0
+    /// The tallest card on the floor, which every other one is drawn to. See
+    /// `CardHeight` — a `LazyVGrid` sizes each ROW on its own, so without this
+    /// five printers came out as two tidy rows of two different heights.
+    @State private var tallest: CGFloat = 0
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Above the cards, because it answers the question the shop
+                // came to this screen with. The cards answer "what is this
+                // machine", which is the second question and the rarer one.
+                if let band, !shop.machinesInUse.isEmpty {
+                    MachineBandView(shop: shop, band: band)
+                }
+                // ── AND WHAT TO PUT ON THE IDLE ONES ──────────────────────
+                //
+                // FIRST, above the band. The band says what is running; this
+                // says what should be. A shop standing here with a machine
+                // finishing is asking this question and nothing answered it.
+                if !shop.machinesInUse.isEmpty {
+                    NextUp(shop: shop)
+                }
+                // A shop that has just plugged a printer in does not know its
+                // address, and the number on the printer's own screen is the
+                // one thing nobody wants to copy by hand across the room.
+                HStack {
+                    Button {
+                        shop.findingPrinters = true
+                    } label: {
+                        Label(shop.words.callIt("mac.find_printers"),
+                              systemImage: "antenna.radiowaves.left.and.right")
+                    }
+                    // LOOKING IS NOT A WRITE. It was greyed out on any book this
+                    // app could not change, with nothing saying why, so it read
+                    // as broken. Scanning the network changes nothing; adding a
+                    // printer it finds does, and the sheet still refuses that —
+                    // with the reason, under the list.
+                    if let why = Shop.findPrintersCaveat(shop) {
+                        Text(why).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    // The same machines, drawn for a screen across the room.
+                    if !shop.machinesInUse.isEmpty {
+                        Button {
+                            openWindow(id: KioskWindow.id)
+                        } label: {
+                            Label(shop.words.callIt("mac.kiosk_open"), systemImage: "rectangle.grid.2x2")
+                        }
+                    }
+                }
+                // ── AND WHETHER THERE IS ROOM FOR ANOTHER ─────────────────
+                //
+                // The band says what is running now; this says what is queued
+                // behind it and when it clears. A shop asked "can you do this
+                // by Thursday" is asking exactly this, and the answer lived
+                // nowhere in this app.
+                if !shop.machinesInUse.isEmpty {
+                    CapacityCard(shop: shop, report: load)
+                        .card(rail: load?.totals.overbooked == true ? Khayt.late : nil,
+                              padding: 14)
+                    // Capacity says whether a machine is busy; this says
+                    // whether being busy is worth it. The pair is the case for
+                    // servicing one printer and selling another.
+                    MachineReliabilityCard(shop: shop, report: scrap)
+                        .card(rail: (scrap?.totals.scrapRate ?? 0) >= 0.05
+                                    ? Khayt.attention : nil,
+                              padding: 14)
+                }
+                // Retired printers are not on the floor: they are listed below,
+                // folded away, for their history and the two things a shop
+                // still does with one — return it to service, or (when nothing
+                // in the book names it) delete it.
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(shop.siteMachinesInUse) { machine in
+                        MachineCard(machine: machine, wear: shop.wear[machine.id], shop: shop)
+                            .atCardHeight(tallest)
+                    }
+                }
+                .equalCardHeights($tallest)
+                RetiredMachines(shop: shop, columns: columns)
+            }
+            .padding(Metric.screen)
+        }
+        .task(id: "\(shop.bandSignature)#\(minute)") {
+            band = await shop.machineBand()
+            load = await shop.capacity()
+            scrap = await shop.machineReliability()
+            // Same signature: the dispatcher's answer is a function of the
+            // queue and what the printers just said, so it goes stale at
+            // exactly the moment the band does.
+            await shop.planDispatch()
+        }
+        .task {
+            // Not a display timer: this drives an engine call, so it ticks at
+            // the resolution the band is drawn to and no faster.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                minute &+= 1
+            }
+        }
+        .background(Khayt.ground)
+        .overlay {
+            if shop.machines.isEmpty {
+                EmptyHere(title: shop.words.callIt("mac.no_machines"), message: shop.words.callIt("mac.no_machines_hint"), mark: .machines)
+            }
+        }
+        .screenToolbar {
+            ToolbarItem {
+                // Only where there is something to place. A button that always
+                // opens a panel saying "nothing to assign" is a button that
+                // teaches a shop to stop pressing it.
+                Button(shop.words.callIt("sched.suggest_btn"),
+                       systemImage: "wand.and.stars") {
+                    shop.forgetSchedule()
+                    shop.schedulingWork = true
+                }
+                .disabled(shop.schedulableRows.isEmpty || shop.workingMachines.isEmpty)
+            }
+            // Parts the coming maintenance needs, with the date to order by.
+            if shop.has("maintenance") {
+                ToolbarItem {
+                    Button(shop.words.callIt("mac.pb_title"), systemImage: "shippingbox") {
+                        Task { await shop.askForPartsList() }
+                    }
+                    .disabled(shop.maintTaskRows.isEmpty || shop.engine == nil)
+                    .help(shop.words.callIt("mac.pb_title"))
+                }
+            }
+            ToolbarItem {
+                Button(shop.words.callIt("mach.add"), systemImage: "plus") { shop.addingMachine = true }
+                    .disabled(!shop.canMoveJobs)
+            }
+        }
+    }
+}
+
+struct MachineCard: View {
+
+    /// The extruder in the shop's language. The printer facts store their
+    /// English label ("Direct Drive", `lib/printer-facts.js` EXTRUDER_KINDS),
+    /// which an Arabic shop was reading as is; a value Khayt does not know is
+    /// shown as typed.
+    static func extruderWord(_ value: String, _ words: Words) -> String {
+        switch value.lowercased() {
+        case "direct drive", "direct": return words.callIt("mac.extruder_direct")
+        case "bowden": return words.callIt("mac.extruder_bowden")
+        default: return value
+        }
+    }
+    /// The stills, refetched on their own timer — see `Camera`.
+    @Environment(Camera.self) private var camera
+    let machine: Machine
+    let wear: NozzleWear?
+    let shop: Shop
+    @State private var upkeep: KhaytEngine.MaintenanceCard?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            card
+            // ── A PRINTER THAT CHANGED ADDRESS ────────────────────────────
+            //
+            // Only for a machine that has actually gone quiet — the same three
+            // failed polls the badge above already calls offline. "Offline" is
+            // also what Khayt says when a printer is switched off, and the two
+            // have completely different fixes, so this offers the one that
+            // applies to a moved lease.
+            if shop.looksUnreachable(machine.id), machine.inService { relocateRow }
+        }
+        .contextMenu {
+                if shop.canMoveJobs {
+                    // "Edit Machine" for a laser or a CNC, as the sheet it opens says.
+                    Button(shop.words.callIt(MachineSheet.isPrinter(shop.kind(of: machine)?.kind ?? "fdm")
+                                             ? "mach.edit" : "mac.mach_edit_machine")) { shop.editingMachine = machine }
+                    // Only where there is a history to read. Klipper keeps one;
+                    // the other six protocols do not expose one Khayt can read,
+                    // and a menu item that always answers "not this printer" is
+                    // an item that teaches people to ignore the menu.
+                    //
+                    // This asked `notWatched == nil`, which is true for all
+                    // THREE protocols this app speaks — so it offered the item
+                    // for a Prusa and handed back a 404 from Moonraker's path.
+                    // The predicate now says what the comment always said.
+                    if PrinterWatch.keepsHistory(machine), !machine.isRetired {
+                        Button(shop.words.callIt("mac.read_history")) {
+                            Task { await shop.importPrinterHistory(machine) }
+                        }
+                        .disabled(shop.importingHistory != nil)
+                    }
+                    // Under service, retired, deleted: the owner's "how do I
+                    // delete a printer?" — see `Shop+MachineLife.swift`.
+                    Divider()
+                    MachineLifeItems(machine: machine, shop: shop) { kind in
+                        Task { await shop.ask(kind, about: machine) }
+                    }
+                }
+            }
+    }
+
+    /// Amber down the leading edge while this machine is laying down plastic.
+    ///
+    /// `Palette.swift` reserves that colour for exactly this — "the one thing
+    /// on any of these screens worth looking up at" — and the screen that
+    /// shows the printers was the one screen not using it.
+    ///
+    /// Only `printing`, not `paused`. A paused machine is not being made on,
+    /// and lighting it the same amber would make the colour mean "a job is
+    /// attached" rather than "it is running now".
+    private var running: Bool {
+        Live.isPrinting(shop.printers.readings[machine.id]?.status?.state ?? "")
+    }
+
+    /// What kind of machine this is. Nil only for the instant before the book
+    /// has loaded, and `shows` treats that as a filament printer — which every
+    /// machine in every book written before this existed genuinely is.
+    private var kind: KhaytEngine.MachineKind? { shop.kind(of: machine) }
+    private func shows(_ field: String) -> Bool { kind?.shows(field) ?? true }
+
+    /// The repair, offered only when this machine has gone quiet.
+    ///
+    /// Two shapes, because the rule draws a line the screen must not blur: a
+    /// MAC or a serial is identity — neither moves with a DHCP lease — and may
+    /// be applied on one confirmation. A model match is "strong, and still a
+    /// guess", so it is proposed and says so.
+    @ViewBuilder private var relocateRow: some View {
+        let move = shop.relocations.first { $0.machineId == machine.id }
+        VStack(alignment: .leading, spacing: 6) {
+            if let move {
+                Text(shop.words.callIt("mac.moved_here", ["host": .string(move.to)]))
+                    .font(.callout).foregroundStyle(.primary)
+                Text(move.why)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !move.isIdentity {
+                    Text(shop.words.callIt("mac.moved_maybe"))
+                        .font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button(shop.words.callIt("mac.moved_apply")) {
+                    Task { await shop.applyRelocation(move) }
+                }
+                .controlSize(.small)
+                .disabled(!shop.canMoveJobs)
+            } else {
+                // ── THREE STATES, BECAUSE THE SECOND ONE IS SLOW ──────
+                //
+                // Listening for an announcement answers in about a second.
+                // Asking a whole /24 takes up to twenty-five, and a button
+                // that has said "Looking…" for twenty of them reads as hung.
+                // So the slow half says what it is doing.
+                Button(shop.words.callIt(shop.sweeping ? "mac.moved_asking"
+                                         : shop.lookingForMoved ? "mac.moved_looking"
+                                                                : "mac.moved_find")) {
+                    Task { await shop.findMovedPrinters() }
+                }
+                .controlSize(.small)
+                .disabled(shop.lookingForMoved)
+            }
+
+            // ── AND WHAT HAPPENED ─────────────────────────────────────────
+            //
+            // Both of these were written in five places and read in none. A
+            // shop pressed "Find it on the network", waited — and got nothing
+            // at all unless the search happened to succeed: no "nothing
+            // answered", no "could not write that", not even "moved to .56".
+            // The feature either worked silently or failed silently, on the
+            // one screen somebody reaches for when something is already wrong.
+            //
+            // Worse since the sweep: the wait went from about a second to as
+            // much as twenty-five, and silence after twenty-five seconds reads
+            // as a broken button rather than as an answer.
+            if let problem = shop.relocateProblem {
+                Text(problem)
+                    .font(.caption).foregroundStyle(Khayt.late)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let note = shop.relocateNote {
+                // Not an alarm. "Nothing answered" is a real answer to a
+                // question the shop asked, and so is "moved to .56".
+                Text(note)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // ── THE CAMERA, FIRST ─────────────────────────────────────────
+            //
+            // Above the name rather than tucked under the details: a shop
+            // glancing at this screen is asking "is it still going and does the
+            // plate look right", and the answer is the picture. Only where
+            // there is one — a placeholder on every machine would make a screen
+            // mostly grey rectangles.
+            if machine.hasCamera, machine.inService {
+                CameraTile(frame: camera.frames[machine.id] ?? .none, webcam: machine.webcam,
+                           words: shop.words)
+            }
+            HStack(spacing: 8) {
+                // The colour the shop gave this machine, which is how it is
+                // recognised on every other screen in Khayt.
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(swatch)
+                    .frame(width: 4, height: 30)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(machine.name).font(.title3.weight(.semibold)).lineLimit(1)
+                        // The name is the handle: clicking it opens the printer,
+                        // the way clicking a job's name opens the job.
+                        .onTapGesture(count: 2) {
+                            if shop.canMoveJobs { shop.editingMachine = machine }
+                        }
+                    // NOT WHEN IT IS THE NAME AGAIN. Most shops call a printer
+                    // after its model, so "Snapmaker U1" sat under "Snapmaker
+                    // U1" on two cards out of three — a caption that says
+                    // nothing still costs a line and makes the row of cards
+                    // ragged. It earns its place on the third: "Bambu X1C" is
+                    // the shop's name for a Bambu Lab X1 Carbon.
+                    if !machine.model.isEmpty, !machine.model.caseInsensitiveEquals(machine.name) {
+                        Text(machine.model).font(.caption).foregroundStyle(.secondary)
+                    }
+                    // Which site it stands in, for a shop with more than one.
+                    // Nothing for a machine with none: most shops have one site.
+                    if let site = shop.locationName(machine.locationId) {
+                        Label(site, systemImage: "mappin.and.ellipse")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .labelStyle(.titleAndIcon).lineLimit(1)
+                    }
+                }
+            }
+            // Under service or retired, said in words with its reason and
+            // date — never colour alone.
+            MachineLifeBadge(machine: machine, words: shop.words)
+
+            // Only when there is something under it. A section header with
+            // nothing beneath it reads as a screen that failed to load.
+            if hasSpecs {
+            DetailSection(shop.words.callIt("mac.the_machine")) {
+                // ── THE BED, DRAWN ────────────────────────────────────────
+                //
+                // "270 × 270 × 270 mm" is a fact a shop compares against the
+                // next card by reading both and doing the arithmetic. Drawn
+                // against the biggest bed on the floor it is compared by
+                // looking, which is what somebody standing in front of the
+                // bench actually wants to know.
+                // In the shop's digits, isolated so "x × y × z" keeps its order
+                // inside an Arabic line.
+                if let bed = machine.bedSize(numeral: shop.words.numeral).map({ Figure.isolated($0) }),
+                   let x = machine.bed?.x, let y = machine.bed?.y {
+                    HStack(alignment: .center, spacing: 12) {
+                        BedPlan(x: x, y: y, widest: shop.widestBed, deepest: shop.deepestBed)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(shop.words.callIt("mac.bed"))
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text(verbatim: "\(bed) \(shop.words.callIt("mac.unit_mm"))").font(.callout.weight(.semibold)).monospacedDigit()
+                            // The dashed rectangle needs naming, or a small
+                            // square inside a big one reads as a rendering
+                            // fault rather than as a comparison.
+                            Text(shop.words.callIt("mac.bed_against",
+                                 ["w": .string("\(Int(saturating: shop.widestBed))"), "d": .string("\(Int(saturating: shop.deepestBed))")]))
+                                .font(.caption2).foregroundStyle(.tertiary)
+                                // It wrapped to one truncated line — "dashed:
+                                // the largest bed…" says nothing at all.
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.bottom, 2)
+                }
+                // ── ONLY WHAT THIS KIND OF MACHINE HAS ───────────────────
+                //
+                // A laser cutter has no nozzle, no extruder and no colour
+                // count, and this screen gave it all three: the field was on
+                // the record, so it was drawn. `lib/machine-kinds.js` says
+                // which specs belong to which kind, and this asks it.
+                if let d = machine.nozzleDiameter, shows("nozzleDiameter") {
+                    DetailLine(shop.words.callIt("mac.nozzle"), "\(Money.figure(d)) \(shop.words.callIt("mac.unit_mm"))")
+                }
+                if let n = machine.maxColors, shows("maxColors") {
+                    DetailLine(shop.words.callIt("mac.colours"), "\(n)")
+                }
+                if let e = machine.extruderType, shows("extruderType") {
+                    DetailLine(shop.words.callIt("mac.extruder"), Self.extruderWord(e, shop.words))
+                }
+                if let w = machine.powerDraw { DetailLine(shop.words.callIt("mac.power"), "\(Int(saturating: w)) \(shop.words.callIt("mac.unit_watts"))") }
+                if let address = machine.address {
+                    // The address, never the key. The store keeps that encrypted
+                    // and this screen has no business opening it to say where a
+                    // printer lives.
+                    DetailLine(shop.words.callIt("mac.address"), address, dim: true)
+                }
+            }
+            }
+
+            Live(machine: machine, shop: shop)
+
+            if let wear, let nozzle = machine.nozzle {
+                DetailSection(shop.words.callIt("mac.nozzle_wear")) {
+                    // ── THE RING IS THE FIGURE ────────────────────────────
+                    //
+                    // This was a `ProgressView`, and a stock capsule has one
+                    // flaw that matters here: it stops at full. A nozzle at 99%
+                    // and a nozzle at 140% drew the same bar, and only the word
+                    // beside it said which. `WearGauge` draws the overshoot
+                    // outside the ring.
+                    //
+                    // The figure is still `lib/nozzle-wear.js`'s — it weights
+                    // an abrasive kilo differently from a plain one, and this
+                    // shows its answer rather than grams over threshold.
+                    HStack(alignment: .center, spacing: 11) {
+                        WearGauge(pct: wear.pct)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: shop.words.numeral(Int(saturating: wear.wear)) + " / " + shop.words.numeral(Int(saturating: wear.threshold)) + " " + shop.words.callIt("common.grams"))
+                                .font(.callout).monospacedDigit()
+                            if wear.over {
+                                Text(shop.words.callIt("mac.nozzle_due"))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Khayt.attention)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    if let installed = nozzle.installedAt, let day = Order.day(installed) {
+                        DetailLine(shop.words.callIt("mac.installed"),
+                                   shop.words.say(day, Date.FormatStyle(date: .abbreviated, time: .omitted)), dim: true)
+                    }
+                    if let material = nozzle.material {
+                        DetailLine(shop.words.callIt("plib.material"), material, dim: true)
+                    }
+                    // WHERE THE FIGURE CAME FROM. The counter reads completed
+                    // orders unless the machine's own history has been read,
+                    // and the two answers can differ by a factor of six — this
+                    // printer has run 133 jobs and sold nineteen. A number
+                    // whose source is not stated is a number nobody can check.
+                    if machine.hasPrinterHistory {
+                        Text(shop.words.callIt("mac.wear_from_printer"))
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+
+            // ── WHAT IT IS WORTH ─────────────────────────────────────────
+            //
+            // Only for a machine whose price the shop has written down. The
+            // figures are `lib/depreciation.js`'s; see `MachineValueLines`.
+            if let value = shop.machineValue[machine.id] {
+                DetailSection(shop.words.callIt("mac.dep_value")) {
+                    MachineValueLines(shop: shop, value: value)
+                }
+            }
+
+            if let materials = machine.compatMaterials, !materials.isEmpty {
+                DetailSection(shop.words.callIt("mac.takes")) {
+                    Text(materials.joined(separator: " · "))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            // What this machine is due for. Drawn whenever maintenance is ON,
+            // not only when tasks exist: the shop has to be able to create the
+            // first one, and a section that appears only once something is in
+            // it is a section nobody can put anything into. The Mac could read
+            // a schedule and never write one, so a shop whose only app is this
+            // one had no schedule at all. `Shop.maintenance(for:)` returns an
+            // EMPTY card for that, never nil — nil is "maintenance is off".
+            //
+            // Kept quiet when empty: one small grey line and the button, so
+            // a printer with nothing scheduled is not shouting about it on
+            // the screen a shop looks at most.
+            // Not for a retired printer: nothing is ever due on one again
+            // (`lib/maintenance.js dueTasks` drops its tasks). What was done
+            // stays, below.
+            if let upkeep, !machine.isRetired {
+                DetailSection(shop.words.callIt("maint.recurring"),
+                              accent: Self.worst(upkeep.tasks)) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        if upkeep.tasks.isEmpty {
+                            Text(shop.words.callIt("maint.no_tasks"))
+                                .font(.caption).foregroundStyle(.tertiary)
+                        }
+                        ForEach(upkeep.tasks) { task in
+                            Upkeep(task: task, machine: machine, shop: shop)
+                        }
+                        HStack(spacing: 14) {
+                            AddMaintenanceTask(shop: shop, machine: machine)
+                            // A maker's schedule for this model, in one step.
+                            ApplyCarePlan(shop: shop, machine: machine)
+                            // What those tasks will need, across the floor.
+                            if upkeep.tasks.contains(where: { $0.careTaskId != nil }) {
+                                Button(shop.words.callIt("mac.pb_title")) {
+                                    Task { await shop.askForPartsList() }
+                                }
+                                .buttonStyle(.borderless).font(.caption)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── AND WHAT WAS ACTUALLY DONE ────────────────────────────────
+            //
+            // Behind the same gate as the schedule above, and shown even when
+            // the shop has set no recurring tasks: a machine can be serviced
+            // without anybody having scheduled it, and that service is still
+            // the thing every maintenance figure in the app is counted from.
+            // `upkeep` is non-nil only once the feature check has passed.
+            if upkeep != nil {
+                ServiceLog(shop: shop, machine: machine)
+            }
+        }
+        // Machine maintenance and downtime is a Professional feature; the
+        // other app hides the whole of it from a Simple shop. Not asked for
+        // rather than asked and hidden — the answer costs a walk of the book.
+        .task(id: upkeepInputs) {
+            upkeep = await shop.maintenance(for: machine)
+        }
+        .card(rail: running ? Khayt.hot : nil, padding: 14, fills: true)
+    }
+
+    private var upkeepInputs: String { shop.maintenanceSignature(for: machine) }
+
+    /// The most urgent status among the tasks, as a colour — or nil when
+    /// nothing is asking for attention, so an up-to-date machine is not tinted
+    /// for being fine.
+    static func worst(_ tasks: [KhaytEngine.MaintenanceCard.Task]) -> Color? {
+        if tasks.contains(where: { $0.status == "overdue" }) { return Khayt.late }
+        if tasks.contains(where: { $0.status == "due" }) { return Khayt.attention }
+        if tasks.contains(where: { $0.status == "warning" }) { return Khayt.note }
+        return nil
+    }
+
+    private var hasSpecs: Bool {
+        machine.bedSize != nil || machine.nozzleDiameter != nil || machine.maxColors != nil
+            || machine.extruderType != nil || machine.powerDraw != nil || machine.address != nil
+    }
+
+    private var swatch: Color {
+        guard var hex = machine.color?.trimmingCharacters(in: .whitespaces), !hex.isEmpty else {
+            return .secondary
+        }
+        if hex.hasPrefix("#") { hex.removeFirst() }
+        guard hex.count == 6, let v = Int(hex, radix: 16) else { return .secondary }
+        return Color(red: Double((v >> 16) & 0xFF) / 255,
+                     green: Double((v >> 8) & 0xFF) / 255,
+                     blue: Double(v & 0xFF) / 255)
+    }
+}
+
+/// One recurring maintenance task, on a machine card.
+///
+/// The status word and the remaining figure say different things and both
+/// earn their place: "due" is what to act on, and "60h ago" is what ranks
+/// three overdue printers against each other when there is time to service
+/// only one of them.
+struct Upkeep: View {
+    let task: KhaytEngine.MaintenanceCard.Task
+    let machine: Machine
+    let shop: Shop
+    @State private var working = false
+    @State private var editing = false
+    /// Delete was chosen and not yet answered. A task has no undo, and the
+    /// item sat one row under Edit in a menu opened to change the interval.
+    @State private var deleting: KhaytEngine.MaintenanceCard.Task?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(task.name.isEmpty ? shop.words.callIt("mac.unnamed") : task.name)
+                    .font(.callout)
+                    .foregroundStyle(task.name.isEmpty ? AnyShapeStyle(.secondary)
+                                                       : AnyShapeStyle(.primary))
+                    .lineLimit(1)
+                if let every {
+                    Text(verbatim: "\(shop.words.callIt("maint.every")) \(every)")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+            Spacer(minLength: 6)
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(shop.words.callIt("maint.status_" + task.status))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(colour)
+                if let left {
+                    Text(left).font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                }
+                if task.deferred == true {
+                    Text(shop.words.callIt("mac.mt_deferred"))
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+            Button(shop.words.callIt("maint.mark_done")) {
+                working = true
+                Task {
+                    await shop.markMaintenanceDone(task.id, on: machine)
+                    working = false
+                }
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
+            // A sample book is not the shop's to write to.
+            .disabled(working || !shop.canMoveJobs)
+            // ── INSPECTED, NOT NEEDED ─────────────────────────────────────
+            //
+            // The shop looked at the part and it is fine: push the task out
+            // without marking it done, so the history never claims a nozzle
+            // was changed that was not (`KhaytMaintenance.deferTask`). Only
+            // once the task is asking for attention.
+            if task.status != "ok" {
+                Button(shop.words.callIt("mac.mt_not_needed")) {
+                    working = true
+                    Task {
+                        await shop.deferMaintenanceTask(task.id, on: machine)
+                        working = false
+                    }
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .help(shop.words.callIt("mac.mt_not_needed_help"))
+                .disabled(working || !shop.canMoveJobs)
+            }
+            // Changing the interval and stopping the task altogether. Drawn
+            // in the tertiary colour rather than hidden until hover: a
+            // schedule is read far more often than it is edited, so this
+            // should recede — but a control that only appears on hover is one
+            // a shop has to already know is there, and this is the only way to
+            // reach either action.
+            Menu {
+                Button(shop.words.callIt("common.edit")) { editing = true }
+                Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                    deleting = task
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+            .disabled(!shop.canMoveJobs)
+            .accessibilityLabel(shop.words.callIt("common.edit"))
+            .shopSheet(isPresented: $editing) {
+                MaintenanceTaskSheet(shop: shop, machine: machine, existing: task)
+            }
+            .askFirst($deleting,
+                      title: { shop.words.callIt("mac.delete_product_q",
+                                                 ["name": .string($0.name.isEmpty
+                                                                  ? shop.words.callIt("mac.unnamed") : $0.name)]) },
+                      message: { _ in shop.words.callIt("mac.no_undo") },
+                      confirm: shop.words.callIt("common.delete"),
+                      cancel: shop.words.callIt("common.cancel")) { chosen in
+                Task { await shop.deleteMaintenanceTask(chosen.id) }
+            }
+        }
+    }
+
+    /// Amber and red mean the same here as everywhere else in Khayt, and an
+    /// up-to-date task is not coloured for being fine.
+    private var colour: Color {
+        switch task.status {
+        case "overdue": Khayt.late
+        case "due":     Khayt.attention
+        case "warning": Khayt.note
+        default:        .secondary
+        }
+    }
+
+    /// The interval, in whichever clock drives the task. Both when both do —
+    /// a task set to "every 100 hours or 30 days" is due on whichever comes
+    /// first, and showing one of them would misstate when that is.
+    private var every: String? {
+        var parts: [String] = []
+        if let h = task.intervalHours { parts.append(Self.amount(h, shop, "common.hours_short")) }
+        if let d = task.intervalDays { parts.append(Self.amount(d, shop, "common.days")) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// How long is left — negative once it is overdue, which is the figure
+    /// that ranks three late printers against each other.
+    ///
+    /// The sign is left on rather than turned into a word. There is no locale
+    /// key for "ago", and inventing one would mean nine translations to say
+    /// what a minus sign already says.
+    private var left: String? {
+        if let h = task.hoursRemaining { return Self.amount(h, shop, "common.hours_short") }
+        if let d = task.daysRemaining { return Self.amount(d, shop, "common.days") }
+        return nil
+    }
+
+    /// The figure in the shop's digits and ISOLATED. Formatted with the
+    /// Arabic locale, "-7" came back with a left-to-right mark in front of the
+    /// sign, and that mark turned the whole line left to right: "-7 س" read
+    /// unit-first. Isolated, the figure keeps its sign and the line runs the
+    /// way its word does.
+    static func amount(_ v: Double, _ shop: Shop, _ unit: String) -> String {
+        let n = Figure.isolated(Money.quantity(v.rounded(), decimals: 0))
+        return n + " " + shop.words.callIt(unit)
+    }
+}
+
+/// The filament on the shelf, drawn as a shelf.
+///
+/// ── WHY THIS IS NOT A TABLE ───────────────────────────────────────────────
+///
+/// It was one, and the shop's six spools came back as six rows of grey text
+/// over a twelve-pixel colour chip, followed by a dozen empty striped rows that
+/// made a stocked shelf look like a broken screen. A filament shelf is read by
+/// COLOUR first — it is how a spool is picked off a rack in a workshop — and
+/// colour was the one thing the table had almost none of.
+///
+/// So the colour is the row now: a spool seen face on, at the size a colour has
+/// to be before it can be told from its neighbour. Everything else a shop asks
+/// of this screen is arranged around it — what it is, how much is left, whether
+/// it is about to run out, and what a kilo of it costs.
+///
+/// The grid stops where the spools stop. A shelf with six spools on it shows
+/// six spools.
+struct Inventory: View {
+    @Bindable var shop: Shop
+    /// The card chosen — on the shop, so Go to… can choose one too.
+    private var selection: Spool.ID? {
+        get { shop.spoolSelection }
+        nonmutating set { shop.spoolSelection = newValue }
+    }
+    /// The spool chosen for Delete, held until the shop answers.
+    @State private var deletingSpool: Spool?
+    @State private var needs: [KhaytEngine.ConsumableNeed] = []
+    /// The tallest card on the shelf — see `CardHeight`. A spool carrying
+    /// "needs drying" and "empty in 14 days" is two lines taller than one that
+    /// is simply full, and nine of them came out as two rows of two heights.
+    @State private var tallest: CGFloat = 0
+    /// What the shelf costs, and whether that has moved. Here rather than in
+    /// the reports because it is a fact about the shelf, and this is the screen
+    /// a shop is on when it is deciding what to reorder.
+    @State private var prices: KhaytEngine.MaterialCost?
+    /// What each material has actually cost, from the supplier purchase log.
+    /// Empty for a shop that has logged none, which is most of them.
+    @State private var supplierPrices: [KhaytEngine.PriceGroup] = []
+
+    /// Top-aligned for the reason `MachineFloor` gives: an unaligned `GridItem` centres.
+    private let columns = [GridItem(.adaptive(minimum: 210, maximum: 280), spacing: 14, alignment: .top)]
+
+    private var shown: [Spool] {
+        let term = shop.search.trimmingCharacters(in: .whitespaces).lowercased()
+        // The site's, when the shop is looking at one (SiteFilter.swift).
+        guard !term.isEmpty else { return shop.siteSpools }
+        return shop.siteSpools.filter {
+            $0.material.lowercased().contains(term)
+                || ($0.colourVariant ?? "").lowercased().contains(term)
+        }
+    }
+
+    var body: some View {
+        Group {
+            // The empty states are about the WHOLE shelf, not the filament on
+            // it. Gating them on spools alone hid the consumables list entirely
+            // from a shop that keeps glue and bags but buys filament as it goes.
+            if shop.spools.isEmpty && shop.consumables.isEmpty {
+                EmptyHere(title: shop.words.callIt("mac.no_filament"), mark: .filament)
+            } else if shown.isEmpty && shop.consumables.isEmpty {
+                NothingMatched(shop: shop, mark: .filament)
+            } else {
+                ScrollView {
+                    // What is about to run out that is NOT filament. Above the
+                    // spools because it is the thing a shop cannot see by
+                    // looking at the rack, and only when nothing is being
+                    // searched for — the search box filters spools, so a full
+                    // consumables list beside three filtered cards describes a
+                    // different set from the one on screen.
+                    // ── WHAT IS LOW AND NOT ALREADY COMING ────────────────
+                    //
+                    // One line, above everything, and only when there is
+                    // something to do about it. The count is the RULE's — what
+                    // is low AND has no open order — rather than the low
+                    // badges, because offering to order something already on
+                    // its way is how a shelf ends up with four kilos of
+                    // a filament the shop uses twice a year.
+                    if shop.has("purchasing"), !shop.needsOrdering.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        ToOrderRow(shop: shop)
+                            .padding(.bottom, 14)
+                            .padding([.horizontal, .top], Metric.screen)
+                    }
+                    // The WHOLE shelf now, not only what is urgent on it —
+                    // see `ConsumablesCard`. Still only when nothing is being
+                    // searched for: the search box filters spools, so a full
+                    // consumables list beside three filtered cards describes a
+                    // different set from the one on screen.
+                    // ── AND WHEN THERE IS NOTHING ON IT YET ───────────
+                    //
+                    // Shown on an EMPTY shelf too, whenever the shop can edit
+                    // one. The way to add the first consumable is the button
+                    // in this card's header, so gating the card on the shelf
+                    // being non-empty put the only way in behind having
+                    // already been in — which is the very gap this screen was
+                    // built to close, rebuilt one level down. This shop's own
+                    // book holds nought consumables, so that is not a corner
+                    // case for them; it is every day.
+                    if !shop.consumables.isEmpty || shop.canMoveJobs,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        ConsumablesCard(needs: needs, shop: shop)
+                            .card(rail: shop.consumables.contains(where: \.isLow)
+                                  ? Khayt.attention : nil,
+                                  padding: 14)
+                            .padding(.bottom, 14)
+                            // In from the edges like the spool grid under it:
+                            // the cards above and below the grid ran from the
+                            // sidebar to the window edge (beta.19 review).
+                            .padding(.horizontal, Metric.screen)
+                            .padding(.top, Metric.screen)
+                    }
+                    // ── WHAT IT COSTS, ABOVE WHAT IS ON IT ────────────────
+                    //
+                    // The cards below say what the shop HAS. This says what it
+                    // is paying, and whether that has moved — which is the
+                    // question a shop has while looking at a shelf it is about
+                    // to reorder from. Only when nothing is being searched for:
+                    // a price summary of the whole shelf above three filtered
+                    // cards describes a different set from the one on screen.
+                    if !shop.spools.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        if let prices, prices.rows.isEmpty {
+                            // NOTHING TO PRICE is one line, not a card. An empty
+                            // card saying "No data yet" took the top of the
+                            // screen on a shop whose spools carried no full
+                            // weight, and gave no hint why.
+                            Label(shop.words.callIt("mac.mc_needs_full"), systemImage: "scalemass")
+                                .font(.callout).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                // Leading, like the cards under it: the column
+                                // centres its children, and a centred sentence
+                                // above a left-aligned shelf read as a banner.
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 14)
+                                .padding(.bottom, 14)
+                                .padding(.horizontal, Metric.screen)
+                        } else {
+                            MaterialCostCard(shop: shop, report: prices)
+                                .card(padding: 14)
+                                .padding(.bottom, 14)
+                                .padding(.horizontal, Metric.screen)
+                        }
+                    }
+                    // ── WHAT WAS PAID, UNDER WHAT IT COSTS ────────────────
+                    //
+                    // The card above reads the SHELF — what the spools on it
+                    // cost. This reads the LOG: what was actually paid, when,
+                    // and to whom, which is what a shop takes to a supplier
+                    // when it asks for a better rate. Only where there is a
+                    // log at all; a shop that has never recorded a purchase
+                    // has nothing to draw and should not be shown an empty
+                    // frame.
+                    if !supplierPrices.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        SupplierPricesCard(shop: shop, groups: supplierPrices)
+                            .card(padding: 14)
+                            .padding(.bottom, 14)
+                    }
+                    // ── WHAT IS COMING, BESIDE WHAT IS HERE ───────────────
+                    //
+                    // "Is more on the way?" is a question a shop has while
+                    // looking at a thin rack, not one it goes to another
+                    // screen to ask. Only when nothing is being searched for,
+                    // for the reason the two cards above give.
+                    if shop.has("purchasing"), !shop.openOrders.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        OnOrderCard(shop: shop)
+                            .card(padding: 14)
+                            .padding(.bottom, 14)
+                    }
+                    // WHOSE BILL IS SITTING HERE. Below what is still coming,
+                    // because the goods arriving is the earlier question — and
+                    // only when there is one, since most shops most days have
+                    // none and a card saying so is furniture.
+                    if shop.has("purchasing"), !shop.billsToSettle.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        BillsCard(shop: shop)
+                            .card(padding: 14)
+                            .padding(.bottom, 14)
+                    }
+                    // Orders asking for about a thousand times what they
+                    // should. Report only, and above the shelf because it is
+                    // about money already spent rather than filament on it.
+                    if shop.has("purchasing"), !shop.suspectOrders.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        SuspectOrdersCard(shop: shop)
+                            .card(rail: Khayt.attention, padding: 14)
+                            .padding(.bottom, 14)
+                    }
+                    LazyVGrid(columns: columns, spacing: 14) {
+                        ForEach(shown) { spool in
+                            SpoolCard(spool: spool, shop: shop,
+                                      low: shop.lowSpools.contains(spool.id),
+                                      runway: shop.spoolRunway[spool.id],
+                                      dryness: shop.spoolDryness[spool.id],
+                                      selected: selection == spool.id)
+                                .atCardHeight(tallest)
+                                .onTapGesture { selection = spool.id }
+                                .onTapGesture(count: 2) {
+                                    if shop.canMoveJobs { shop.editingSpool = spool }
+                                }
+                                .contextMenu {
+                                    // Labelling is not a write, so it does not
+                                    // wait on `canMoveJobs` the way editing
+                                    // does — a read-only book can still print
+                                    // a sheet for the rack it is describing.
+                                    Button(shop.words.callIt("mac.print_labels")) {
+                                        Task { await shop.askForShelfLabels([spool.id]) }
+                                    }
+                                    // WHERE IT WENT. A read like labelling, so
+                                    // it does not wait on `canMoveJobs`: the
+                                    // whole point is to answer a shelf count
+                                    // that disagrees with the book, and a
+                                    // second machine looking at the same book
+                                    // is exactly when that is asked.
+                                    //
+                                    // Offered only when there is something to
+                                    // show. An empty sheet is a menu item that
+                                    // teaches a shop the feature does nothing.
+                                    if !(spool.usageHistory ?? []).isEmpty {
+                                        Button(shop.words.callIt("mac.spool_history")) {
+                                            shop.spoolHistoryFor = spool
+                                        }
+                                    }
+                                    // ANSWERING THE NAG WHERE IT APPEARS.
+                                    //
+                                    // The card above says `due` or `overdue`
+                                    // for this spool and there was no way to
+                                    // say it had been dried — an app asking
+                                    // for something it would not accept. A
+                                    // write, so it waits on `canMoveJobs`.
+                                    Button(shop.words.callIt("mac.mark_dried")) {
+                                        Task { shop.moveProblem = await shop.markDried(spool.id) }
+                                    }
+                                    .disabled(!shop.canMoveJobs)
+                                    // THE DESKTOP'S THREE SHELF FORMS: the
+                                    // drying log (a read too, so not gated on
+                                    // writing), a correction with its reason,
+                                    // and — for a shop with sites — a move.
+                                    Button(shop.words.callIt("inv.dry_log") + "\u{2026}") {
+                                        shop.dryingLogFor = spool
+                                    }
+                                    // And the desktop's fourth: the test prints
+                                    // run on this spool (a read too, like the
+                                    // drying log; adding one waits on writing).
+                                    Button(shop.words.callIt("inv.test_prints") + "\u{2026}") {
+                                        shop.testPrintLogFor = spool
+                                    }
+                                    Button(shop.words.callIt("inv.adjust_title") + "\u{2026}") {
+                                        shop.adjustingSpool = spool
+                                    }
+                                    .disabled(!shop.canMoveJobs)
+                                    if !shop.locations.isEmpty {
+                                        Button(shop.words.callIt("inv.transfer_title") + "\u{2026}") {
+                                            shop.transferringSpool = spool
+                                        }
+                                        .disabled(!shop.canMoveJobs)
+                                    }
+                                    Divider()
+                                    if shop.canMoveJobs, shop.has("purchasing") {
+                                        // ORDER MORE. Drafted, never sent: a
+                                        // purchase order is something a shop
+                                        // hands a supplier, and an app that
+                                        // sent one because somebody chose a
+                                        // menu item would have done something
+                                        // on their behalf they cannot take
+                                        // back. It appears on the card above
+                                        // as a draft.
+                                        Button(shop.words.callIt("mac.draft_an_order")) {
+                                            Task {
+                                                shop.moveProblem = await shop.draftOrder(
+                                                    for: spool.id, consumable: false)
+                                            }
+                                        }
+                                        Button(shop.words.callIt("mac.edit_spool")) {
+                                            shop.editingSpool = spool
+                                        }
+                                        Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                                            deletingSpool = spool
+                                        }
+                                    }
+                                }
+                        }
+                    }
+                    .equalCardHeights($tallest)
+                    .padding(Metric.screen)
+                    // ── WHO THE SHOP BUYS FROM, UNDER WHAT IT BOUGHT ──────
+                    //
+                    // Below the rack, where the other app keeps it: a supplier
+                    // is a fact ABOUT the shelf — who to ring, how long they
+                    // take, what they quote — rather than a state of it, and
+                    // the cards above answer what the shelf is doing today.
+                    // Shown even when empty, because a card that appeared only
+                    // once there was a supplier would leave a shop no way to
+                    // write down its first.
+                    if shop.has("purchasing"),
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        SuppliersCard(shop: shop)
+                            .card(padding: 14)
+                            .padding(.bottom, 14)
+                            .padding(.horizontal, Metric.screen)
+                    }
+                }
+                .background(Khayt.ground)
+            }
+        }
+        // Recomputed when the shelf changes. A price is a fact about what was
+        // bought, so it moves only when a spool is added or edited.
+        .task(id: shop.spools.count) {
+            prices = await shop.materialCost()
+        }
+        // Re-read when the log changes rather than when the shelf does: a
+        // purchase logged against a supplier moves this and touches no spool.
+        .task(id: shop.supplierRows.count) {
+            supplierPrices = await shop.supplierPrices()
+        }
+        // The other shelf moves for a second reason: the usage rate is measured
+        // over a trailing window, so what is about to run out changes as jobs
+        // finish even when nobody has touched the stock.
+        .task(id: shop.consumableSignature) {
+            needs = await shop.consumableNeeds()
+        }
+        // Edit › Undo can bring a spool back, but the item sits under Edit in
+        // a context menu on a grid of near-identical cards — named before it
+        // goes, so a right-click on the neighbouring card is caught here.
+        .askFirst($deletingSpool,
+                  title: { shop.words.callIt("mac.delete_product_q", ["name": .string(AskName.spool($0))]) },
+                  message: { _ in shop.words.callIt("mac.undo_after") },
+                  confirm: shop.words.callIt("common.delete"),
+                  cancel: shop.words.callIt("common.cancel")) { spool in
+            Task { await shop.deleteSpool(spool.id) }
+        }
+        // THE SHOPPING LIST: what is at or under its reorder point, by
+        // supplier, to copy or print — the desktop's, from the same rule
+        // (`lib/reorder.js shoppingList`). A read, so not gated on writing.
+        .screenToolbar {
+            // ADD A SPOOL. Only the navy strip could (`ScreenActions`): in the
+            // default window nothing set `addingSpool`, so a shop on it could
+            // correct a spool but never put a new one on the shelf (Nov 10).
+            ToolbarItem {
+                Button {
+                    shop.addingSpool = true
+                } label: {
+                    Label(shop.words.callIt("mac.new_spool"), systemImage: "plus")
+                }
+                .disabled(!shop.canMoveJobs)
+                .help(shop.canMoveJobs ? shop.words.callIt("mac.new_spool") : shop.lockedReason)
+            }
+            ToolbarItem {
+                Button(shop.words.callIt("mac.spoolman_import") + "…", systemImage: "square.and.arrow.down") {
+                    shop.importingSpoolman = true
+                }
+                .disabled(!shop.canMoveJobs)
+                .help(shop.words.callIt("mac.spoolman_import"))
+            }
+            ToolbarItem {
+                Button(shop.words.callIt("shop.title"), systemImage: "cart") {
+                    Task { await shop.askForShoppingList() }
+                }
+                .disabled(shop.spools.isEmpty || shop.engine == nil)
+                .help(shop.words.callIt("shop.title"))
+            }
+        }
+    }
+}
+
+/// The one line that turns "these are low" into an order.
+///
+/// It says what it will do and how many, and then confirms — because a batch
+/// that drafts six orders is six things a shop has to look over afterwards, and
+/// a button that did it on one click would be doing paperwork on their behalf.
+///
+/// Drafts, like every other order this app raises. Sending is the shop's.
+private struct ToOrderRow: View {
+    @Bindable var shop: Shop
+    @State private var confirming = false
+    @State private var drafted: Int?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "shippingbox").foregroundStyle(Khayt.attention)
+            Text(shop.words.counting(shop.needsOrdering.count, "mac.to_order"))
+                .font(.callout)
+            Spacer(minLength: 8)
+            if let drafted {
+                Text(shop.words.callIt("po.batch_done", ["n": .number(Double(drafted))]))
+                    .font(.caption).foregroundStyle(Khayt.done)
+            }
+            Button(shop.words.callIt("mac.draft_them")) { confirming = true }
+                .disabled(!shop.canMoveJobs)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .card(rail: Khayt.attention, padding: 0)
+        .confirmationDialog(
+            shop.words.callIt("po.batch_confirm",
+                              ["n": .number(Double(shop.needsOrdering.count))]),
+            isPresented: $confirming, titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.draft_them")) {
+                Task { drafted = await shop.draftWhatIsLow() }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: {
+            // WHAT IT WILL ACTUALLY ORDER, before it is ordered. A count alone
+            // asks a shop to agree to six figures it has not seen.
+            Text(shop.needsOrdering.map(\.label).joined(separator: "\n"))
+        }
+    }
+}
+
+/// What is about to run out that is not filament.
+///
+/// Glue, IPA, bags, nozzles. A shop can see its filament by looking at the
+/// rack; it cannot see that it is two days off running out of mailing bags,
+/// and that stops production exactly the same way.
+///
+/// Every quantity is in the item's own unit. There is no grams figure here on
+/// purpose — naming one grams is how "4 boxes" becomes "4 g" on a supplier's
+/// order form.
+/// The other shelf, and what is running low on it.
+///
+/// ── IT USED TO BE THE SECOND HALF ONLY ────────────────────────────────────
+///
+/// This drew `consumableNeeds` — the rule's answer to "what is about to run
+/// out that is not filament" — and nothing else. That rule filters: `if (!low
+/// && daysLeft > leadDays) continue`. So the card showed the urgent items and
+/// there was no way to see the shelf, and no way to put anything on it: the
+/// record was written only by the other app's modal.
+///
+/// On the shop this was written for that came to an empty card, because the
+/// live book holds ZERO consumables — the Mac is the app they use, and the Mac
+/// could not add one. A screen that can only ever say nothing reads as
+/// "nothing is running out".
+///
+/// So the shelf is the list now, and the rule's answer is merged ONTO it by
+/// id: every consumable is a row, and a row the rule has an opinion about
+/// carries its days of cover and its suggested quantity. Nothing the rule said
+/// is lost, and the items it is silent about are no longer invisible.
+struct ConsumablesCard: View {
+    let needs: [KhaytEngine.ConsumableNeed]
+    let shop: Shop
+    /// The shelves, as `lib/consumable-categories.js` groups them, and which
+    /// one is chosen. Held rather than asked: the engine is an actor, and a
+    /// view cannot await it while drawing.
+    @State private var shelves: [KhaytEngine.ConsumableCategory] = []
+    @State private var chosen = ""
+    /// The rule's sentinel for "no category of its own". NUL-prefixed, so it
+    /// is never drawn — `cons.cat_none` is said in its place.
+    @State private var uncategorised = ""
+    /// The ids on the chosen shelf. Nil means all of them.
+    @State private var onShelf: [String]?
+
+    /// What the rule said, by id, so a row can carry it.
+    private var forecast: [String: KhaytEngine.ConsumableNeed] {
+        Dictionary(needs.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    /// Everything on the shelf, narrowed to the chosen category, low first.
+    ///
+    /// Low first rather than by days of cover: the rule already sorts its own
+    /// answer that way, and this list contains items it never spoke about.
+    /// Within each half, the shop's own order is kept.
+    private var rows: [Consumable] {
+        let all = shop.consumables
+        let narrowed = onShelf.map { ids in
+            let want = Set(ids)
+            return all.filter { want.contains($0.id) }
+        } ?? all
+        return narrowed.sorted { a, b in
+            a.isLow == b.isLow ? false : a.isLow
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(shop.words.callIt("cons.title")).font(.headline)
+                // How many of them are already out or below their minimum, as
+                // against merely forecast to be. The two are different jobs:
+                // one is a trip to the shop today. Counted over the WHOLE
+                // shelf, not the chosen category — a shop narrowing to
+                // Packaging still wants to know the IPA has run out.
+                let low = shop.consumables.filter(\.isLow).count
+                if low > 0 {
+                    Text(verbatim: shop.words.numeral(low) + " " + shop.words.callIt("cons.low"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Khayt.attention)
+                }
+                Spacer()
+                // Nothing to choose between until there are at least two
+                // shelves — the same threshold the other app uses.
+                if shelves.count > 1 { picker }
+                if shop.canMoveJobs {
+                    Button {
+                        shop.addingConsumable = true
+                    } label: {
+                        Image(systemName: "plus").font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.borderless)
+                    .help(shop.words.callIt("cons.add_title"))
+                    .accessibilityLabel(shop.words.callIt("cons.add_title"))
+                }
+            }
+            if shop.consumables.isEmpty {
+                // Nothing on the shelf at all — as against nothing in the
+                // chosen category. One line, because a shop that does not
+                // track consumables should not be nagged by a card; the way
+                // in is the button in the header above.
+                Text(shop.words.callIt("cons.empty"))
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if rows.isEmpty {
+                // Only reachable with a filter on, since the rule drops a
+                // selection whose shelf has been emptied — but say which, and
+                // offer the way out, rather than showing a blank.
+                HStack(spacing: 8) {
+                    Text(shop.words.callIt("cons.cat_empty"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button(shop.words.callIt("cons.cat_all")) { choose("") }
+                        .buttonStyle(.link).font(.caption)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 7) {
+                    ForEach(rows) { item in
+                        Row(item: item, need: forecast[item.id], shop: shop,
+                            showCategory: chosen.isEmpty)
+                    }
+                }
+            }
+        }
+        .task(id: shop.consumableSignature) { await reload() }
+    }
+
+    @ViewBuilder private var picker: some View {
+        Menu {
+            Button(shop.words.callIt("cons.cat_all")) { choose("") }
+            Divider()
+            ForEach(shelves) { shelf in
+                // NEVER the sentinel's own label — it is a NUL-prefixed string
+                // and renders as a replacement character.
+                // The shelf's name as the shop READS it; the choice is still
+                // the stored label, so the rule matches it as written.
+                Button("\(shelf.key == uncategorised ? shop.words.callIt("cons.cat_none") : shop.words.shelfWord(shelf.label)) (\(shelf.count))") {
+                    choose(shelf.key == uncategorised ? uncategorised : shelf.label)
+                }
+            }
+        } label: {
+            Text(chosenLabel).font(.caption)
+        }
+        .menuStyle(.borderlessButton).fixedSize()
+    }
+
+    private var chosenLabel: String {
+        if chosen.isEmpty { return shop.words.callIt("cons.cat_all") }
+        if chosen == uncategorised { return shop.words.callIt("cons.cat_none") }
+        return shop.words.shelfWord(chosen)
+    }
+
+    private func choose(_ selection: String) {
+        shop.consumableCategory = selection
+        Task { await reload() }
+    }
+
+    private func reload() async {
+        let answer = await shop.consumableShelves()
+        shelves = answer.categories
+        uncategorised = answer.uncategorised
+        // The RULE's selection, not the stored one: it returns '' when the
+        // chosen shelf has nothing on it any more, which is what stops a shop
+        // staring at an empty list under a heading that still names it.
+        chosen = answer.selected
+        shop.consumableCategory = answer.selected
+        onShelf = await shop.consumableIds(inCategory: answer.selected)
+    }
+
+    /// One consumable, with whatever the reorder rule had to say about it.
+    private struct Row: View {
+        let item: Consumable
+        let need: KhaytEngine.ConsumableNeed?
+        let shop: Shop
+        /// Only when the list is not already narrowed to it — the picker says
+        /// it otherwise.
+        let showCategory: Bool
+        /// Delete chosen, not yet answered.
+        @State private var deleting: Consumable?
+
+        private var unit: String { (item.unit ?? "").trimmingCharacters(in: .whitespaces) }
+
+        /// The shelf this item is on, WHEN that is a second fact.
+        ///
+        /// A shop that calls its packaging shelf "Packaging" and ticks the
+        /// packaging box gets two chips reading the same word — the category
+        /// and the badge are different facts (which shelf it is on; whether
+        /// one comes off per shipment) that happen to share a spelling, and on
+        /// the sample shop that is two of the six rows. One fact said twice in
+        /// two colours reads as a fault in the app, not as two facts.
+        ///
+        /// Folded the way `lib/consumable-categories.js` folds a category, so
+        /// "packaging" and "Packaging " collide with the badge too.
+        private var shelfChip: String? {
+            let said = (item.category ?? "").trimmingCharacters(in: .whitespaces)
+            guard !said.isEmpty else { return nil }
+            // Said in the shop's language — "Cleaning" under an Arabic name
+            // was an English chip on an Arabic shelf. The stored word is not
+            // changed; see `Words.shelfWord`.
+            let shown = shop.words.shelfWord(said)
+            guard item.isPackaging == true else { return shown }
+            let fold = { (v: String) in
+                v.lowercased().split(separator: " ", omittingEmptySubsequences: true)
+                    .joined(separator: " ")
+            }
+            // Compared as SHOWN as well as stored: in Arabic the badge reads
+            // تغليف and a shelf stored as "Packaging" is shown as تغليف too,
+            // so comparing only the stored word drew "تغليف" beside "Packaging".
+            let badge = fold(shop.words.callIt("cons.packaging_badge"))
+            return fold(said) == badge || fold(shown) == badge ? nil : shown
+        }
+
+        var body: some View {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 5) {
+                        Text(item.title(shop.words))
+                            .font(.callout).lineLimit(1)
+                        if showCategory, let category = shelfChip {
+                            Text(category)
+                                .font(.caption2)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(Khayt.recessed, in: Capsule())
+                                .foregroundStyle(.secondary)
+                        }
+                        if item.isPackaging == true {
+                            Text(shop.words.callIt("cons.packaging_badge"))
+                                .font(.caption2)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(Khayt.attention.opacity(0.16), in: Capsule())
+                                .foregroundStyle(Khayt.attention)
+                        }
+                    }
+                    Text(stockLine).font(.caption2).foregroundStyle(.tertiary)
+                }
+                Spacer(minLength: 6)
+                VStack(alignment: .trailing, spacing: 1) {
+                    if item.isLow {
+                        Text(shop.words.callIt("cons.low"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Khayt.attention)
+                    } else if let cover {
+                        Text(cover).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    }
+                    // What to buy, where the RULE was willing to commit to a
+                    // figure. It refuses when there is no rate and no minimum,
+                    // and an invented number there lands on a purchase order.
+                    if let need, need.suggestQty > 0 {
+                        Text(verbatim: "\(shop.words.callIt("reorder.suggest")) \(shop.words.amount(Self.qty(need.suggestQty), need.unit))")
+                            .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) {
+                if shop.canMoveJobs { shop.editingConsumable = item }
+            }
+            // The row that says a thing is running out is the row to order it
+            // from. A draft, like a spool's — and the quantity is the rule's
+            // own reorder figure, not the suggestion beside it, because that
+            // suggestion is a forecast and an order is a commitment.
+            .contextMenu {
+                if shop.canMoveJobs {
+                    Button(shop.words.callIt("cons.edit_title")) { shop.editingConsumable = item }
+                    if shop.has("purchasing"), need != nil {
+                        Button(shop.words.callIt("mac.draft_an_order")) {
+                            Task {
+                                shop.moveProblem = await shop.draftOrder(
+                                    for: item.id, consumable: true)
+                            }
+                        }
+                    }
+                    Divider()
+                    Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                        deleting = item
+                    }
+                }
+            }
+            .askFirst($deleting,
+                      title: { shop.words.callIt("mac.delete_product_q", ["name": .string($0.title(shop.words))]) },
+                      message: { _ in shop.words.callIt("mac.undo_after") },
+                      confirm: shop.words.callIt("common.delete"),
+                      cancel: shop.words.callIt("common.cancel")) { chosen in
+                Task { await shop.deleteConsumable(chosen.id) }
+            }
+        }
+
+        /// What is on hand, in the shop's own word for it.
+        private var stockLine: String {
+            // The figure and its unit as one isolated run, in the shop's word
+            // for the unit — never the stored "L" or "each" in an Arabic line.
+            "\(shop.words.callIt("reorder.in_stock")): \(shop.words.amount(Self.qty(item.onHand), unit))"
+        }
+
+        /// Days of cover, where the rule had a forecast at all. Nil means
+        /// nothing is consuming this — which is not the same as none left, and
+        /// must not be drawn as "0 days".
+        private var cover: String? {
+            guard let days = need?.daysLeft else { return nil }
+            return "\(Self.qty(days)) \(shop.words.callIt("common.days"))"
+        }
+
+        /// Whole units where they are whole. A shop counts bags and gloves, and
+        /// "6.0 each" reads like a measurement of something that is not.
+        static func qty(_ v: Double) -> String {
+            let whole = v.rounded()
+            return abs(v - whole) < 0.05
+                ? whole.formatted(.number.precision(.fractionLength(0)).locale(Money.digits))
+                : v.formatted(.number.precision(.fractionLength(1)).locale(Money.digits))
+        }
+    }
+}
+
+/// One spool, face on.
+struct SpoolCard: View {
+    let spool: Spool
+    let shop: Shop
+    let low: Bool
+    /// The shelf answered the pointer nowhere. A spool card opens its editor,
+    /// so it lifts and takes the pointing hand — the same answer the board's
+    /// job cards and the dashboard's machine tiles give.
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    /// How long this one has got, or nil when nothing has been printed from it
+    /// in the window — an unknown future, which the card says nothing about
+    /// rather than guessing at.
+    var runway: KhaytEngine.Runway?
+    /// Whether it has gone damp. Nil, and `unknown`, are the same silence: a
+    /// spool nobody has recorded drying is not a spool that is wet.
+    var dryness: KhaytEngine.Dryness?
+    var selected = false
+
+    /// Only for a spool with two months or less in it.
+    ///
+    /// A shelf that annotates every card annotates none of them: the line is
+    /// there to be noticed, and a roll with a year left is not news. Nil is
+    /// also the answer for a spool nothing has been printed from — see
+    /// `Shop.spoolRunway` — and for one already at nought, which the weight
+    /// above says better than a countdown to today would.
+    private var endsSoon: Double? {
+        guard let d = runway?.daysLeft, d <= 60 else { return nil }
+        return d
+    }
+
+    private var colour: Color? {
+        Swatch.rgb(fromHex: spool.color).map { Color(red: $0.r, green: $0.g, blue: $0.b) }
+    }
+
+    /// What this item is counted in. Nil for the instant before the book has
+    /// loaded, and `Quantity.say` reads that as grams — which every item
+    /// written before this existed genuinely is.
+    private var unit: KhaytEngine.InventoryUnit? { shop.unit(of: spool) }
+
+    /// OPEN JOBS HAVE PROMISED MORE THAN IS ON IT — the desktop's
+    /// "Over-committed" badge (`renderer/inventory.js`). Grams only: a part's
+    /// weight against a bottle counted in ml compares nothing.
+    static func overcommitted(weight: Double?, unit: String?, runway: KhaytEngine.Runway?) -> Bool {
+        guard (unit ?? "g") == "g", let committed = runway?.committedG, committed > 0 else { return false }
+        return committed > (weight ?? 0) + 0.5
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            face
+            VStack(spacing: 2) {
+                Text(spool.material.isEmpty ? "—" : spool.material)
+                    .font(.callout.weight(.medium)).lineLimit(1)
+                // The shop's own name for the colour, which is what it is
+                // called out loud. Absent for a spool nobody has named.
+                if let variant = spool.colourVariant, !variant.isEmpty {
+                    Text(variant).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            HStack(spacing: 6) {
+                // In the item's OWN unit. A bottle of resin said "500 g" and a
+                // stack of ply said "6 g", because the only unit this screen
+                // knew was the only unit anything could be recorded in.
+                Text(spool.weight.map { Quantity.say($0, unit, shop.words) } ?? "—")
+                    .font(.callout).monospacedDigit()
+                    // A JOB FINISHING TAKES GRAMS OFF THIS SPOOL, and that is
+                    // the most physical thing that happens in the whole app —
+                    // the shelf is the screen that says what the shop has. It
+                    // snapped from one figure to the next with nothing in
+                    // between, which is exactly what `Motion.swift` says a
+                    // figure arriving is for.
+                    .contentTransition(.numericText())
+                    .foregroundStyle(low ? Khayt.attention : .primary)
+                if low {
+                    // The word, not only a colour: a shop reading this at a
+                    // glance in a bright workshop should not have to know that
+                    // amber means anything.
+                    Chip(text: shop.words.callIt("cons.low"), tint: Khayt.attention)
+                }
+                if Self.overcommitted(weight: spool.weight, unit: unit?.unit, runway: runway) {
+                    Chip(text: shop.words.callIt("inv.overcommit_warn"), tint: Khayt.attention)
+                }
+            }
+            // Per kilo where it is KNOWN, the purchase price where it is not.
+            //
+            // A rate needs what the spool weighed when it arrived, and only
+            // spools bought since `spool-edit.js` started recording that have
+            // it. Dividing by what is left instead made the figure climb as the
+            // roll emptied, which is why the old one was deleted rather than
+            // fixed. An older spool shows what it cost — a fact — rather than a
+            // rate worked out from the wrong number.
+            // Per KILO for filament, per LITRE for resin, per SHEET for ply.
+            // This was the one place the gram assumption was load bearing
+            // rather than cosmetic: a 500 ml bottle at 180 came out as "360.00
+            // / kg", which is a figure about a different quantity wearing the
+            // wrong name.
+            //
+            // SECONDARY, not tertiary. Tertiary is for labels (see `Role.text3`)
+            // and a price is a figure a shop reads; on the dark card it sank to
+            // a texture, "75.00" barely there under the weight above it.
+            if let rate = unit?.rate {
+                Text(Money.text(rate, shop.currency) + " / "
+                     + shop.words.callIt(unit?.rateKey ?? "unit.per_kg"))
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+            } else if let cost = spool.cost {
+                Text(Money.text(cost, shop.currency))
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+            }
+            // How long it has got. Amber only once it is inside a fortnight —
+            // the colour is the app's "wants a person", and a spool with six
+            // weeks in it does not.
+            if let days = endsSoon {
+                // DECIDED ON THE NUMBER THAT IS PRINTED, not the one behind it.
+                // The ASA spool had 14.2 days, which rounds to "empty in 14
+                // days" and failed a `<= 14` test — so the card said fourteen
+                // in the colour that means "no hurry". A reader cannot see the
+                // .2, and a figure that argues with its own colour is worse
+                // than either alone.
+                let shown = Int(saturating: days.rounded())
+                Text(shown < 1
+                     ? shop.words.callIt("mac.empty_now")
+                     : shop.words.callIt("mac.empty_in") + " "
+                       + shop.words.counting(shown, "mac.days_word"))
+                    .font(.caption2).monospacedDigit()
+                    .foregroundStyle(shown <= 14 ? AnyShapeStyle(Khayt.attention)
+                                                 : AnyShapeStyle(.tertiary))
+            }
+            // Damp filament prints badly, and the shelf is where somebody is
+            // standing when they could do something about it. Only the two
+            // states that are news: `good` is quiet and `unknown` — which is
+            // most of a real shelf — says nothing at all, because a spool
+            // nobody has recorded drying is not a spool that is wet.
+            if let state = dryness?.state, state == "overdue" || state == "due" {
+                Text(shop.words.callIt(state == "overdue" ? "mac.dry_overdue" : "mac.dry_due"))
+                    .font(.caption2)
+                    .foregroundStyle(state == "overdue" ? AnyShapeStyle(Khayt.attention)
+                                                        : AnyShapeStyle(.tertiary))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        // Measured before the frame below, so this is the card's own natural
+        // height — the number the shelf needs to find its tallest. This card
+        // builds its own surface rather than going through `.card()`, so it
+        // carries the probe itself; see `CardHeight`.
+        .background {
+            GeometryReader { geo in
+                Color.clear.preference(key: CardHeight.self, value: geo.size.height)
+            }
+        }
+        // Same as the machine cards: the shelf drew five spools in one row with
+        // three different bottom edges, because a spool carrying "needs drying"
+        // and "empty in 14 days" is two lines taller than one that is simply
+        // full. The surface fills the height it is given; the contents stay at
+        // the top.
+        .frame(maxHeight: .infinity, alignment: .top)
+        // The app's card rather than `.quinary`, which is a translucent grey:
+        // over the new ground it read as a recess punched into the screen, so
+        // six spools looked like six holes. A low one keeps its amber ring
+        // instead of taking a rail — the content of this card is centred and a
+        // bar down one edge of centred content reads as a stray mark.
+        .background(selected ? AnyShapeStyle(.selection) : AnyShapeStyle(Khayt.surface),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(low ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(Khayt.hairline),
+                          lineWidth: low ? 1.5 : 1))
+        .liftsOnHover(hovering)
+        .onHover { hovering = $0 }
+        .animation(Motion.of(Motion.figure, unless: reduced), value: spool.weight)
+        .help(spool.material)
+    }
+
+    /// WHAT THIS ITEM IS, drawn as the thing it is.
+    ///
+    /// Every item on the shelf was a spool. A 500 ml bottle of resin was a
+    /// spool, a stack of plywood was a spool, and the only thing that said
+    /// otherwise was the unit after the number — "340 ml" under a picture of a
+    /// reel of filament. The shelf is read by SHAPE and COLOUR before anything
+    /// is read as words, which is the whole argument for drawing these at all,
+    /// and it was telling the eye the wrong thing about a third of the sample.
+    ///
+    /// `lib/inventory-units.js` already knows: `mass` is filament, `volume` is
+    /// a liquid, `count` is sheet goods. That judgement is not repeated here —
+    /// it is asked, and `ItemFace` fails a test if a measure is ever added
+    /// without a shape to draw it as.
+    ///
+    /// All three carry the same two facts the spool always did: what colour it
+    /// is, and how much is left. A bottle fills from the bottom, a stack has
+    /// fewer sheets in it. Drawing the object but not its state would have been
+    /// half the job — that was the bug the wound spool fixed, and it would have
+    /// come straight back for the other two.
+    @ViewBuilder private var face: some View {
+        switch ItemFace.of(measure: unit?.measure) {
+        case .bottle: bottle
+        case .sheets: sheets
+        case .spool:  spoolFace
+        // A unit a NEWER Khayt wrote and this build has not learned. No
+        // picture, rather than a spool that would state something false about
+        // it — the row keeps its name, its quantity and its colour, and a shelf
+        // that hides stock it cannot illustrate is worse than one that
+        // illustrates only what it understands.
+        case nil:     Color.clear.frame(width: 72, height: 72)
+        }
+    }
+
+    /// A bottle of resin, seen face on and filled to what is left.
+    ///
+    /// The neck and cap are what make it a bottle rather than a rounded
+    /// rectangle — a plain block filled to 68% is a battery meter, and the
+    /// shape has to be recognisable before the level means anything.
+    private var bottle: some View {
+        let bodyW = 40.0, bodyH = 48.0
+        let level = spool.fill ?? 1
+        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        return VStack(spacing: 0) {
+            // The cap, then the neck. Bare, never coloured: the resin is in the
+            // bottle, and colouring the cap would put it outside.
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Khayt.bareSpool)
+                .frame(width: 19, height: 6)
+                .overlay(RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .strokeBorder(Khayt.drawnEdge, lineWidth: 1))
+            Rectangle()
+                .fill(Khayt.bareSpool)
+                .frame(width: 13, height: 8)
+                .overlay(Rectangle().strokeBorder(Khayt.drawnEdge, lineWidth: 1))
+            shape
+                .fill(Khayt.bareSpool)
+                .frame(width: bodyW, height: bodyH)
+                // FROM THE BOTTOM, which is where a liquid sits. Clipped to the
+                // bottle's own shape afterwards so the fill takes the rounded
+                // corners rather than squaring them off.
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(colour ?? Color(nsColor: .quaternaryLabelColor))
+                        .frame(height: bodyH * level)
+                }
+                .clipShape(shape)
+                .overlay(shape.strokeBorder(Khayt.drawnEdge, lineWidth: 1))
+                // A colour nobody recorded is a dashed outline, never a grey
+                // that could be mistaken for grey resin. Same rule as the spool.
+                .overlay(alignment: .bottom) {
+                    if colour == nil {
+                        Rectangle()
+                            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                            .foregroundStyle(.tertiary)
+                            .frame(height: bodyH * level)
+                    }
+                }
+        }
+        .frame(width: 72, height: 72)
+    }
+
+    /// Sheet goods, seen edge on: one drawn sheet per sheet on the rack.
+    ///
+    /// COUNTED RATHER THAN SCALED, because this is the one unit whose measure
+    /// is literally `count` — six sheets of ply is six things you can see from
+    /// across the room, and a bar filled to 60% would be a worse picture of it
+    /// than the thing itself. Two sheets left is two lines, and that is the
+    /// moment `inventory-units.js` calls low.
+    ///
+    /// Capped at eight, above which the stack stops growing and the figure
+    /// underneath carries the number. A rack of forty sheets drawn to scale is
+    /// a solid block, which says less than eight lines do.
+    private var sheets: some View {
+        let count = min(8, max(1, Int((spool.weight ?? 1).rounded())))
+        let sheetH = 5.0, gap = 2.0, width = 52.0
+        return VStack(spacing: gap) {
+            ForEach(0..<count, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(colour ?? Color(nsColor: .quaternaryLabelColor))
+                    .frame(width: width, height: sheetH)
+                    .overlay(RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .strokeBorder(colour == nil ? AnyShapeStyle(.tertiary)
+                                                    : AnyShapeStyle(Khayt.drawnEdge),
+                                      lineWidth: 1))
+            }
+        }
+        .frame(width: 72, height: 72, alignment: .bottom)
+    }
+
+    /// A spool seen face on: the filament, and the hole through the middle.
+    ///
+    /// Drawn rather than photographed, and drawn as a RING because that is the
+    /// shape being looked for on a rack. A flat square of colour is a swatch; a
+    /// ring is a spool, and the difference is what makes the shelf scannable.
+    ///
+    /// ── AND IT IS WOUND TO WHAT IS LEFT ───────────────────────────────────
+    ///
+    /// The picture used to be full on every card. A spool down to its last
+    /// 120 g was drawn exactly like an untouched kilo, and a number underneath
+    /// said otherwise — so the biggest, first thing the eye landed on was the
+    /// one part of the card that was not true.
+    ///
+    /// Filament sits between the hub and the flange, and the wound diameter
+    /// shrinks toward the hub as it goes. So that is what shrinks here: the
+    /// flange stays, the colour winds down to the hub, and a nearly-empty spool
+    /// LOOKS nearly empty from across the room. It is the same information the
+    /// grams give, in the shape a shop already reads it in.
+    ///
+    /// A spool with no record of what it weighed new keeps the old full ring —
+    /// see `Spool.fill`. Drawing a guess would put a wrong picture at the top of
+    /// the card, which is worse than the honest one that only says what colour.
+    private var spoolFace: some View {
+        // Hub 22pt across on a 72pt face, so the filament winds between r=11 and
+        // r=36. An empty spool is bare flange with the hub's ring on it.
+        let outer = 36.0, hub = 11.0
+        let wound = spool.fill.map { hub + (outer - hub) * $0 } ?? outer
+        return ZStack {
+            // The bare flange, showing wherever the filament no longer reaches.
+            Circle().fill(Khayt.bareSpool)
+            Circle().strokeBorder(Khayt.drawnEdge, lineWidth: 1)
+
+            Circle()
+                .fill(colour ?? Color(nsColor: .quaternaryLabelColor))
+                .overlay(
+                    // A hint of depth, so a black spool is not a black hole and
+                    // a white one is not a gap in the page. Theme-aware, or it
+                    // is only true of one of the two themes — see `drawnEdge`.
+                    Circle().strokeBorder(Khayt.drawnEdge, lineWidth: 1)
+                )
+                .frame(width: wound * 2, height: wound * 2)
+
+            Circle().fill(.background).frame(width: hub * 2, height: hub * 2)
+            Circle().strokeBorder(Khayt.drawnEdge, lineWidth: 1)
+                .frame(width: hub * 2, height: hub * 2)
+            // A colour nobody recorded is a dashed outline, never a grey that
+            // could be mistaken for grey filament.
+            if colour == nil {
+                Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: wound * 2, height: wound * 2)
+            }
+        }
+        .frame(width: outer * 2, height: outer * 2)
+    }
+}
+
+private struct Live: View {
+    let machine: Machine
+    let shop: Shop
+
+    var body: some View {
+        // A machine this app cannot ask says so. A card that silently shows
+        // nothing looks broken, and a shop would go back to the other app
+        // without knowing why.
+        switch PrinterWatch.notWatched(machine) {
+        case .noConnection:
+            EmptyView()   // nothing is configured; there is nothing to report
+        case .otherProtocol(let name):
+            DetailSection(shop.words.callIt("mac.live")) {
+                Text(shop.words.callIt("mac.not_polled", ["protocol": .string(name)]))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        // Under service or retired: not asked, and the card says so in words
+        // — the badge above says which; this says what follows from it.
+        case .underService, .retired:
+            DetailSection(shop.words.callIt("mac.live")) {
+                Text(shop.words.callIt(machine.isRetired ? "mac.life_not_polled_retired"
+                                                         : "mac.life_not_polled_service"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case nil:
+            DetailSection(shop.words.callIt("mac.live")) { reading }
+        }
+        // The plug the printer sits on, when there is one. Switching OFF goes
+        // through the shared rule every time; the button is refused with the
+        // reason rather than hidden, so the shop knows why it cannot.
+        // Not on a retired printer: it has left the shop, and a switch on its
+        // card is a way to power something that is no longer there.
+        if machine.smartPlug?.usable == true, !machine.isRetired {
+            DetailSection(shop.words.callIt("plug.title")) { plugRow }
+        }
+    }
+
+    @ViewBuilder private var plugRow: some View {
+        let state = shop.plugStates[machine.id]
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Image(systemName: state?.on == true ? "powerplug.fill" : "powerplug")
+                    .foregroundStyle(state?.on == true ? Khayt.done : .secondary)
+                Text(shop.words.callIt(state?.on == true ? "plug.on"
+                                       : state?.on == false ? "plug.off" : "plug.unknown"))
+                    .font(.callout)
+                if let watts = state?.watts {
+                    Text(verbatim: "\(Money.quantity(watts)) \(shop.words.callIt("mac.unit_watts"))").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                }
+                Spacer()
+                if state?.on == true {
+                    Button(shop.words.callIt("plug.turn_off")) {
+                        Task { await shop.switchPlug(machine, on: false) }
+                    }
+                } else {
+                    Button(shop.words.callIt("plug.turn_on")) {
+                        Task { await shop.switchPlug(machine, on: true) }
+                    }
+                }
+            }
+            .buttonStyle(.bordered).controlSize(.small)
+            .disabled(!shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
+            if let problem = shop.plugProblem[machine.id] {
+                Text(problem).font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .task(id: machine.id) { await shop.readPlug(machine) }
+    }
+
+    @ViewBuilder private var reading: some View {
+        if let seen = shop.printers.readings[machine.id] {
+            if let status = seen.status {
+                printing(status)
+            } else if let problem = seen.problem {
+                // In the vocabulary of the person who has to fix it, not the
+                // socket's. `explainPrinterHttp` exists for the same reason.
+                Text(problem)
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } else {
+            Text(shop.words.callIt("mac.asking"))
+                .font(.caption).foregroundStyle(.tertiary)
+        }
+    }
+
+    /// Pause, resume, cancel — and dropping one object from the plate.
+    ///
+    /// THE MAC APP COULD WATCH SEVEN PROTOCOLS AND TOUCH NONE OF THEM. It knew
+    /// a print was failing, it knew which machine, and stopping it meant
+    /// walking to the printer or opening the other app.
+    ///
+    /// Only while something is actually running: a row of dead buttons under an
+    /// idle printer is four things that cannot be pressed, every card, all day.
+    @ViewBuilder private func controls(_ status: KhaytEngine.PrinterStatus) -> some View {
+        let busy = shop.printerBusy.contains(machine.id)
+        let type = machine.printerApi?.type ?? ""
+        // ONLY WHAT THIS PROTOCOL CAN TAKE. A Bambu or Elegoo card drew Pause
+        // and Cancel and failed on press with "requires Bambu Connect" or
+        // "unknown printer type"; a Repetier card drew a Pause it cannot send.
+        // `PrinterControl.offers` asks `lib/printer-commands.js`, the table
+        // the press itself is built from.
+        let known = shop.printerVerbs[type]
+        let paused = isPaused(status.state)
+        let step: PrinterControl.Verb = paused ? .resume : .pause
+        let canStep = PrinterControl.offers(step, known)
+        let canCancel = PrinterControl.offers(.cancel, known)
+        let canDrop = type == "moonraker"
+        VStack(alignment: .leading, spacing: 6) {
+            if canStep || canCancel || canDrop {
+                HStack(spacing: 8) {
+                    if canStep {
+                        Button(shop.words.callIt(paused ? "mac.printer_resume" : "mac.printer_pause")) {
+                            Task { await shop.tell(machine, step) }
+                        }
+                    }
+                    // ASKS FIRST. Cancelling throws away however many hours are already
+                    // in the plate and no printer asks twice. Pause and resume are each
+                    // other's undo and go straight through.
+                    if canCancel {
+                        Button(shop.words.callIt("mac.printer_cancel")) { shop.confirmingCancel = machine }
+                            .foregroundStyle(Khayt.late)
+                    }
+                    if canDrop {
+                        Spacer()
+                        Button(shop.words.callIt("mac.drop_object") + "\u{2026}") {
+                            shop.droppingFrom = machine
+                        }
+                    }
+                    // A Bambu's speed preset (confirmed — it changes a running print)
+                    // and its chamber light (straight through — it changes nothing).
+                    if type == "bambu" {
+                        Menu(shop.words.callIt("mac.printer_speed")) {
+                            ForEach(1...4, id: \.self) { level in
+                                Button(shop.words.callIt("mac.printer_speed_\(level)")) {
+                                    shop.confirmingSpeed = Shop.SpeedChange(machine: machine, level: level)
+                                }
+                            }
+                        }
+                        .fixedSize()
+                        Menu(shop.words.callIt("mac.printer_light")) {
+                            Button(shop.words.callIt("mac.printer_light_on")) {
+                                Task { await shop.control(machine, .light(true)) }
+                            }
+                            Button(shop.words.callIt("mac.printer_light_off")) {
+                                Task { await shop.control(machine, .light(false)) }
+                            }
+                        }
+                        .fixedSize()
+                    }
+                    Spacer()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(busy || !shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
+            } else if known != nil {
+                // Said, not left blank: a card with no buttons under a running
+                // print reads as a missing feature somebody forgot to draw.
+                Text(shop.words.callIt("mac.printer_no_control"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let problem = shop.printerProblem[machine.id] {
+                // The printer's refusal in the vocabulary of somebody who has to
+                // act on it — a sentence, not a status code.
+                Text(problem)
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .task(id: type) { await shop.learnPrinterVerbs(type) }
+    }
+
+    private func isPaused(_ state: String) -> Bool {
+        ["paused", "pausing"].contains(state.lowercased())
+    }
+
+    @ViewBuilder private func printing(_ status: KhaytEngine.PrinterStatus) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(state(status.state)).font(.callout.weight(.semibold))
+                Spacer()
+                if let left = status.timeRemaining, left > 0 {
+                    Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left, shop.words))
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                }
+            }
+            // WHY it is paused or failed, when the printer says (a Bambu's
+            // print_error / HMS notice, `lib/bambu-faults.js`). Bambu's own
+            // sentence and the code to look it up by — the code is what the
+            // printer's screen and Bambu's wiki use, in any language.
+            if let fault = status.fault, !fault.isEmpty {
+                Label { Text(verbatim: fault) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if isRunning(status.state) || isPaused(status.state) {
+                controls(status)
+            }
+            if isRunning(status.state) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        if !status.filename.isEmpty {
+                            Text(status.filename).lineLimit(1).truncationMode(.middle)
+                        }
+                        Spacer()
+                        // "Layer 412 of 750" beside the percentage, when the
+                        // printer says both. The bar below is drawn as layers;
+                        // this is the count it is drawn from.
+                        if let layers = status.layers {
+                            Text(shop.words.callIt("mac.layer_of",
+                                                   ["layer": .string(shop.words.numeral(layers.current)),
+                                                    "total": .string(shop.words.numeral(layers.total))]))
+                                .monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        Text(verbatim: shop.words.numeral(status.progress) + "%").monospacedDigit()
+                    }
+                    .font(.caption)
+                    // A BAR, BUT THE RIGHT ONE.
+                    //
+                    // What a printer is doing is laying layers, and how far
+                    // through it is, is how many of them are down. So the
+                    // progress is drawn as the stack itself, filling from the
+                    // bed upward — the app's own subject, in the one place on
+                    // any screen where the subject is literally what is being
+                    // measured.
+                    //
+                    // The first attempt put this motif behind a dashboard
+                    // tile's label and number, where at that size it read as
+                    // skeleton-loading bars — a screen that had not finished
+                    // drawing. Only the screenshot said so. Here it has room,
+                    // it sits under its own caption, and it means something.
+                    ZStack(alignment: .leading) {
+                        LayerLinesShape()
+                            .fill(Khayt.hot.opacity(0.16))
+                        LayerLinesShape(progress: Double(status.progress) / 100)
+                            .fill(Khayt.hot)
+                    }
+                    .frame(height: 26)
+                    .accessibilityElement()
+                    .accessibilityLabel(shop.words.numeral(status.progress) + "%")
+                }
+                // WHICH SIGNAL the percentage came from, because bytes are not
+                // work: on a relief whose detail is all in its upper layers,
+                // file position read 0.7% when the job was 19% done. A shop
+                // deciding whether to wait is owed that distinction.
+                //
+                // Only where there IS a distinction. Moonraker is the one
+                // adapter that chooses between two signals; the others report a
+                // percentage their own server computed, and captioning that
+                // "by file position" would be a claim about somebody else's
+                // firmware.
+                //
+                // AND ONLY FROM THE ADAPTER THAT CHOOSES. The paragraph above
+                // was true of the intent and false of the code: `lib/sdcp.js`
+                // sets `progressSource` too, to `time` or `none`, and this
+                // read anything it did not recognise as "by file position" —
+                // so a resin printer reporting its own elapsed ticks was
+                // captioned with a claim about a file it does not have. The
+                // type is what settles it, not the spelling of the source.
+                if let caption = PrinterWatch.progressCaption(type: status.type,
+                                                              source: status.progressSource) {
+                    Text(shop.words.callIt(caption))
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+            // A SPOOL THAT RAN OUT, said on the card as well as in the alert.
+            // Only `true` is drawn: false is a loaded head and nil is a machine
+            // with no sensor, and neither is something to look at.
+            if status.filamentOut == true, isRunning(status.state) {
+                Label(shop.words.callIt("mac.filament_out"), systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption.weight(.semibold)).foregroundStyle(Khayt.attention)
+            }
+            // The printer's own word — Klippy's fault, a macro's reason for
+            // pausing, PrusaLink's attention text. Its language, not ours: it
+            // is the firmware's sentence and translating it would be a guess.
+            if let said = status.message {
+                Text(verbatim: said)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help(shop.words.callIt("mac.printer_says"))
+            }
+            HStack(spacing: 14) {
+                // "212/220°" while heating or holding, the reading alone when
+                // the heater is off — a target of 0 is not news.
+                if let nozzle = status.tempNozzle {
+                    Label(PrinterWatch.heat(nozzle, target: status.targetNozzle), systemImage: "thermometer.medium")
+                        .help(shop.words.callIt("mac.nozzle_temp"))
+                }
+                if let bed = status.tempBed {
+                    Label(PrinterWatch.heat(bed, target: status.targetBed), systemImage: "rectangle.fill")
+                        .help(shop.words.callIt("mac.bed_temp"))
+                }
+                if let chamber = status.tempChamber {
+                    Label(PrinterWatch.heat(chamber, target: status.targetChamber), systemImage: "cube.transparent")
+                        .help(shop.words.callIt("mac.chamber_temp"))
+                }
+            }
+            .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            // FAN, SPEED AND FLOW: only while a job runs, and speed and flow
+            // only when somebody has changed them. 100% is "as sliced", and a
+            // row of 100%s on every card is noise that hides the one that is not.
+            let tuned = PrinterWatch.tuning(status, running: isRunning(status.state))
+            if !tuned.isEmpty {
+                HStack(spacing: 14) {
+                    ForEach(tuned, id: \.key) { item in
+                        Label(shop.words.numeral(item.percent) + "%", systemImage: item.symbol)
+                            .help(shop.words.callIt(item.key))
+                    }
+                }
+                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// Klipper's own words, in the shop's language where Khayt has one —
+    /// `PrinterWatch.stateWord`, which the machine sheet's Test button uses too.
+    private func state(_ raw: String) -> String { PrinterWatch.stateWord(raw, shop.words) }
+
+    /// Is there a job on this machine — running or held part-way through?
+    /// This is the question the progress bar asks, and a paused print still
+    /// has a percentage worth showing.
+    private func isRunning(_ raw: String) -> Bool {
+        Self.isPrinting(raw) || raw.lowercased() == "paused"
+    }
+
+    /// Is it laying down plastic RIGHT NOW? A narrower question than the one
+    /// above and a different answer for a paused machine, which is why they
+    /// are two functions. Static because the card around this view asks it
+    /// too, and one spelling of the state means one place to change when a
+    /// protocol calls it something else.
+    static func isPrinting(_ raw: String) -> Bool { PrinterWatch.isPrinting(raw) }
+
+}

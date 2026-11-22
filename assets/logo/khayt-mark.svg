@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="300 110 424 760" fill="currentColor" role="img" aria-label="Khayt">
+  <!-- The 2026 mark (Figma Qqxg4imtKVgC3TfNGcRGOk, page "05 Logo & icon", concept A):
+       the nozzle, the drop at its tip that is the dot of خ, and the thread that
+       draws the letter. One colour; drawn from the same geometry as
+       assets/icon-masters/fg.png. -->
+  <rect x="497" y="130" width="30" height="60" rx="12"/>
+  <rect x="420" y="176" width="184" height="118" rx="26"/>
+  <rect x="452" y="294" width="120" height="22" rx="8"/>
+  <path d="M466 316H558L528 362H496Z"/>
+  <circle cx="512" cy="396" r="30"/>
+  <path d="M368 512C350 480 380 452 424 458C520 472 612 464 688 460C560 488 362 566 354 694C346 816 470 860 690 810"
+        fill="none" stroke="currentColor" stroke-width="64" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,595 @@
+import Foundation
+import Testing
+import KhaytCore
+@testable import KhaytApp
+
+/// Orders a storefront has already sent, read against the shelf.
+///
+/// ── THE GAP THIS CLOSED ───────────────────────────────────────────────────
+///
+/// The Integrations screen hands a shop the address to paste into Shopify,
+/// Salla, Zid, WooCommerce, Etsy or Medusa, and it works: every order those
+/// send is filed in khayt-cloud's intake queue right now. This app never asked
+/// for one. So the Mac could tell a storefront where to post its orders and
+/// could not show the shop a single order that had arrived.
+///
+/// `CloudIntake` is pure of the network — `fetch` is a seam, as
+/// `CloudReader.pull`'s is — so none of this speaks to the service.
+@MainActor
+struct CloudIntakeTests {
+
+    static let connection = CloudReader.Connection(
+        url: "https://cloud.khaytapp.com", shopId: "shop_a1", storedToken: "")
+
+    static func answer(_ json: String, status: Int = 200) -> CloudIntake.Fetch {
+        { request in
+            (Data(json.utf8),
+             HTTPURLResponse(url: request.url!, statusCode: status,
+                             httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    /// THE HEADER, WHICH IS NOT A DETAIL.
+    ///
+    /// khayt-cloud records the delta capability of every credential it hears
+    /// from on EVERY route, and one request without `x-delta-capable` closes
+    /// delta sync for the whole shop, on all its devices — from a screen with
+    /// nothing to do with syncing. Building on `CloudReader.request` is what
+    /// prevents it, and this is the assertion that keeps it there.
+    @Test("every request carries the header the whole shop's sync depends on")
+    func theHeaderIsAlwaysThere() async throws {
+        var seen: [URLRequest] = []
+        let spy: CloudIntake.Fetch = { request in
+            seen.append(request)
+            return (Data(#"{"items":[]}"#.utf8),
+                    HTTPURLResponse(url: request.url!, statusCode: 200,
+                                    httpVersion: nil, headerFields: nil)!)
+        }
+        _ = try await CloudIntake.list(Self.connection, token: "t", fetch: spy)
+        try await CloudIntake.drain(Self.connection, token: "t", id: "9", fetch: spy)
+        #expect(seen.count == 2)
+        for request in seen {
+            #expect(request.value(forHTTPHeaderField: "x-delta-capable") == "1",
+                    "a request without this closes delta sync for every device this shop has")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer t")
+        }
+        #expect(seen[0].url?.path == "/v1/shops/shop_a1/intake")
+        #expect(seen[1].httpMethod == "DELETE")
+        #expect(seen[1].url?.path == "/v1/shops/shop_a1/intake/9")
+    }
+
+    /// `created_at` is a MySQL `DATETIME` — `2026-09-22 14:02:11`, no `T` and
+    /// no zone. An ISO8601 parser alone returns nil for every row the service
+    /// has ever held, and the queue would sort by nothing.
+    @Test("the cloud's own timestamp is read, not only an ISO one")
+    func mysqlTimestamps() async throws {
+        let items = try await CloudIntake.list(Self.connection, token: "t", fetch: Self.answer("""
+            {"items":[
+              {"id":"3","payload":{"title":"Later"},"createdAt":"2026-09-22 14:02:11"},
+              {"id":"2","payload":{"title":"ISO"},"createdAt":"2026-09-20T09:00:00Z"},
+              {"id":"1","payload":{"title":"Earlier"},"createdAt":"2026-09-19 08:00:00"}
+            ]}
+            """))
+        #expect(items.count == 3)
+        #expect(items.allSatisfy { $0.createdAt != nil },
+                "a row whose date could not be read sorts as the oldest thing there is")
+        // Oldest first — the order a shop works through.
+        #expect(items.map(\.title) == ["Earlier", "ISO", "Later"])
+    }
+
+    /// khayt-cloud's import route answered `"id":"0"` for every storefront
+    /// order for most of its life. The id is how a row is deleted afterwards,
+    /// so a row carrying that one would be imported and then offered again on
+    /// every look — the shop importing the same order each time it opened the
+    /// screen.
+    @Test("a row with no usable id is dropped rather than shown")
+    func unusableRows() async throws {
+        let items = try await CloudIntake.list(Self.connection, token: "t", fetch: Self.answer("""
+            {"items":[
+              {"id":"0","payload":{"title":"Cannot be deleted"}},
+              {"id":"","payload":{"title":"Nor this"}},
+              {"id":"7","payload":"not an object"},
+              {"id":"8","payload":{"title":"Real"}}
+            ]}
+            """))
+        #expect(items.map(\.title) == ["Real"])
+    }
+
+    @Test("a refusal is reported with what the cloud said")
+    func refusals() async {
+        await #expect(throws: CloudIntake.Failure.self) {
+            _ = try await CloudIntake.list(Self.connection, token: "t",
+                                           fetch: Self.answer(#"{"error":"Unknown shop"}"#, status: 404))
+        }
+    }
+}
+
+/// What an online order does to the shelf.
+///
+/// The arithmetic is `lib/shelf-sale.js` and is tested in `test/shelf-sale
+/// .test.js`. These are about the reading this app builds from it and the
+/// writes it turns into — the parts that are Swift.
+@MainActor
+struct OnlineOrderReadingTests {
+
+    static func shop() async -> Shop {
+        let shop = Shop()
+        await shop.load(.sample)
+        return shop
+    }
+
+    static func order(_ description: String, shop: Shop) async throws -> Shop.OnlineOrder {
+        let payload = JSONValue.object([
+            "title": .string("Salla order — SL-4"),
+            "description": .string(description),
+            "source": .string("salla"),
+            "ref": .string("salla:SL-4"),
+            "name": .string("Nora"),
+        ])
+        let engine = try #require(shop.engine)
+        return Shop.OnlineOrder(
+            item: CloudIntake.Item(id: "12", payload: payload, createdAt: Date()),
+            reading: try await engine.shelfSaleReading(
+                payload: payload, products: shop.productRows,
+                stock: Shop.stockCounts(shop.settingsDict)))
+    }
+
+    /// The sample book's shelf, so the numbers below are the book's and not a
+    /// fixture's. `sample-shop.json` stocks twelve of one product and four of
+    /// another.
+    static func stocked(_ shop: Shop) -> [(String, String, Int)] {
+        shop.shownProducts.compactMap { row in
+            shop.stockCount(of: row.id).map { (row.id, row.name, $0) }
+        }
+    }
+
+    @Test("an order for something on the shelf is a sale, and says so")
+    func aSale() async throws {
+        let shop = await Self.shop()
+        let shelf = Self.stocked(shop).first { $0.2 >= 2 }
+        let stocked = try #require(shelf, "the sample book stocks nothing any more")
+        let order = try await Self.order("• \(stocked.1) × 2", shop: shop)
+        #expect(order.allFromShelf)
+        #expect(order.fromShelf == 2)
+        #expect(order.toPrint == 0)
+        #expect(order.lines.first?.productId == stocked.0)
+    }
+
+    /// ── WHAT THE STORE SHOWED, NOT WHAT THE BOOK SAYS NOW ───────────────
+    ///
+    /// A re-price the store is HOLDING (#1705) is not on the website, so a
+    /// customer bought at the old figure. Priced from the book, the job and
+    /// its "paid" figure disagreed with the money that moved.
+    @Test("an online order is priced at what the store listed, not at a re-price the store is holding")
+    func pricedAtTheListedPrice() async throws {
+        let shop = await Self.shop()
+        let stocked = try #require(Self.stocked(shop).first { $0.2 >= 2 })
+        let order = try await Self.order("• \(stocked.1) × 2", shop: shop)
+        let book = try #require(await shop.onlinePricing(order))
+        let bookUnit = try #require(book.lines.first?.unit)
+        // The store still lists the price it was last published at.
+        let listed = bookUnit + 7
+        shop.webStoreHeld = CatalogPublisher.Held(live: true, prices: [stocked.0: String(listed)])
+        let held = try #require(await shop.onlinePricing(order))
+        #expect(held.lines.first?.unit == listed)
+        #expect(held.lines.first?.source == "listed")
+        #expect(held.total == listed * 2)
+    }
+
+    @Test("a line that carries the price the customer paid is priced at it")
+    func pricedAtTheLinePrice() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let stocked = try #require(Self.stocked(shop).first { $0.2 >= 2 })
+        let payload = JSONValue.object([
+            "title": .string("Store order — W-9"), "source": .string("webstore"),
+            "ref": .string("webstore:W-9"), "name": .string("Nora"),
+            "lines": .array([.object(["name": .string(stocked.1), "qty": .number(2),
+                                      "productId": .string(stocked.0), "unitPrice": .number(33.5)])]),
+        ])
+        let order = Shop.OnlineOrder(
+            item: CloudIntake.Item(id: "13", payload: payload, createdAt: Date()),
+            reading: try await engine.shelfSaleReading(payload: payload, products: shop.productRows,
+                                                       stock: Shop.stockCounts(shop.settingsDict)))
+        let priced = try #require(await shop.onlinePricing(order))
+        #expect(priced.lines.first?.unit == 33.5)
+        #expect(priced.lines.first?.source == "line")
+        #expect(priced.total == 67)
+    }
+
+    /// A quantity from outside that no `Int` holds. `Int(1e20)` traps, and a
+    /// paid web-store order is read 20 s after every launch, so one such order
+    /// crash-looped the app.
+    @Test("a huge quantity is capped, on the shared rule's reading and on a raw one")
+    func hugeQuantities() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let stocked = try #require(Self.stocked(shop).first)
+        for huge in [1e20, 5e18] {
+            let payload = JSONValue.object([
+                "title": .string("Store order — W-10"), "source": .string("webstore"),
+                "ref": .string("webstore:W-10"), "name": .string("Nora"),
+                "lines": .array([.object(["name": .string(stocked.1), "qty": .number(huge),
+                                          "productId": .string(stocked.0)])]),
+            ])
+            let order = Shop.OnlineOrder(
+                item: CloudIntake.Item(id: "14", payload: payload, createdAt: Date()),
+                reading: try await engine.shelfSaleReading(payload: payload, products: shop.productRows,
+                                                           stock: Shop.stockCounts(shop.settingsDict)))
+            #expect(order.lines.first?.qty == 100_000)
+            let input = await shop.onlineJobInput(order)
+            #expect(input["parts"] != nil, "the job input is built without trapping")
+
+            // A reading the rule did not clamp — an older copy, or another host.
+            let raw = Shop.OnlineOrder(
+                item: CloudIntake.Item(id: "15", payload: payload, createdAt: Date()),
+                reading: .object(["fromShelf": .number(huge), "toPrint": .number(-huge),
+                                  "lines": .array([.object(["name": .string("Vase"), "qty": .number(huge),
+                                                            "onShelf": .number(huge), "toPrint": .number(.nan)])])]))
+            #expect(raw.fromShelf == 100_000)
+            #expect(raw.toPrint == -100_000)
+            #expect(raw.lines.first?.qty == 100_000)
+            #expect(raw.lines.first?.toPrint == 0)
+            _ = await shop.onlineJobInput(raw)
+        }
+        #expect(Shop.OnlineOrder.count(7.9) == 7)
+    }
+
+    static func quoteFormPayload(quote: [String: JSONValue]?) -> JSONValue {
+        var p: [String: JSONValue] = [
+            "title": .string("Quote request — cube.stl"), "source": .string("quote-form"),
+            "name": .string("Sara"), "contact": .string("sara@example.com"), "qty": .number(1),
+            "description": .string("Please print this"), "link": .string("https://example.com/m/42"),
+        ]
+        if let quote { p["quote"] = .object(quote) }
+        return .object(p)
+    }
+
+    @Test("a quote-form request is a quote on the no-file path too, costed from the signed figures")
+    func quoteFormRequestIsCostedQuote() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let signed: [String: JSONValue] = [
+            "price": .number(65.88), "currency": .string("SAR"), "qty": .number(1),
+            "grams": .number(20), "hours": .number(1.5), "reliable": .bool(true), "verified": .bool(true),
+        ]
+        func input(_ quote: [String: JSONValue]?) async throws -> [String: JSONValue] {
+            let payload = Self.quoteFormPayload(quote: quote)
+            let order = try await Shop.onlineOrder(
+                CloudIntake.Item(id: "40", payload: payload, createdAt: Date()),
+                products: shop.productRows, stock: Shop.stockCounts(shop.settingsDict), engine: engine)
+            return await shop.onlineJobInput(order)
+        }
+
+        let verified = try await input(signed)
+        #expect(verified["asQuote"] == .bool(true), "no invoice number, with or without a file")
+        let notes = Shop.plainString(verified["notes"]) ?? ""
+        #expect(notes.contains("Please print this"))
+        #expect(notes.contains("65.88 SAR"), "the shop sees what the visitor was shown")
+        #expect(notes.contains("sara@example.com"), "and how to reach them")
+        guard case .array(let parts)? = verified["parts"], case .object(let part)? = parts.first else {
+            Issue.record("no part"); return
+        }
+        #expect(Shop.plainNumber(part["printWeight"]) == 20)
+        #expect(Shop.plainNumber(part["printTime"]) == 1.5)
+        #expect((Shop.plainNumber(part["baseCost"]) ?? 0) > 0, "costed at the shop's rates, not zero")
+
+        // A price the browser merely claims is not the cloud's: no note, no figures.
+        var claimed = signed; claimed["verified"] = nil
+        let unsigned = try await input(claimed)
+        #expect(unsigned["asQuote"] == .bool(true))
+        #expect(!(Shop.plainString(unsigned["notes"]) ?? "").contains("65.88"))
+        #expect((Shop.plainString(unsigned["notes"]) ?? "").contains("https://example.com/m/42"), "the visitor's link is kept")
+    }
+
+    @Test("the signed quote is read per piece, and a rough one says so")
+    func shownQuote() async {
+        let shop = await Self.shop()
+        let p = Self.quoteFormPayload(quote: ["price": .number(120), "currency": .string("SAR"), "qty": .number(3),
+                                              "grams": .number(12.5), "hours": .number(0.75),
+                                              "reliable": .bool(false), "verified": .bool(true)])
+        let shown = QuoteFormFile.Shown(p)
+        #expect(shown?.qty == 3)
+        #expect(shown?.grams == 12.5)
+        #expect(shown?.reliable == false)
+        #expect(shown.map { $0.note(shop.words) }?.contains("120.00 SAR") == true)
+        #expect(shown.map { $0.note(shop.words) }?.contains("rough") == true)
+        #expect(QuoteFormFile.Shown(Self.quoteFormPayload(quote: ["price": .number(0), "verified": .bool(true)])) == nil)
+        #expect(QuoteFormFile.Shown(Self.quoteFormPayload(quote: nil)) == nil)
+    }
+
+    @Test("waiting quote requests are counted; the first read is the baseline, later ones are new")
+    func quoteRequestsCounted() async {
+        let shop = await Self.shop()
+        func item(_ id: String, _ source: String = "quote-form") -> CloudIntake.Item {
+            CloudIntake.Item(id: id, payload: .object(["title": .string("Q" + id), "source": .string(source)]),
+                             createdAt: Date())
+        }
+        shop.noteQuoteRequests([item("1"), item("2"), item("3", "salla")])
+        #expect(shop.quoteRequestsWaiting == 2, "a storefront order is not a quote request")
+        #expect(shop.quoteRequestsSeen == ["1", "2"])
+        shop.noteQuoteRequests([item("2"), item("4")])
+        #expect(shop.quoteRequestsWaiting == 2)
+        #expect(shop.quoteRequestsSeen == ["1", "2", "4"], "a new id joins the announced set")
+    }
+
+    @Test("a platform's shared address is flagged as an allowed origin")
+    func sharedPlatformOrigins() {
+        let flagged = QuoteFormEmbed.sharedPlatformOrigins(["https://salla.sa", "https://myshop.com", "https://zid.store"])
+        #expect(flagged == ["https://salla.sa", "https://zid.store"])
+        #expect(QuoteFormEmbed.sharedPlatformOrigins(["https://shop.salla.sa.example"]).isEmpty)
+    }
+
+    @Test("the waiting count reads right in Arabic: one, two, a few, many")
+    func waitingCountsInArabic() async {
+        let shop = await Self.shop()
+        let ar = Words()
+        if let engine = shop.engine { await ar.load("ar", engine: engine) }
+        #expect(ar.counting(1, "mac.qfe_waiting").contains("واحد"))
+        #expect(ar.counting(2, "mac.qfe_waiting").hasPrefix("طلبا"))
+        #expect(ar.counting(3, "mac.qfe_waiting").contains("طلبات"))
+        #expect(shop.words.counting(1, "mac.qfe_files_count") != shop.words.counting(5, "mac.qfe_files_count"))
+    }
+
+    @Test("the quote form's limits read in the units the form uses")
+    func memorySizes() {
+        #expect(Format.memorySize(32 << 20).hasPrefix("32"))
+        #expect(Format.memorySize(0).hasPrefix("0"))
+    }
+
+    @Test("an order already in the book is found, by its reference or by its queue item")
+    func alreadyInBook() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let order = try await Self.order("• A thing × 1", shop: shop)
+        #expect(await !Shop.alreadyInBook(order, source: "salla", orders: [], engine: engine))
+        // Recorded by this Mac before, and the drain failed: found by the queue id.
+        let byIntake: [JSONValue] = [.object(["id": .string("J1"), "intakeId": .string("12")])]
+        #expect(await Shop.alreadyInBook(order, source: "salla", orders: byIntake, engine: engine))
+        // Written by the webhook for the same platform order: found by reference.
+        let byRef: [JSONValue] = [.object(["id": .string("J2"), "source": .string("salla"),
+                                           "sourceOrderId": .string("salla:SL-4")])]
+        #expect(await Shop.alreadyInBook(order, source: "salla", orders: byRef, engine: engine))
+        // A different order is not this one.
+        let other: [JSONValue] = [.object(["id": .string("J3"), "intakeId": .string("99"), "source": .string("salla"),
+                                           "sourceOrderId": .string("salla:SL-5")])]
+        #expect(await !Shop.alreadyInBook(order, source: "salla", orders: other, engine: engine))
+    }
+
+    @Test("an order for something this shop does not sell is reported, not guessed at")
+    func unmatched() async throws {
+        let shop = await Self.shop()
+        let order = try await Self.order("• A thing nobody here makes × 1", shop: shop)
+        #expect(order.unmatched == 1)
+        #expect(!order.allFromShelf)
+        #expect(order.lines.first?.unmatched == true)
+        #expect(order.lines.first?.fromShelf == 0,
+                "an unrecognised line took something off a shelf")
+    }
+
+    /// ── ONE SETTINGS WRITE, AND IT STARTS FROM `out.settings` ────────────
+    ///
+    /// `newOrder` advances the shop's invoice counter and hands the settings
+    /// back with it advanced. The shelf lives in the same object. Writing the
+    /// shelf first and the counter second puts the shelf back as it was — a
+    /// bug that costs a number a customer can see and that nothing else in the
+    /// app notices, because every other figure is still right.
+    ///
+    /// `putStockCount` merges rather than rebuilds, which is what makes the
+    /// one-write order work. This proves both halves survive it.
+    @Test("the shelf and the advanced invoice counter survive one write")
+    func oneSettingsWrite() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let stocked = try #require(Self.stocked(shop).first { $0.2 >= 2 })
+        var settings = shop.settingsDict
+        let before = Shop.stockCount(of: stocked.0, in: .object(settings))
+        #expect(before == stocked.2)
+
+        let out = try await engine.newOrder(
+            await shop.onlineJobInput(try await Self.order("• \(stocked.1) × 2", shop: shop)),
+            orders: [], settings: settings, now: Date(),
+            tokens: (tracking: Shop.randomBytes(16), quoteApproval: Shop.randomBytes(16)))
+
+        settings = out.settings
+        Shop.putStockCount(stocked.2 - 2, for: stocked.0, into: &settings, at: Date())
+
+        #expect(Shop.stockCount(of: stocked.0, in: .object(settings)) == stocked.2 - 2)
+        // …and every other shelf in the book is where it was.
+        for (id, _, count) in Self.stocked(shop) where id != stocked.0 {
+            #expect(Shop.stockCount(of: id, in: .object(settings)) == count,
+                    "counting one product rebuilt the whole shelf")
+        }
+        // …and the counter the order consumed is still advanced.
+        if case .number(let next)? = settings["invNumNext"],
+           case .number(let was)? = shop.settingsDict["invNumNext"] {
+            #expect(next > was, "the shelf write put the invoice counter back")
+        }
+    }
+
+    /// ── THE FIGURE THAT IS APPLIED IS A RELATIVE ONE ────────────────────
+    ///
+    /// The effects list carries `taken` (how many came off) and `to` (what
+    /// would be left). `to` is absolute, and it was worked out from the count
+    /// as it stood WHEN THE QUEUE WAS READ — which can be minutes before the
+    /// shop presses the button, with a counter sale, a recount or a sync from
+    /// another Mac in between. Writing it would put the shelf back to a number
+    /// that was true then, silently.
+    @Test("the deduction is how many came off, not what was left")
+    func deductionsAreRelative() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let stocked = try #require(Self.stocked(shop).first { $0.2 >= 3 })
+        let order = try await Self.order("• \(stocked.1) × 3", shop: shop)
+        let effects = try await engine.shelfSaleEffects(order.reading, at: Date())
+        let deductions = Shop.deductions(effects)
+        #expect(deductions.count == 1)
+        #expect(deductions.first?.0 == stocked.0)
+        #expect(deductions.first?.1 == 3, """
+            the deduction is \(deductions.first?.1 ?? -1) — that is what would be \
+            LEFT, and applying it to a shelf that has moved since overwrites the \
+            newer count with an older one
+            """)
+
+        // Applied against a book whose shelf has moved on since the screen was
+        // drawn: one more was sold over the counter in between.
+        var settings = shop.settingsDict
+        Shop.putStockCount(stocked.2 - 1, for: stocked.0, into: &settings, at: Date())
+        for (productId, taken) in deductions {
+            let onShelf = try #require(Shop.stockCount(of: productId, in: .object(settings)))
+            Shop.putStockCount(max(0, onShelf - taken), for: productId,
+                               into: &settings, at: Date())
+        }
+        #expect(Shop.stockCount(of: stocked.0, in: .object(settings)) == stocked.2 - 4,
+                "the counter sale that happened in between was undone")
+    }
+
+    /// ── THE ONE THAT WOULD HAVE COST REAL MONEY ─────────────────────────
+    ///
+    /// The first cut handed `newOrder` parts carrying a name and a quantity
+    /// and nothing else. A part with no grams and no hours costs nothing, so
+    /// every online order this app recorded would have landed in the book
+    /// priced at **zero** — in the column the whole business is measured in,
+    /// without throwing anywhere. `lib/storefront-orders.js` exists because
+    /// that already happened once, to every Salla order Khayt ever imported.
+    @Test("an order for something in the catalogue is priced, not recorded free")
+    func aRecordedOrderIsPriced() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let stocked = try #require(Self.stocked(shop).first { $0.2 >= 2 })
+        let order = try await Self.order("• \(stocked.1) × 2", shop: shop)
+
+        let out = try await engine.newOrder(
+            await shop.onlineJobInput(order), orders: [], settings: shop.settingsDict,
+            now: Date(), tokens: (tracking: Shop.randomBytes(16),
+                                  quoteApproval: Shop.randomBytes(16)))
+        guard case .object(let record) = out.order else {
+            Issue.record("newOrder produced no record"); return
+        }
+        guard case .number(let price)? = record["price"] else {
+            Issue.record("the record carries no price at all"); return
+        }
+        #expect(price > 0, """
+            an online order for a product this shop sells was recorded at \(price) — \
+            the storefront's own total is not in the payload, so the catalogue's \
+            parts are the only thing that can price it
+            """)
+        // And it is the catalogue's price for two, not for one.
+        let one = try await engine.newOrder(
+            await shop.onlineJobInput(try await Self.order("• \(stocked.1) × 1", shop: shop)),
+            orders: [], settings: shop.settingsDict, now: Date(),
+            tokens: (tracking: Shop.randomBytes(16), quoteApproval: Shop.randomBytes(16)))
+        guard case .object(let single) = one.order,
+              case .number(let singlePrice)? = single["price"] else {
+            Issue.record("no single-quantity record"); return
+        }
+        #expect(price > singlePrice, "two of a thing cost the same as one")
+    }
+
+    /// What the catalogue publishes for each product, by the same builder
+    /// the web store is published with — the price the customer was shown.
+    static func published(_ shop: Shop) async throws -> [String: Double] {
+        let engine = try #require(shop.engine)
+        let catalog = try await engine.storefrontCatalog(
+            products: shop.productRows, settings: shop.settingsValue, lang: "en",
+            withPhotos: false, heroes: [:])
+        guard case .object(let o) = catalog, case .array(let items)? = o["items"] else { return [:] }
+        var out: [String: Double] = [:]
+        for case .object(let item) in items {
+            if case .string(let id)? = item["id"], case .string(let price)? = item["price"],
+               let n = Double(price) { out[id] = n }
+        }
+        return out
+    }
+
+    static func price(_ input: [String: JSONValue], shop: Shop) async throws -> Double {
+        let engine = try #require(shop.engine)
+        let out = try await engine.newOrder(
+            input, orders: [], settings: shop.settingsDict, now: Date(),
+            tokens: (tracking: Shop.randomBytes(16), quoteApproval: Shop.randomBytes(16)))
+        guard case .object(let record) = out.order, case .number(let p)? = record["price"] else {
+            Issue.record("no priced record"); return -1
+        }
+        return p
+    }
+
+    /// ── THREE OF A THING IS THREE TIMES ITS PRICE ───────────────────────
+    ///
+    /// The parts were multiplied by the quantity and the price was not: a
+    /// product with a typed price brought it in as the WHOLE job's total, so
+    /// three of a 50 product became a job of 50, recorded as paid 50.
+    @Test("several of one product is priced at the published price times how many")
+    func quantityIsPriced() async throws {
+        let shop = await Self.shop()
+        let published = try await Self.published(shop)
+        let stocked = try #require(Self.stocked(shop).first { published[$0.0] != nil },
+                                   "nothing in the sample book is both stocked and published")
+        let unit = try #require(published[stocked.0])
+        let order = try await Self.order("• \(stocked.1) × 3", shop: shop)
+        let price = try await Self.price(await shop.onlineJobInput(order), shop: shop)
+        #expect(abs(price - unit * 3) < 0.005, "three at \(unit) came to \(price)")
+    }
+
+    /// A basket of two products lost both prices and was priced at the first
+    /// one's margin. Each line keeps its own.
+    @Test("a basket is the sum of each line at its own published price")
+    func basketIsSumOfLines() async throws {
+        let shop = await Self.shop()
+        let published = try await Self.published(shop)
+        let two = Self.stocked(shop).filter { published[$0.0] != nil }
+        guard two.count >= 2 else { return }
+        let order = try await Self.order("• \(two[0].1) × 2\n• \(two[1].1) × 1", shop: shop)
+        let price = try await Self.price(await shop.onlineJobInput(order), shop: shop)
+        let expected = (published[two[0].0] ?? 0) * 2 + (published[two[1].0] ?? 0)
+        #expect(abs(price - expected) < 0.005, "the basket came to \(price), its lines to \(expected)")
+    }
+
+    /// A basket of three different things is not one of them. Stamping the
+    /// record with a `productId` would report the sale against the wrong
+    /// catalogue row — and bring that product's packaging and assembly count
+    /// with it, which the shared rule prices and deducts.
+    @Test("a mixed basket is not filed against one product")
+    func mixedBasketHasNoProduct() async throws {
+        let shop = await Self.shop()
+        let stocked = Self.stocked(shop)
+        guard stocked.count >= 2 else { return }
+        let mixed = try await Self.order("• \(stocked[0].1) × 1\n• \(stocked[1].1) × 1",
+                                         shop: shop)
+        let input = await shop.onlineJobInput(mixed)
+        #expect(input["productId"] == nil)
+
+        let single = try await Self.order("• \(stocked[0].1) × 1", shop: shop)
+        #expect(await shop.onlineJobInput(single)["productId"] == .string(stocked[0].0),
+                "an order that IS one product should be filed against it")
+    }
+
+    /// A line naming nothing this shop sells is a part with the customer's own
+    /// words and no cost — which is what a request is. It must still be IN the
+    /// job: dropping it would record an order missing something the customer
+    /// asked for and paid for.
+    @Test("an unrecognised line is carried into the job, unpriced")
+    func unmatchedLinesSurvive() async throws {
+        let shop = await Self.shop()
+        let order = try await Self.order("• A thing nobody here makes × 3", shop: shop)
+        let input = await shop.onlineJobInput(order)
+        guard case .array(let parts)? = input["parts"], case .object(let first)? = parts.first
+        else { Issue.record("the unrecognised line was dropped"); return }
+        #expect(parts.count == 1)
+        if case .string(let name)? = first["name"] {
+            #expect(name.contains("nobody here makes"))
+        }
+        if case .number(let qty)? = first["qty"] { #expect(qty == 3) }
+    }
+
+    /// A shop with no cloud has no queue, and must not be told about one.
+    @Test("a book with no cloud is quiet rather than wrong")
+    func noCloudNoNoise() async throws {
+        let shop = await Self.shop()
+        await shop.readOnlineOrders { _ in
+            Issue.record("a book with no cloud asked the network for a queue")
+            throw CloudIntake.Failure.notConnected
+        }
+        #expect(shop.onlineOrders.isEmpty)
+        #expect(shop.onlineProblem == nil, "a shop without a storefront was shown an error")
+    }
+}

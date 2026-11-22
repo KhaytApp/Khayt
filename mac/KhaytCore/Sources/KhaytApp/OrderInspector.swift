@@ -1,0 +1,853 @@
+import SwiftUI
+import AppKit
+import KhaytCore
+
+/// The selected job, in detail.
+///
+/// The money here is not arithmetic written in Swift. `lib/tax.js` decides how a
+/// price divides into what the shop keeps and what it is only holding for the
+/// tax authority, and it does it differently by country — inclusive in the Gulf
+/// and most of Europe, added on top in the US and Canada. A second
+/// implementation would be a second chance to get that backwards.
+struct OrderInspector: View {
+    let shop: Shop
+    @State private var split: TaxSplit?
+
+    var body: some View {
+        Group {
+            if let job = shop.selected {
+                Detail(job: job, shop: shop, split: split)
+                    .task(id: job.id) { split = await shop.taxSplit(job.price) }
+            } else {
+                EmptyHere(title: shop.words.callIt("mac.no_job"), message: shop.words.callIt("mac.no_job_hint"), mark: .jobs)
+            }
+        }
+    }
+}
+
+private struct Detail: View {
+    let job: Order
+    let shop: Shop
+    let split: TaxSplit?
+    @State private var zatca: KhaytEngine.ZatcaReporting.Invoice?
+    @State private var editing: Order.Part?
+    /// The partial-delivery sheet (`PartsDeliveredSheet`).
+    @State private var delivering = false
+    /// The part a spool switch is being recorded for (`SpoolSwitchSheet`).
+    @State private var switching: SpoolSwitchTarget?
+    /// Carrier names, for the Shipment section. Read once, and only for a job
+    /// that has a carrier.
+    @State private var carriers: [KhaytEngine.CarrierChoice] = []
+    /// The papers this job's product carries. Empty for a job typed by hand.
+    @State private var papers: [KhaytEngine.OrderDocument] = []
+    /// Where this app last sent the job — nil for one it never sent.
+    @State private var printed: KhaytEngine.PrintedOn?
+    @State private var timelapse: KhaytEngine.TimelapseLink?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                header
+                if ReprintLinks.shows(job) {
+                    ReprintLinks(shop: shop, job: job)
+                }
+                if StoreLinesSection.shows(job) {
+                    StoreLinesSection(shop: shop, job: job)
+                }
+                // ── MAY THIS BE SOLD? ─────────────────────────────────────
+                //
+                // Asked where the sale is, not only where the model is. A
+                // non-commercial model, or one whose bought licence has run
+                // out, printed and invoiced is the one mistake here with a
+                // designer on the other end of it.
+                let problems = shop.saleProblems(job.parts.compactMap(\.printFileId))
+                if !problems.isEmpty {
+                    LicenceWarning(shop: shop, problems: problems)
+                }
+                if shop.canMoveJobs, !shop.sendablePrinters.isEmpty,
+                   !Shop.finishedStatuses.contains(job.status), job.status != "cancelled" {
+                    // Beside the job it is for: the plate goes to a machine
+                    // from where the shop is already looking at the work.
+                    VStack(alignment: .leading, spacing: 4) {
+                        Button(shop.words.callIt("mac.send_title") + "…") {
+                            shop.pendingSend = Shop.PendingHold(id: job.id, project: job.project)
+                        }
+                        .buttonStyle(.link)
+                        .font(.callout)
+                        if let note = shop.sendNote {
+                            Text(note).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                if job.machineId?.isEmpty == false || printed != nil {
+                    JobMachineLine(shop: shop, job: job, printed: printed)
+                }
+                if let timelapse {
+                    TimelapseLine(shop: shop, link: timelapse)
+                }
+                Divider()
+                money
+                if Shop.finishedStatuses.contains(job.status), job.shippingStatus != nil || shop.canMoveJobs {
+                    Divider()
+                    shipment
+                }
+                if !job.parts.isEmpty {
+                    Divider()
+                    parts
+                }
+                // Which spool and which LOT the filament came from — what a
+                // recall asks. Hidden when the job drew nothing.
+                let drawn = FilamentUsed.rows(for: job, spools: shop.spools)
+                if !drawn.isEmpty {
+                    Divider()
+                    FilamentUsedSection(shop: shop, rows: drawn)
+                }
+                // Who did it and the hours on it — for a shop with staff, or a
+                // job that already names somebody.
+                if JobStaffSection.shows(shop, job) {
+                    Divider()
+                    JobStaffSection(shop: shop, job: job)
+                }
+                // The shop's post-processing steps, ticked on a job in Post —
+                // the desktop's card checklist (`order.postChecks`).
+                if JobPostChecklist.shows(shop, job) {
+                    Divider()
+                    JobPostChecklist(shop: shop, job: job)
+                }
+                // The shop's own order fields that have a value here.
+                if !JobCustomFields.rows(shop, job).isEmpty {
+                    Divider()
+                    JobCustomFields(shop: shop, job: job)
+                }
+                // What the whole object came to, for a shop looking at one
+                // leg of it. Only where there is a kit to show or a book that
+                // has kits in it — a picker offering to file a job into
+                // nothing, on every job, is a control that says nothing.
+                // Only where the shop has agreed to it, and only on a job
+                // that names a customer — a message drafted about nobody has
+                // no one to send it to.
+                if shop.aiReplyAllowed, !job.client.isEmpty {
+                    Divider()
+                    Button(shop.words.callIt("mac.draft_a_message")) {
+                        shop.draftingFor = job
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                }
+                // WhatsApp: the update due at this job's milestone, and the
+                // shop's OWN saved messages — no key, no connection, nobody's
+                // agreement to send a customer's details to a service. A job
+                // with no customer record still gets a message the shop can
+                // copy, and the sheet says why WhatsApp cannot be opened.
+                WhatsAppJobRow(shop: shop, job: job)
+                // A PHOTOGRAPH OF THE FINISHED PRINT. Portfolio has always
+                // read these and nothing here could write one, so the empty
+                // state told a shop to add a photo to a completed order and
+                // offered nowhere to do it.
+                if shop.canPhotograph(job) {
+                    Divider()
+                    AddPrintPhoto(shop: shop, job: job)
+                }
+                // The photos already on it — the printer's own, taken at the
+                // end of the print, or the shop's — and the one thing worth
+                // doing with a good one: putting it on the product.
+                if !shop.photos(of: job).isEmpty {
+                    Divider()
+                    JobPhotos(shop: shop, job: job)
+                }
+                if shop.kit(of: job.id) != nil || !shop.kits.isEmpty || shop.canWrite {
+                    Divider()
+                    KitSection(shop: shop, job: job)
+                }
+                // Only for an invoice that is actually owed a report. A job
+                // still on the bench is not late, and a shop that has not
+                // opted into Phase 2 is not subject to any of this — saying
+                // "not submitted" there would raise an alarm about a rule that
+                // does not apply to it.
+                if let zatca, zatca.eligible, zatca.status != "notConfigured" {
+                    Divider()
+                    ZatcaLine(state: zatca, shop: shop)
+                }
+                // ── THE PAPERS THAT GO WITH IT ───────────────────────
+                //
+                // Here rather than only on the product, because this is where
+                // somebody stands when they are about to make the thing: the
+                // assembly sheet is no use filed against a catalogue entry
+                // nobody opens while the printer is running.
+                if !papers.isEmpty {
+                    Divider()
+                    DetailSection(shop.words.callIt("pdoc.title")) {
+                        ForEach(papers) { paper in
+                            HStack(spacing: 8) {
+                                Button(paper.name) {
+                                    if let build = shop.source.build {
+                                        ProductDocs.open(paper.filename, in: build)
+                                    }
+                                }
+                                .buttonStyle(.link)
+                                .lineLimit(1).truncationMode(.middle)
+                                // Said plainly, because it decides what goes in
+                                // the box: a setup sheet the floor reads is not
+                                // a sheet to hand the customer.
+                                if !paper.packWithOrder {
+                                    Text(shop.words.callIt("pdoc.not_shipped"))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+                // A connector's buttons and fields (hidden until connectors ship).
+                if ConnectorsSwitch.isOn() {
+                    ConnectorSection(shop: shop, attach: "order", recordId: job.id)
+                }
+                if !job.notes.isEmpty {
+                    Divider()
+                    DetailSection(shop.words.callIt("doc.notes")) { Text(job.notes).textSelection(.enabled) }
+                }
+                // What happened to it: the stages it went through and how
+                // long each took, and every change to its due date, discount,
+                // shipping, priority and price.
+                Divider()
+                HStack(spacing: 14) {
+                    Button(shop.words.callIt("ord.timeline")) {
+                        shop.pendingHistory = Shop.HistoryRequest(id: job.id, project: job.project)
+                    }
+                    Button(shop.words.callIt("ord.edit_history")) {
+                        shop.pendingHistory = Shop.HistoryRequest(id: job.id, project: job.project, edits: true)
+                    }
+                    if shop.canMoveJobs {
+                        Button(shop.words.callIt("mac.order_details")) {
+                            shop.pendingDetails = Shop.PendingHold(id: job.id, project: job.project)
+                        }
+                    }
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+                // Taking the job away, at the foot of the panel where a shop
+                // looks for it. The job's menu always had these; the panel did
+                // not, and "I can't delete" was the result (Nov 8 2026). Same
+                // rule, same question, same Cancel — no new way to delete.
+                InspectorRemovalRow(shop: shop, job: job)
+            }
+            .padding(16)
+        }
+        .task(id: job.id) {
+            zatca = await shop.zatcaReporting()?.invoices.first { $0.id == job.id }
+            papers = await shop.documents(for: job)
+        }
+        // Asked again when a send lands, not only when another job is picked.
+        .task(id: shop.printRunsStamp(job.id)) {
+            printed = await shop.printedOn(job.id)
+            timelapse = await shop.timelapseLink(job.id)
+        }
+        .shopSheet(item: $editing) { part in
+            EditPartSheet(shop: shop, orderId: job.id, part: part)
+        }
+        .shopSheet(isPresented: $delivering) {
+            PartsDeliveredSheet(shop: shop, job: job)
+        }
+        .shopSheet(item: $switching) { target in
+            SpoolSwitchSheet(shop: shop, job: job, target: target)
+        }
+    }
+
+    /// A spool's name for a switch line, or its id when it is off the shelf.
+    private func spoolName(_ id: String) -> String {
+        shop.spools.first { $0.id == id }?.material ?? id
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // The shown title (never a printer's hash — `JobTitle`), with
+            // what the book really holds on hover.
+            Text(shop.shownTitle(of: job))
+                .font(.title3.weight(.semibold))
+                .textSelection(.enabled)
+                .help(job.project)
+            HStack(spacing: 6) {
+                Text(job.reference).monospacedDigit()
+                if let s = Stage.of(job) {
+                    Text("·")
+                    Label(shop.words.callIt(s.key), systemImage: s.symbol).labelStyle(.titleAndIcon)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            if !job.client.isEmpty {
+                Label(job.client, systemImage: "person")
+                    .font(.callout)
+                    .padding(.top, 2)
+            }
+            // The next thing done to this job, named — the Job menu's Move
+            // Along (or Delivered) under the eyes of whoever is reading it.
+            // Hidden exactly where those items are greyed (`Shop+NextStep`).
+            if let next = shop.nextStep(for: job.id) {
+                Button {
+                    shop.takeNextStep(job.id)
+                } label: {
+                    Label(shop.nextStepTitle(next), systemImage: Self.symbol(for: next))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.top, 6)
+            }
+        }
+    }
+
+    /// The destination's own symbol, so the button reads like the board.
+    private static func symbol(for step: NextStep) -> String {
+        switch step {
+        case .accept: "checkmark.seal"
+        case .move(let stage): stage.symbol
+        case .deliver: Stage.delivered.symbol
+        }
+    }
+
+    /// Who took the parcel, its number and where it has got to — or, before
+    /// it has gone, the way to send it. A tracking number is the one thing a
+    /// shop is asked for by the customer, so it is selectable to copy.
+    private var shipment: some View {
+        DetailSection(shop.words.callIt("ship.manage_title")) {
+            if let status = job.shippingStatus {
+                if let carrier = job.carrier {
+                    DetailLine(shop.words.callIt("ship.carrier"),
+                               carriers.first { $0.id == carrier }?.name(shop.words.language) ?? carrier)
+                }
+                if let number = job.trackingNumber {
+                    LabeledContent(shop.words.callIt("ship.tracking")) {
+                        Text(number).textSelection(.enabled).monospacedDigit()
+                    }
+                    .font(.callout)
+                }
+                DetailLine(shop.words.callIt("ship.status"), shop.words.callIt("ship.st." + status))
+            }
+            if shop.canMoveJobs, job.shippingStatus != nil || job.deliveredAt == nil {
+                Button(shop.words.callIt(job.shippingStatus != nil ? "ship.manage_title" : "ship.title") + "…") {
+                    shop.pendingShipment = Shop.PendingHold(id: job.id, project: job.project)
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+                .padding(.top, 2)
+            }
+        }
+        .task(id: job.carrier) {
+            if job.carrier != nil, carriers.isEmpty, let engine = shop.engine {
+                carriers = (try? await engine.allCarriers()) ?? []
+            }
+        }
+    }
+
+    private var money: some View {
+        DetailSection(shop.words.callIt("mac.money")) {
+            // Billed, not the bare price: on a shop that adds tax on top this
+            // read "Total 100" over "Paid 110" (Oct 2026 review). And `due`,
+            // not billed: a job paid in full before tax on top was owed was
+            // settled at its price, and read "Total 115, Paid 100, Owed 0".
+            DetailLine(shop.words.callIt("common.total"), Money.text(job.figures?.due ?? job.price, job.currency))
+            if let split {
+                // Only shown for a registered shop: an unregistered one has no
+                // split, and inventing a zero-rate line would imply otherwise.
+                DetailLine(shop.words.callIt("mac.shop_keeps"), Money.text(split.subtotal, job.currency), dim: true)
+                // The tax's name in the app's language (`Shop.nameTax`). This
+                // cut `taxSummary` at its first digit, which left the English
+                // "VAT" on an Arabic screen, and fell back to a literal "Tax".
+                DetailLine(shop.taxName ?? shop.words.callIt("mac.pnl_col_vat"),
+                     Money.text(split.taxTotal, job.currency), dim: true)
+                    // The whole rule — rate and whether it is in the price —
+                    // on hover, in the app's words.
+                    .help(shop.taxSummary ?? "")
+            }
+            DetailLine(shop.words.callIt("mac.paid"), Money.text(job.paidAmount, job.currency))
+            // In the job's OWN currency, beside its total and what was paid —
+            // `owed` is the shop's, and printed it under this job's mark read
+            // a 100 USD job as "Owed 375.00 USD".
+            DetailLine(shop.words.callIt("flow.owed"), Money.text(job.owedInOwnCurrency, job.currency), strong: !job.isSettled)
+            if shop.canMoveJobs {
+                // Where somebody is already reading what is owed. ⇧⌘P does the
+                // same thing from anywhere; this is the one place the question
+                // "has this been paid" is actually being asked.
+                Button(shop.words.callIt("pay.modal_title")) {
+                    shop.pendingPayment = Shop.PendingHold(id: job.id, project: job.project)
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+                .padding(.top, 2)
+                // A Tabby / Tamara checkout for the customer, when the shop
+                // has either switched on — the desktop's card button.
+                if shop.offersBnpl(job) {
+                    Button(shop.words.callIt("mac.bnpl_title") + "\u{2026}") {
+                        shop.pendingBnpl = Shop.PendingHold(id: job.id, project: job.project)
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                }
+                // A reminder for money still owed on real work — never a
+                // quote, which is chased by its own follow-up.
+                if job.status != "quote", !job.isSettled {
+                    Button(shop.words.callIt("mac.send_reminder")) {
+                        Task { await shop.sendPaymentReminder(job.id) }
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                }
+                // A deposit the portal recorded, for the shop that had typed it
+                // in by hand already: taken back, and never recorded again.
+                if let key = shop.undoablePortalDeposit(job.id) {
+                    Button(shop.words.callIt("mac.undo_portal_deposit")) {
+                        Task { await shop.undoPortalDeposit(job.id, key: key) }
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                }
+            }
+            // Beside the figures it states. Not behind `canMoveJobs`: showing
+            // the document writes nothing, and the sample shop is the one book
+            // most people will look at an invoice in first.
+            Button(shop.words.callIt("doc.invoice")) { shop.showInvoice(job.id) }
+                .buttonStyle(.link)
+                .font(.callout)
+            // Before the work is invoiced: the same paper as a request for
+            // payment, which numbers nothing (`showProforma`).
+            if Shop.offersProforma(job) {
+                Button(shop.words.callIt("ord.gen_proforma")) { shop.showProforma(job.id) }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                // Part of the price asked for on its own — each prints as a
+                // proforma too. Writes the job, so it needs a book we hold.
+                Button(shop.words.callIt("mac.milestones") + "\u{2026}") { shop.showMilestones(job.id) }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                    .disabled(!shop.canMoveJobs)
+            }
+            // The papers that go with the work — what goes in the box, what
+            // the customer signs for, the floor's sheet. Showing one writes
+            // nothing, so they are offered as the invoice is.
+            if job.status != "quote" {
+                JobPaperButtons(shop: shop, job: job)
+            }
+            // A quote's other answers: chase it, change it, or turn it down.
+            if job.status == "quote" {
+                QuoteActions(shop: shop, job: job)
+            }
+            // The customer's way to say yes. Only on a quote, only on a real
+            // book (the link is minted into the job), and only while the
+            // server is up — the link points at this Mac.
+            if job.status == "quote", shop.canMoveJobs {
+                Button(shop.words.callIt("mac.copy_quote_link")) {
+                    Task {
+                        if let link = await shop.quoteLink(for: job.id) {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(link, forType: .string)
+                            shop.quoteLinkNote = shop.words.callIt("mac.quote_link_copied")
+                        } else {
+                            shop.quoteLinkNote = shop.words.callIt("mac.quote_link_no_server")
+                        }
+                    }
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+                if let note = shop.quoteLinkNote {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            // "Where is my order" — for a job that is under way or done, not a
+            // quote (that has its own link above). The page shows the customer
+            // the stage, the shipping and, once complete, a survey.
+            if job.status != "quote", shop.canMoveJobs {
+                Button(shop.words.callIt("mac.copy_tracking_link")) {
+                    Task {
+                        if let link = await shop.trackingLink(for: job.id) {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(link, forType: .string)
+                            shop.quoteLinkNote = shop.words.callIt("mac.tracking_link_copied")
+                        } else {
+                            shop.quoteLinkNote = shop.words.callIt("mac.quote_link_no_server")
+                        }
+                    }
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+                if let note = shop.quoteLinkNote {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            // The customer's CLOUD link — publish, copy, ask, talk, take down.
+            // Beside the LAN links above, which point at this Mac.
+            CustomerLinkSection(shop: shop, job: job)
+            if let due = Order.day(job.dueDate) {
+                DetailLine(shop.words.callIt("doc.due"), shop.words.say(due, Date.FormatStyle(date: .abbreviated, time: .omitted)),
+                     warn: job.isOverdue())
+            }
+        }
+    }
+
+    private var parts: some View {
+        DetailSection(shop.words.callIt("mac.parts")) {
+            // By position: a part with no id of its own is given a fresh one on
+            // every read, and keying on that would rebuild the rows each reload.
+            ForEach(Array(job.parts.enumerated()), id: \.offset) { index, part in
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) {
+                            Text(part.name).lineLimit(1)
+                            // Already with the customer (partial delivery).
+                            if part.delivered {
+                                Image(systemName: "shippingbox.fill")
+                                    .font(.caption).foregroundStyle(Role.ok)
+                                    .help(shop.words.callIt("ord.partial_delivery"))
+                            }
+                        }
+                        Text(part.colour.isEmpty ? part.material : "\(part.material) · \(part.colour)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        // Grams this part's print took from other rolls (a
+                        // spool switch), each already off that roll.
+                        ForEach(Array(part.additionalSpools.enumerated()), id: \.offset) { _, extra in
+                            Text(verbatim: "+ \(spoolName(extra.spoolId)) · \(Money.grams(extra.weight)) \(shop.words.callIt("common.grams"))")
+                                .font(.caption2).monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        if Shop.offersSpoolSwitch(job), shop.canSwitchSpools {
+                            Button(shop.words.callIt("ord.add_spool") + "\u{2026}") {
+                                switching = SpoolSwitchTarget(id: index, part: part, partCount: job.parts.count)
+                            }
+                            .buttonStyle(.link)
+                            .font(.caption)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text("×\(part.qty)").monospacedDigit()
+                        // `grams`, not `figure`. The money formatter always
+                        // shows two decimals, which is what turned a 180g
+                        // failure into "180.00 grams" once already — and here
+                        // printed a 129.18g part where a shop reads 129.2.
+                        // The SYMBOL, not the word — this sits beside "×1" in
+                        // a narrow column. `common.grams` is where Khayt keeps
+                        // it, and it is not "g" everywhere: Arabic writes غ.
+                        // Hard-coding the letter was a claim that the symbol is
+                        // universal, and the catalogue says otherwise.
+                        Text(verbatim: "\(Money.grams(part.printWeight)) \(shop.words.callIt("common.grams"))")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 2)
+                // Double-click opens it, the way a job, a spool and a model all
+                // open. A context menu as well, because a double-click you have
+                // to know about is a feature for the person who wrote it.
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) { if shop.canMoveJobs { editing = part } }
+                .contextMenu {
+                    Button(shop.words.callIt("mac.edit_part") + "\u{2026}") { editing = part }
+                        .disabled(!shop.canMoveJobs)
+                    if Shop.offersSpoolSwitch(job) {
+                        Button(shop.words.callIt("ord.add_spool") + "\u{2026}") {
+                            switching = SpoolSwitchTarget(id: index, part: part, partCount: job.parts.count)
+                        }
+                        .disabled(!shop.canSwitchSpools)
+                    }
+                }
+            }
+            DetailLine(shop.words.callIt("mac.machine_time"), Money.quantity(job.printTime, decimals: 1) + " " + shop.words.callIt("mac.unit_h"), dim: true)
+            // "N of M parts delivered" — the desktop's card badge — once any
+            // part has gone to the customer.
+            let delivered = Shop.partsDelivered(job)
+            if delivered > 0 {
+                Text(shop.words.callIt("ord.parts_delivered", [
+                    "done": .number(Double(delivered)), "total": .number(Double(job.parts.count)),
+                ]))
+                .font(.callout).foregroundStyle(Role.ok).monospacedDigit()
+            }
+            if Shop.offersPartialDelivery(job), shop.canMoveJobs {
+                Button(shop.words.callIt("mac.parts_delivered_btn") + "\u{2026}") { delivering = true }
+                    .buttonStyle(.link)
+                    .font(.callout)
+            }
+        }
+    }
+}
+
+
+/// Whether this invoice has been reported to the tax authority.
+///
+/// Khayt already puts the Phase 1 QR on the document. What this says is the
+/// thing a Saudi shop can be penalised for and could not see on this app: that
+/// the invoice in the customer's hand has not been reported.
+///
+/// It does NOT offer to submit. Signing needs Node crypto and lives in the
+/// Electron app, and a button here that could not finish the job would be
+/// worse than the plain statement.
+struct ZatcaLine: View {
+    let state: KhaytEngine.ZatcaReporting.Invoice
+    let shop: Shop
+
+    var body: some View {
+        // NO HEADING. There is no plain "ZATCA" label in the locales, and the
+        // status strings are whole sentences already — "Submitted to ZATCA",
+        // "Not submitted". A heading above them would either repeat the word or
+        // mean inventing a key that needs nine translations to say it again.
+        VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: symbol).foregroundStyle(colour)
+                    Text(shop.words.callIt(key)).foregroundStyle(colour)
+                    if let icv = state.icv {
+                        Text("·").foregroundStyle(.tertiary)
+                        // The counter the authority requires to be unbroken, so
+                        // a gap in it is something a shop can be asked about.
+                        Text(verbatim: "ICV \(icv.formatted(.number.precision(.fractionLength(0)).locale(shop.words.locale)))")
+                            .monospacedDigit().foregroundStyle(.secondary)
+                    }
+                }
+                .font(.callout)
+                // Why it was refused. Without it "rejected" is a dead end.
+                if !state.message.isEmpty, state.status != "accepted" {
+                    Text(state.message).font(.caption).foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            if let at = state.at {
+                Text(shop.words.say(Date(timeIntervalSince1970: at / 1000),
+                                    Date.FormatStyle(date: .abbreviated, time: .shortened)))
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var key: String {
+        switch state.status {
+        case "accepted": "zatca2.status_accepted"
+        case "rejected": "zatca2.status_rejected"
+        case "error":    "zatca2.status_error"
+        default:         "zatca2.status_pending"
+        }
+    }
+
+    private var colour: Color {
+        switch state.status {
+        case "accepted": Khayt.done
+        case "rejected", "error": Khayt.late
+        default: Khayt.attention
+        }
+    }
+
+    private var symbol: String {
+        switch state.status {
+        case "accepted": "checkmark.seal.fill"
+        case "rejected", "error": "exclamationmark.triangle.fill"
+        default: "clock.badge.exclamationmark"
+        }
+    }
+}
+
+/// Which machine the job is on — and, once this app has sent it, which one
+/// actually printed it and when (`lib/print-runs.js`).
+///
+/// A send writes the job's `machineId`, so the plan a shop picked by hand is
+/// never replaced without this line saying so: "Printed on X (planned Y)".
+struct JobMachineLine: View {
+    let shop: Shop
+    let job: Order
+    let printed: KhaytEngine.PrintedOn?
+
+    var body: some View {
+        // "Deleted printer", never the raw id, for one no longer in the book.
+        let name: (String) -> String = { id in shop.machineName(forId: id) }
+        if let printed {
+            VStack(alignment: .leading, spacing: 2) {
+                Label(Self.sentence(printed, name: name, words: shop.words), systemImage: "printer")
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let at = Self.date(printed.at) {
+                    Text(shop.words.say(at, Date.FormatStyle(date: .abbreviated, time: .shortened)))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if !printed.earlier.isEmpty {
+                    Text(Self.earlier(printed.earlier, name: name, words: shop.words))
+                        .font(.caption2).foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        } else if let id = job.machineId, !id.isEmpty {
+            DetailLine(shop.words.callIt("doc.machine"), name(id))
+        }
+    }
+
+    /// The headline: printed (or only sent) on what, and the plan when it differs.
+    static func sentence(_ p: KhaytEngine.PrintedOn, name: (String) -> String, words: Words) -> String {
+        let base = p.started ? "mac.job_printed_on" : "mac.job_sent_to"
+        var params: [String: JSONValue] = ["machine": .string(name(p.machineId))]
+        if let planned = p.planned, !planned.isEmpty {
+            params["planned"] = .string(name(planned))
+            return words.callIt(base + "_planned", params)
+        }
+        return words.callIt(base, params)
+    }
+
+    /// The sends before the last, newest first: "Earlier: Ender · 16 Oct".
+    static func earlier(_ runs: [KhaytEngine.PrintedOn.Run], name: (String) -> String, words: Words) -> String {
+        let list = runs.prefix(5).map { r -> String in
+            guard let at = date(r.at) else { return name(r.machineId) }
+            return name(r.machineId) + " · " + words.say(at, Date.FormatStyle(date: .abbreviated, time: .omitted))
+        }
+        return words.callIt("mac.job_runs_earlier",
+                            ["list": .string(list.joined(separator: words.isRTL ? "، " : ", "))])
+    }
+
+    /// `toISOString()`, with or without milliseconds.
+    static func date(_ iso: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: iso) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: iso)
+    }
+}
+
+/// A job's photos, each with "Use as product photo" when the job was made
+/// from a catalogue product.
+///
+/// Rows of fixed size rather than a grid: an inspector column is narrow, and a
+/// thumbnail whose height follows its width is the shape `Portfolio` records
+/// fighting a layout loop over.
+struct JobPhotos: View {
+    let shop: Shop
+    let job: Order
+
+    @State private var working: String?
+    @State private var said: [String: Shop.ProductPhotoResult] = [:]
+    @State private var modelSaid: [String: Shop.ProductPhotoResult] = [:]
+
+    var body: some View {
+        DetailSection(shop.words.callIt("mac.print_photos")) {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                ForEach(shop.photos(of: job)) { snap in
+                    HStack(spacing: Space.xs) {
+                        Thumbnail(source: snap.thumb.map(ThumbnailSource.inlineData))
+                            .frame(width: 64, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .onTapGesture(count: 2) { shop.openPhoto(snap) }
+                        VStack(alignment: .leading, spacing: 2) {
+                            if shop.canUseAsProductPhoto(job) {
+                                Button(shop.words.callIt("mac.use_as_product_photo")) {
+                                    working = snap.id
+                                    Task {
+                                        said[snap.id] = await shop.useAsProductPhoto(snap)
+                                        working = nil
+                                    }
+                                }
+                                .buttonStyle(.link)
+                                .font(.callout)
+                                .disabled(working != nil)
+                            }
+                            if shop.canUseAsModelPhoto(job) {
+                                Button(shop.words.callIt("mac.use_as_model_photo")) {
+                                    working = snap.id
+                                    Task {
+                                        let result = await shop.useAsModelPhoto(snap)
+                                        modelSaid[snap.id] = result
+                                        working = nil
+                                    }
+                                }
+                                .buttonStyle(.link)
+                                .font(.callout)
+                                .disabled(working != nil)
+                            }
+                            if let result = modelSaid[snap.id], result != .failed {
+                                Text(shop.words.callIt(result == .added ? "mac.model_photo_added" : "mac.model_photo_already"))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            if let result = said[snap.id], result != .failed {
+                                Text(shop.words.callIt(result == .added
+                                                       ? "mac.product_photo_added"
+                                                       : "mac.product_photo_already"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        if working == snap.id { ProgressView().controlSize(.small) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// "Add a photo" on a finished job.
+///
+/// A link rather than a tile: the inspector is a column of facts, and the one
+/// thing this adds is an action. The picture itself is shown in Portfolio,
+/// which is where somebody goes to look at them.
+struct AddPrintPhoto: View {
+    let shop: Shop
+    let job: Order
+
+    @State private var choosing = false
+    @State private var working = false
+
+    var body: some View {
+        HStack(spacing: Space.xs) {
+            Button(shop.words.callIt("mac.add_print_photo")) { choosing = true }
+                .buttonStyle(.link)
+                .font(.callout)
+                .disabled(working)
+            if working { ProgressView().controlSize(.small) }
+        }
+        .fileImporter(isPresented: $choosing,
+                      allowedContentTypes: LibraryPhoto.kinds) { result in
+            guard case .success(let url) = result else { return }
+            working = true
+            Task {
+                defer { working = false }
+                // Security-scoped, because the file is wherever the shop keeps
+                // its photographs and this app is asking for one by name.
+                let opened = url.startAccessingSecurityScopedResource()
+                defer { if opened { url.stopAccessingSecurityScopedResource() } }
+                guard let data = try? Data(contentsOf: url) else { return }
+                await shop.addPhoto(to: job, from: data)
+            }
+        }
+    }
+}
+
+/// Delete… or, where the rule refuses, the reason and Cancel Job.
+private struct InspectorRemovalRow: View {
+    let shop: Shop
+    let job: Order
+
+    var body: some View {
+        switch shop.inspectorRemoval(for: job.id) {
+        case .delete:
+            Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                shop.askToDeleteJobs([job.id])
+            }
+            .buttonStyle(.link)
+            .font(.callout)
+            .foregroundStyle(Khayt.late)
+            .disabled(!shop.mayDeleteJobs)
+        case .cancel(let why):
+            HStack(spacing: 10) {
+                Button(shop.words.callIt("mac.cancel_job")) {
+                    Task { await shop.cancelInstead(job.id) }
+                }
+                .buttonStyle(.link)
+                .disabled(!shop.canMoveJobs)
+                Text(why).foregroundStyle(.secondary)
+            }
+            .font(.callout)
+        case .refused(let why):
+            Text(why).font(.callout).foregroundStyle(.secondary)
+        case .none:
+            EmptyView()
+        }
+    }
+}

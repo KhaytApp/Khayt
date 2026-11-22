@@ -1,0 +1,93 @@
+/* Blueprint — identity layer over the Workbench shell.
+
+   The theme declares shell: 'workbench', so applyBodyClasses() puts BOTH
+   .khayt-workbench (the full sidebar layout) and .khayt-blueprint (this hook)
+   on <body>. Everything here is additive: no layout, no geometry, nothing that
+   could leave the shell half-styled if this file failed to load. Tokens do the
+   heavy lifting; this is only what tokens cannot express.
+
+   Three ideas, all borrowed from drafting rather than invented:
+     1. the ground is ruled paper, faintly
+     2. the accent is a DRAWN LINE, never a fill
+     3. every figure is monospaced so columns align down the page */
+
+/* 1 — Ruled ground. Two hairline gradients at 24px make a graph-paper grid.
+   Kept at ~7% alpha so it reads as texture, not as a table.
+
+   Two things this has to work around, both found by checking the computed
+   style rather than by looking at a screenshot and assuming:
+
+   a) It goes on .khayt-app, not on <body>. The shell paints an opaque
+      background on .khayt-app and that element covers the viewport, so a body
+      texture is simply hidden behind it.
+   b) It uses the background-image LONGHAND. tokens.css sets `background:
+      var(--bg)` on `html[data-design="blueprint"] body` — a shorthand, which
+      resets background-image to none, and at higher specificity than a bare
+      body.khayt-blueprint rule. Longhand here, and the descendant selector,
+      keep both the colour and the texture. */
+body.khayt-blueprint .khayt-app {
+  background-image:
+    linear-gradient(to right,  var(--hairline) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-attachment: fixed;
+}
+
+/* Panels sit ON the paper, so they cover the grid rather than blending with it. */
+body.khayt-blueprint .card,
+body.khayt-blueprint .panel,
+body.khayt-blueprint .modal {
+  background-color: var(--surface);
+}
+
+/* 2 — The accent as drawn line. The active nav item gets a ruled edge instead
+   of a filled pill; the fill stays a 12% wash so dark text keeps its contrast. */
+body.khayt-blueprint .nav-item.active,
+body.khayt-blueprint .sidebar-item.active {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+  border-radius: var(--radius-sm);
+}
+body.khayt-blueprint[dir="rtl"] .nav-item.active,
+body.khayt-blueprint[dir="rtl"] .sidebar-item.active {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+
+/* Section heads get the drafting underline — a full-width hairline with a
+   short accent segment at the start, like a title block rule. */
+body.khayt-blueprint .card-head {
+  border-bottom: 1px solid var(--line);
+  background-image: linear-gradient(to right, var(--accent) 0 32px, transparent 32px);
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  background-size: 100% 2px;
+  padding-bottom: 8px;
+}
+body.khayt-blueprint[dir="rtl"] .card-head {
+  background-position: right bottom;
+  background-image: linear-gradient(to left, var(--accent) 0 32px, transparent 32px);
+}
+
+/* 3 — Figures are instrument readouts: monospaced and tabular so digits keep
+   their column when a value changes. */
+body.khayt-blueprint .stat-value,
+body.khayt-blueprint .metric,
+body.khayt-blueprint td.num,
+body.khayt-blueprint .mono {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Buttons: squared, ruled, and filled only when primary. */
+body.khayt-blueprint .btn {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-2);
+}
+body.khayt-blueprint .btn.primary {
+  border-color: var(--accent);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body.khayt-blueprint .khayt-app { background-image: none; }
+}

@@ -1,0 +1,144 @@
+# The desktop and the phone are one contract split across two languages, and
+# nothing else in CI ever compares them: the Ubuntu job cannot compile Swift,
+# and `xcodebuild` never sees a real server response. A renamed JSON key passes
+# both and empties a screen on the phone.
+#
+# REQUIRED on main since Nov 2026 ("LAN server and companion models"). A
+# required check must always report, so this workflow has NO path filter: an
+# unfiltered workflow always runs, and `ios-relevant` below decides whether the
+# expensive job does anything. A job skipped by its own `if:` still reports,
+# and a required check counts a skip as passing (the `Mac app tests` pattern in
+# ci.yml). Every push to main runs it regardless.
+#
+# Why required: Nov 8 2026, a KhaytCore signature change (#2327) merged with
+# the phone's build broken on main and every required check green.
+name: iOS contract
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Every `run:` is `bash -eo pipefail` (GitHub's default without `shell:` is
+# `bash -e`, with NO pipefail): a step that pipes a test into tail, tee or grep
+# must fail when the test does. `xcodebuild test | tail` was green with
+# ** TEST FAILED ** from Jul 28 to Nov 10 2026.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ios-relevant:
+    name: Does this touch the iPhone app?
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          files=$(git diff --name-only "$BASE"...HEAD)
+          echo "$files"
+          # IPHONE-RELEVANT PATHS (the old workflow path filter):
+          # - ios/: the app itself.
+          # - mac/KhaytCore/: the phone links this package, and its business logic
+          #   is Mac-side source. A commit that adds `import AppKit` to it, or
+          #   changes a public signature the phone calls, keeps every Mac check
+          #   green and stops the iOS app compiling. lib/ reaches the phone only
+          #   through the synced copies in mac/KhaytCore/Sources/KhaytCore/JS.
+          # - lib/lan-server.js and renderer/analytics.js: the fixture reads the
+          #   desktop's responses and STATUSES from these (`shipped` once went in
+          #   with no case on the phone).
+          # - lib/ and plugins/: the unit tests also read lib/*.js and
+          #   plugins/samples/*.json straight from the checkout (parity checks,
+          #   SENDABLE_FIELDS), not only through the synced copies.
+          # - renderer/locales/: the source mac/sync-js.sh copies into the
+          #   phone's engine as locale-*.js.
+          # - renderer/invoice.css (the phone's copy must not drift) and
+          #   docs/lan-device-keys.vectors.json (shared signing vectors).
+          #   RepoPathsInTheFilterTests fails if a test reads a path this misses.
+          pattern='^(ios/|mac/KhaytCore/|lib/|plugins/|renderer/analytics\.js$|renderer/invoice\.css$|renderer/locales/|docs/lan-device-keys\.vectors\.json$|scripts/ios-contract-|\.github/workflows/ios-contract\.yml$)'
+          # A here-string, not `printf | grep -q`: under pipefail grep's early
+          # exit can SIGPIPE printf on a long list and flip the answer.
+          if grep -qE "$pattern" <<< "$files"; then run=true; else run=false; fi
+          echo "run=$run" | tee -a "$GITHUB_OUTPUT"
+
+  contract:
+    name: LAN server and companion models
+    needs: ios-relevant
+    if: needs.ios-relevant.outputs.run == 'true'
+    # iOS 27 is the companion's minimum (Oct 2026), so it builds with an iOS 27
+    # SDK. `macos-latest` (macos-26) tops out at Xcode 26.6 / iOS 26.5; GitHub's
+    # `xcode-27` image (public preview) has Xcode 27.0 as default and iOS 27.0
+    # simulators.
+    runs-on: xcode-27
+    # Xcode 27.1, not the image's default 27.0: the iPhone Duo fold API
+    # (`GeometryProxy.reservedRegions`, iOS 27.1) is only in the 27.1 SDK. The
+    # image carries it (27A9275), the same build the TestFlight uploads use.
+    # Tests still run on the iOS 27.0 simulator, the app's minimum.
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Decode live server responses with the shipping Swift models
+        run: npm run test:ios-contract
+
+      # BEFORE the app, on purpose. If KhaytCore has stopped being portable the
+      # app build fails too, but it fails with the app's name on it and a list
+      # of missing types — which sends whoever reads it looking in `ios/`. This
+      # says the package, and it is the package that changed.
+      - name: KhaytCore still builds for the phone
+        working-directory: mac/KhaytCore
+        # pipefail: without it the step's status is `tail`'s, always 0.
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -scheme KhaytCore \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/kc-ios" \
+            CODE_SIGNING_ALLOWED=NO | tail -30
+
+      # The companion's own unit tests. They need a booted simulator, which the
+      # contract check above does not, so a failure here is about the app rather
+      # than the desktop contract.
+      #
+      # pipefail: from Jul 28 to Nov 10 2026 this ran `xcodebuild test | tail`
+      # with no pipefail, so the step took tail's status. Main printed
+      # `** TEST FAILED **` (12 failures) and stayed green; #2360 merged with
+      # 15 failures.
+      # Ad-hoc signing, not CODE_SIGNING_ALLOWED=NO: an unsigned simulator app
+      # has no entitlements, so every Keychain read comes back nil and the
+      # Keychain tests (connector keys, the device key, the cloud session)
+      # fail. `-` signs ad hoc with the entitlements and needs no certificate.
+      - name: Companion unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme KhaytCompanion \
+            -project ios/KhaytCompanion.xcodeproj \
+            -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0' \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \
+            | tee "$RUNNER_TEMP/companion-tests.log" | tail -60
+
+      # The assertion lines are spread through the log, above tail's 60.
+      - name: Which assertions failed
+        if: failure()
+        run: |
+          grep -E 'error: |Failing tests:|^\s+[A-Za-z]+Tests\.test' "$RUNNER_TEMP/companion-tests.log" | head -200 || true

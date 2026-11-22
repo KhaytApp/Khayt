@@ -1,0 +1,3 @@
+"NSCameraUsageDescription" = "Khayt verwendet die Kamera, um Spulenetiketten und Barcodes zu lesen, Belege zu fotografieren und Fotos fertiger Drucke aufzunehmen.";
+"NFCReaderUsageDescription" = "Khayt liest und beschreibt die NFC-Tags an Filamentspulen.";
+"NSLocalNetworkUsageDescription" = "Khayt verbindet sich mit Khayt auf deinem Mac oder PC im selben WLAN, um Warteschlange, Bestand und Druckerstatus anzuzeigen.";

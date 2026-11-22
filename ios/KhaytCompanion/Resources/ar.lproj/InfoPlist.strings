@@ -1,0 +1,3 @@
+"NSCameraUsageDescription" = "يستخدم Khayt الكاميرا لقراءة ملصقات البكرات والباركود، وتصوير الإيصالات، والتقاط صور للطباعات المنتهية.";
+"NFCReaderUsageDescription" = "يقرأ Khayt وسوم NFC على بكرات الخيط ويكتب عليها.";
+"NSLocalNetworkUsageDescription" = "يتصل Khayt بتطبيق Khayt على جهاز Mac أو الحاسوب على شبكة Wi‑Fi نفسها لعرض الطابور والمخزون وحالة الطابعات.";

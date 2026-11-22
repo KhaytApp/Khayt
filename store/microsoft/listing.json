@@ -1,0 +1,64 @@
+{
+  "$comment": [
+    "Source of truth for the Microsoft Store listing. Edit THIS file, not Partner Center —",
+    "anything changed by hand in Partner Center is overwritten by the next release.",
+    "scripts/build-store-metadata.mjs validates every Store limit before CI submits it,",
+    "so a listing that would be rejected fails the build instead of the certification queue.",
+    "Limits enforced: description 10000, shortDescription 255, whatsNew 1500 (generated from",
+    "the CHANGELOG), features 20 x 200, searchTerms 7 x 40 and 21 words total, caption 200."
+  ],
+
+  "language": "en-us",
+
+  "shortDescription": "Offline-first production management for 3D printing businesses — quoting, kanban, invoicing, inventory and analytics in one desktop app. Free, no subscription, and your data never leaves your machine.",
+
+  "description": "Khayt replaces spreadsheets, chat notes and separate invoicing tools with one desktop app built specifically for 3D printing shops.\n\nEverything runs locally. There is no account to create, no monthly fee, and no data leaves your machine unless you deliberately configure an integration.\n\nQUOTING THAT MATCHES REALITY\nBuild a multi-part quote and watch the cost break down live: material, machine time, electricity, labour, overhead, failure rate and margin. FDM is costed by the gram, resin by the millilitre, and multi-material AMS/MMU jobs are handled properly. Drop in a G-code or 3MF file and Khayt reads the slicer's own print time, weight and filament type rather than asking you to guess. Volume tiers and loyalty discounts apply themselves. Export the quote as a PDF with revision history, or send an approval link the customer can accept from their phone.\n\nA PRODUCTION QUEUE YOU CAN SEE\nDrag jobs across a kanban board from Pending to Printing, Post-Processing, QC and Completed. Watch live progress rings per machine, put a job on hold with a reason, and keep a full audit log of every change order. Connect OctoPrint, Moonraker or Bambu Cloud and the board follows your printers instead of your memory.\n\nINVOICING, INCLUDING ZATCA\nBilingual English/Arabic invoices with TLV-encoded QR codes for ZATCA Phase 1, and full Phase 2 support: ECDSA signing, CSR generation, compliance and production CSIDs, and e-invoice submission to FATOORA. Proforma and milestone invoicing, credit notes, and a GAZT VAT return export are all built in.\n\nINVENTORY THAT DEDUCTS ITSELF\nTrack filament spools with automatic deduction when an order completes, FIFO or weighted-average costing, reorder alerts with draft purchase orders, a colour variants library, a spool drying log and per-supplier price history.\n\nCLIENTS AND A CUSTOMER PORTAL\nClient profiles with bilingual fields, VAT and CR numbers, credit limits and loyalty tiers. Customers get a live order-tracking page that refreshes itself, and you get referral attribution and NPS surveys.\n\nANALYTICS WORTH READING\nRevenue trends, filament consumption, per-machine profit and loss, waste and failure costs, and a break-even view — all computed from the jobs you already logged.\n\nMAKER TOOLS INCLUDED\nA 3MF and G-code converter with 3D preview, a print-file library with per-machine slicer profiles, a colour studio for mixing and matching filament, and a print portfolio built from your own order photos.\n\nWORKS OFFLINE, BY DESIGN\nKhayt is a local desktop application. Your orders, clients and prices live in a file on your own disk. There is no cloud account, no telemetry you did not switch on, and no subscription. Optional integrations — email delivery, storefront webhooks, printer APIs, an AI quoting assistant using your own API key — are all opt-in and off until you configure them.\n\nAvailable in English and Arabic, with full right-to-left layout support.",
+
+  "features": [
+    "Multi-part quoting with live cost breakdown: material, machine time, electricity, labour, overhead, failure rate and margin",
+    "Reads print time, weight and filament type straight out of G-code and 3MF files",
+    "FDM (gram-based) and resin (mL-based) costing, including multi-material AMS/MMU jobs",
+    "Volume pricing tiers and automatic loyalty discounts",
+    "Drag-and-drop production kanban: Pending, Printing, Post-Processing, QC, Completed",
+    "Live printer status from OctoPrint, Moonraker and Bambu Cloud",
+    "Bilingual English/Arabic invoices with ZATCA Phase 1 QR codes",
+    "ZATCA Phase 2: ECDSA signing, CSR generation, CSIDs and FATOORA submission",
+    "Proforma and milestone invoicing, credit notes, and GAZT VAT return export",
+    "Filament inventory with auto-deduction, FIFO costing and reorder alerts",
+    "Client profiles with credit limits, loyalty tiers and referral attribution",
+    "Live customer order-tracking portal and shareable quote approval links",
+    "Analytics: revenue trends, filament usage, per-machine profit and loss, break-even",
+    "3MF and G-code converter with 3D preview and a print-file library",
+    "Colour studio for filament mixing, matching and swatch management",
+    "Works fully offline — no account, no subscription, no data leaves your machine"
+  ],
+
+  "searchTerms": [
+    "3D printing",
+    "print shop",
+    "quoting",
+    "ZATCA invoicing",
+    "filament inventory",
+    "print queue",
+    "maker business"
+  ],
+
+  "additionalSystemRequirements": "Windows 10 version 1809 or later. 4 GB RAM and 500 MB of free disk space recommended.",
+
+  "copyrightAndTrademark": "© Khayt. Licensed under FSL-1.1-Apache-2.0.",
+
+  "developedBy": "Khayt",
+
+  "screenshots": [
+    { "file": "screenshot-1-dashboard.png",         "caption": "Dashboard — revenue, open orders and live machine status at a glance" },
+    { "file": "screenshot-2-calculator.png",        "caption": "Calculator — a multi-part quote with the full cost breakdown, live" },
+    { "file": "screenshot-3-production-queue.png",  "caption": "Production queue — drag jobs from Pending through QC to Completed" },
+    { "file": "screenshot-4-orders-log.png",        "caption": "Orders log — the full history, filterable, with PDF export" },
+    { "file": "screenshot-5-analytics.png",         "caption": "Analytics — revenue trends, filament usage and per-machine profit and loss" },
+    { "file": "screenshot-6-inventory.png",         "caption": "Inventory — spool tracking with FIFO cost and reorder alerts" },
+    { "file": "screenshot-7-clients.png",           "caption": "Clients — profiles, loyalty tiers and purchase history" },
+    { "file": "screenshot-9-catalog.png",           "caption": "Catalog — reusable product SKUs with one-click quoting" },
+    { "file": "screenshot-11-settings-invoice.png", "caption": "Invoicing — ZATCA Phase 2 onboarding and custom SMTP delivery" },
+    { "file": "screenshot-12-portfolio.png",        "caption": "Portfolio — a finished-print gallery built from your own order photos" }
+  ]
+}

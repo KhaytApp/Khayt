@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="spec" x1="80" y1="120" x2="944" y2="944" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff4d2e"/>
+      <stop offset="0.18" stop-color="#ff8a1f"/>
+      <stop offset="0.36" stop-color="#ffc21f"/>
+      <stop offset="0.58" stop-color="#22c55e"/>
+      <stop offset="0.8" stop-color="#2a95ff"/>
+      <stop offset="1" stop-color="#7c5cff"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="80" x2="0" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="ds" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#3a1400" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect x="72" y="72" width="880" height="880" rx="224" fill="url(#spec)"/>
+  <rect x="72" y="72" width="880" height="880" rx="224" fill="url(#sheen)"/>
+  <g filter="url(#ds)">
+    <rect x="394" y="372" width="236" height="72" rx="20" fill="#ffffff"/>
+    <rect x="342" y="468" width="340" height="72" rx="20" fill="#ffffff"/>
+    <rect x="290" y="564" width="444" height="72" rx="20" fill="#ffffff"/>
+  </g>
+  <rect x="286" y="672" width="452" height="30" rx="15" fill="#241206" opacity="0.9"/>
+</svg>

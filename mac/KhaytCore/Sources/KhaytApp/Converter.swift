@@ -1,0 +1,442 @@
+import Foundation
+import KhaytCore
+
+/// Converting a 3MF for another printer, without Electron.
+///
+/// ── THE SPLIT, AND WHY ────────────────────────────────────────────────────
+///
+/// `lib/mf-convert.js` decides what a converted file should contain. It cannot
+/// open or write one here: `zip-read` and `zip-write` are built on Node's zlib,
+/// which does not exist in JavaScriptCore. So this does the two ends — `Zip`
+/// reads, `ZipWrite` writes — and asks the shared rule the question in the
+/// middle, which is the only part that is a decision rather than plumbing.
+///
+/// ── WHAT CROSSES INTO THE ENGINE, AND WHAT MUST NOT ───────────────────────
+///
+/// Only the small members. A 3MF's configs are a few kilobytes of JSON and XML
+/// and are the only things a conversion rewrites; its mesh is up to four
+/// hundred megabytes and passes through untouched. Handing that to
+/// JavaScriptCore would copy it twice for nothing, so a large member crosses as
+/// its NAME and its size alone, and is copied byte-for-byte out of the source
+/// file at the end — still compressed, never inflated.
+///
+/// That is also what makes the guarantee cheap to keep: geometry this app never
+/// decodes is geometry it cannot corrupt.
+@MainActor
+enum Converter {
+
+    /// Above this, a member is passed by name rather than by content.
+    ///
+    /// Four megabytes clears every `Metadata/*.config` seen in the wild by a
+    /// wide margin — the largest in this shop's library is 46 kB — and refuses
+    /// meshes, which begin at hundreds of kilobytes and run to hundreds of
+    /// megabytes.
+    nonisolated static let inlineLimit = 4 << 20
+
+    /// How much mesh may cross for a COLOUR PLAN, which is the one job that
+    /// needs it.
+    ///
+    /// ── WHY THERE IS A SECOND, LARGER LIMIT ───────────────────────────────
+    ///
+    /// Full Spectrum and band-swap rewrite the paint codec inside the mesh:
+    /// every `paint_color` attribute is remapped onto the target's physical
+    /// heads. That cannot be done from the outside, so for those two options
+    /// the `.model` members have to be in the engine — and this app used to
+    /// refuse both outright and send the shop to the other app.
+    ///
+    /// MEASURED, twice, because the first measurement chose the wrong number.
+    ///
+    /// Passing a mesh as an ordinary argument costs about twenty-six times its
+    /// size in memory: `call2` substitutes arguments into the script's own
+    /// source, so the XML is escaped, concatenated and re-parsed. A 32 MB
+    /// model peaked at 840 MB that way. BOUND as a global instead it crosses
+    /// once — 256 MB costs 0.04s and 883 MB, the same memory as 32 MB the
+    /// other way — which is why `convertMembers` takes `meshes` separately.
+    ///
+    /// And the limit is sized against the files that NEED a colour plan, not
+    /// against the library. That distinction is the whole of it: 32 MB covers
+    /// 93% of this shop's 3MFs but only 4 of the 11 with more than four
+    /// colours, because a model painted in sixteen colours is a detailed one.
+    /// Measured across those eleven — 2.3, 3.9, 7.3, 8.7, 42, 95, 96, 146,
+    /// 185, 230 and 602 MB — 256 MB reaches ten of them. The last is refused
+    /// by name and by size rather than the whole feature being refused as a
+    /// category, which is what this app did before.
+    ///
+    /// A `var` for two reasons: it is derived from the machine at launch, and
+    /// a test that proves the refusal would otherwise have to write a quarter
+    /// of a gigabyte to disk on every run. Nothing in the app assigns to it
+    /// after `defaultMeshBudget()`.
+    nonisolated(unsafe) static var paintInlineLimit = defaultMeshBudget()
+
+    /// How much a whole conversion may hold, every member together.
+    ///
+    /// The rebuild reads each member back out of the source — the mesh whole —
+    /// and keeps them all until the new zip is written. `Zip` caps any ONE
+    /// member at a gigabyte, but nothing capped the sum: a 3MF of a dozen
+    /// near-gigabyte members (each compressing a thousand to one, so the file
+    /// itself is small) asked for twelve. Two gigabytes is twice the largest
+    /// single member `Zip` will read, so every file that converted before
+    /// still does.
+    ///
+    /// Checked against the sizes the directory declares, before anything is
+    /// read, and again as the members come out: `Zip.data` never hands back
+    /// more than an entry declared, so the two agree. A `var` for the same
+    /// reason as `paintInlineLimit` — a test would otherwise need gigabytes.
+    nonisolated(unsafe) static var rebuildLimit = 2 << 30
+
+    /// How much model XML this Mac will hold at once, from how much memory it
+    /// has.
+    ///
+    /// ── WHY IT IS NOT A FIXED NUMBER ──────────────────────────────────────
+    ///
+    /// A machine with 32 GB should not be held to what one with 8 GB can do,
+    /// and a fixed limit picks the smaller machine for everybody. This asks
+    /// the machine.
+    ///
+    /// Two measured figures decide it. A bound mesh peaks at about five and a
+    /// half times its own size — 64 MB costs 266 MB, 256 MB costs 1.0 GB,
+    /// 512 MB costs 2.6 GB, 1 GB costs 5.6 GB — so `peakPerByte` is six,
+    /// rounded up rather than fitted. And a conversion may have a sixth of the
+    /// machine, which is generous for something that takes a fraction of a
+    /// second and is over.
+    ///
+    ///     32 GB → about 950 MB of model
+    ///     16 GB → about 475 MB
+    ///      8 GB → about 240 MB, which is roughly where a fixed limit sat
+    ///
+    /// The floor exists so an unusual machine still does something rather than
+    /// refusing every colour plan; the ceiling because past two gigabytes the
+    /// time to read the file off disk, not this, is what a shop waits for.
+    nonisolated static func defaultMeshBudget() -> Int {
+        let memoryShare = 6      // a sixth of the machine
+        let peakPerByte = 6      // measured at ~5.5, rounded up
+        let ram = Int(ProcessInfo.processInfo.physicalMemory)
+        let budget = ram / memoryShare / peakPerByte
+        return max(64 << 20, min(budget, 2 << 30))
+    }
+
+    /// The same figure in megabytes, for the sentence a shop reads. Derived
+    /// rather than written twice, so the message cannot outlive the limit.
+    nonisolated static var paintLimitMB: Int { paintInlineLimit / 1_048_576 }
+
+    /// The root model — the member that is the mesh, and the one member whose
+    /// LAYOUT the rule still has to see.
+    ///
+    /// A 3MF's `<build>` block lists where each object sits on the bed. It is a
+    /// line per object at the end of a file that is otherwise triangles, and
+    /// re-placing those items is how a conversion keeps the plates centred when
+    /// the target bed is a different size. Passing this member by name alone
+    /// meant the rule had nothing to read and the conversion failed outright —
+    /// so the block crosses on its own, and comes back on its own.
+    nonisolated static func isRootModel(_ name: String) -> Bool {
+        name.lowercased().hasSuffix("3d/3dmodel.model")
+    }
+
+    /// Where `<build>…</build>` sits in a root model's bytes.
+    ///
+    /// Bytes rather than text on purpose: the block is spliced back in at
+    /// exactly the range it was taken from, so four hundred megabytes of mesh
+    /// are never decoded into a String to have one line changed. Nil when the
+    /// file has no build block (`<build/>`, or a CAD export that has none),
+    /// which is a file with no layout to re-tile rather than a failure.
+    nonisolated static func buildBlockRange(in data: Data) -> Range<Data.Index>? {
+        var from = data.startIndex
+        while let open = data.range(of: Data("<build".utf8), in: from..<data.endIndex) {
+            // `<buildinfo` is not `<build`. The element name ends at a space or
+            // at the closing angle bracket, and nothing else counts.
+            let after = open.upperBound
+            if after < data.endIndex,
+               data[after] == UInt8(ascii: ">") || data[after] == UInt8(ascii: " ")
+                || data[after] == UInt8(ascii: "\n") || data[after] == UInt8(ascii: "\r")
+                || data[after] == UInt8(ascii: "\t") {
+                guard let close = data.range(of: Data("</build>".utf8), in: after..<data.endIndex)
+                else { return nil }
+                return open.lowerBound..<close.upperBound
+            }
+            from = after
+        }
+        return nil
+    }
+
+    enum Failure: Error, CustomStringConvertible, Equatable {
+        case notOurs
+        case unreadable(String)
+        case refused(String)
+        /// A colour plan was asked for on a mesh too large to bring in.
+        case meshTooBig(String, bytes: Int)
+        /// Every member together is more than a conversion will hold.
+        case tooBig(bytes: Int)
+
+        var description: String {
+            switch self {
+            case .notOurs: return "Another app has this book open."
+            case .unreadable(let why): return "Could not read the 3MF: \(why)"
+            case .refused(let why): return why
+            case .meshTooBig(let name, let bytes):
+                // The SIZE and the NAME, because "too large" on its own is a
+                // wall. A shop told which member and how big it is can see
+                // that a plain retarget of the same file will still work.
+                let mb = String(format: "%.0f", Double(bytes) / 1_048_576)
+                let cap = Converter.paintLimitMB
+                return "A colour plan has to rewrite the model itself, and \(name) is \(mb) MB — "
+                     + "more than the \(cap) MB this app will bring in at once. "
+                     + "Convert it in Khayt, or retarget it here without a colour plan."
+            case .tooBig(let bytes):
+                let mb = String(format: "%.0f", Double(bytes) / 1_048_576)
+                let cap = Converter.rebuildLimit / 1_048_576
+                return "This 3MF unpacks to \(mb) MB, more than the \(cap) MB a conversion will hold at once."
+            }
+        }
+
+        /// The same, in the shop's language, figures in the shop's digits.
+        @MainActor func said(_ words: Words) -> String {
+            switch self {
+            case .notOurs: return words.callIt("mac.lib_err_not_ours")
+            case .unreadable(let why): return words.callIt("mac.conv_err_unreadable", ["why": .string(why)])
+            case .refused(let why): return why
+            case .meshTooBig(let name, let bytes):
+                return words.callIt("mac.conv_err_mesh_too_big", [
+                    "name": .string(name),
+                    "mb": .string(Money.quantity(Double(bytes) / 1_048_576, decimals: 0)),
+                    "cap": .string(Money.quantity(Double(Converter.paintLimitMB), decimals: 0))])
+            case .tooBig(let bytes):
+                return words.callIt("mac.conv_err_too_big", [
+                    "mb": .string(Money.quantity(Double(bytes) / 1_048_576, decimals: 0)),
+                    "cap": .string(Money.quantity(Double(Converter.rebuildLimit / 1_048_576), decimals: 0))])
+            }
+        }
+    }
+
+    struct Result: Sendable {
+        let url: URL
+        /// What the shared rule said it did, for the window to show.
+        let report: JSONValue?
+    }
+
+    /// What the engine is told about each member of `source`: its name and
+    /// size, the text of every small one, the `<build>` block of the root
+    /// model — and, with `bindMeshes`, every `.model` member's XML, bound by
+    /// name (see `paintInlineLimit`). Shared by the conversion and the sheet's
+    /// preview, so the preview is asked about exactly the file the conversion
+    /// will read. Blocking file work: called off the main thread by `preview`.
+    nonisolated static func describe(_ source: URL, bindMeshes: Bool) throws
+        -> (entries: [Zip.Entry], described: [JSONValue], meshes: [String: String]) {
+        let entries: [Zip.Entry]
+        do { entries = try Zip.entries(of: source) }
+        catch { throw Failure.unreadable(ErrorText.plain(error)) }
+        guard !entries.isEmpty else { throw Failure.unreadable("it holds nothing") }
+        // The whole file's declared size, summed before a byte is read — see
+        // `rebuildLimit`. Overflow-safe: a lying directory can claim anything.
+        let declared = entries.reduce(0) { $0 > Int.max - $1.size ? Int.max : $0 + $1.size }
+        guard declared <= rebuildLimit else { throw Failure.tooBig(bytes: declared) }
+
+        // What the engine is told about each member: everything small enough to
+        // decide about, and nothing else.
+        var described: [JSONValue] = []
+        /// Model XML, bound by name rather than carried in the script.
+        var meshes: [String: String] = [:]
+        /// How much of it, running, because they are all bound together.
+        var bound = 0
+        for entry in entries {
+            var member: [String: JSONValue] = [
+                "name": .string(entry.name),
+                "size": .number(Double(entry.size)),
+            ]
+            let isModel = entry.name.lowercased().hasSuffix(".model")
+            // A colour plan reads and rewrites EVERY `.model` member, not only
+            // the root: a 3MF may carry one per object.
+            if bindMeshes, isModel {
+                // THE TOTAL, not this one member. Every mesh in the file is
+                // bound at the same time, so a model in twelve painted parts
+                // costs the sum of them — checking each on its own would let a
+                // file through at twelve times the budget.
+                bound += entry.size
+                guard bound <= paintInlineLimit else {
+                    throw Failure.meshTooBig(entry.name, bytes: bound)
+                }
+                guard let data = try? Zip.data(of: entry, in: source, limit: .max),
+                      let text = String(data: data, encoding: .utf8) else {
+                    throw Failure.unreadable("\(entry.name) would not come out as text")
+                }
+                // BOUND, not passed. See `KhaytEngine.convertMembers(_:options:meshes:)`:
+                // a model in a script's source costs twenty-six times its size.
+                let variable = "__khaytMesh\(meshes.count)"
+                meshes[variable] = text
+                member["meshVar"] = .string(variable)
+                described.append(.object(member))
+                continue
+            }
+            if entry.size <= inlineLimit, let data = try? Zip.data(of: entry, in: source),
+               let text = String(data: data, encoding: .utf8) {
+                member["data"] = .string(text)
+            } else if isRootModel(entry.name),
+                      let data = try? Zip.data(of: entry, in: source, limit: .max),
+                      let range = buildBlockRange(in: data),
+                      let block = String(data: Data(data[range]), encoding: .utf8) {
+                // The mesh still does not cross. Its layout does, on its own —
+                // kilobytes of it, out of a member that may be hundreds of
+                // megabytes. Read again at the splice rather than held here,
+                // because holding it would put the whole mesh alongside the
+                // engine for the length of the call, which is the cost this
+                // design exists to avoid.
+                member["build"] = .string(block)
+            }
+            described.append(.object(member))
+        }
+
+        return (entries, described, meshes)
+    }
+
+    /// What the converter sheet shows: `KhaytEngine.convertPreview`, for this
+    /// file and target. The zip is read on a queue of its own, never on the
+    /// main thread: with `plans` the meshes come out whole, and a painted
+    /// model runs to hundreds of megabytes.
+    static func preview(_ source: URL, target: [String: JSONValue], bounds: [String: JSONValue]?,
+                        plans: Bool, engine: KhaytEngine) async throws -> KhaytEngine.ConvertPreview {
+        let (_, described, meshes) = try await describeOffMain(source, bindMeshes: plans)
+        return try await engine.convertPreview(described, target: target, bounds: bounds,
+                                               plans: plans, meshes: meshes)
+    }
+
+    /// `describe`, on `readQueue`.
+    static func describeOffMain(_ source: URL, bindMeshes: Bool) async throws
+        -> (entries: [Zip.Entry], described: [JSONValue], meshes: [String: String]) {
+        let read: Swift.Result<(entries: [Zip.Entry], described: [JSONValue], meshes: [String: String]), any Error> =
+            await withCheckedContinuation { done in
+                readQueue.async { done.resume(returning: Swift.Result { try describe(source, bindMeshes: bindMeshes) }) }
+            }
+        return try read.get()
+    }
+
+    /// Where a 3MF is read for the sheet and the conversion: serial and off the cooperative pool,
+    /// so a slow read blocks neither the window nor Swift's own threads.
+    nonisolated static let readQueue = DispatchQueue(label: "khayt.convert.read", qos: .userInitiated)
+
+    /// Convert `source` for a target printer and write the result to `into`.
+    static func convert(_ source: URL, into destination: URL,
+                        options: [String: JSONValue], engine: KhaytEngine) async throws -> Result {
+        // A colour plan rewrites the mesh, so for those two options the
+        // `.model` members come in with their bytes. Everything else still
+        // crosses by name, which is what keeps the rest of a 400 MB file out
+        // of this process.
+        let paintPlan = truthy(options["fullSpectrum"]) || truthy(options["bandSwap"])
+
+        // Read off the main thread: with a colour plan every mesh comes out whole.
+        let (entries, described, meshes) = try await describeOffMain(source, bindMeshes: paintPlan)
+
+        let planned = try await engine.convertMembers(described, options: options, meshes: meshes)
+        guard planned.ok, let members = planned.members else {
+            throw Failure.refused(planned.error ?? "the converter refused it")
+        }
+
+        let out = try rebuild(members, from: source, entries: entries)
+
+        // ATOMIC: the Save panel lets a shop pick the model it is converting
+        // FROM, and a plain write truncated the only copy before writing the
+        // new one — a crash or a full disk in between lost both.
+        do { try ZipWrite.archive(out).write(to: destination, options: .atomic) }
+        catch { throw Failure.unreadable(ErrorText.plain(error)) }
+        return Result(url: destination, report: planned.report)
+    }
+
+    /// The new zip's members. A member the plan rewrote is written from its
+    /// new text; every other one is copied out of the source — by `from` when
+    /// it is a renamed copy (a split plate's thumbnail), else by its own name —
+    /// which is how geometry survives a conversion byte for byte.
+    nonisolated static func rebuild(_ members: [KhaytEngine.ConvertedMember], from source: URL,
+                                    entries: [Zip.Entry]) throws -> [ZipWrite.Member] {
+        let byName = Dictionary(entries.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
+        var out: [ZipWrite.Member] = []
+        /// What the rebuild holds so far, against the same cap.
+        var held = 0
+        func hold(_ data: Data) throws {
+            held += data.count
+            guard held <= rebuildLimit else { throw Failure.tooBig(bytes: held) }
+        }
+        for member in members {
+            if let text = member.text {
+                let data = Data(text.utf8)
+                try hold(data)
+                out.append(.init(member.name, data))
+            } else if let block = member.buildBlock {
+                // A re-tiled layout, put back exactly where it came from. The
+                // triangles either side of it are the bytes that were there.
+                guard let entry = byName[member.name],
+                      var data = try? Zip.data(of: entry, in: source, limit: .max),
+                      let range = buildBlockRange(in: data) else {
+                    throw Failure.unreadable("\(member.name)'s plate layout would not go back in")
+                }
+                data.replaceSubrange(range, with: Data(block.utf8))
+                try hold(data)
+                out.append(.init(member.name, data))
+            } else if let entry = byName[member.from ?? member.name] {
+                guard let data = try? Zip.data(of: entry, in: source, limit: .max) else {
+                    throw Failure.unreadable("\(member.name) would not come back out")
+                }
+                try hold(data)
+                out.append(.init(member.name, data))
+            } else {
+                // The plan named a member the source does not have, which is a
+                // rule inventing a file. Better to stop than to write a 3MF
+                // with a hole where one is expected.
+                throw Failure.refused("the conversion asked for \(member.name), which is not in the file")
+            }
+        }
+        return out
+    }
+
+    /// One plate's file, as "Split into plates" writes it.
+    struct PlateResult: Sendable {
+        let index: Int
+        let url: URL?
+        let report: JSONValue?
+        /// Why this plate was not written; the others still were.
+        let error: String?
+    }
+
+    /// "Split into plates": every plate of `source` converted into a file of
+    /// its own in `folder`, named as `lib/plates.js` `plateFileName` names it
+    /// (`statue-plate3.3mf`). Each plate keeps its own colours in slots 1..k
+    /// (`lib/plate-split.js`). One plate that cannot stand alone fails alone.
+    ///
+    /// The meshes come in when the project has more colours than the target
+    /// has slots (`bindMeshes`): a plate's own colour map rewrites the paint,
+    /// and reads it to know which colours the plate prints with. Read once,
+    /// for every plate.
+    static func convertPlates(_ source: URL, into folder: URL, options: [String: JSONValue],
+                              bindMeshes: Bool, engine: KhaytEngine) async throws -> [PlateResult] {
+        let (entries, described, meshes) = try await describeOffMain(source, bindMeshes: bindMeshes)
+        let plates = try await engine.splitPlates(described, sourceName: source.lastPathComponent, meshes: meshes)
+        guard plates.count >= 2 else {
+            throw Failure.refused("This project has only one plate — convert the whole file instead.")
+        }
+        var results: [PlateResult] = []
+        for plate in plates {
+            guard plate.splittable else {
+                results.append(PlateResult(index: plate.index, url: nil, report: nil,
+                                           error: plate.problem ?? "This plate cannot be split out."))
+                continue
+            }
+            do {
+                let planned = try await engine.convertPlateMembers(described, plateIndex: plate.index,
+                                                                   options: options, meshes: meshes)
+                guard planned.ok, let members = planned.members else {
+                    throw Failure.refused(planned.error ?? "the converter refused it")
+                }
+                let out = try rebuild(members, from: source, entries: entries)
+                let destination = folder.appending(path: plate.fileName)
+                do { try ZipWrite.archive(out).write(to: destination, options: .atomic) }
+                catch { throw Failure.unreadable(ErrorText.plain(error)) }
+                results.append(PlateResult(index: plate.index, url: destination, report: planned.report, error: nil))
+            } catch let failure as Failure {
+                results.append(PlateResult(index: plate.index, url: nil, report: nil, error: failure.description))
+            }
+        }
+        return results
+    }
+
+    private static func truthy(_ value: JSONValue?) -> Bool {
+        if case .bool(true) = value { return true }
+        return false
+    }
+}

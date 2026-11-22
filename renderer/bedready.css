@@ -1,0 +1,23 @@
+/* Bed Ready flavor — cosmetic overrides layered on top of the shared Khayt shell.
+ *
+ * Bed Ready is the standalone maker app: it runs permanently in the commerce-free
+ * "enthusiast" experience (forced in shell.js applyMode() via body[data-flavor]).
+ * The shared markup still ships a few business affordances that enthusiast mode
+ * hides only while mode-enthusiast is on the body — this stylesheet hard-hides
+ * them by flavor as a belt-and-suspenders, and removes the mode switcher entirely
+ * (there is nothing to switch to in Bed Ready).
+ *
+ * Loaded ONLY by renderer/bedready.html. Khayt's index.html never links it.
+ */
+
+/* No mode switching in Bed Ready — it's always the maker experience. */
+body[data-flavor="bedready"] #brExperienceCard {
+  display: none !important;
+}
+
+/* Business/commerce surfaces are never part of Bed Ready. Enthusiast mode already
+ * hides .biz-only, but pin it to the flavor too so nothing leaks during boot before
+ * applyMode() has run. */
+body[data-flavor="bedready"] .biz-only {
+  display: none !important;
+}

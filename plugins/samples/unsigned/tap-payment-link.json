@@ -1,0 +1,95 @@
+{
+  "khayt": {
+    "manifest": 1
+  },
+  "id": "app.khayt.samples.tap",
+  "name": {
+    "en": "Tap payment link",
+    "ar": "رابط دفع تاپ"
+  },
+  "description": {
+    "en": "Creates a Tap invoice for what is still owed on a job, valid for 7 days, and fills in its payment link to send to the customer. Use your test key until you are ready.",
+    "ar": "ينشئ فاتورة تاپ بالمبلغ المتبقي على العمل صالحة لسبعة أيام ويملأ رابط الدفع لإرساله للعميل. استخدم مفتاح الاختبار حتى تكون جاهزًا."
+  },
+  "publisher": "Khayt",
+  "version": "1.0.0",
+  "homepage": "https://khaytapp.com/developers/samples/",
+  "domains": [
+    "api.tap.company"
+  ],
+  "secrets": [
+    {
+      "name": "secretKey",
+      "label": {
+        "en": "Tap secret key (sk_test_… or sk_live_…)",
+        "ar": "المفتاح السري لتاپ (sk_test_… أو sk_live_…)"
+      },
+      "kind": "apiKey"
+    }
+  ],
+  "fields": [
+    {
+      "key": "paymentLinkUrl",
+      "label": {
+        "en": "Payment link",
+        "ar": "رابط الدفع"
+      },
+      "type": "text",
+      "attach": "order"
+    }
+  ],
+  "actions": [
+    {
+      "id": "paymentLink",
+      "label": {
+        "en": "Create Tap payment link",
+        "ar": "إنشاء رابط دفع تاپ"
+      },
+      "placement": "order",
+      "kind": "post",
+      "url": "https://api.tap.company/v2/invoices/",
+      "auth": {
+        "header": "Authorization",
+        "scheme": "Bearer",
+        "secret": "secretKey"
+      },
+      "body": {
+        "format": "json-template",
+        "template": {
+          "draft": false,
+          "due": "{now.epochMs}",
+          "expiry": "{now.plusDays.7.epochMs}",
+          "description": "{order.number} {order.title}",
+          "mode": "INVOICE",
+          "customer": {
+            "first_name": "{customer.name}",
+            "email": "{customer.email}"
+          },
+          "order": {
+            "amount": "{order.amountDue}",
+            "currency": "{order.amountDueCurrency}",
+            "items": [
+              {
+                "description": "{order.title}",
+                "amount": "{order.amountDue}",
+                "currency": "{order.amountDueCurrency}",
+                "quantity": 1
+              }
+            ]
+          },
+          "reference": {
+            "order": "{order.id}"
+          }
+        }
+      },
+      "response": {
+        "fields": {
+          "paymentLinkUrl": "url"
+        }
+      }
+    }
+  ],
+  "scopes": [
+    "fields.write"
+  ]
+}

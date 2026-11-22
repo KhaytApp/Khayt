@@ -1,0 +1,166 @@
+/* NOTE: --ink-3 (aliased to --text-muted) is darkened/lightened to clear
+   WCAG AA 4.5:1 against BOTH --bg and --surface. It is used as a text colour in
+   192 CSS rules and 540 renderer call sites — hints, subtitles, metadata — so it
+   is body text, not decoration, and 2.75:1 was a real readability failure.
+   Measured, not eyeballed: see the contrast sweep in the scan.
+
+   Meridian — tokens for the time-first shell.
+
+   Meridian is not a reskin of an existing layout: it removes the left sidebar
+   entirely, moves navigation to a horizontal bar, and makes a SCHEDULE the
+   primary surface. See shell.js for the layout and screens.js for the timeline.
+
+   The palette follows from that. A schedule is read across, fast, so:
+
+   - The ground is a cool neutral, not a warm or tinted one. Job blocks carry
+     colour by STATE, and any tint in the background would bias how those blocks
+     read against each other.
+   - The accent is a signal teal reserved almost entirely for the NOW line and
+     the current time. It is the one thing on screen that means "this instant",
+     so it appears almost nowhere else.
+   - Lane rules and hour gridlines are deliberately faint. On a schedule the
+     grid is scaffolding — if it competes with the blocks, the blocks stop being
+     the data. */
+
+html[data-design="meridian"] {
+  /* ---- Surfaces (cool neutral, no tint) ---- */
+  --bg:        #f2f4f6;   /* window backdrop */
+  --bg-2:      #eaedf1;   /* lane gutter / staging strip */
+  --surface:   #ffffff;   /* panels, job blocks */
+  --surface-1: #ffffff;
+  --surface-2: #f6f8fa;
+  --surface-3: #eceff3;
+  --panel:     #ffffff;
+  --panel-2:   #f6f8fa;
+
+  /* ---- Ink ---- */
+  --ink:       #10151c;
+  --ink-2:     #4a5462;
+  --ink-3:     #656f7d;
+  --ink-4:     #a3abb6;
+
+  /* ---- Lines. Two weights: structure, and the hour grid behind the data. ---- */
+  --line:      #dde2e8;
+  --line-2:    #e8ecf1;
+  --line-soft: #eef1f5;
+  --hairline:  rgba(16,21,28,0.06);
+  --mrd-grid:  rgba(16,21,28,0.05);   /* hour gridline */
+  --mrd-grid-strong: rgba(16,21,28,0.10); /* every 6th hour */
+
+  /* ---- Accent (signal teal) — HSL channels so applyAccent() can swap them ---- */
+  --accent-h: 184;
+  --accent-s: 72%;
+  --accent-l: 36%;
+  --accent:      hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  --accent-ink:  #ffffff;
+  --on-accent:   #ffffff;
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.13);
+  --accent-line: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.45);
+  --accent-2:    #0e7c86;
+
+  /* ---- Job-state colours. These ARE the data on a schedule, so they get the
+         saturation and the chrome does not. Foregrounds clear AA on their
+         own -bg fill. ---- */
+  --mrd-run:#0b6ea8;    --mrd-run-bg:#dcecf7;    /* printing        */
+  --mrd-queue:#5b6675;  --mrd-queue-bg:#e8ebef;  /* waiting         */
+  --mrd-late:#b3261e;   --mrd-late-bg:#fbe3e1;   /* overdue         */
+  --mrd-done:#1c6b45;   --mrd-done-bg:#dff0e6;   /* finished        */
+  --mrd-hold:#8a5a00;   --mrd-hold-bg:#f8ecd4;   /* blocked / hold  */
+  --mrd-idle:#98a1ad;                            /* empty lane time */
+
+  /* ---- Shadows: a schedule is flat; blocks lift only on hover ---- */
+  --shadow-1: 0 1px 2px rgba(16,21,28,.06);
+  --shadow-2: 0 8px 24px rgba(16,21,28,.12);
+  --shadow-pop: var(--shadow-2);
+
+  /* ---- Radii — small; blocks butt against an axis and want crisp edges ---- */
+  --radius:    8px;
+  --radius-sm: 5px;
+  --r-sm: 5px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
+  /* ---- Fonts. Vendored under renderer/fonts/ already; no new font added. ---- */
+  --font-ui:   "Albert Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Spline Sans Mono", ui-monospace, monospace;
+  --font-ar:   "IBM Plex Sans Arabic", var(--font-ui);
+  --font-sans: var(--font-ui);
+  --font-num:  var(--font-mono);
+  --mono:      var(--font-mono);
+
+  /* ---- Shell metrics. The lane gutter and hour width are read by both the
+         CSS and screens.js, so the axis and the blocks cannot disagree. ---- */
+  --mrd-gutter: 168px;   /* machine-name column */
+  --mrd-hour:   58px;    /* px per hour on the axis */
+  --mrd-lane-h: 46px;
+  --mrd-topbar: 46px;
+
+  /* ---- Aliases the shared renderer reads ---- */
+  --text: var(--ink);
+  --text-dim: var(--ink-2);
+  --text-muted: var(--ink-3);
+  --text-faint: var(--ink-4);
+  --border: var(--line);
+  --border-2: #cfd6de;
+  --border-soft: var(--line-2);
+  --primary: var(--accent);
+  --primary-soft: var(--accent-soft);
+  --success: var(--mrd-done);
+  --warning: var(--mrd-hold);
+  --danger: var(--mrd-late);
+  --ok: var(--mrd-done);
+  --bg-elev: var(--surface-2);
+  --bg-card: var(--surface);
+
+  --nav-w: 0px;   /* there is no left nav in this shell */
+}
+
+html[data-design="meridian"][data-theme="dark"] {
+  --bg:        #0f1319;
+  --bg-2:      #0b0e13;
+  --surface:   #171c24;
+  --surface-1: #171c24;
+  --surface-2: #1d232c;
+  --surface-3: #232a35;
+  --panel:     #171c24;
+  --panel-2:   #1d232c;
+
+  --ink:       #e6eaf0;
+  --ink-2:     #a2acbb;
+  --ink-3:     #798493;
+  --ink-4:     #545e6c;
+
+  --line:      #262e39;
+  --line-2:    #1e242d;
+  --line-soft: #1e242d;
+  --hairline:  rgba(230,234,240,0.06);
+  --mrd-grid:  rgba(230,234,240,0.05);
+  --mrd-grid-strong: rgba(230,234,240,0.11);
+  --border-2:  #313a47;
+
+  --accent-l: 52%;
+
+  --mrd-run:#66b8e8;    --mrd-run-bg:#11304a;
+  --mrd-queue:#9aa5b4;  --mrd-queue-bg:#232a35;
+  --mrd-late:#f4796c;   --mrd-late-bg:#3d1b19;
+  --mrd-done:#4fc389;   --mrd-done-bg:#12331f;
+  --mrd-hold:#e0a83f;   --mrd-hold-bg:#382c11;
+  --mrd-idle:#4a5462;
+
+  --shadow-1: 0 1px 2px rgba(0,0,0,.45);
+  --shadow-2: 0 10px 28px rgba(0,0,0,.55);
+}
+
+html[data-design="meridian"],
+html[data-design="meridian"] body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+html[data-design="meridian"][dir="rtl"],
+html[data-design="meridian"] body[dir="rtl"] {
+  font-family: var(--font-ar);
+}

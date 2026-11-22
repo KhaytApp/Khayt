@@ -1,0 +1,193 @@
+import SwiftUI
+import KhaytCore
+
+/// A job's due date, how urgent it is, and — when the number changed on the
+/// phone — what it costs.
+///
+/// Three fields, not thirty. These are the ones a shop floor actually adjusts
+/// — "it slipped a week", "this one first", "we agreed 1,800 in the end" — and
+/// the ones whose changes Khayt writes into the job's edit history, because
+/// they are what a customer can be told a different answer about later. The
+/// price box is empty until typed in: empty means the price stands.
+///
+/// Everything else the order editor writes is left exactly as it was. That is
+/// the shared rule's guarantee, not this sheet's promise: `applyEdit` touches
+/// only the fields it is handed.
+struct EditJobSheet: View {
+    /// How wide this sheet is. A CONSTANT rather than a number in the body,
+    /// because `SnapshotTests` photographs the sheet at a size of its own and
+    /// the two silently disagreed: the sheet grew and the picture kept the old
+    /// width, so the render came back cropped down the middle with no failure.
+    /// 460, and the number is the segmented control's doing.
+    ///
+    /// At 360 the Grid gave the picker its ideal width and the label column
+    /// whatever was left, which was about fifty points — so "Mark as priority /
+    /// urgent" came out one or two characters to a line, seven lines tall, in
+    /// the shipping English app. The labels are `fixedSize` now so the column
+    /// is measured from the text rather than from the leftovers, and the sheet
+    /// is wide enough to hold both.
+    ///
+    /// 500 since the alpha.56 review: the English row needs about 450pt —
+    /// the label is ~140, and the segmented control will not go below 297
+    /// however it is framed — and at 460 that is a 424pt column, so the
+    /// control ran through the right margin to the sheet's edge. Measured in
+    /// an `NSHostingView` (`EditJobMarginTests`); the snapshot draws the
+    /// control as a placeholder of whatever width it is offered, so it cannot
+    /// show this.
+    static let width: CGFloat = 500
+
+    let shop: Shop
+    let subject: Shop.PendingHold
+
+    @State private var hasDueDate = false
+    @State private var dueDate = Date()
+    @State private var priority = "normal"
+    /// A new total, as typed. Empty is "leave it".
+    @State private var priceText = ""
+    @State private var started = false
+    /// A test, a gift, something for the shop itself. See `lib/business-scope.js`.
+    @State private var nonBusiness = false
+
+    private var job: Order? { shop.orders.first { $0.id == subject.id } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(shop.words.callIt("mac.edit_job")).font(.headline)
+            Text(subject.project).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    Text(shop.words.callIt("doc.due")).foregroundStyle(.secondary)
+                        .fixedSize()
+                    // A job with no due date is a real answer, so the sheet has
+                    // to be able to say it — a date picker alone cannot.
+                    Toggle(isOn: $hasDueDate) {
+                        if hasDueDate {
+                            DatePicker("", selection: $dueDate, displayedComponents: .date)
+                                .labelsHidden()
+                        } else {
+                            Text(shop.words.callIt("mac.no_due_date")).foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                }
+                GridRow {
+                    Text(shop.words.callIt("oe.priority")).foregroundStyle(.secondary)
+                        .fixedSize()
+                    Picker("", selection: $priority) {
+                        ForEach(Shop.priorityLevels, id: \.self) { level in
+                            Text(shop.words.callIt(Self.wordFor(level))).tag(level)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                }
+                GridRow {
+                    Text(shop.words.callIt("common.total")).foregroundStyle(.secondary)
+                        .fixedSize()
+                    HStack(spacing: 8) {
+                        if let job {
+                            // The job's own currency: the price is stored in it.
+                            Text(Money.text(job.price, job.currency.isEmpty ? shop.currency : job.currency))
+                                .monospacedDigit()
+                        }
+                        Text(shop.words.callIt("pe.price_override")).foregroundStyle(.secondary)
+                        TextField(shop.words.callIt("pe.price_override_ph"), text: $priceText)
+                            .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
+                    }
+                }
+            }
+
+            // In the other app's words, which the shared catalogue has in every
+            // language: it leaves the money, and it does not pretend the print
+            // never ran.
+            VStack(alignment: .leading, spacing: 2) {
+                Toggle(shop.words.callIt("oe.non_business"), isOn: $nonBusiness)
+                    .toggleStyle(.checkbox)
+                Text(shop.words.callIt("oe.non_business_hint"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack {
+                Spacer()
+                Button(shop.words.callIt("common.cancel")) { shop.clearQuestion() }
+                    .keyboardShortcut(.cancelAction)
+                Button(shop.words.callIt("common.save"), action: commit)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(18)
+        .frame(width: Self.width)
+        .onAppear {
+            guard !started else { return }
+            started = true
+            let was = Self.opening(job, priority: shop.priorityOf(job))
+            opened = was
+            hasDueDate = was.hasDueDate
+            if let day = was.dueDate { dueDate = day }
+            priority = was.priority
+            nonBusiness = job?.nonBusiness == true
+        }
+    }
+
+    /// Khayt names the two raised levels and not the ordinary one, so this app
+    /// supplies only the word Khayt has never needed.
+    static func wordFor(_ level: String) -> String {
+        switch level {
+        case "urgent": "ord.priority_urgent"
+        case "high": "ord.priority_high"
+        default: "mac.priority_normal"
+        }
+    }
+
+    /// The three fields as the sheet opens a job.
+    struct Opened: Equatable {
+        var hasDueDate: Bool
+        var dueDate: Date?
+        var priority: String
+    }
+
+    @State private var opened = Opened(hasDueDate: false, dueDate: nil, priority: "normal")
+
+    static func opening(_ job: Order?, priority: String) -> Opened {
+        let day = Order.day(job?.dueDate)
+        return Opened(hasDueDate: day != nil, dueDate: day, priority: priority)
+    }
+
+    /// What the shared rule is handed: ONLY what the shop changed.
+    ///
+    /// A due date is compared as a DAY — the picker shows days — so a job
+    /// whose due date the book holds as `2026-10-05T21:00:00.000Z` keeps that
+    /// stamp unless the shop picks a different day. Sending the re-read day
+    /// every time re-spelled it as `2026-10-06`, and wrote an edit into the
+    /// job's history that nobody made. A priority the rule does not know
+    /// (`low`, from somewhere else) is likewise kept unless the shop picks one.
+    static func fields(opened: Opened, hasDueDate: Bool, dueDate: Date, priority: String,
+                       price: Double?) -> [String: JSONValue] {
+        var out: [String: JSONValue] = [:]
+        let sameDay = opened.dueDate.map { Calendar.book.isDate($0, inSameDayAs: dueDate) } ?? false
+        if hasDueDate != opened.hasDueDate || (hasDueDate && !sameDay) {
+            out["dueDate"] = hasDueDate ? .string(Shop.localDay(dueDate)) : .null
+        }
+        if priority != opened.priority { out["priorityLevel"] = .string(priority) }
+        if let price { out["price"] = .number(price) }
+        return out
+    }
+
+    private func commit() {
+        let id = subject.id
+        let typed = priceText.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
+        let price = typed.isEmpty ? nil : Double(typed).map { max(0, $0) }
+        let fields = Self.fields(opened: opened, hasDueDate: hasDueDate, dueDate: dueDate,
+                                 priority: priority, price: price)
+        let wasNonBusiness = job?.nonBusiness == true
+        let nowNonBusiness = nonBusiness
+        shop.clearQuestion()
+        Task {
+            if !fields.isEmpty { await shop.editJob(id, fields: fields) }
+            // Only when it changed: an edit that did not touch it writes nothing.
+            if nowNonBusiness != wasNonBusiness { await shop.setNonBusiness(id, nowNonBusiness) }
+        }
+    }
+}

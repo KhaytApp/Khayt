@@ -1,0 +1,91 @@
+/* Nocturne — identity layer over the Command shell.
+
+   The theme declares shell: 'command', so applyBodyClasses() puts BOTH
+   .khayt-command (the rail + inspector + status bar layout) and .khayt-nocturne
+   (this hook) on <body>. Command is the right host: the dense monitoring
+   layout is what you actually want when you are checking a farm at 2am.
+
+   Everything here is additive — no layout, no geometry. If this file failed to
+   load you would get Command with Nocturne's colours, which is still a working
+   screen. See tokens.css for the reasoning behind the palette. */
+
+/* Glanceability. The whole premise is reading this from across a dim room, so
+   the headline figures go up a step and stay tabular — a changing value must
+   not shift the digits beside it. */
+body.khayt-nocturne .stat-value,
+body.khayt-nocturne .metric {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.12em;
+  letter-spacing: -0.015em;
+}
+body.khayt-nocturne td.num,
+body.khayt-nocturne .mono {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Elevation by line, not by light: panels are separated by a hairline and a
+   barely-lighter fill rather than by brightness, so nothing on screen becomes
+   a lamp in a dark room. */
+body.khayt-nocturne .card,
+body.khayt-nocturne .panel {
+  border: 1px solid var(--line);
+  background-color: var(--surface);
+}
+
+/* The accent is an instrument marker: a lit edge on the active item, never a
+   large fill. A big amber block at night is exactly the glare this avoids. */
+body.khayt-nocturne .nav-item.active,
+body.khayt-nocturne .sidebar-item.active,
+body.khayt-nocturne .rail-item.active {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+body.khayt-nocturne[dir="rtl"] .nav-item.active,
+body.khayt-nocturne[dir="rtl"] .sidebar-item.active,
+body.khayt-nocturne[dir="rtl"] .rail-item.active {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+
+/* Status pills keep their saturation while chrome stays muted — this is the
+   one place colour is spent, so a failure is the loudest thing on the screen. */
+body.khayt-nocturne .badge,
+body.khayt-nocturne .pill {
+  border: 1px solid currentColor;
+  background-clip: padding-box;
+}
+
+/* A danger state gets a lit edge as well as a fill, so it survives being seen
+   at an angle or out of the corner of an eye. */
+body.khayt-nocturne .badge.danger,
+body.khayt-nocturne .pill.danger,
+body.khayt-nocturne .status-error {
+  box-shadow: 0 0 0 1px var(--nk-red), 0 0 12px hsl(4 100% 60% / 0.28);
+}
+
+/* Inputs recede until focused; then the amber marker confirms where you are. */
+body.khayt-nocturne input,
+body.khayt-nocturne select,
+body.khayt-nocturne textarea {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+}
+body.khayt-nocturne input:focus-visible,
+body.khayt-nocturne select:focus-visible,
+body.khayt-nocturne textarea:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 1px;
+}
+
+/* Scrollbars, so a bright default track does not undo the whole palette. */
+body.khayt-nocturne * {
+  scrollbar-color: var(--surface-3) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.khayt-nocturne .badge.danger,
+  body.khayt-nocturne .pill.danger,
+  body.khayt-nocturne .status-error { box-shadow: 0 0 0 1px var(--nk-red); }
+}

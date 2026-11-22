@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@font-face{font-family:"Space Grotesk";src:url("renderer/fonts/space-grotesk-latin-400.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Space Grotesk";src:url("renderer/fonts/space-grotesk-latin-500.woff2") format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"Space Grotesk";src:url("renderer/fonts/space-grotesk-latin-600.woff2") format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"Space Grotesk";src:url("renderer/fonts/space-grotesk-latin-700.woff2") format("woff2");font-weight:700;font-display:swap}
+body{margin:0;background:#efebe3;font-family:"Space Grotesk","IBM Plex Sans Arabic",ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#0b54ad;text-decoration:none}
+a:hover{color:#08417f}
+::-webkit-scrollbar{width:0;height:0}
+input,textarea,select,button{font-family:inherit}
+@keyframes khayt-pulse{0%,100%{opacity:.35}50%{opacity:1}}
+@keyframes khayt-ping{0%{transform:scale(.7);opacity:.75}100%{transform:scale(2.3);opacity:0}}
+@keyframes khayt-rise{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes khayt-spin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+
+<section id="t3" style="padding:36px 40px 44px; scroll-margin-top:16px">
+
+  <div style="display:flex; align-items:baseline; gap:10px; margin:0 0 6px">
+    <a href="#t3" style="font:700 10px/1 'Space Grotesk',monospace; letter-spacing:.1em; padding:5px 8px; background:#1E1A15; color:#efebe3; border-radius:4px">3</a>
+    <span style="font:600 14px/1.2 'Space Grotesk',sans-serif; color:#1E1A15">Local-first — the phone holds its own book</span>
+  </div>
+  <p style="margin:0 0 24px; max-width:760px; font:400 13px/1.55 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">Pairing by Bonjour, a partial book the UI is honest about, six tabs, and swipe-to-advance. Built against <code style="font:500 12px ui-monospace,monospace">ShopBrowser.swift</code>, <code style="font:500 12px ui-monospace,monospace">CompanionBook.swift</code> and <code style="font:500 12px ui-monospace,monospace">BookScope.swift</code> rather than from the brief alone.</p>
+
+  <div style="display:flex; flex-wrap:wrap; gap:34px; align-items:flex-start">
+
+    <div style="flex:none; width:216px; display:flex; flex-direction:column; gap:18px">
+      <div>
+        <div style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-bottom:9px">Jump to a screen</div>
+        <div style="display:flex; flex-direction:column; gap:3px">
+          <sc-for list="{{ rail }}" as="r" hint-placeholder-count="14">
+            <button onClick="{{ r.onGo }}" style="display:flex; align-items:center; gap:9px; width:100%; min-height:34px; padding:6px 9px; border:none; border-radius:7px; cursor:pointer; text-align:start; background:{{ r.bg }}; color:{{ r.ink }}; font:500 12.5px 'Space Grotesk',sans-serif" style-hover="background:#e3ded3">
+              <span style="width:5px; height:5px; border-radius:50%; flex:none; background:{{ r.dot }}"></span>
+              <span style="flex:1; min-width:0">{{ r.label }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #dcd5c8; padding-top:16px; display:flex; flex-direction:column; gap:8px">
+        <div style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-bottom:1px">Conditions</div>
+        <button onClick="{{ toggleLang }}" style="min-height:36px; padding:0 12px; border:1px solid #dcd5c8; border-radius:8px; background:#fbf9f5; color:#1E1A15; font:600 12.5px 'Space Grotesk',sans-serif; cursor:pointer; text-align:start" style-hover="background:#efebe3">{{ langBtn }}</button>
+        <button onClick="{{ toggleConn }}" style="min-height:36px; padding:0 12px; border:1px solid #dcd5c8; border-radius:8px; background:#fbf9f5; color:#1E1A15; font:600 12.5px 'Space Grotesk',sans-serif; cursor:pointer; text-align:start" style-hover="background:#efebe3">{{ connBtn }}</button>
+        <button onClick="{{ toggleTheme }}" style="min-height:36px; padding:0 12px; border:1px solid #dcd5c8; border-radius:8px; background:#fbf9f5; color:#1E1A15; font:600 12.5px 'Space Grotesk',sans-serif; cursor:pointer; text-align:start" style-hover="background:#efebe3">{{ themeBtn }}</button>
+        <button onClick="{{ toggleBook }}" style="min-height:36px; padding:0 12px; border:1px solid #dcd5c8; border-radius:8px; background:#fbf9f5; color:#1E1A15; font:600 12.5px 'Space Grotesk',sans-serif; cursor:pointer; text-align:start" style-hover="background:#efebe3">{{ bookBtn }}</button>
+        <button onClick="{{ resetAll }}" style="min-height:36px; padding:0 12px; border:1px solid #dcd5c8; border-radius:8px; background:none; color:#4f5b69; font:500 12.5px 'Space Grotesk',sans-serif; cursor:pointer; text-align:start" style-hover="color:#1E1A15">Reset the shop</button>
+      </div>
+    </div>
+
+    <div style="flex:none">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div dir="{{ dir }}" style="height:100%; display:flex; flex-direction:column; background:{{ c.ground }}; font-family:'Space Grotesk','IBM Plex Sans Arabic',ui-sans-serif,system-ui,sans-serif">
+
+          <sc-if value="{{ showPair }}" hint-placeholder-val="{{ false }}">
+            <div style="height:100%; display:flex; flex-direction:column; padding:72px 24px 30px">
+
+              <sc-if value="{{ pFind }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex; flex-direction:column; height:100%">
+                  <img src="assets/logo/mark-256.png" alt="Khayt" width="52" height="52" style="width:52px; height:52px; border-radius:12px; display:block; margin-bottom:20px">
+                  <div style="font:600 28px/1.15 'Space Grotesk',sans-serif; letter-spacing:-.02em; color:{{ c.ink }}">{{ s.findTitle }}</div>
+                  <p style="margin:9px 0 0; font:400 14.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.findBody }}</p>
+
+                  <div style="display:flex; align-items:center; gap:9px; margin:22px 0 11px">
+                    <span style="width:13px; height:13px; border-radius:7px; border:2px solid {{ c.hairline }}; border-top-color:{{ c.brand }}; animation:khayt-spin .8s linear infinite; flex:none"></span>
+                    <span style="font:700 10.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}">{{ s.searching }}</span>
+                  </div>
+
+                  <div style="display:flex; flex-direction:column; gap:9px">
+                    <sc-for list="{{ shops }}" as="sh" hint-placeholder-count="3">
+                      <button onClick="{{ sh.onPick }}" style="position:relative; overflow:hidden; display:flex; align-items:center; gap:13px; width:100%; min-height:78px; padding:14px 14px 14px 17px; text-align:start; cursor:pointer; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px" style-active="background:{{ c.sunk }}">
+                        <sc-if value="{{ sh.servesBook }}" hint-placeholder-val="{{ true }}">
+                          <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ c.done }}"></span>
+                        </sc-if>
+                        <span style="flex:1; min-width:0">
+                          <span style="display:block; font:600 16.5px/1.25 'Space Grotesk',sans-serif; color:{{ c.ink }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ sh.name }}</span>
+                          <span style="display:block; font:400 13px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ sh.subTone }}; margin-top:4px">{{ sh.sub }}</span>
+                        </span>
+                        <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style="flex:none; transform:{{ arrowFlip }}"><path d="M1.5 1l5.5 6-5.5 6" stroke="{{ c.note }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                      </button>
+                    </sc-for>
+                  </div>
+
+                  <div style="flex:1; min-height:18px"></div>
+
+                  <button onClick="{{ pGoManual }}" style="display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; min-height:52px; padding:0 16px; border-radius:12px; border:1px solid {{ c.hairline }}; background:none; cursor:pointer; color:{{ c.note }}; font:500 14.5px 'Space Grotesk',sans-serif; text-align:start" style-hover="color:{{ c.ink }}">
+                    <span>{{ s.enterAddress }}</span>
+                    <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style="flex:none; transform:{{ arrowFlip }}"><path d="M1.5 1l5.5 6-5.5 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  </button>
+                  <p style="margin:9px 2px 0; font:400 12px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.enterAddressWhy }}</p>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ pManual }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex; flex-direction:column; height:100%">
+                  <div style="font:600 28px/1.15 'Space Grotesk',sans-serif; letter-spacing:-.02em; color:{{ c.ink }}">{{ s.manualTitle }}</div>
+                  <p style="margin:9px 0 22px; font:400 14.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.manualBody }}</p>
+                  <label style="display:block; font:700 10.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin-bottom:9px">{{ s.desktopIp }}</label>
+                  <input value="{{ pairHost }}" onChange="{{ onHost }}" inputMode="decimal" placeholder="192.168.1.42" style="width:100%; min-height:56px; padding:0 16px; border-radius:12px; border:1px solid {{ c.hairline }}; background:{{ c.surface }}; color:{{ c.ink }}; font:500 19px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; direction:ltr; outline:none">
+                  <label style="display:block; font:700 10.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin:18px 0 9px">{{ s.port }}</label>
+                  <input value="{{ pairPort }}" onChange="{{ onPort }}" inputMode="numeric" placeholder="3219" style="width:100%; min-height:56px; padding:0 16px; border-radius:12px; border:1px solid {{ c.hairline }}; background:{{ c.surface }}; color:{{ c.ink }}; font:500 19px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; direction:ltr; outline:none">
+                  <div style="flex:1; min-height:18px"></div>
+                  <button onClick="{{ pManualNext }}" style="width:100%; min-height:58px; border:none; border-radius:14px; background:{{ c.brand }}; color:{{ c.onBrand }}; font:600 17px 'Space Grotesk',sans-serif; cursor:pointer" style-active="opacity:.85">{{ s.pairNext }}</button>
+                  <button onClick="{{ pBack }}" style="width:100%; min-height:48px; margin-top:8px; border:none; background:none; color:{{ c.note }}; font:500 14.5px 'Space Grotesk',sans-serif; cursor:pointer">{{ s.pairBack }}</button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ pPin }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex; flex-direction:column; height:100%">
+                  <div style="font:700 10.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin-bottom:10px">{{ pickedShop }}</div>
+                  <div style="font:600 28px/1.15 'Space Grotesk',sans-serif; letter-spacing:-.02em; color:{{ c.ink }}">{{ s.pinTitle }}</div>
+                  <p style="margin:9px 0 22px; font:400 14.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.pinBody }}</p>
+                  <input value="{{ pairPin }}" onChange="{{ onPin }}" inputMode="numeric" placeholder="••••" style="width:100%; min-height:64px; padding:0 18px; border-radius:12px; border:1px solid {{ pinLine }}; background:{{ c.surface }}; color:{{ c.ink }}; font:600 26px 'Space Grotesk',sans-serif; letter-spacing:.3em; font-variant-numeric:tabular-nums; direction:ltr; outline:none">
+                  <sc-if value="{{ pinBad }}" hint-placeholder-val="{{ false }}">
+                    <p style="margin:10px 2px 0; font:500 13px/1.45 ui-sans-serif,system-ui,sans-serif; color:{{ c.late }}">{{ s.pinWrong }}</p>
+                  </sc-if>
+                  <p style="margin:10px 2px 0; font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.pinFoot }}</p>
+                  <div style="flex:1; min-height:18px"></div>
+                  <button onClick="{{ pPinNext }}" style="width:100%; min-height:58px; border:none; border-radius:14px; background:{{ c.brand }}; color:{{ c.onBrand }}; font:600 17px 'Space Grotesk',sans-serif; cursor:pointer" style-active="opacity:.85">{{ s.pairConnect }}</button>
+                  <button onClick="{{ pBack }}" style="width:100%; min-height:48px; margin-top:8px; border:none; background:none; color:{{ c.note }}; font:500 14.5px 'Space Grotesk',sans-serif; cursor:pointer">{{ s.pairBack }}</button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ pPull }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex; flex-direction:column; height:100%">
+                  <div style="font:600 28px/1.15 'Space Grotesk',sans-serif; letter-spacing:-.02em; color:{{ c.ink }}">{{ s.pullTitle }}</div>
+                  <p style="margin:9px 0 22px; font:400 14.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.pullBody }}</p>
+                  <div style="border:1px solid {{ c.hairline }}; border-radius:14px; background:{{ c.surface }}; overflow:hidden">
+                    <sc-for list="{{ pullRows }}" as="pr" hint-placeholder-count="6">
+                      <div style="display:flex; align-items:center; gap:11px; padding:13px 15px; border-bottom:1px solid {{ c.hairline }}">
+                        <span style="width:19px; height:19px; border-radius:10px; flex:none; display:flex; align-items:center; justify-content:center; background:{{ c.doneWash }}; color:{{ c.done }}; font:700 11px 'Space Grotesk',sans-serif">✓</span>
+                        <span style="flex:1; min-width:0; font:500 14.5px 'Space Grotesk',sans-serif; color:{{ c.ink }}">{{ pr.label }}</span>
+                        <span style="flex:none; font:500 13px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ pr.tone }}; direction:ltr">{{ pr.value }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <p style="margin:12px 2px 0; font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.pullFoot }}</p>
+                  <div style="flex:1; min-height:18px"></div>
+                  <button onClick="{{ pDone }}" style="width:100%; min-height:58px; border:none; border-radius:14px; background:{{ c.brand }}; color:{{ c.onBrand }}; font:600 17px 'Space Grotesk',sans-serif; cursor:pointer" style-active="opacity:.85">{{ s.pairFinish }}</button>
+                </div>
+              </sc-if>
+
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showApp }}" hint-placeholder-val="{{ true }}">
+            <div style="height:100%; display:flex; flex-direction:column; position:relative">
+
+              <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+                <div style="flex:none; padding:62px 16px 12px; border-bottom:1px solid {{ c.hairline }}">
+                  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:12px">
+                    <div style="display:flex; align-items:center; gap:11px; min-width:0">
+                      <img src="assets/logo/mark-256.png" alt="Khayt" width="38" height="38" style="width:38px; height:38px; border-radius:9px; flex:none; display:block">
+                      <div style="min-width:0">
+                        <div style="font:700 11px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin-bottom:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ shopName }}</div>
+                        <div style="font:600 27px/1 'Space Grotesk',sans-serif; letter-spacing:-.02em; color:{{ c.ink }}">{{ s.shopPulse }}</div>
+                      </div>
+                    </div>
+                    <button onClick="{{ goNotifs }}" style="flex:none; position:relative; width:44px; height:44px; border-radius:12px; border:1px solid {{ c.hairline }}; background:{{ c.surface }}; cursor:pointer; display:flex; align-items:center; justify-content:center; color:{{ c.ink }}">
+                      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"></path><path d="M10.5 19a1.8 1.8 0 0 0 3 0"></path></svg>
+                      <sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}">
+                        <span style="position:absolute; top:7px; inset-inline-end:7px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:{{ c.late }}; color:{{ c.ground }}; font:700 10px/17px 'Space Grotesk',sans-serif; text-align:center; direction:ltr">{{ unreadCount }}</span>
+                      </sc-if>
+                    </button>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isPlainHeader }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none; display:flex; align-items:center; gap:8px; padding:62px 14px 12px; border-bottom:1px solid {{ c.hairline }}; min-height:44px">
+                  <sc-if value="{{ canBack }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ pop }}" style="flex:none; min-width:44px; min-height:44px; display:flex; align-items:center; padding:0 6px; background:none; border:none; cursor:pointer; color:{{ c.brand }}">
+                      <svg width="10" height="17" viewBox="0 0 10 17" fill="none" style="transform:{{ arrowFlip }}"><path d="M8 1.5L1.5 8.5 8 15.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    </button>
+                  </sc-if>
+                  <div style="flex:1; min-width:0; padding-inline-start:{{ titlePad }}">
+                    <div style="font:600 21px/1.2 'Space Grotesk',sans-serif; letter-spacing:-.01em; color:{{ c.ink }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ navTitle }}</div>
+                    <sc-if value="{{ hasNavSub }}" hint-placeholder-val="{{ false }}">
+                      <div style="font:400 12.5px/1.3 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ navSub }}</div>
+                    </sc-if>
+                  </div>
+                  <sc-if value="{{ hasNavAction }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ navAction }}" style="flex:none; min-width:44px; min-height:44px; padding:0 13px; border-radius:11px; border:none; background:{{ c.brandWash }}; color:{{ c.brand }}; font:600 14px 'Space Grotesk',sans-serif; cursor:pointer">{{ navActionLabel }}</button>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ showAsOf }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none; display:flex; align-items:center; gap:9px; padding:9px 16px; background:{{ asOfBg }}; border-bottom:1px solid {{ c.hairline }}">
+                  <span style="width:7px; height:7px; border-radius:4px; flex:none; background:{{ asOfTone }}"></span>
+                  <span style="flex:1; min-width:0; font:500 12.5px/1.35 'Space Grotesk',sans-serif; color:{{ asOfTone }}">{{ asOfText }}</span>
+                  <sc-if value="{{ showAsOfAction }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ toggleConn }}" style="flex:none; min-height:30px; padding:0 11px; border-radius:7px; border:1px solid {{ c.hairline }}; background:none; color:{{ c.note }}; font:600 11.5px 'Space Grotesk',sans-serif; cursor:pointer">{{ s.retry }}</button>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <div style="flex:1; min-height:0; overflow-y:auto; padding-bottom:18px">
+
+                <sc-if value="{{ notPulled }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:54px 28px; text-align:center">
+                    <div style="font:600 20px/1.25 'Space Grotesk',sans-serif; color:{{ c.ink }}; text-wrap:pretty">{{ s.notPulledTitle }}</div>
+                    <p style="margin:10px 0 0; font:400 14px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.notPulledBody }}</p>
+                    <button onClick="{{ toggleBook }}" style="width:100%; min-height:52px; margin-top:22px; border:none; border-radius:13px; background:{{ c.brand }}; color:{{ c.onBrand }}; font:600 15.5px 'Space Grotesk',sans-serif; cursor:pointer">{{ s.notPulledCta }}</button>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ bodyVisible }}" hint-placeholder-val="{{ true }}">
+                  <div>
+
+                    <sc-if value="{{ atHome }}" hint-placeholder-val="{{ true }}">
+                      <div>
+                        <div style="display:flex; gap:8px; padding:14px 16px 0">
+                          <div style="flex:1; min-width:0; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:12px; padding:12px 13px 11px">
+                            <div style="font:600 34px/1.05 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.ink }}; letter-spacing:-.02em">{{ n.pending }}</div>
+                            <div style="font:700 10.5px/1.2 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin-top:5px">{{ s.inQueue }}</div>
+                          </div>
+                          <div style="flex:1; min-width:0; position:relative; overflow:hidden; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:12px; padding:12px 13px 11px">
+                            <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ c.hot }}"></span>
+                            <div style="font:600 34px/1.05 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.hot }}; letter-spacing:-.02em">{{ n.printing }}</div>
+                            <div style="font:700 10.5px/1.2 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.hot }}; margin-top:5px">{{ s.printingStat }}</div>
+                          </div>
+                          <div style="flex:1; min-width:0; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:12px; padding:12px 13px 11px">
+                            <div style="font:600 34px/1.05 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.done }}; letter-spacing:-.02em">{{ n.completed }}</div>
+                            <div style="font:700 10.5px/1.2 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin-top:5px">{{ s.doneToday }}</div>
+                          </div>
+                        </div>
+
+                        <div style="padding:20px 16px 8px">
+                          <span style="font:700 11px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}">{{ s.money }}</span>
+                        </div>
+                        <div style="margin:0 16px; display:flex; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:12px; overflow:hidden">
+                          <sc-for list="{{ moneyFigures }}" as="mf" hint-placeholder-count="3">
+                            <div style="flex:1; min-width:0; padding:13px 12px; border-inline-end:1px solid {{ c.hairline }}">
+                              <div style="font:600 25px/1.05 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; letter-spacing:-.02em; color:{{ mf.tone }}; direction:ltr">{{ mf.value }}</div>
+                              <div style="font:700 9.5px/1.2 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin-top:6px">{{ mf.label }}</div>
+                              <div style="font:400 11px/1.3 ui-sans-serif,system-ui,sans-serif; color:{{ mf.noteTone }}; margin-top:3px">{{ mf.note }}</div>
+                            </div>
+                          </sc-for>
+                        </div>
+
+                        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:20px 16px 8px">
+                          <span style="font:700 11px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}">{{ s.pipeline }}</span>
+                          <span style="font:400 12px ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}">{{ s.tapToFilter }}</span>
+                        </div>
+                        <div style="display:flex; gap:7px; padding:0 16px; overflow-x:auto">
+                          <sc-for list="{{ lanes }}" as="lane" hint-placeholder-count="5">
+                            <button onClick="{{ lane.onPick }}" style="flex:none; min-width:60px; min-height:64px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:9px 8px; border-radius:11px; cursor:pointer; background:{{ lane.bg }}; border:1px solid {{ lane.line }}">
+                              <span style="font:600 21px/1 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ lane.ink }}">{{ lane.count }}</span>
+                              <span style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.08em; color:{{ lane.ink }}">{{ lane.label }}</span>
+                            </button>
+                          </sc-for>
+                        </div>
+
+                        <sc-if value="{{ hasAlerts }}" hint-placeholder-val="{{ true }}">
+                          <div style="display:flex; flex-direction:column; gap:8px; padding:16px 16px 0">
+                            <sc-for list="{{ alerts }}" as="al" hint-placeholder-count="2">
+                              <button onClick="{{ al.onGo }}" style="position:relative; overflow:hidden; display:flex; align-items:center; gap:11px; width:100%; min-height:56px; padding:11px 13px 11px 16px; border-radius:11px; cursor:pointer; text-align:start; background:{{ al.wash }}; border:1px solid {{ al.line }}">
+                                <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ al.tone }}"></span>
+                                <span style="flex:1; min-width:0">
+                                  <span style="display:block; font:600 13.5px/1.3 'Space Grotesk',sans-serif; color:{{ al.tone }}">{{ al.title }}</span>
+                                  <span style="display:block; font:400 12.5px/1.35 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ al.sub }}</span>
+                                </span>
+                                <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style="flex:none; transform:{{ arrowFlip }}"><path d="M1.5 1l5.5 6-5.5 6" stroke="{{ c.note }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                              </button>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+
+                        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:20px 16px 8px">
+                          <span style="font:700 11px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}">{{ laneTitle }}</span>
+                          <span style="font:400 12px ui-sans-serif,system-ui,sans-serif; font-variant-numeric:tabular-nums; color:{{ c.note }}">{{ homeCount }}</span>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:8px; padding:0 16px">
+                          <sc-for list="{{ homeJobs }}" as="job" hint-placeholder-count="4">
+                            <div style="position:relative; overflow:hidden; border-radius:11px; background:{{ job.swipeBg }}; touch-action:pan-y">
+                              <div style="position:absolute; inset:0; display:flex; align-items:center; padding:0 18px; pointer-events:none">
+                                <span style="font:700 11.5px/1 'Space Grotesk',sans-serif; letter-spacing:.08em; text-transform:uppercase; color:{{ job.swipeInk }}">{{ job.swipeLabel }}</span>
+                              </div>
+                              <button onClick="{{ job.onOpen }}" onPointerDown="{{ job.onDown }}" onPointerMove="{{ job.onMove }}" onPointerUp="{{ job.onUp }}" onPointerCancel="{{ job.onUp }}" style="position:relative; overflow:hidden; display:flex; width:100%; padding:0; text-align:start; cursor:pointer; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:11px; min-height:66px; transform:{{ job.swipeT }}; transition:{{ job.swipeTrans }}">
+                                <sc-if value="{{ job.hasRail }}" hint-placeholder-val="{{ true }}">
+                                  <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ job.tone }}"></span>
+                                </sc-if>
+                                <span style="flex:1; min-width:0; padding:11px 13px 11px 16px; display:flex; flex-direction:column; gap:5px">
+                                  <span style="display:flex; align-items:baseline; justify-content:space-between; gap:9px">
+                                    <span style="font:500 15px/1.3 'Space Grotesk',sans-serif; color:{{ c.ink }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ job.project }}</span>
+                                    <span style="flex:none; font:500 12px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.note }}; direction:ltr">{{ job.tag }}</span>
+                                  </span>
+                                  <span style="display:flex; align-items:center; justify-content:space-between; gap:9px">
+                                    <span style="font:400 12.5px/1.35 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ job.sub }}</span>
+                                    <span style="flex:none; padding:2px 8px; border-radius:999px; font:600 11px 'Space Grotesk',sans-serif; color:{{ job.tone }}; background:{{ job.wash }}">{{ job.stageLabel }}</span>
+                                  </span>
+                                  <sc-if value="{{ job.printing }}" hint-placeholder-val="{{ false }}">
+                                    <span style="display:flex; align-items:center; gap:9px; margin-top:2px">
+                                      <span style="flex:1; height:4px; border-radius:2px; background:{{ c.hairline }}; overflow:hidden">
+                                        <span style="display:block; height:100%; border-radius:2px; background:{{ c.hot }}; width:{{ job.pct }}"></span>
+                                      </span>
+                                      <span style="flex:none; font:500 11.5px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.hot }}; direction:ltr">{{ job.pct }}</span>
+                                      <sc-if value="{{ job.hasLeft }}" hint-placeholder-val="{{ false }}">
+                                        <span style="flex:none; font:400 11.5px ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}">{{ job.left }}</span>
+                                      </sc-if>
+                                    </span>
+                                  </sc-if>
+                                </span>
+                              </button>
+                            </div>
+                          </sc-for>
+                          <sc-if value="{{ homeEmpty }}" hint-placeholder-val="{{ false }}">
+                            <div style="padding:34px 16px; text-align:center">
+                              <div style="font:600 15px/1.3 'Space Grotesk',sans-serif; color:{{ c.ink }}">{{ s.queueClear }}</div>
+                              <div style="font:400 13px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:5px">{{ s.allCaughtUp }}</div>
+                            </div>
+                          </sc-if>
+                        </div>
+                        <p style="margin:14px 18px 0; font:400 11.5px/1.45 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-align:center">{{ s.swipeHint }}</p>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atOrders }}" hint-placeholder-val="{{ false }}">
+                      <div>
+                        <div style="display:flex; gap:3px; margin:14px 16px; padding:3px; background:{{ c.sunk }}; border-radius:10px">
+                          <sc-for list="{{ orderTabs }}" as="ot" hint-placeholder-count="2">
+                            <button onClick="{{ ot.onPick }}" style="flex:1; min-height:44px; border:none; border-radius:8px; cursor:pointer; font:600 13.5px 'Space Grotesk',sans-serif; background:{{ ot.bg }}; color:{{ ot.ink }}">{{ ot.label }}</button>
+                          </sc-for>
+                        </div>
+                        <div style="display:flex; gap:7px; padding:0 16px 14px; overflow-x:auto">
+                          <sc-for list="{{ chips }}" as="ch" hint-placeholder-count="5">
+                            <button onClick="{{ ch.onPick }}" style="flex:none; min-height:44px; padding:0 16px; border-radius:999px; cursor:pointer; font:600 13px 'Space Grotesk',sans-serif; background:{{ ch.bg }}; color:{{ ch.ink }}; border:1px solid {{ ch.line }}">{{ ch.label }}</button>
+                          </sc-for>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:8px; padding:0 16px">
+                          <sc-for list="{{ orderList }}" as="job" hint-placeholder-count="5">
+                            <div style="position:relative; overflow:hidden; border-radius:11px; background:{{ job.swipeBg }}; touch-action:pan-y">
+                              <div style="position:absolute; inset:0; display:flex; align-items:center; padding:0 18px; pointer-events:none">
+                                <span style="font:700 11.5px/1 'Space Grotesk',sans-serif; letter-spacing:.08em; text-transform:uppercase; color:{{ job.swipeInk }}">{{ job.swipeLabel }}</span>
+                              </div>
+                              <button onClick="{{ job.onOpen }}" onPointerDown="{{ job.onDown }}" onPointerMove="{{ job.onMove }}" onPointerUp="{{ job.onUp }}" onPointerCancel="{{ job.onUp }}" style="position:relative; overflow:hidden; display:flex; width:100%; padding:0; text-align:start; cursor:pointer; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:11px; min-height:70px; transform:{{ job.swipeT }}; transition:{{ job.swipeTrans }}">
+                                <sc-if value="{{ job.hasRail }}" hint-placeholder-val="{{ true }}">
+                                  <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ job.tone }}"></span>
+                                </sc-if>
+                                <span style="flex:1; min-width:0; padding:12px 13px 12px 16px; display:flex; flex-direction:column; gap:5px">
+                                  <span style="display:flex; align-items:baseline; justify-content:space-between; gap:9px">
+                                    <span style="font:500 15px/1.3 'Space Grotesk',sans-serif; color:{{ c.ink }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ job.project }}</span>
+                                    <span style="flex:none; font:500 12px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.note }}; direction:ltr">{{ job.tag }}</span>
+                                  </span>
+                                  <span style="font:400 12.5px/1.35 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ job.sub }}</span>
+                                  <span style="display:flex; align-items:center; gap:7px; margin-top:2px">
+                                    <span style="padding:2px 8px; border-radius:999px; font:600 11px 'Space Grotesk',sans-serif; color:{{ job.tone }}; background:{{ job.wash }}">{{ job.stageLabel }}</span>
+                                    <sc-if value="{{ job.late }}" hint-placeholder-val="{{ false }}">
+                                      <span style="padding:2px 8px; border-radius:999px; font:700 10.5px 'Space Grotesk',sans-serif; letter-spacing:.06em; color:{{ c.late }}; background:{{ c.lateWash }}">{{ s.late }}</span>
+                                    </sc-if>
+                                    <span style="flex:1"></span>
+                                    <span style="font:400 12px ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}">{{ job.due }}</span>
+                                  </span>
+                                </span>
+                              </button>
+                            </div>
+                          </sc-for>
+                          <sc-if value="{{ orderListEmpty }}" hint-placeholder-val="{{ false }}">
+                            <div style="padding:44px 16px; text-align:center">
+                              <div style="font:600 15px/1.3 'Space Grotesk',sans-serif; color:{{ c.ink }}">{{ emptyTitle }}</div>
+                              <div style="font:400 13px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:5px">{{ emptyBody }}</div>
+                            </div>
+                          </sc-if>
+                        </div>
+
+                        <sc-if value="{{ showWindowLine }}" hint-placeholder-val="{{ true }}">
+                          <div style="margin:18px 16px 0; padding-top:14px; border-top:1px solid {{ c.hairline }}">
+                            <div style="font:600 12.5px/1.35 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.ink }}; direction:{{ dir }}">{{ windowCount }}</div>
+                            <div style="font:400 12px/1.45 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:4px; text-wrap:pretty">{{ s.windowBody }}</div>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atOrder }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:16px">
+                        <div style="position:relative; overflow:hidden; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; padding:16px 16px 16px 19px">
+                          <sc-if value="{{ job.hasRail }}" hint-placeholder-val="{{ true }}">
+                            <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ job.tone }}"></span>
+                          </sc-if>
+                          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:11px">
+                            <span style="padding:3px 10px; border-radius:999px; font:600 12px 'Space Grotesk',sans-serif; color:{{ job.tone }}; background:{{ job.wash }}">{{ job.stageLabel }}</span>
+                            <sc-if value="{{ job.late }}" hint-placeholder-val="{{ false }}">
+                              <span style="padding:3px 10px; border-radius:999px; font:700 11px 'Space Grotesk',sans-serif; letter-spacing:.06em; color:{{ c.late }}; background:{{ c.lateWash }}">{{ s.late }}</span>
+                            </sc-if>
+                          </div>
+                          <div style="font:600 25px/1.2 'Space Grotesk',sans-serif; letter-spacing:-.02em; color:{{ c.ink }}; text-wrap:pretty">{{ job.project }}</div>
+                          <div style="font:400 14.5px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:6px">{{ job.client }}</div>
+                          <sc-if value="{{ job.printing }}" hint-placeholder-val="{{ false }}">
+                            <div style="margin-top:18px">
+                              <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:8px">
+                                <span style="font:700 10.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}">{{ s.printProgress }}</span>
+                                <span style="font:600 17px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.hot }}; direction:ltr">{{ job.pct }}</span>
+                              </div>
+                              <div style="height:7px; border-radius:4px; background:{{ c.hairline }}; overflow:hidden">
+                                <div style="height:100%; border-radius:4px; background:{{ c.hot }}; transition:width .45s cubic-bezier(.32,.72,0,1); width:{{ job.pct }}"></div>
+                              </div>
+                              <sc-if value="{{ job.hasLeft }}" hint-placeholder-val="{{ false }}">
+                                <div style="font:400 12.5px ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:8px">{{ job.left }} {{ s.left }}</div>
+                              </sc-if>
+                              <sc-if value="{{ job.noEstimate }}" hint-placeholder-val="{{ false }}">
+                                <div style="font:400 12.5px ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:8px">{{ s.noEstimate }}</div>
+                              </sc-if>
+                            </div>
+                          </sc-if>
+                        </div>
+                        <div style="margin-top:12px; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; overflow:hidden">
+                          <sc-for list="{{ orderFields }}" as="f" hint-placeholder-count="5">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid {{ c.hairline }}; min-height:52px">
+                              <span style="font:400 14px ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}">{{ f.label }}</span>
+                              <span style="font:500 14.5px 'Space Grotesk',sans-serif; color:{{ c.ink }}; text-align:end">{{ f.value }}</span>
+                            </div>
+                          </sc-for>
+                        </div>
+                        <div style="margin-top:12px">
+                          <div style="font:700 10.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin:0 2px 9px">{{ s.moveTo }}</div>
+                          <div style="display:flex; flex-wrap:wrap; gap:7px">
+                            <sc-for list="{{ stagePicker }}" as="stg" hint-placeholder-count="5">
+                              <button onClick="{{ stg.onPick }}" style="flex:none; min-height:44px; padding:0 15px; border-radius:11px; cursor:pointer; font:600 13.5px 'Space Grotesk',sans-serif; background:{{ stg.bg }}; color:{{ stg.ink }}; border:1px solid {{ stg.line }}">{{ stg.label }}</button>
+                            </sc-for>
+                          </div>
+                        </div>
+                        <button onClick="{{ job.onAdvance }}" style="display:flex; align-items:center; justify-content:center; gap:9px; width:100%; min-height:62px; margin-top:18px; border:none; border-radius:14px; background:{{ c.brand }}; color:{{ c.onBrand }}; font:600 17px 'Space Grotesk',sans-serif; cursor:pointer" style-active="opacity:.85">
+                          <span>{{ job.advanceLabel }}</span>
+                          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex:none; transform:{{ arrowFlip }}"><path d="M3 9h11M10 4.5L14.5 9 10 13.5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                        </button>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atNewOrder }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:16px">
+                        <div style="background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; overflow:hidden">
+                          <sc-for list="{{ newFields }}" as="f" hint-placeholder-count="5">
+                            <div style="padding:12px 16px; border-bottom:1px solid {{ c.hairline }}">
+                              <label style="display:block; font:700 10px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin-bottom:7px">{{ f.label }}</label>
+                              <input value="{{ f.value }}" onChange="{{ f.onInput }}" placeholder="{{ f.placeholder }}" style="width:100%; min-height:32px; padding:0; border:none; background:none; outline:none; color:{{ c.ink }}; font:500 16px 'Space Grotesk',sans-serif">
+                            </div>
+                          </sc-for>
+                        </div>
+                        <p style="margin:12px 2px 0; font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ writeNoteTone }}; text-wrap:pretty">{{ writeNote }}</p>
+                        <button onClick="{{ submitOrder }}" disabled="{{ writeDisabled }}" style="width:100%; min-height:58px; margin-top:16px; border:none; border-radius:14px; background:{{ writeBtnBg }}; color:{{ writeBtnInk }}; font:600 17px 'Space Grotesk',sans-serif; cursor:{{ writeCursor }}" style-active="opacity:.85">{{ s.addToQueue }}</button>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atStock }}" hint-placeholder-val="{{ false }}">
+                      <div>
+                        <div style="padding:14px 16px 0">
+                          <div style="display:flex; align-items:center; gap:9px; min-height:46px; padding:0 13px; border-radius:12px; background:{{ c.surface }}; border:1px solid {{ c.hairline }}">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{ c.note }}" stroke-width="1.8" stroke-linecap="round" style="flex:none"><circle cx="11" cy="11" r="6.5"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                            <input value="{{ stockQ }}" onChange="{{ onStockQ }}" placeholder="{{ s.searchPlaceholder }}" style="flex:1; min-width:0; border:none; background:none; outline:none; color:{{ c.ink }}; font:400 15px ui-sans-serif,system-ui,sans-serif">
+                          </div>
+                        </div>
+                        <div style="display:flex; gap:7px; padding:12px 16px 14px; overflow-x:auto">
+                          <sc-for list="{{ stockChips }}" as="ch" hint-placeholder-count="2">
+                            <button onClick="{{ ch.onPick }}" style="flex:none; min-height:44px; padding:0 16px; border-radius:999px; cursor:pointer; font:600 13px 'Space Grotesk',sans-serif; background:{{ ch.bg }}; color:{{ ch.ink }}; border:1px solid {{ ch.line }}">{{ ch.label }}</button>
+                          </sc-for>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:8px; padding:0 16px">
+                          <sc-for list="{{ spoolList }}" as="sp" hint-placeholder-count="5">
+                            <button onClick="{{ sp.onOpen }}" style="position:relative; overflow:hidden; display:flex; align-items:center; gap:12px; width:100%; min-height:72px; padding:12px 13px 12px 16px; text-align:start; cursor:pointer; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:11px">
+                              <sc-if value="{{ sp.hasRail }}" hint-placeholder-val="{{ false }}">
+                                <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ c.attention }}"></span>
+                              </sc-if>
+                              <span style="flex:none; width:34px; height:34px; border-radius:17px; border:1px solid {{ c.hairline }}; background:{{ sp.hex }}"></span>
+                              <span style="flex:1; min-width:0">
+                                <span style="display:flex; align-items:baseline; gap:7px">
+                                  <span style="font:500 15px/1.3 'Space Grotesk',sans-serif; color:{{ c.ink }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ sp.name }}</span>
+                                  <span style="flex:none; font:500 11.5px 'Space Grotesk',sans-serif; color:{{ c.note }}; direction:ltr">{{ sp.id }}</span>
+                                </span>
+                                <span style="display:flex; align-items:center; gap:9px; margin-top:7px">
+                                  <span style="flex:1; height:4px; border-radius:2px; background:{{ c.hairline }}; overflow:hidden">
+                                    <span style="display:block; height:100%; border-radius:2px; background:{{ sp.barTone }}; width:{{ sp.pct }}"></span>
+                                  </span>
+                                  <span style="flex:none; font:500 12.5px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ sp.barTone }}; direction:ltr">{{ sp.grams }}</span>
+                                </span>
+                              </span>
+                            </button>
+                          </sc-for>
+                          <sc-if value="{{ spoolListEmpty }}" hint-placeholder-val="{{ false }}">
+                            <div style="padding:44px 16px; text-align:center">
+                              <div style="font:600 15px/1.3 'Space Grotesk',sans-serif; color:{{ c.ink }}">{{ s.noResults }}</div>
+                              <div style="font:400 13px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:5px">{{ s.tryDiffSearch }}</div>
+                            </div>
+                          </sc-if>
+                        </div>
+                        <div style="margin:18px 16px 0; padding-top:14px; border-top:1px solid {{ c.hairline }}">
+                          <div style="font:600 12.5px/1.35 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.ink }}">{{ wholeInventory }}</div>
+                          <div style="font:400 12px/1.45 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:4px; text-wrap:pretty">{{ s.wholeBody }}</div>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atSpool }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:16px">
+                        <div style="display:flex; align-items:center; gap:15px; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; padding:16px">
+                          <span style="flex:none; width:64px; height:64px; border-radius:32px; border:1px solid {{ c.hairline }}; background:{{ spool.hex }}"></span>
+                          <div style="flex:1; min-width:0">
+                            <div style="font:600 21px/1.2 'Space Grotesk',sans-serif; color:{{ c.ink }}; letter-spacing:-.01em">{{ spool.name }}</div>
+                            <div style="font:400 13.5px/1.35 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:4px; direction:ltr">{{ spool.id }}</div>
+                          </div>
+                        </div>
+                        <div style="margin-top:12px; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; padding:16px">
+                          <div style="display:flex; align-items:baseline; gap:5px">
+                            <span style="font:600 34px/1 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ spool.barTone }}; direction:ltr">{{ spool.remaining }}</span>
+                            <span style="font:500 15px 'Space Grotesk',sans-serif; color:{{ c.note }}">g {{ s.remaining }}</span>
+                          </div>
+                          <div style="height:7px; border-radius:4px; background:{{ c.hairline }}; overflow:hidden; margin-top:12px">
+                            <div style="height:100%; border-radius:4px; background:{{ spool.barTone }}; transition:width .35s ease; width:{{ spool.pct }}"></div>
+                          </div>
+                          <div style="display:flex; align-items:center; gap:9px; margin-top:14px">
+                            <button onClick="{{ spoolMinus }}" style="flex:1; min-height:46px; border-radius:11px; border:1px solid {{ c.hairline }}; background:none; color:{{ c.ink }}; font:600 15px 'Space Grotesk',sans-serif; cursor:pointer">−50 g</button>
+                            <button onClick="{{ spoolPlus }}" style="flex:1; min-height:46px; border-radius:11px; border:1px solid {{ c.hairline }}; background:none; color:{{ c.ink }}; font:600 15px 'Space Grotesk',sans-serif; cursor:pointer">+50 g</button>
+                          </div>
+                          <sc-if value="{{ spool.low }}" hint-placeholder-val="{{ false }}">
+                            <p style="margin:13px 0 0; font:400 13px/1.45 ui-sans-serif,system-ui,sans-serif; color:{{ c.attention }}">{{ s.lowStockWarn }}</p>
+                          </sc-if>
+                        </div>
+                        <div style="margin-top:12px; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; overflow:hidden">
+                          <sc-for list="{{ spoolFields }}" as="f" hint-placeholder-count="4">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid {{ c.hairline }}; min-height:52px">
+                              <span style="font:400 14px ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}">{{ f.label }}</span>
+                              <span style="font:500 14.5px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.ink }}; direction:ltr">{{ f.value }}</span>
+                            </div>
+                          </sc-for>
+                        </div>
+                        <button onClick="{{ writeNfc }}" style="display:flex; align-items:center; justify-content:center; gap:9px; width:100%; min-height:56px; margin-top:12px; border-radius:14px; border:1px solid {{ c.brand }}; background:{{ c.brandWash }}; color:{{ c.brand }}; font:600 15.5px 'Space Grotesk',sans-serif; cursor:pointer">
+                          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 8a8 8 0 0 1 0 8M9.5 6a12 12 0 0 1 0 12M13 4.5a16 16 0 0 1 0 15M17 3.5a20 20 0 0 1 0 17"></path></svg>
+                          <span>{{ s.writeNfc }}</span>
+                        </button>
+                        <p style="margin:9px 2px 0; font:400 12px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.nfcFoot }}</p>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atAddSpool }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:16px">
+                        <sc-if value="{{ addPicking }}" hint-placeholder-val="{{ true }}">
+                          <div style="display:flex; flex-direction:column; gap:10px">
+                            <sc-for list="{{ addMethods }}" as="m" hint-placeholder-count="3">
+                              <button onClick="{{ m.onPick }}" style="display:flex; align-items:center; gap:14px; width:100%; min-height:84px; padding:16px; text-align:start; cursor:pointer; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px">
+                                <span style="flex:none; width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:{{ m.iconBg }}; color:{{ m.iconInk }}">
+                                  <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ m.d1 }}"></path><path d="{{ m.d2 }}"></path></svg>
+                                </span>
+                                <span style="flex:1; min-width:0">
+                                  <span style="display:block; font:600 16.5px/1.25 'Space Grotesk',sans-serif; color:{{ c.ink }}">{{ m.title }}</span>
+                                  <span style="display:block; font:400 13px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:4px">{{ m.sub }}</span>
+                                </span>
+                              </button>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ addPhoto }}" hint-placeholder-val="{{ false }}">
+                          <div>
+                            <div style="position:relative; aspect-ratio:3/4; border-radius:16px; overflow:hidden; background:#0a0908; display:flex; align-items:center; justify-content:center">
+                              <div style="position:absolute; inset:34px 24px; border-radius:10px; border:2px dashed rgba(255,255,255,.34)"></div>
+                              <div style="position:absolute; inset-inline:24px; top:34px; height:2px; background:{{ c.brand }}; box-shadow:0 0 14px {{ c.brand }}"></div>
+                              <span style="position:relative; font:500 14px ui-sans-serif,system-ui,sans-serif; color:rgba(255,255,255,.72); text-align:center; padding:0 30px; text-wrap:pretty">{{ s.alignLabel }}</span>
+                            </div>
+                            <button onClick="{{ addCapture }}" style="width:100%; min-height:62px; margin-top:16px; border:none; border-radius:14px; background:{{ c.brand }}; color:{{ c.onBrand }}; font:600 17px 'Space Grotesk',sans-serif; cursor:pointer">{{ s.captureLabel }}</button>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ addNfc }}" hint-placeholder-val="{{ false }}">
+                          <div style="display:flex; flex-direction:column; align-items:center; padding:54px 20px 0; text-align:center">
+                            <span style="position:relative; width:92px; height:92px; border-radius:46px; display:flex; align-items:center; justify-content:center; background:{{ c.brandWash }}; color:{{ c.brand }}">
+                              <span style="position:absolute; inset:0; border-radius:46px; border:2px solid {{ c.brand }}; animation:khayt-ping 1.9s ease-out infinite"></span>
+                              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 8a8 8 0 0 1 0 8M9.5 6a12 12 0 0 1 0 12M13 4.5a16 16 0 0 1 0 15M17 3.5a20 20 0 0 1 0 17"></path></svg>
+                            </span>
+                            <div style="font:600 20px/1.25 'Space Grotesk',sans-serif; color:{{ c.ink }}; margin-top:26px">{{ s.readyToScan }}</div>
+                            <p style="margin:9px 0 0; font:400 14px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; max-width:260px; text-wrap:pretty">{{ s.holdNearTag }}</p>
+                            <button onClick="{{ addCapture }}" style="width:100%; min-height:52px; margin-top:32px; border-radius:13px; border:1px solid {{ c.hairline }}; background:none; color:{{ c.note }}; font:500 14.5px 'Space Grotesk',sans-serif; cursor:pointer">{{ s.simulateNfc }}</button>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ addManual }}" hint-placeholder-val="{{ false }}">
+                          <div>
+                            <div style="background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; overflow:hidden">
+                              <sc-for list="{{ spoolFormFields }}" as="f" hint-placeholder-count="4">
+                                <div style="padding:12px 16px; border-bottom:1px solid {{ c.hairline }}">
+                                  <label style="display:block; font:700 10px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin-bottom:7px">{{ f.label }}</label>
+                                  <input value="{{ f.value }}" onChange="{{ f.onInput }}" placeholder="{{ f.placeholder }}" style="width:100%; min-height:32px; padding:0; border:none; background:none; outline:none; color:{{ c.ink }}; font:500 16px 'Space Grotesk',sans-serif">
+                                </div>
+                              </sc-for>
+                            </div>
+                            <button onClick="{{ submitSpool }}" style="width:100%; min-height:58px; margin-top:16px; border:none; border-radius:14px; background:{{ c.brand }}; color:{{ c.onBrand }}; font:600 17px 'Space Grotesk',sans-serif; cursor:pointer">{{ s.addSpool }}</button>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atMachines }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex; flex-direction:column; gap:10px; padding:14px 16px 0">
+                        <sc-for list="{{ machineList }}" as="m" hint-placeholder-count="4">
+                          <div style="position:relative; overflow:hidden; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; padding:14px 15px 14px 18px">
+                            <sc-if value="{{ m.hasRail }}" hint-placeholder-val="{{ true }}">
+                              <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ m.tone }}"></span>
+                            </sc-if>
+                            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px">
+                              <span style="font:500 16px/1.3 'Space Grotesk',sans-serif; color:{{ c.ink }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ m.name }}</span>
+                              <span style="flex:none; padding:2px 9px; border-radius:999px; font:600 11.5px 'Space Grotesk',sans-serif; color:{{ m.tone }}; background:{{ m.wash }}">{{ m.statusLabel }}</span>
+                            </div>
+                            <div style="font:400 13px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ m.sub }}</div>
+                            <sc-if value="{{ m.running }}" hint-placeholder-val="{{ false }}">
+                              <div>
+                                <div style="display:flex; align-items:center; gap:9px; margin-top:11px">
+                                  <span style="flex:1; height:5px; border-radius:3px; background:{{ c.hairline }}; overflow:hidden">
+                                    <span style="display:block; height:100%; border-radius:3px; background:{{ c.hot }}; width:{{ m.pct }}"></span>
+                                  </span>
+                                  <span style="flex:none; font:500 13px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.hot }}; direction:ltr">{{ m.pct }}</span>
+                                </div>
+                                <div style="display:flex; gap:16px; margin-top:11px; padding-top:11px; border-top:1px solid {{ c.hairline }}">
+                                  <span style="font:400 12.5px ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}">{{ s.nozzle }} <span style="font:500 13px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.ink }}; direction:ltr">{{ m.nozzle }}</span></span>
+                                  <span style="font:400 12.5px ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}">{{ s.bed }} <span style="font:500 13px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ c.ink }}; direction:ltr">{{ m.bed }}</span></span>
+                                </div>
+                              </div>
+                            </sc-if>
+                          </div>
+                        </sc-for>
+                        <sc-if value="{{ machinesStale }}" hint-placeholder-val="{{ false }}">
+                          <p style="margin:6px 2px 0; font:400 12px/1.45 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.machinesStale }}</p>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atClients }}" hint-placeholder-val="{{ false }}">
+                      <div>
+                        <div style="display:flex; flex-direction:column; gap:8px; padding:14px 16px 0">
+                          <sc-for list="{{ clientList }}" as="cl" hint-placeholder-count="6">
+                            <div style="display:flex; align-items:center; gap:12px; min-height:68px; padding:12px 14px; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:11px">
+                              <span style="flex:none; width:38px; height:38px; border-radius:19px; display:flex; align-items:center; justify-content:center; background:{{ c.sunk }}; color:{{ c.note }}; font:600 15px 'Space Grotesk',sans-serif">{{ cl.initial }}</span>
+                              <div style="flex:1; min-width:0">
+                                <div style="font:500 15px/1.3 'Space Grotesk',sans-serif; color:{{ c.ink }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ cl.name }}</div>
+                                <div style="font:400 12.5px/1.35 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:3px">{{ cl.open }}</div>
+                              </div>
+                              <div style="flex:none; text-align:end">
+                                <div style="font:600 15px/1.2 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ cl.totalTone }}; direction:ltr">{{ cl.total }}</div>
+                                <div style="font:400 10.5px/1.2 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:4px">{{ cl.totalNote }}</div>
+                              </div>
+                            </div>
+                          </sc-for>
+                        </div>
+                        <div style="margin:18px 16px 0; padding-top:14px; border-top:1px solid {{ c.hairline }}">
+                          <div style="font:600 12.5px/1.35 'Space Grotesk',sans-serif; color:{{ c.ink }}">{{ wholeClients }}</div>
+                          <div style="font:400 12px/1.45 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:4px; text-wrap:pretty">{{ s.clientsWindowBody }}</div>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atIntake }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:14px 16px 0">
+                        <p style="margin:0 2px 14px; font:400 13px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.intakeFoot }}</p>
+                        <div style="display:flex; flex-direction:column; gap:10px">
+                          <sc-for list="{{ intakeList }}" as="it" hint-placeholder-count="3">
+                            <div style="position:relative; overflow:hidden; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; padding:14px 15px 14px 18px">
+                              <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ c.attention }}"></span>
+                              <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px">
+                                <span style="font:500 16px/1.3 'Space Grotesk',sans-serif; color:{{ c.ink }}">{{ it.who }}</span>
+                                <span style="flex:none; font:400 12px ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}">{{ it.when }}</span>
+                              </div>
+                              <div style="font:400 13.5px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:5px; text-wrap:pretty">{{ it.want }}</div>
+                              <div style="display:flex; align-items:center; gap:8px; margin-top:13px">
+                                <button onClick="{{ it.onAccept }}" style="flex:1; min-height:46px; border-radius:11px; border:none; background:{{ c.brand }}; color:{{ c.onBrand }}; font:600 14.5px 'Space Grotesk',sans-serif; cursor:pointer">{{ s.takeIt }}</button>
+                                <button onClick="{{ it.onDismiss }}" style="flex:none; min-width:100px; min-height:46px; border-radius:11px; border:1px solid {{ c.hairline }}; background:none; color:{{ c.note }}; font:500 14.5px 'Space Grotesk',sans-serif; cursor:pointer">{{ s.dismiss }}</button>
+                              </div>
+                            </div>
+                          </sc-for>
+                          <sc-if value="{{ intakeEmpty }}" hint-placeholder-val="{{ false }}">
+                            <div style="padding:44px 16px; text-align:center">
+                              <div style="font:600 15px/1.3 'Space Grotesk',sans-serif; color:{{ c.ink }}">{{ s.nobodyWaiting }}</div>
+                              <div style="font:400 13px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:5px">{{ s.nobodyWaitingSub }}</div>
+                            </div>
+                          </sc-if>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atNotifs }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex; flex-direction:column; gap:8px; padding:14px 16px 0">
+                        <sc-for list="{{ notifList }}" as="nt" hint-placeholder-count="5">
+                          <div style="position:relative; overflow:hidden; display:flex; gap:12px; background:{{ nt.bg }}; border:1px solid {{ c.hairline }}; border-radius:12px; padding:13px 14px 13px 17px">
+                            <sc-if value="{{ nt.hasRail }}" hint-placeholder-val="{{ true }}">
+                              <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ nt.tone }}"></span>
+                            </sc-if>
+                            <div style="flex:1; min-width:0">
+                              <div style="font:500 14.5px/1.35 'Space Grotesk',sans-serif; color:{{ c.ink }}; text-wrap:pretty">{{ nt.title }}</div>
+                              <div style="font:400 12.5px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:4px">{{ nt.when }}</div>
+                            </div>
+                            <sc-if value="{{ nt.unread }}" hint-placeholder-val="{{ true }}">
+                              <span style="flex:none; width:8px; height:8px; border-radius:4px; margin-top:5px; background:{{ c.brand }}"></span>
+                            </sc-if>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ atSettings }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:14px 16px 0">
+                        <div style="position:relative; overflow:hidden; display:flex; align-items:center; gap:12px; background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; padding:15px 15px 15px 18px">
+                          <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:{{ connTone }}"></span>
+                          <div style="flex:1; min-width:0">
+                            <div style="font:600 15.5px/1.3 'Space Grotesk',sans-serif; color:{{ connTone }}">{{ connHeadline }}</div>
+                            <div style="font:400 13px/1.4 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; margin-top:4px">{{ connDetail }}</div>
+                          </div>
+                        </div>
+
+                        <div style="font:700 10.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin:22px 2px 9px">{{ s.theBook }}</div>
+                        <div style="background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; overflow:hidden">
+                          <sc-for list="{{ scopeRows }}" as="sr" hint-placeholder-count="5">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px; border-bottom:1px solid {{ c.hairline }}; min-height:50px">
+                              <span style="flex:1; min-width:0; font:400 14.5px ui-sans-serif,system-ui,sans-serif; color:{{ c.ink }}">{{ sr.label }}</span>
+                              <span style="flex:none; font:500 14px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; color:{{ sr.tone }}; direction:ltr">{{ sr.value }}</span>
+                            </div>
+                          </sc-for>
+                        </div>
+                        <p style="margin:9px 2px 0; font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ omittedLine }}</p>
+
+                        <div style="font:700 10.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin:22px 2px 9px">{{ s.language }}</div>
+                        <div style="display:flex; gap:3px; padding:3px; background:{{ c.sunk }}; border-radius:10px">
+                          <sc-for list="{{ langOpts }}" as="lo" hint-placeholder-count="2">
+                            <button onClick="{{ lo.onPick }}" style="flex:1; min-height:44px; border:none; border-radius:8px; cursor:pointer; font:600 14.5px 'Space Grotesk',sans-serif; background:{{ lo.bg }}; color:{{ lo.ink }}">{{ lo.label }}</button>
+                          </sc-for>
+                        </div>
+
+                        <div style="font:700 10.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:{{ c.note }}; margin:22px 2px 9px">{{ s.notifications }}</div>
+                        <div style="background:{{ c.surface }}; border:1px solid {{ c.hairline }}; border-radius:14px; overflow:hidden">
+                          <sc-for list="{{ toggles }}" as="tg" hint-placeholder-count="3">
+                            <button onClick="{{ tg.onToggle }}" style="display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:54px; padding:13px 16px; text-align:start; background:none; border:none; border-bottom:1px solid {{ c.hairline }}; cursor:pointer">
+                              <span style="flex:1; min-width:0; font:400 14.5px ui-sans-serif,system-ui,sans-serif; color:{{ c.ink }}">{{ tg.label }}</span>
+                              <span style="flex:none; width:50px; height:30px; border-radius:15px; padding:2px; display:flex; align-items:center; background:{{ tg.track }}; justify-content:{{ tg.justify }}; transition:background .2s ease">
+                                <span style="width:26px; height:26px; border-radius:13px; background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+                              </span>
+                            </button>
+                          </sc-for>
+                        </div>
+
+                        <button onClick="{{ unpair }}" style="width:100%; min-height:54px; margin-top:22px; border-radius:13px; border:1px solid {{ c.lateLine }}; background:{{ c.lateWash }}; color:{{ c.late }}; font:600 15.5px 'Space Grotesk',sans-serif; cursor:pointer">{{ s.unpairDevice }}</button>
+                        <p style="margin:9px 2px 0; font:400 12px/1.5 ui-sans-serif,system-ui,sans-serif; color:{{ c.note }}; text-wrap:pretty">{{ s.unpairFoot }}</p>
+                      </div>
+                    </sc-if>
+
+                  </div>
+                </sc-if>
+              </div>
+
+              <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute; inset-inline:16px; bottom:98px; z-index:40; display:flex; align-items:center; gap:10px; padding:13px 16px; border-radius:12px; background:{{ c.toastBg }}; border:1px solid {{ c.hairline }}; box-shadow:0 8px 28px rgba(0,0,0,.36); animation:khayt-rise .24s cubic-bezier(.32,.72,0,1)">
+                  <span style="width:8px; height:8px; border-radius:4px; flex:none; background:{{ c.done }}"></span>
+                  <span style="flex:1; min-width:0; font:500 14px 'Space Grotesk',sans-serif; color:{{ c.ink }}">{{ toast }}</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+                <div style="flex:none; display:flex; background:{{ c.surface }}; border-top:1px solid {{ c.hairline }}; padding-bottom:26px">
+                  <button onClick="{{ goHome }}" style="flex:1; min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:8px 1px 4px; background:none; border:none; cursor:pointer; color:{{ ink.home }}">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><rect x="3" y="3" width="7" height="9" rx="1.4"></rect><rect x="14" y="3" width="7" height="5" rx="1.4"></rect><rect x="14" y="12" width="7" height="9" rx="1.4"></rect><rect x="3" y="16" width="7" height="5" rx="1.4"></rect></svg>
+                    <span style="font:600 9.5px/1 'Space Grotesk',sans-serif; text-align:center">{{ s.tab_home }}</span>
+                  </button>
+                  <button onClick="{{ goOrders }}" style="flex:1; min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:8px 1px 4px; background:none; border:none; cursor:pointer; color:{{ ink.orders }}">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M8 4h11M8 9h11M8 15h11M8 20h11"></path><path d="M3.5 4h.01M3.5 9h.01M3.5 15h.01M3.5 20h.01"></path></svg>
+                    <span style="font:600 9.5px/1 'Space Grotesk',sans-serif; text-align:center">{{ s.tab_orders }}</span>
+                  </button>
+                  <button onClick="{{ goStock }}" style="flex:1; min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:8px 1px 4px; background:none; border:none; cursor:pointer; color:{{ ink.stock }}">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><rect x="5" y="3.5" width="14" height="17" rx="2"></rect><circle cx="12" cy="12" r="4.2"></circle><circle cx="12" cy="12" r="1.2"></circle><path d="M5 7h14M5 17h14"></path></svg>
+                    <span style="font:600 9.5px/1 'Space Grotesk',sans-serif; text-align:center">{{ s.tab_inventory }}</span>
+                  </button>
+                  <button onClick="{{ goMachines }}" style="flex:1; min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:8px 1px 4px; background:none; border:none; cursor:pointer; color:{{ ink.machines }}">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M7 9V3.5h10V9"></path><rect x="4" y="9" width="16" height="8" rx="1.8"></rect><path d="M7 15h10v5.5H7z"></path><circle cx="17" cy="12" r=".9" fill="currentColor" stroke="none"></circle></svg>
+                    <span style="font:600 9.5px/1 'Space Grotesk',sans-serif; text-align:center">{{ s.tab_machines }}</span>
+                  </button>
+                  <button onClick="{{ goClients }}" style="flex:1; min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:8px 1px 4px; background:none; border:none; cursor:pointer; color:{{ ink.clients }}">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="9" cy="8" r="3.2"></circle><path d="M3.5 19c.6-3.3 2.9-5 5.5-5s4.9 1.7 5.5 5"></path><path d="M16 5.2A3 3 0 0 1 16 11M20.5 19c-.4-2.2-1.6-3.7-3.2-4.4"></path></svg>
+                    <span style="font:600 9.5px/1 'Space Grotesk',sans-serif; text-align:center">{{ s.tab_clients }}</span>
+                  </button>
+                  <button onClick="{{ goSettings }}" style="flex:1; min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:8px 1px 4px; background:none; border:none; cursor:pointer; color:{{ ink.settings }}">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 13a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V20a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 4 13H3.8a2 2 0 1 1 0-4H4a1.6 1.6 0 0 0 1.1-2.7l-.1-.1A2 2 0 1 1 7.7 3.4l.1.1A1.6 1.6 0 0 0 10 4V3.8a2 2 0 1 1 4 0V4a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.6 1.6 0 0 0 20 10h.2a2 2 0 1 1 0 4H20a1.6 1.6 0 0 0-.6 0z"></path></svg>
+                    <span style="font:600 9.5px/1 'Space Grotesk',sans-serif; text-align:center">{{ s.tab_settings }}</span>
+                  </button>
+                </div>
+              </sc-if>
+
+            </div>
+          </sc-if>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="flex:1 1 300px; min-width:0; max-width:360px; display:flex; flex-direction:column; gap:16px">
+
+      <div style="background:#fbf9f5; border:1px solid #dcd5c8; border-radius:10px; padding:16px 18px">
+        <div style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-bottom:11px">The vocabulary for a partial book</div>
+        <p style="margin:0 0 14px; font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">Three patterns, and one rule that decides between them.</p>
+
+        <div style="display:flex; flex-direction:column; gap:14px">
+          <div>
+            <div style="font:600 13px/1.3 'Space Grotesk',sans-serif; color:#1E1A15; margin-bottom:4px">1 · Window line</div>
+            <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">At the <strong>end</strong> of a windowed list, never the top — the list is true as far as it goes, and the caveat belongs where it stops. Quiet, no rail: the shape of the book is not news.</div>
+            <div style="margin-top:8px; padding:11px 13px; border-top:1px solid #dcd5c8; background:#efebe3; border-radius:0 0 7px 7px">
+              <div style="font:600 12.5px 'Space Grotesk',sans-serif; color:#1E1A15; font-variant-numeric:tabular-nums">212 of 3,140 orders</div>
+              <div style="font:400 12px/1.45 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; margin-top:4px">Every unfinished one, and the newest 200 finished. Older history stays on the Mac.</div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font:600 13px/1.3 'Space Grotesk',sans-serif; color:#1E1A15; margin-bottom:4px">2 · Deferred figure</div>
+            <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">A number that would be a lie is <strong>not rendered as a number</strong>. It keeps its slot and its size so nothing reflows — but it is an em-dash in quiet ink, captioned with where the answer lives. Never a zero: a zero is an answer.</div>
+            <div style="margin-top:8px; display:flex; gap:10px">
+              <div style="flex:1; padding:11px 13px; background:#efebe3; border:1px solid #dcd5c8; border-radius:8px">
+                <div style="font:600 25px/1.05 'Space Grotesk',sans-serif; color:#1b5e4f; font-variant-numeric:tabular-nums">18,400</div>
+                <div style="font:700 9.5px/1.2 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-top:6px">This month</div>
+                <div style="font:400 11px/1.3 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; margin-top:3px">SAR</div>
+              </div>
+              <div style="flex:1; padding:11px 13px; background:#efebe3; border:1px solid #dcd5c8; border-radius:8px">
+                <div style="font:600 25px/1.05 'Space Grotesk',sans-serif; color:#4f5b69; font-variant-numeric:tabular-nums">—</div>
+                <div style="font:700 9.5px/1.2 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-top:6px">This year</div>
+                <div style="font:400 11px/1.3 ui-sans-serif,system-ui,sans-serif; color:#8a5a0b; margin-top:3px">On the Mac</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font:600 13px/1.3 'Space Grotesk',sans-serif; color:#1E1A15; margin-bottom:4px">3 · As-of stamp</div>
+            <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">One strip under the header, not a badge per row. The whole screen is as old as the book is; saying so once is honest and saying it forty times is noise.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#fbf9f5; border:1px solid #dcd5c8; border-radius:10px; padding:16px 18px">
+        <div style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-bottom:10px">The rule that decides</div>
+        <p style="margin:0 0 10px; font:400 12.5px/1.55 ui-sans-serif,system-ui,sans-serif; color:#1E1A15; text-wrap:pretty"><strong>A question bounded by recency is answerable when the window reaches past its boundary.</strong></p>
+        <p style="margin:0 0 10px; font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty"><code style="font:500 11.5px ui-monospace,monospace">openPlusNewest(200)</code> guarantees two things: <em>every</em> unfinished order whatever its age, and the newest 200 finished. So "in queue", "printing" and "done today" are always safe — open work all travels, and today's finished work is inside any window.</p>
+        <p style="margin:0; font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">"This month" is safe only if the oldest finished order the phone holds is <em>older</em> than the first of the month. Here the window reaches back to 14 June, so the month is covered and the year is not. The phone can work that out on its own — it knows the oldest record it holds — which means this is a computed decision, not a guess a screen makes.</p>
+      </div>
+
+      <div style="background:#fbf9f5; border:1px solid #dcd5c8; border-radius:10px; padding:16px 18px">
+        <div style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-bottom:11px">Your two conflicts, settled by the code</div>
+        <div style="display:flex; flex-direction:column; gap:13px">
+          <div>
+            <div style="font:600 13px/1.3 'Space Grotesk',sans-serif; color:#1E1A15; margin-bottom:3px">Clients is a tab. I was wrong.</div>
+            <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty"><code style="font:500 11.5px ui-monospace,monospace">ContentView.swift</code> ships six, including <code style="font:500 11.5px ui-monospace,monospace">tab.clients</code>. Five was my number for a companion that was a remote control; a phone that holds <code style="font:500 11.5px ui-monospace,monospace">clients</code> <em>whole</em> — while orders are windowed — has better client data than order data, and burying its most complete collection one level down would be backwards. Six tabs at 402pt gives 67pt each, which clears the target.</div>
+          </div>
+          <div>
+            <div style="font:600 13px/1.3 'Space Grotesk',sans-serif; color:#1E1A15; margin-bottom:3px">Inventory, not Stock.</div>
+            <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">The key is <code style="font:500 11.5px ui-monospace,monospace">tab.inventory</code>, the collection is <code style="font:500 11.5px ui-monospace,monospace">inventory</code>, the Arabic is المخزون, and the desktop says it too. I picked "Stock" because it is shorter in a tab — a typographic preference, which is not a reason to make the app disagree with its own data model in two languages. Renamed.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#fbf9f5; border:1px solid #dcd5c8; border-radius:10px; padding:16px 18px">
+        <div style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-bottom:10px">What these changes broke</div>
+        <div style="display:flex; flex-direction:column; gap:12px">
+          <div>
+            <div style="font:600 13px/1.3 'Space Grotesk',sans-serif; color:#1E1A15; margin-bottom:3px">The offline banner was wrong, not just incomplete</div>
+            <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">It said "Desktop offline — Khayt is not answering" in alarm red. When the phone holds the book, that is no longer a failure: it is the normal condition of a phone in a workshop. Losing the Mac is now a <em>quiet</em> as-of stamp, and red is kept for the shop where the Mac serves no book and the screens really are empty.</div>
+          </div>
+          <div>
+            <div style="font:600 13px/1.3 'Space Grotesk',sans-serif; color:#1E1A15; margin-bottom:3px">"Retry" became the wrong verb</div>
+            <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">Nothing failed, so there is nothing to retry. The action is to <em>refresh</em> a book that is working fine and merely old.</div>
+          </div>
+          <div>
+            <div style="font:600 13px/1.3 'Space Grotesk',sans-serif; color:#1E1A15; margin-bottom:3px">The 4-step wizard's best screen is gone</div>
+            <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">Step 4 checked three things and said honestly which failed. Bonjour deletes the two questions it was diagnosing. I moved that screen's job to the <em>pull</em>: it now itemises what actually landed, which both replaces the reassurance and teaches the window before the first list needs it.</div>
+          </div>
+          <div>
+            <div style="font:600 13px/1.3 'Space Grotesk',sans-serif; color:#1E1A15; margin-bottom:3px">Filing an expense writes somewhere you cannot read</div>
+            <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty"><code style="font:500 11.5px ui-monospace,monospace">expenses</code> is in <code style="font:500 11.5px ui-monospace,monospace">omitted</code>. The Expense screen you asked for can capture one but must never show a list or a total — it is write-only on this device, and the UI has to say so rather than show an empty ledger.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#fbf9f5; border:1px solid #dcd5c8; border-radius:10px; padding:16px 18px">
+        <div style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-bottom:10px">Order of work</div>
+        <div style="display:flex; flex-direction:column; gap:6px">
+          <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69"><strong style="color:#1b5e4f">Done</strong> — Bonjour pairing · partial-book vocabulary · six tabs · Inventory rename · swipe-to-advance · Clients</div>
+          <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69"><strong style="color:#1E1A15">Next</strong> — the seven screens: add spool as one sheet, spool detail, write NFC, barcode, waste, expense, quote</div>
+          <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69"><strong style="color:#1E1A15">Then</strong> — the handoff spec: tokens, per-screen states, Dynamic Type, RTL</div>
+          <div style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#8a5a0b"><strong>Blocked</strong> — the copy reconciliation. No <code style="font:500 11.5px ui-monospace,monospace">.strings</code>, <code style="font:500 11.5px ui-monospace,monospace">.xcstrings</code> or <code style="font:500 11.5px ui-monospace,monospace">.lproj</code> is committed. I can recover all 179 keys from the <code style="font:500 11.5px ui-monospace,monospace">L10n.tr()</code> call sites and infer EN, but the app's Arabic exists only in your Xcode project — export it and the table is a short job.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1240,&quot;height&quot;:1180},&quot;lang&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;en&quot;,&quot;ar&quot;],&quot;default&quot;:&quot;en&quot;,&quot;tsType&quot;:&quot;'en' | 'ar'&quot;,&quot;section&quot;:&quot;Localisation&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark' | 'light'&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;connected&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;State&quot;}}">
+const SEQ = ['pending', 'printing', 'post', 'qc', 'completed'];
+
+const STR = {
+  en: {
+    shopPulse: 'Shop Pulse', inQueue: 'In queue', printingStat: 'Printing', doneToday: 'Done today',
+    pipeline: 'Pipeline', tapToFilter: 'tap to filter', all: 'All', money: 'Money',
+    pending: 'Pending', printing: 'Printing', post: 'Post', qc: 'QC', completed: 'Done',
+    queueClear: 'Queue is clear', allCaughtUp: 'Nothing waiting on a person',
+    noCompleted: 'No completed orders', completedAppear: 'Finished work lands here',
+    lowStock: 'Low stock', spool: 'spool', spools: 'spools', jobs: 'jobs', orders: 'orders',
+    retry: 'Refresh',
+    tab_home: 'Home', tab_orders: 'Orders', tab_inventory: 'Inventory',
+    tab_machines: 'Machines', tab_clients: 'Clients', tab_settings: 'Settings',
+    active: 'Active', history: 'History', late: 'Late', left: 'left',
+    moveTo: 'Move to', advanceTo: 'Move to', markDone: 'Mark done', printProgress: 'Print progress',
+    dueDate: 'Due', filament: 'Filament', printer: 'Printer', quantity: 'Quantity', client: 'Client',
+    newOrder: 'New order', addToQueue: 'Add to the queue',
+    // The app refuses writes offline — it does not queue them. Promising a
+    // sync that does not exist would have shipped UI against a capability.
+    newOrderFoot: 'Writes go to the Mac. Needs it in reach.',
+    writeBlocked: 'The Mac is away. Khayt refuses writes rather than queueing them, so this cannot be saved yet.',
+    orderClient: 'Client', orderItem: 'Item', orderMaterial: 'Material', orderQty: 'Quantity', orderDue: 'Due date',
+    searchPlaceholder: 'Search brand, material, colour…', lowStockFilter: 'Low stock', allStock: 'All',
+    noResults: 'No results', tryDiffSearch: 'Try a different search',
+    inventory: 'Inventory', remaining: 'remaining', lowStockWarn: 'Low stock — worth ordering a replacement',
+    sku: 'SKU', lot: 'Lot', nozzleTemp: 'Nozzle temp', bedTemp: 'Bed temp', material: 'Material',
+    writeNfc: 'Write to NFC tag',
+    nfcFoot: 'Writes OpenTag3D by default. Whether the printer reads it depends on its firmware.',
+    addSpool: 'Add spool', scanLabel: 'Scan the label', photoOcr: 'Read the printed label with the camera',
+    nfcTap: 'Tap an NFC tag', nfcTapSub: 'Hold the phone against the spool tag',
+    manualEntry: 'Type it in', manualSub: 'Brand, material, colour, weight',
+    alignLabel: 'Align the label inside the frame', captureLabel: 'Capture', readyToScan: 'Ready to scan',
+    holdNearTag: 'Hold the phone near the NFC tag on the spool', simulateNfc: 'Simulate a read',
+    brand: 'Brand', colour: 'Colour', weight: 'Weight (g)',
+    machines: 'Machines', idle: 'Idle', error: 'Error', readyForJob: 'Ready for the next job',
+    nozzle: 'Nozzle', bed: 'Bed',
+    machinesStale: 'Live temperatures need the Mac. These are the last readings the book holds.',
+    clients: 'Clients', intake: 'Intake', takeIt: 'Take it', dismiss: 'Dismiss',
+    intakeFoot: 'Walk-ins and the waiting list. Taking one puts it in the queue as pending.',
+    nobodyWaiting: 'Nobody waiting', nobodyWaitingSub: 'Walk-ins will appear here',
+    notifications: 'Notifications', settings: 'Settings', theBook: 'What this phone holds',
+    language: 'Language', unpairDevice: 'Unpair this device',
+    unpairFoot: 'Deletes the shop’s book from this phone, along with the PIN.',
+    notifQueue: 'Queue changes', notifStock: 'Low filament', notifLate: 'Overdue orders',
+    connectedToDesktop: 'Working from the book', notReaching: 'Working from the book',
+    macInReach: 'Mac in reach', macAway: 'Mac away since 14:32',
+    owed: 'Owed', thisMonth: 'This month', thisYear: 'This year', onTheMac: 'On the Mac',
+    unpaidNote: '3 unpaid', sar: 'SAR',
+    openOrders: 'open', ordersWith: 'orders',
+    swipeHint: 'Swipe a job forward to advance it. Tap to open.',
+    noEstimate: 'No estimate yet — the machine has not reported one.',
+    // scope vocabulary
+    windowBody: 'Every unfinished one, and the newest 200 finished. Older history stays on the Mac.',
+    wholeBody: 'The phone holds every spool the shop has.',
+    clientsWindowBody: 'Every client travels. Their order totals do not — those need history the phone does not hold.',
+    asOfBook: 'Working from the book · as of {t}',
+    asOfNoBook: 'This shop’s Mac does not hand over records',
+    liveOnly: 'Live from the Mac · nothing is kept on this phone',
+    ordersTitle: 'Orders',
+    notPulledTitle: 'This phone has not been given the shop’s book yet',
+    notPulledBody: 'This Mac runs the older desktop, which does not serve records. Screens fill only while it is in reach.',
+    notPulledCta: 'Try fetching the book',
+    // pairing
+    findTitle: 'Which shop?', findBody: 'Macs running Khayt announce themselves on this Wi-Fi.',
+    searching: 'Searching', canWorkOffline: 'Can work offline with this shop',
+    needsMac: 'Needs the Mac in reach',
+    enterAddress: 'Enter the address myself',
+    enterAddressWhy: 'For a Mac that does not advertise, or a network that blocks it.',
+    manualTitle: 'The Mac’s address', manualBody: 'Khayt prints both on the desktop, under Settings → LAN API.',
+    desktopIp: 'Desktop IP', port: 'Port',
+    pinTitle: 'The owner PIN', pinBody: 'Four digits from Settings → LAN API. The intake PIN will not work here.',
+    pinFoot: 'Kept in the iPhone Keychain, never sent anywhere but this Mac.',
+    pinWrong: 'That PIN was refused. Check Settings → LAN API on the Mac.',
+    pairNext: 'Continue', pairBack: 'Back', pairConnect: 'Connect', pairFinish: 'Open the board',
+    pullTitle: 'Copying the shop’s book', pullBody: 'A working set, not the whole thing — history stays on the Mac.',
+    pullFoot: 'Expenses, print files, products and the audit log were not sent. The phone knows it does not have them.',
+    tMoved: 'Moved to', tQueued: 'Added to the queue', tSpool: 'Spool added', tNfc: 'Tag written',
+    tTaken: 'Added as pending', tDismissed: 'Dismissed',
+  },
+  ar: {
+    shopPulse: 'نبض الورشة', inQueue: 'في الانتظار', printingStat: 'قيد الطباعة', doneToday: 'اكتمل اليوم',
+    pipeline: 'المسار', tapToFilter: 'اضغط للتصفية', all: 'الكل', money: 'المال',
+    pending: 'معلّق', printing: 'طباعة', post: 'معالجة', qc: 'فحص', completed: 'مكتمل',
+    queueClear: 'الطابور فارغ', allCaughtUp: 'لا شيء ينتظر أحداً',
+    noCompleted: 'لا طلبات مكتملة', completedAppear: 'سيظهر العمل المنجز هنا',
+    lowStock: 'مخزون منخفض', spool: 'بكرة', spools: 'بكرات', jobs: 'مهام', orders: 'طلبات',
+    retry: 'تحديث',
+    tab_home: 'الرئيسية', tab_orders: 'الطلبات', tab_inventory: 'المخزون',
+    tab_machines: 'الآلات', tab_clients: 'العملاء', tab_settings: 'الإعدادات',
+    active: 'نشط', history: 'السجل', late: 'متأخر', left: 'متبقٍ',
+    moveTo: 'انقل إلى', advanceTo: 'انقل إلى', markDone: 'إنهاء', printProgress: 'تقدّم الطباعة',
+    dueDate: 'التسليم', filament: 'الخيط', printer: 'الطابعة', quantity: 'الكمية', client: 'العميل',
+    newOrder: 'طلب جديد', addToQueue: 'أضف إلى الطابور',
+    newOrderFoot: 'الكتابة تذهب إلى الماك. يحتاج أن يكون متاحاً.',
+    writeBlocked: 'الماك غير متاح. خيط يرفض الكتابة بدل أن يؤجّلها، لذا لا يمكن الحفظ الآن.',
+    orderClient: 'العميل', orderItem: 'القطعة', orderMaterial: 'المادة', orderQty: 'الكمية', orderDue: 'تاريخ التسليم',
+    searchPlaceholder: 'ابحث بالعلامة أو المادة أو اللون…', lowStockFilter: 'مخزون منخفض', allStock: 'الكل',
+    noResults: 'لا نتائج', tryDiffSearch: 'جرّب بحثاً مختلفاً',
+    inventory: 'المخزون', remaining: 'متبقٍ', lowStockWarn: 'مخزون منخفض — يُستحسن طلب بديل',
+    sku: 'الرمز', lot: 'التشغيلة', nozzleTemp: 'حرارة الفوهة', bedTemp: 'حرارة المنصّة', material: 'المادة',
+    writeNfc: 'اكتب على بطاقة NFC',
+    nfcFoot: 'يكتب OpenTag3D افتراضياً. قراءة الطابعة للبطاقة تعتمد على برنامجها.',
+    addSpool: 'إضافة بكرة', scanLabel: 'امسح الملصق', photoOcr: 'اقرأ الملصق المطبوع بالكاميرا',
+    nfcTap: 'المس بطاقة NFC', nfcTapSub: 'قرّب الهاتف من بطاقة البكرة',
+    manualEntry: 'أدخلها يدوياً', manualSub: 'العلامة والمادة واللون والوزن',
+    alignLabel: 'حاذِ الملصق داخل الإطار', captureLabel: 'التقاط', readyToScan: 'جاهز للمسح',
+    holdNearTag: 'قرّب الهاتف من بطاقة NFC على البكرة', simulateNfc: 'محاكاة قراءة',
+    brand: 'العلامة', colour: 'اللون', weight: 'الوزن (غ)',
+    machines: 'الآلات', idle: 'خامل', error: 'خطأ', readyForJob: 'جاهز للمهمة التالية',
+    nozzle: 'الفوهة', bed: 'المنصّة',
+    machinesStale: 'الحرارات الحيّة تحتاج الماك. هذه آخر قراءات في الدفتر.',
+    clients: 'العملاء', intake: 'الاستقبال', takeIt: 'خذها', dismiss: 'تجاهل',
+    intakeFoot: 'الزوار وقائمة الانتظار. أخذ أي منها يضعها في الطابور كمعلّقة.',
+    nobodyWaiting: 'لا أحد ينتظر', nobodyWaitingSub: 'سيظهر الزوار هنا',
+    notifications: 'الإشعارات', settings: 'الإعدادات', theBook: 'ما يحتفظ به هذا الهاتف',
+    language: 'اللغة', unpairDevice: 'فصل هذا الجهاز',
+    unpairFoot: 'يحذف دفتر الورشة من هذا الهاتف، ومعه الرمز.',
+    notifQueue: 'تغيّرات الطابور', notifStock: 'نقص الخيط', notifLate: 'الطلبات المتأخرة',
+    connectedToDesktop: 'يعمل من الدفتر', notReaching: 'يعمل من الدفتر',
+    macInReach: 'الماك متاح', macAway: 'الماك غير متاح منذ ١٤:٣٢',
+    owed: 'مستحق', thisMonth: 'هذا الشهر', thisYear: 'هذه السنة', onTheMac: 'على الماك',
+    unpaidNote: '٣ غير مدفوعة', sar: 'ر.س',
+    openOrders: 'مفتوحة', ordersWith: 'طلبات',
+    swipeHint: 'اسحب المهمة للأمام لتقديمها. اضغط للفتح.',
+    noEstimate: 'لا تقدير بعد — الآلة لم تُبلّغ عنه.',
+    windowBody: 'كل غير المنتهية، وأحدث ٢٠٠ منتهية. باقي السجل يبقى على الماك.',
+    wholeBody: 'الهاتف يحتفظ بكل بكرات الورشة.',
+    clientsWindowBody: 'كل العملاء موجودون. أما إجمالي طلباتهم فيحتاج سجلاً لا يحمله الهاتف.',
+    asOfBook: 'يعمل من الدفتر · حتى {t}',
+    asOfNoBook: 'ماك هذه الورشة لا يسلّم السجلات',
+    liveOnly: 'مباشر من الماك · لا يُحفظ شيء على هذا الهاتف',
+    ordersTitle: 'الطلبات',
+    notPulledTitle: 'لم يُسلَّم هذا الهاتف دفتر الورشة بعد',
+    notPulledBody: 'هذا الماك يشغّل النسخة القديمة التي لا تسلّم السجلات. تمتلئ الشاشات فقط عند توفّره.',
+    notPulledCta: 'حاول جلب الدفتر',
+    findTitle: 'أي ورشة؟', findBody: 'أجهزة الماك التي تشغّل خيط تعلن عن نفسها على هذه الشبكة.',
+    searching: 'جاري البحث', canWorkOffline: 'يمكن العمل دون اتصال مع هذه الورشة',
+    needsMac: 'يحتاج الماك قريباً',
+    enterAddress: 'سأُدخل العنوان بنفسي',
+    enterAddressWhy: 'لماك لا يعلن عن نفسه، أو شبكة تحجب ذلك.',
+    manualTitle: 'عنوان الماك', manualBody: 'يعرضهما خيط على السطح، في الإعدادات ← واجهة الشبكة.',
+    desktopIp: 'عنوان السطح', port: 'المنفذ',
+    pinTitle: 'رمز المالك', pinBody: 'أربعة أرقام من الإعدادات ← واجهة الشبكة. رمز الاستقبال لا يصلح هنا.',
+    pinFoot: 'يُحفظ في سلسلة مفاتيح الآيفون، ولا يُرسل إلا لهذا الماك.',
+    pinWrong: 'رُفض هذا الرمز. راجع الإعدادات ← واجهة الشبكة على الماك.',
+    pairNext: 'متابعة', pairBack: 'رجوع', pairConnect: 'اتصال', pairFinish: 'افتح اللوحة',
+    pullTitle: 'نسخ دفتر الورشة', pullBody: 'مجموعة عمل، لا الدفتر كاملاً — السجل يبقى على الماك.',
+    pullFoot: 'لم تُرسل المصروفات وملفات الطباعة والمنتجات وسجل التدقيق. والهاتف يعلم أنها ليست لديه.',
+    tMoved: 'نُقلت إلى', tQueued: 'أُضيف إلى الطابور', tSpool: 'أُضيفت البكرة', tNfc: 'كُتبت البطاقة',
+    tTaken: 'أُضيفت كمعلّقة', tDismissed: 'تم التجاهل',
+  },
+};
+
+const RAILED = { printing: true, qc: true };
+
+const DARK = {
+  ground: '#16130f', surface: '#201c17', sunk: '#2a251e', hairline: '#3a342c',
+  brand: '#4591ed', onBrand: '#0b1622', hot: '#f0763d', done: '#4fbfa0',
+  attention: '#e0a73c', late: '#f2564a', note: '#9ea7b3', ink: '#F2EDE4', toastBg: '#2a251e',
+};
+const LIGHT = {
+  ground: '#efebe3', surface: '#fbf9f5', sunk: '#e3ded3', hairline: '#dcd5c8',
+  brand: '#0b54ad', onBrand: '#ffffff', hot: '#af3e18', done: '#1b5e4f',
+  attention: '#8a5a0b', late: '#bb2d44', note: '#4f5b69', ink: '#1E1A15', toastBg: '#ffffff',
+};
+
+function wash(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+
+const JOBS = [
+  { id: '1284', project: 'Falcon hood', client: 'Acme Robotics', material: 'PLA · Ink', stage: 'printing', progress: 68, left: '2h 10m', machine: 'Snapmaker U1', qty: 4, due: 'Today' },
+  { id: '1285', project: 'Drone arm ×6', client: 'Najd Aerial', material: 'PETG · Slate', stage: 'printing', progress: 23, left: '5h 40m', machine: 'Bambu P1S', qty: 6, due: 'Tomorrow' },
+  { id: '1281', project: 'Gauge bezel', client: 'Rawabi Motors', material: 'ASA · Black', stage: 'post', qty: 12, due: 'Today', machine: 'Bambu P1S' },
+  { id: '1278', project: 'Clinic tray', client: 'Dr. Salem', material: 'PLA · White', stage: 'qc', qty: 20, due: '2 days ago', late: true, machine: 'Prusa MK4' },
+  { id: '1286', project: 'Shelf bracket', client: 'Walk-in', material: 'PLA · Ink', stage: 'pending', qty: 2, due: 'Thu' },
+  { id: '1287', project: 'Camera mount', client: "Studio Tis'een", material: 'PETG · Clear', stage: 'pending', qty: 1, due: 'Thu' },
+  { id: '1272', project: 'Vent grille ×3', client: 'Acme Robotics', material: 'ASA · Grey', stage: 'completed', qty: 3, due: 'Delivered' },
+];
+
+const SPOOLS = [
+  { id: 'SP-104', brand: 'Polymaker', material: 'PLA', colour: 'Ink', hex: '#1b1b1f', remaining: 180, total: 1000, sku: 'PM-PLA-INK-1K', lot: 'L2409-88', nozzle: '215 °C', bed: '60 °C' },
+  { id: 'SP-097', brand: 'Esun', material: 'PETG', colour: 'Slate', hex: '#5a6472', remaining: 120, total: 1000, sku: 'ES-PETG-SLT', lot: 'L2408-12', nozzle: '240 °C', bed: '80 °C' },
+  { id: 'SP-112', brand: 'Bambu', material: 'ASA', colour: 'Black', hex: '#0e0e10', remaining: 740, total: 1000, sku: 'BL-ASA-BLK', lot: 'L2410-04', nozzle: '260 °C', bed: '95 °C' },
+  { id: 'SP-101', brand: 'Polymaker', material: 'PLA', colour: 'White', hex: '#f2efe8', remaining: 620, total: 1000, sku: 'PM-PLA-WHT-1K', lot: 'L2409-90', nozzle: '215 °C', bed: '60 °C' },
+  { id: 'SP-118', brand: 'Esun', material: 'PETG', colour: 'Clear', hex: '#cfd8dd', remaining: 910, total: 1000, sku: 'ES-PETG-CLR', lot: 'L2410-21', nozzle: '240 °C', bed: '80 °C' },
+  { id: 'SP-090', brand: 'Bambu', material: 'ASA', colour: 'Grey', hex: '#8b8f95', remaining: 430, total: 1000, sku: 'BL-ASA-GRY', lot: 'L2407-77', nozzle: '260 °C', bed: '95 °C' },
+];
+
+const MACHINES = [
+  { id: 'm1', name: 'Snapmaker U1', status: 'printing', pct: 68, job: 'Falcon hood', nozzle: '218 / 220 °C', bed: '60 / 60 °C' },
+  { id: 'm2', name: 'Bambu P1S', status: 'printing', pct: 23, job: 'Drone arm ×6', nozzle: '246 / 250 °C', bed: '80 / 80 °C' },
+  { id: 'm3', name: 'Prusa MK4', status: 'idle' },
+  { id: 'm4', name: 'Elegoo Saturn 4', status: 'error', detail: 'Resin tank below minimum' },
+];
+
+const CLIENTS = [
+  { id: 'c1', name: 'Acme Robotics', open: 2 },
+  { id: 'c2', name: 'Najd Aerial', open: 1 },
+  { id: 'c3', name: 'Rawabi Motors', open: 1 },
+  { id: 'c4', name: 'Dr. Salem', open: 1 },
+  { id: 'c5', name: "Studio Tis'een", open: 1 },
+  { id: 'c6', name: 'Hail Prototyping', open: 0 },
+];
+
+const INTAKE = [
+  { id: 'w1', who: 'Ahmed R.', want: 'Phone stand, 2 pieces. Wants it in black, happy to wait until Thursday.', when: '12 min' },
+  { id: 'w2', who: 'Lina K.', want: 'Replacement gear for a coffee grinder. Brought an STL on a USB stick.', when: '40 min' },
+  { id: 'w3', who: 'Tareq', want: 'Drone canopy — needs a quote before committing.', when: '1h' },
+];
+
+const NOTIFS = [
+  { id: 'n1', title: 'Clinic tray is two days past its due date', when: '08:12', tone: 'late', unread: true },
+  { id: 'n2', title: 'Ink PLA is down to 180 g', when: '07:55', tone: 'attention', unread: true },
+  { id: 'n3', title: 'Elegoo Saturn 4 stopped — resin below minimum', when: 'Yesterday 19:40', tone: 'late', unread: true },
+  { id: 'n4', title: 'Vent grille ×3 was marked delivered', when: 'Yesterday 16:02', tone: 'done', unread: false },
+  { id: 'n5', title: 'Book refreshed from Khayt — Al Rawdah', when: 'Yesterday 09:15', tone: 'none', unread: false },
+];
+
+const SHOPS = [
+  { id: 'Khayt — Al Rawdah', servesBook: true },
+  { id: 'Workshop Mac', servesBook: false },
+  { id: 'Khayt — Warehouse', servesBook: true },
+];
+
+/// What the Mac said it sent. Mirrors BookScope.Taken.
+const SCOPE = {
+  printLog: { whole: false, sent: 212, available: 3140 },
+  clients: { whole: true, sent: 38 },
+  inventory: { whole: true, sent: 6 },
+  machines: { whole: true, sent: 4 },
+  waitingList: { whole: true, sent: 3 },
+};
+const OMITTED = ['expenses', 'printFiles', 'products', 'auditLog', 'giftCards'];
+// The oldest finished order the window reaches back to. This is the one fact
+// that decides whether a period figure is answerable.
+const WINDOW_REACHES = new Date('2026-06-14');
+const TODAY = new Date('2026-09-18');
+
+class Component extends DCLogic {
+  state = {
+    paired: true, pairStep: 'find', pickedShop: SHOPS[0].id, servesBook: true,
+    pairHost: '192.168.1.42', pairPort: '3219', pairPin: '', pinBad: false,
+    tab: 'home', push: null, selJob: null, selSpool: null,
+    lane: 'all', ordersTab: 'active', chip: 'all',
+    stockQ: '', stockLow: false, addMethod: null,
+    jobs: JOBS.map(j => ({ ...j })), spools: SPOOLS.map(s => ({ ...s })),
+    intake: INTAKE.map(i => ({ ...i })), notifs: NOTIFS.map(n => ({ ...n })),
+    form: { client: '', item: '', material: '', qty: '', due: '' },
+    spoolForm: { brand: '', material: '', colour: '', weight: '' },
+    notifOn: { queue: true, stock: true, late: false },
+    swipe: null,
+    lang: null, conn: null, theme: null, book: null, toast: null,
+  };
+
+  get lang() { return this.state.lang ?? (this.props.lang || 'en'); }
+  get connected() { return this.state.conn ?? (this.props.connected !== false); }
+  get dark() { return this.state.theme ?? (this.props.theme !== 'light'); }
+  /// Whether this phone actually holds a book. False models the Electron shop.
+  get hasBook() { return this.state.book ?? this.state.servesBook; }
+
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  say = (msg) => {
+    clearTimeout(this._t);
+    this.setState({ toast: msg });
+    this._t = setTimeout(() => this.setState({ toast: null }), 2100);
+  };
+
+  setStage = (id, stage) => {
+    const s = STR[this.lang];
+    this.setState(st => ({
+      jobs: st.jobs.map(j => j.id === id
+        ? {
+            ...j, stage,
+            late: stage === 'completed' ? false : j.late,
+            // A job that has just entered printing starts at nothing and has no
+            // estimate until the machine reports one.
+            progress: stage === 'printing' ? (j.progress ?? 0) : j.progress,
+          }
+        : j),
+    }));
+    this.say(s.tMoved + ' ' + s[stage]);
+  };
+
+  advance = (id) => {
+    const j = this.state.jobs.find(x => x.id === id);
+    if (!j) return;
+    this.setStage(id, SEQ[Math.min(SEQ.indexOf(j.stage) + 1, SEQ.length - 1)]);
+  };
+
+  renderVals() {
+    const lang = this.lang;
+    const rtl = lang === 'ar';
+    const s = STR[lang];
+    const c0 = this.dark ? DARK : LIGHT;
+    const connected = this.connected;
+    const hasBook = this.hasBook;
+    const st = this.state;
+    const jobs = st.jobs;
+
+    const c = {
+      ...c0,
+      brandWash: wash(c0.brand, 0.14),
+      lateWash: wash(c0.late, 0.12),
+      lateLine: wash(c0.late, 0.32),
+      doneWash: wash(c0.done, 0.16),
+    };
+
+    const TONE = { pending: c.note, printing: c.hot, post: c.note, qc: c.attention, completed: c.done };
+    const n = SEQ.reduce((a, k) => (a[k] = jobs.filter(j => j.stage === k).length, a), {});
+
+    // ── The one rule ────────────────────────────────────────────────────────
+    // A period figure is answerable when the window reaches PAST the period's
+    // start. The phone knows the oldest finished record it holds, so this is
+    // computed, never assumed. Open work always travels, so anything bounded to
+    // open orders (owed, in queue, printing) is answerable whatever the window.
+    const reaches = (periodStart) => SCOPE.printLog.whole || WINDOW_REACHES <= periodStart;
+    const monthStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+    const yearStart = new Date(TODAY.getFullYear(), 0, 1);
+
+    const figure = (value, label, note, tone, answerable) => answerable
+      ? { value, label, note, tone, noteTone: c.note }
+      : { value: '—', label, note: s.onTheMac, tone: c.note, noteTone: c.attention };
+
+    const moneyFigures = [
+      // Owed is computed from UNFINISHED orders, every one of which travels.
+      figure('4,820', s.owed, s.unpaidNote, c.attention, true),
+      figure('18,400', s.thisMonth, s.sar, c.done, reaches(monthStart)),
+      figure('—', s.thisYear, s.sar, c.done, reaches(yearStart)),
+    ];
+
+    // ── Swipe-to-advance ────────────────────────────────────────────────────
+    // The gesture is an accelerator. The whole row is still a 44pt+ tap that
+    // opens the detail, and the detail still carries the explicit button.
+    const fwd = rtl ? -1 : 1;
+    const THRESHOLD = 92;
+    const sw = st.swipe;
+
+    const shape = (j) => {
+      const canAdvance = j.stage !== 'completed';
+      const dragging = sw && sw.id === j.id;
+      const dx = dragging ? sw.dx : 0;
+      const past = dx * fwd > THRESHOLD;
+      const nextStage = SEQ[Math.min(SEQ.indexOf(j.stage) + 1, 4)];
+      return {
+        ...j,
+        tag: '#' + j.id,
+        tone: TONE[j.stage],
+        wash: wash(TONE[j.stage], 0.14),
+        hasRail: !!RAILED[j.stage] || !!j.late,
+        stageLabel: s[j.stage],
+        printing: j.stage === 'printing',
+        // A print that has only just started has no estimate yet, and a unit
+        // with nothing in front of it ("— left") is the same lie one step
+        // quieter. Same rule as a deferred figure: no value, no figure.
+        hasLeft: !!j.left,
+        noEstimate: j.stage === 'printing' && !j.left,
+        pct: (j.progress ?? 0) + '%',
+        sub: j.client + ' · ' + j.material + ' · ×' + j.qty,
+        advanceLabel: j.stage === 'qc' ? s.markDone : s.advanceTo + ' ' + s[nextStage],
+        swipeLabel: canAdvance ? (past ? s.markDone === s[nextStage] ? s.markDone : s[nextStage] : s.moveTo) : '',
+        swipeBg: canAdvance && dragging ? (past ? wash(c.brand, 0.22) : c.sunk) : 'transparent',
+        swipeInk: past ? c.brand : c.note,
+        swipeT: dx ? 'translateX(' + dx + 'px)' : 'none',
+        swipeTrans: dragging ? 'none' : 'transform .28s cubic-bezier(.32,.72,0,1)',
+        onDown: canAdvance ? (e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          this.setState({ swipe: { id: j.id, x0: e.clientX, dx: 0, moved: false } });
+        } : () => {},
+        onMove: canAdvance ? (e) => {
+          const cur = this.state.swipe;
+          if (!cur || cur.id !== j.id) return;
+          const d = e.clientX - cur.x0;
+          // Only track the forward direction; a backwards drag does nothing.
+          const clamped = d * fwd > 0 ? Math.min(Math.abs(d), 150) * fwd : 0;
+          this.setState({ swipe: { ...cur, dx: clamped, moved: Math.abs(d) > 6 } });
+        } : () => {},
+        onUp: canAdvance ? () => {
+          const cur = this.state.swipe;
+          this.setState({ swipe: null });
+          if (cur && cur.id === j.id && cur.dx * fwd > THRESHOLD) this.advance(j.id);
+        } : () => {},
+        onOpen: () => {
+          // A drag that moved must not also open the detail.
+          if (sw && sw.id === j.id && sw.moved) return;
+          this.setState({ push: 'order', selJob: j.id });
+        },
+        onAdvance: () => this.advance(j.id),
+      };
+    };
+
+    const push = st.push;
+    const tab = st.tab;
+    const screen = push || tab;
+    const go = (t) => () => this.setState({ tab: t, push: null });
+
+    // ── Home ────────────────────────────────────────────────────────────────
+    const lanes = [{ id: 'all', label: s.all, count: jobs.length }]
+      .concat(SEQ.map(k => ({ id: k, label: s[k], count: n[k] })))
+      .map(l => {
+        const on = l.id === st.lane;
+        const tone = l.id === 'all' ? c.brand : TONE[l.id];
+        return {
+          ...l,
+          bg: on ? wash(tone, 0.16) : c.surface,
+          line: on ? wash(tone, 0.55) : c.hairline,
+          ink: on ? tone : (l.count > 0 || l.id === 'all' ? c.ink : c.note),
+          onPick: () => l.id === 'completed'
+            ? this.setState({ tab: 'orders', push: null, ordersTab: 'history', chip: 'all' })
+            : this.setState({ lane: l.id }),
+        };
+      });
+
+    const homeFiltered = st.lane === 'all' ? jobs : jobs.filter(j => j.stage === st.lane);
+    const homeJobs = homeFiltered.slice(0, 5).map(shape);
+
+    const lowSpools = st.spools.filter(sp => sp.remaining <= 200);
+    const lateJobs = jobs.filter(j => j.late);
+    const alerts = [];
+    if (lateJobs.length) alerts.push({
+      tone: c.late, wash: c.lateWash, line: c.lateLine,
+      title: lateJobs.length + ' ' + (rtl ? 'طلب متأخر' : (lateJobs.length > 1 ? 'orders are late' : 'order is late')),
+      sub: lateJobs.map(j => j.project).join(' · '),
+      onGo: () => this.setState({ tab: 'orders', push: null, ordersTab: 'active', chip: 'all' }),
+    });
+    if (lowSpools.length) alerts.push({
+      tone: c.attention, wash: wash(c.attention, 0.11), line: wash(c.attention, 0.32),
+      title: s.lowStock + ' — ' + lowSpools.length + ' ' + (lowSpools.length > 1 ? s.spools : s.spool),
+      sub: lowSpools.map(sp => sp.brand + ' ' + sp.colour + ' · ' + sp.remaining + ' g').join(' · '),
+      onGo: () => this.setState({ tab: 'inventory', push: null, stockLow: true }),
+    });
+    if (st.intake.length) alerts.push({
+      tone: c.attention, wash: wash(c.attention, 0.11), line: wash(c.attention, 0.32),
+      title: st.intake.length + ' ' + (rtl ? 'ينتظرون' : (st.intake.length > 1 ? 'people are waiting' : 'person is waiting')),
+      sub: st.intake.map(i => i.who).join(' · '),
+      onGo: () => this.setState({ push: 'intake' }),
+    });
+
+    // ── Orders ──────────────────────────────────────────────────────────────
+    const isHistory = st.ordersTab === 'history';
+    const orderTabs = [{ id: 'active', label: s.active }, { id: 'history', label: s.history }].map(t => ({
+      ...t,
+      onPick: () => this.setState({ ordersTab: t.id, chip: 'all' }),
+      bg: t.id === st.ordersTab ? c.surface : 'transparent',
+      ink: t.id === st.ordersTab ? c.ink : c.note,
+    }));
+    const chipIds = isHistory ? ['all', 'completed'] : ['all', 'pending', 'printing', 'post', 'qc'];
+    const chips = chipIds.map(id => {
+      const on = id === st.chip;
+      const tone = id === 'all' ? c.brand : TONE[id];
+      return {
+        id, label: id === 'all' ? s.all : s[id],
+        onPick: () => this.setState({ chip: id }),
+        bg: on ? wash(tone, 0.16) : 'transparent',
+        ink: on ? tone : c.note,
+        line: on ? wash(tone, 0.5) : c.hairline,
+      };
+    });
+    const pool = isHistory ? jobs.filter(j => j.stage === 'completed') : jobs.filter(j => j.stage !== 'completed');
+    const orderList = (st.chip === 'all' ? pool : pool.filter(j => j.stage === st.chip)).map(shape);
+
+    const fmt = (v) => v.toLocaleString(rtl ? 'ar-EG' : 'en-US');
+
+    // ── Order detail ────────────────────────────────────────────────────────
+    const selJob = jobs.find(j => j.id === st.selJob);
+    const job = selJob ? shape(selJob) : null;
+    const orderFields = selJob ? [
+      { label: s.dueDate, value: selJob.due },
+      { label: s.filament, value: selJob.material },
+      { label: s.quantity, value: '×' + selJob.qty },
+      { label: s.printer, value: selJob.machine || '—' },
+      { label: s.client, value: selJob.client },
+    ] : [];
+    const stagePicker = selJob ? SEQ.map(k => {
+      const on = k === selJob.stage;
+      return {
+        label: s[k], onPick: () => this.setStage(selJob.id, k),
+        bg: on ? wash(TONE[k], 0.16) : 'transparent',
+        ink: on ? TONE[k] : c.note,
+        line: on ? wash(TONE[k], 0.5) : c.hairline,
+      };
+    }) : [];
+
+    // ── New order ───────────────────────────────────────────────────────────
+    const f = st.form;
+    const setF = (k) => (e) => { const v = e.target.value; this.setState(p => ({ form: { ...p.form, [k]: v } })); };
+    const newFields = [
+      { label: s.orderClient, value: f.client, placeholder: 'Acme Robotics', onInput: setF('client') },
+      { label: s.orderItem, value: f.item, placeholder: 'Falcon hood', onInput: setF('item') },
+      { label: s.orderMaterial, value: f.material, placeholder: 'PLA · Ink', onInput: setF('material') },
+      { label: s.orderQty, value: f.qty, placeholder: '4', onInput: setF('qty') },
+      { label: s.orderDue, value: f.due, placeholder: 'Thu', onInput: setF('due') },
+    ];
+
+    // ── Inventory ───────────────────────────────────────────────────────────
+    const q = st.stockQ.trim().toLowerCase();
+    const spoolShape = (sp) => {
+      const pctN = Math.round((sp.remaining / sp.total) * 100);
+      const low = sp.remaining <= 200;
+      return {
+        ...sp,
+        name: sp.brand + ' ' + sp.material + ' · ' + sp.colour,
+        pct: pctN + '%', grams: sp.remaining + ' g',
+        low, hasRail: low, barTone: low ? c.attention : c.note,
+        onOpen: () => this.setState({ push: 'spool', selSpool: sp.id }),
+      };
+    };
+    const spoolList = st.spools
+      .filter(sp => !st.stockLow || sp.remaining <= 200)
+      .filter(sp => !q || (sp.brand + ' ' + sp.material + ' ' + sp.colour).toLowerCase().includes(q))
+      .sort((a, b) => a.remaining - b.remaining)
+      .map(spoolShape);
+    const stockChips = [
+      { label: s.allStock, on: !st.stockLow, onPick: () => this.setState({ stockLow: false }) },
+      { label: s.lowStockFilter, on: st.stockLow, onPick: () => this.setState({ stockLow: true }) },
+    ].map(ch => ({
+      ...ch,
+      bg: ch.on ? wash(c.brand, 0.16) : 'transparent',
+      ink: ch.on ? c.brand : c.note,
+      line: ch.on ? wash(c.brand, 0.5) : c.hairline,
+    }));
+
+    const selSpool = st.spools.find(sp => sp.id === st.selSpool);
+    const spool = selSpool ? spoolShape(selSpool) : null;
+    const spoolFields = selSpool ? [
+      { label: s.sku, value: selSpool.sku }, { label: s.lot, value: selSpool.lot },
+      { label: s.nozzleTemp, value: selSpool.nozzle }, { label: s.bedTemp, value: selSpool.bed },
+    ] : [];
+    const bump = (d) => () => this.setState(p => ({
+      spools: p.spools.map(sp => sp.id === p.selSpool
+        ? { ...sp, remaining: Math.max(0, Math.min(sp.total, sp.remaining + d)) } : sp),
+    }));
+
+    // ── Add spool ───────────────────────────────────────────────────────────
+    const addMethods = [
+      { title: s.scanLabel, sub: s.photoOcr, id: 'photo', d1: 'M4 8h3l1.5-2.2h7L17 8h3v11H4z', d2: 'M12 16.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z' },
+      { title: s.nfcTap, sub: s.nfcTapSub, id: 'nfc', d1: 'M6 8a8 8 0 0 1 0 8M9.5 6a12 12 0 0 1 0 12', d2: 'M13 4.5a16 16 0 0 1 0 15M17 3.5a20 20 0 0 1 0 17' },
+      { title: s.manualEntry, sub: s.manualSub, id: 'manual', d1: 'M4 20h4L19 9a2 2 0 0 0-3-3L5 17z', d2: 'M14.5 6.5 17.5 9.5' },
+    ].map((m, i) => ({
+      ...m,
+      onPick: () => this.setState({ addMethod: m.id }),
+      iconBg: i === 0 ? c.brandWash : wash(c.note, 0.12),
+      iconInk: i === 0 ? c.brand : c.note,
+    }));
+    const sf = st.spoolForm;
+    const setSF = (k) => (e) => { const v = e.target.value; this.setState(p => ({ spoolForm: { ...p.spoolForm, [k]: v } })); };
+    const spoolFormFields = [
+      { label: s.brand, value: sf.brand, placeholder: 'Polymaker', onInput: setSF('brand') },
+      { label: s.material, value: sf.material, placeholder: 'PLA', onInput: setSF('material') },
+      { label: s.colour, value: sf.colour, placeholder: 'Ink', onInput: setSF('colour') },
+      { label: s.weight, value: sf.weight, placeholder: '1000', onInput: setSF('weight') },
+    ];
+
+    // ── Machines ────────────────────────────────────────────────────────────
+    const mTone = { printing: c.hot, idle: c.note, error: c.late };
+    const machineList = MACHINES.map(m => ({
+      ...m,
+      running: m.status === 'printing',
+      tone: mTone[m.status], wash: wash(mTone[m.status], 0.14),
+      hasRail: m.status !== 'idle',
+      statusLabel: m.status === 'printing' ? s.printing : (m.status === 'idle' ? s.idle : s.error),
+      sub: m.status === 'printing' ? m.job : (m.status === 'idle' ? s.readyForJob : m.detail),
+      pct: (m.pct ?? 0) + '%',
+    }));
+
+    // ── Clients — whole collection, windowed totals ─────────────────────────
+    const clientList = CLIENTS.map(cl => {
+      const openCount = jobs.filter(j => j.client === cl.name && j.stage !== 'completed').length;
+      return {
+        ...cl,
+        initial: cl.name.charAt(0),
+        open: openCount + ' ' + s.openOrders,
+        // The count of a client's orders needs all of printLog. It is windowed,
+        // so this is deferred rather than guessed.
+        total: SCOPE.printLog.whole ? String(cl.open) : '—',
+        totalTone: SCOPE.printLog.whole ? c.ink : c.note,
+        totalNote: SCOPE.printLog.whole ? s.ordersWith : s.onTheMac,
+      };
+    });
+
+    // ── Intake / notifications ──────────────────────────────────────────────
+    const intakeList = st.intake.map(i => ({
+      ...i,
+      onAccept: () => {
+        this.setState(p => ({
+          intake: p.intake.filter(x => x.id !== i.id),
+          jobs: p.jobs.concat([{
+            id: String(1290 + p.jobs.length), project: i.want.split(/[,.]/)[0], client: i.who,
+            material: 'PLA · Ink', stage: 'pending', qty: 1, due: 'Thu',
+          }]),
+        }));
+        this.say(s.tTaken);
+      },
+      onDismiss: () => { this.setState(p => ({ intake: p.intake.filter(x => x.id !== i.id) })); this.say(s.tDismissed); },
+    }));
+    const nTone = { late: c.late, attention: c.attention, done: c.done, none: c.note };
+    const notifList = st.notifs.map(nt => ({
+      ...nt, tone: nTone[nt.tone],
+      hasRail: nt.tone === 'late' || nt.tone === 'attention',
+      bg: nt.unread ? c.surface : 'transparent',
+    }));
+    const unread = st.notifs.filter(nt => nt.unread).length;
+
+    // ── Settings ────────────────────────────────────────────────────────────
+    const scopeRows = [
+      { key: 'printLog', label: s.ordersTitle }, { key: 'clients', label: s.clients },
+      { key: 'inventory', label: s.inventory }, { key: 'machines', label: s.machines },
+      { key: 'waitingList', label: s.intake },
+    ].map(r => {
+      const h = SCOPE[r.key];
+      return {
+        label: r.label,
+        value: h.whole ? fmt(h.sent) : fmt(h.sent) + ' / ' + fmt(h.available),
+        tone: h.whole ? c.ink : c.attention,
+      };
+    });
+    const langOpts = [{ id: 'en', label: 'English' }, { id: 'ar', label: 'العربية' }].map(o => ({
+      ...o, onPick: () => this.setState({ lang: o.id }),
+      bg: o.id === lang ? c.surface : 'transparent',
+      ink: o.id === lang ? c.ink : c.note,
+    }));
+    const toggles = [
+      { k: 'queue', label: s.notifQueue }, { k: 'stock', label: s.notifStock }, { k: 'late', label: s.notifLate },
+    ].map(t => ({
+      ...t, on: st.notifOn[t.k],
+      track: st.notifOn[t.k] ? c.done : c.sunk,
+      justify: st.notifOn[t.k] ? 'flex-end' : 'flex-start',
+      onToggle: () => this.setState(p => ({ notifOn: { ...p.notifOn, [t.k]: !p.notifOn[t.k] } })),
+    }));
+
+    // ── Pairing ─────────────────────────────────────────────────────────────
+    const shops = SHOPS.map(sh => ({
+      ...sh, name: sh.id,
+      sub: sh.servesBook ? s.canWorkOffline : s.needsMac,
+      subTone: sh.servesBook ? c.done : c.note,
+      onPick: () => this.setState({ pickedShop: sh.id, servesBook: sh.servesBook, book: null, pairStep: 'pin', pairPin: '', pinBad: false }),
+    }));
+    const pullRows = [
+      { label: rtl ? 'الإعدادات' : 'Settings', value: '✓', tone: c.done },
+      { label: rtl ? 'طلبات مفتوحة' : 'Open orders', value: fmt(12), tone: c.ink },
+      { label: rtl ? 'أحدث المنتهية' : 'Newest finished', value: fmt(200), tone: c.attention },
+      { label: s.clients, value: fmt(38), tone: c.ink },
+      { label: s.inventory, value: fmt(6), tone: c.ink },
+      { label: s.machines, value: fmt(4), tone: c.ink },
+    ];
+
+    // ── Chrome ──────────────────────────────────────────────────────────────
+    const titles = {
+      orders: s.tab_orders, inventory: s.tab_inventory, machines: s.tab_machines,
+      clients: s.tab_clients, settings: s.tab_settings,
+      order: selJob ? selJob.project : s.tab_orders, newOrder: s.newOrder,
+      spool: selSpool ? selSpool.brand + ' ' + selSpool.material : s.tab_inventory,
+      addSpool: s.addSpool, intake: s.intake, notifications: s.notifications,
+    };
+    const navActions = {
+      orders: { label: '+ ' + s.newOrder, go: () => this.setState({ push: 'newOrder' }) },
+      inventory: { label: '+ ' + s.addSpool, go: () => this.setState({ push: 'addSpool', addMethod: null }) },
+    };
+    const act = navActions[screen];
+    const tabInk = (t) => (tab === t && !push ? c.brand : c.note);
+
+    // A phone with a book is not "offline" when the Mac is away — it is simply
+    // working from a book of a certain age. Only a bookless shop is in trouble.
+    // Two axes, four cells — and only one of them is trouble.
+    //   book + Mac in reach  → nothing to say
+    //   book + Mac away      → a quiet age stamp; the screens are still true
+    //   bookless + in reach  → a quiet advisory; the screens are full, but live
+    //   bookless + away      → the only alarm: the screens really are empty
+    const showAsOf = st.paired && (!connected || !hasBook);
+    const notPulled = st.paired && !hasBook && !connected;
+    const asOfAlarm = !hasBook && !connected;
+
+    return {
+      s, c, dir: rtl ? 'rtl' : 'ltr', isDark: this.dark,
+      arrowFlip: rtl ? 'scaleX(-1)' : 'none',
+      showPair: !st.paired, showApp: st.paired,
+      shopName: st.pickedShop,
+
+      showAsOf,
+      asOfText: hasBook
+        ? s.asOfBook.replace('{t}', '14:32')
+        : (connected ? s.liveOnly : s.asOfNoBook),
+      asOfTone: asOfAlarm ? c.late : c.note,
+      asOfBg: asOfAlarm ? c.lateWash : c.sunk,
+      // Only offer the action where it is real. With the Mac already in reach
+      // there is nothing to reconnect to, and a button that flips a working
+      // session to offline is the "Retry" mistake wearing a different label.
+      showAsOfAction: !connected,
+      notPulled, bodyVisible: !notPulled,
+
+      isHome: st.paired && screen === 'home',
+      isPlainHeader: st.paired && screen !== 'home',
+      canBack: !!push, titlePad: push ? '0px' : '4px',
+      navTitle: titles[screen] || '',
+      navSub: screen === 'order' && selJob ? '#' + selJob.id + ' · ' + selJob.client : '',
+      hasNavSub: screen === 'order' && !!selJob,
+      hasNavAction: !!act && !push,
+      navActionLabel: act ? act.label : '', navAction: act ? act.go : () => {},
+      pop: () => this.setState({ push: null, addMethod: null }),
+
+      atHome: screen === 'home', atOrders: screen === 'orders', atOrder: screen === 'order',
+      atNewOrder: screen === 'newOrder', atStock: screen === 'inventory', atSpool: screen === 'spool',
+      atAddSpool: screen === 'addSpool', atMachines: screen === 'machines',
+      atClients: screen === 'clients', atIntake: screen === 'intake',
+      atNotifs: screen === 'notifications', atSettings: screen === 'settings',
+      showTabs: !push,
+
+      n, lanes, homeJobs, alerts, hasAlerts: alerts.length > 0, moneyFigures,
+      homeEmpty: homeJobs.length === 0,
+      homeCount: homeFiltered.length + ' ' + s.jobs,
+      laneTitle: st.lane === 'all' ? s.tab_orders : s[st.lane],
+      hasUnread: unread > 0, unreadCount: String(unread),
+      goNotifs: () => this.setState({ push: 'notifications' }),
+
+      orderTabs, chips, orderList, orderListEmpty: orderList.length === 0,
+      emptyTitle: isHistory ? s.noCompleted : s.queueClear,
+      emptyBody: isHistory ? s.completedAppear : s.allCaughtUp,
+      showWindowLine: isHistory && !SCOPE.printLog.whole,
+      windowCount: fmt(SCOPE.printLog.sent) + ' / ' + fmt(SCOPE.printLog.available) + ' ' + s.orders,
+      wholeInventory: fmt(SCOPE.inventory.sent) + ' ' + s.spools,
+      wholeClients: fmt(SCOPE.clients.sent) + ' ' + s.clients,
+      machinesStale: !connected,
+
+      job, orderFields, stagePicker, newFields,
+      submitOrder: () => {
+        const v = st.form;
+        this.setState(p => ({
+          jobs: p.jobs.concat([{
+            id: String(1290 + p.jobs.length), project: v.item || 'Untitled', client: v.client || 'Walk-in',
+            material: v.material || 'PLA · Ink', stage: 'pending', qty: Number(v.qty) || 1, due: v.due || 'Thu',
+          }]),
+          form: { client: '', item: '', material: '', qty: '', due: '' },
+          push: null, tab: 'orders', ordersTab: 'active', chip: 'all',
+        }));
+        this.say(s.tQueued);
+      },
+
+      stockQ: st.stockQ, onStockQ: (e) => { const v = e.target.value; this.setState({ stockQ: v }); },
+      stockChips, spoolList, spoolListEmpty: spoolList.length === 0,
+      spool, spoolFields, spoolMinus: bump(-50), spoolPlus: bump(50),
+      writeNfc: () => this.say(s.tNfc),
+      addMethods, spoolFormFields,
+      addPicking: !st.addMethod, addPhoto: st.addMethod === 'photo',
+      addNfc: st.addMethod === 'nfc', addManual: st.addMethod === 'manual',
+      addCapture: () => this.setState({ addMethod: 'manual' }),
+      submitSpool: () => {
+        const v = st.spoolForm;
+        this.setState(p => ({
+          spools: p.spools.concat([{
+            id: 'SP-' + (120 + p.spools.length), brand: v.brand || 'Polymaker',
+            material: v.material || 'PLA', colour: v.colour || 'Ink', hex: '#6b7280',
+            remaining: Number(v.weight) || 1000, total: Number(v.weight) || 1000,
+            sku: '—', lot: '—', nozzle: '215 °C', bed: '60 °C',
+          }]),
+          spoolForm: { brand: '', material: '', colour: '', weight: '' },
+          push: null, tab: 'inventory', stockLow: false,
+        }));
+        this.say(s.tSpool);
+      },
+
+      machineList, clientList, intakeList, intakeEmpty: intakeList.length === 0, notifList,
+      scopeRows, langOpts, toggles,
+      omittedLine: (rtl ? 'لم تُرسل: ' : 'Not sent: ') + OMITTED.join(', ') + '.',
+      // Settings is where somebody goes to diagnose the link, so the headline
+      // is the CONNECTION and the line under it is what that means for data.
+      // Previously both branches read "Working from the book", which answered
+      // the second question twice and the first one never.
+      connTone: connected ? c.done : (hasBook ? c.note : c.late),
+      connHeadline: connected ? s.macInReach : s.macAway,
+      connDetail: st.pickedShop + ' · ' + (hasBook ? s.connectedToDesktop : s.liveOnly),
+      canWrite: connected,
+      writeDisabled: !connected,
+      writeCursor: connected ? 'pointer' : 'not-allowed',
+      writeNoteTone: connected ? c.note : c.attention,
+      writeNote: connected ? s.newOrderFoot : s.writeBlocked,
+      writeBtnBg: connected ? c.brand : c.sunk,
+      writeBtnInk: connected ? c.onBrand : c.note,
+      unpair: () => this.setState({ paired: false, pairStep: 'find', pairPin: '', tab: 'home', push: null }),
+
+      pFind: st.pairStep === 'find', pManual: st.pairStep === 'manual',
+      pPin: st.pairStep === 'pin', pPull: st.pairStep === 'pull',
+      shops, pullRows, pickedShop: st.pickedShop,
+      pairHost: st.pairHost, pairPort: st.pairPort, pairPin: st.pairPin,
+      pinBad: st.pinBad, pinLine: st.pinBad ? c.late : c.hairline,
+      onHost: (e) => { const v = e.target.value; this.setState({ pairHost: v }); },
+      onPort: (e) => { const v = e.target.value; this.setState({ pairPort: v }); },
+      onPin: (e) => { const v = e.target.value; this.setState({ pairPin: v, pinBad: false }); },
+      pGoManual: () => this.setState({ pairStep: 'manual' }),
+      pManualNext: () => this.setState({ pairStep: 'pin', pickedShop: st.pairHost, servesBook: true, book: null }),
+      pPinNext: () => st.pairPin.length < 4
+        ? this.setState({ pinBad: true })
+        : this.setState({ pairStep: st.servesBook ? 'pull' : 'done', paired: !st.servesBook, tab: 'home' }),
+      pDone: () => this.setState({ paired: true, tab: 'home', push: null }),
+      pBack: () => this.setState({ pairStep: st.pairStep === 'pin' ? 'find' : 'find', pinBad: false }),
+
+      ink: {
+        home: tabInk('home'), orders: tabInk('orders'), stock: tabInk('inventory'),
+        machines: tabInk('machines'), clients: tabInk('clients'), settings: tabInk('settings'),
+      },
+      goHome: go('home'), goOrders: go('orders'), goStock: go('inventory'),
+      goMachines: go('machines'), goClients: go('clients'), goSettings: go('settings'),
+      toast: st.toast,
+
+      rail: [
+        { id: 'pair', label: 'Pair — find a shop', go: () => this.setState({ paired: false, pairStep: 'find' }) },
+        { id: 'pairPin', label: 'Pair — owner PIN', go: () => this.setState({ paired: false, pairStep: 'pin', pairPin: '' }) },
+        { id: 'pairPull', label: 'Pair — copying the book', go: () => this.setState({ paired: false, pairStep: 'pull' }) },
+        { id: 'home', label: 'Board (home)', go: () => this.setState({ paired: true, tab: 'home', push: null }) },
+        { id: 'orders', label: 'Orders', go: () => this.setState({ paired: true, tab: 'orders', push: null, ordersTab: 'active' }) },
+        { id: 'ordersHist', label: 'Orders — history', go: () => this.setState({ paired: true, tab: 'orders', push: null, ordersTab: 'history', chip: 'all' }) },
+        { id: 'order', label: 'Order detail', go: () => this.setState({ paired: true, push: 'order', selJob: '1284' }) },
+        { id: 'newOrder', label: 'New order', go: () => this.setState({ paired: true, push: 'newOrder' }) },
+        { id: 'intake', label: 'Intake', go: () => this.setState({ paired: true, push: 'intake' }) },
+        { id: 'inventory', label: 'Inventory', go: () => this.setState({ paired: true, tab: 'inventory', push: null, stockLow: false, stockQ: '' }) },
+        { id: 'spool', label: 'Spool detail', go: () => this.setState({ paired: true, push: 'spool', selSpool: 'SP-104' }) },
+        { id: 'addSpool', label: 'Add spool', go: () => this.setState({ paired: true, push: 'addSpool', addMethod: null }) },
+        { id: 'machines', label: 'Machines', go: () => this.setState({ paired: true, tab: 'machines', push: null }) },
+        { id: 'clients', label: 'Clients', go: () => this.setState({ paired: true, tab: 'clients', push: null }) },
+        { id: 'notifications', label: 'Notifications', go: () => this.setState({ paired: true, push: 'notifications' }) },
+        { id: 'settings', label: 'Settings — the book', go: () => this.setState({ paired: true, tab: 'settings', push: null }) },
+      ].map(r => {
+        const active = !st.paired
+          ? (r.id === 'pair' && st.pairStep === 'find') || (r.id === 'pairPin' && st.pairStep === 'pin') || (r.id === 'pairPull' && st.pairStep === 'pull')
+          : r.id === screen || (r.id === 'ordersHist' && screen === 'orders' && isHistory);
+        return { ...r, onGo: r.go, bg: active ? '#e3ded3' : 'transparent', ink: active ? '#1E1A15' : '#4f5b69', dot: active ? '#0b54ad' : '#c9c1b2' };
+      }),
+
+      langBtn: rtl ? 'العربية · RTL' : 'English · LTR',
+      connBtn: connected ? 'Mac in reach' : 'Mac away',
+      themeBtn: this.dark ? 'Dark' : 'Warm paper',
+      bookBtn: hasBook ? 'Holds the book' : 'No book (Electron shop)',
+      toggleLang: () => this.setState({ lang: rtl ? 'en' : 'ar' }),
+      toggleConn: () => this.setState({ conn: !connected }),
+      toggleTheme: () => this.setState({ theme: !this.dark }),
+      toggleBook: () => this.setState({ book: !hasBook }),
+      resetAll: () => this.setState({
+        jobs: JOBS.map(j => ({ ...j })), spools: SPOOLS.map(x => ({ ...x })),
+        intake: INTAKE.map(i => ({ ...i })), notifs: NOTIFS.map(x => ({ ...x })),
+        lane: 'all', chip: 'all', ordersTab: 'active', stockQ: '', stockLow: false,
+        push: null, tab: 'home', paired: true, toast: null, swipe: null, book: null,
+        servesBook: true, pickedShop: SHOPS[0].id,
+      }),
+    };
+  }
+}
+</script>
+</body>
+</html>

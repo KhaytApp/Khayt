@@ -1,0 +1,50 @@
+{
+  "khayt": {
+    "manifest": 1
+  },
+  "id": "app.khayt.samples.slack",
+  "name": {
+    "en": "Slack alerts",
+    "ar": "تنبيهات Slack"
+  },
+  "description": {
+    "en": "Posts a message to a Slack channel when a job comes in or is paid."
+  },
+  "publisher": "Khayt",
+  "version": "1.0.0",
+  "domains": [
+    "hooks.slack.com"
+  ],
+  "secrets": [
+    {
+      "name": "webhookPath",
+      "label": {
+        "en": "Webhook path (the part after /services/)"
+      },
+      "kind": "url"
+    }
+  ],
+  "events": [
+    {
+      "event": "order_created",
+      "url": "https://hooks.slack.com/services/{secret.webhookPath}",
+      "body": {
+        "format": "json-template",
+        "template": {
+          "text": "New job {order.number}: {order.title} for {customer.name} ({order.total} {order.currency})"
+        }
+      }
+    },
+    {
+      "event": "payment_received",
+      "url": "https://hooks.slack.com/services/{secret.webhookPath}",
+      "body": {
+        "format": "json-template",
+        "template": {
+          "text": "Paid: {order.number} ({order.total} {order.currency})"
+        }
+      }
+    }
+  ],
+  "signature": "GKAez8Nc3hke6WN/yOF54cWiv+R8uttlIbxI9LGdOka5mNO5G7XglQivKIw4EDVaJIC2vRdW0k3dZePE5blPCQ=="
+}

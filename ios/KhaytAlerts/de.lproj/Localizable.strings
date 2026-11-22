@@ -1,0 +1,20 @@
+/* The notification service extension's own copy of the alert words.
+   Held to the app's by NotificationStringsTests. */
+"alert.print.finished" = "Druck abgeschlossen";
+"alert.print.failed" = "Druck fehlgeschlagen";
+"alert.print.cancelled" = "Druck abgebrochen";
+"alert.print.a_job" = "Ein Auftrag";
+"alert.print.move_post" = "In die Nachbearbeitung verschieben";
+"alert.print.reprint" = "Zurück in die Warteschlange";
+"alert.print.mark_shipped" = "Als versandt markieren";
+"PUSH_TITLE" = "Khayt";
+"PUSH_PRINT_FINISHED" = "Ein Druck ist fertig";
+"PUSH_INTAKE" = "Neue Auftragsanfrage";
+"PUSH_OVERDUE" = "Aufträge sind überfällig";
+"PUSH_LOW_STOCK" = "Filament wird knapp";
+"PUSH_DUE_TODAY" = "Aufträge sind heute fällig";
+"PUSH_QUOTE_DECISION" = "Ein Kunde hat auf ein Angebot geantwortet";
+"PUSH_QUOTE_APPROVED" = "Ein Kunde hat ein Angebot angenommen";
+"PUSH_QUOTE_DECLINED" = "Ein Kunde hat ein Angebot abgelehnt";
+"PUSH_MESSAGE" = "Ein Kunde hat eine Nachricht gesendet";
+"PUSH_PAYMENT" = "Eine Zahlung ist eingegangen";

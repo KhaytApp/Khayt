@@ -1,0 +1,161 @@
+/* NOTE: --ink-3 (aliased to --text-muted) is darkened/lightened to clear
+   WCAG AA 4.5:1 against BOTH --bg and --surface. It is used as a text colour in
+   192 CSS rules and 540 renderer call sites — hints, subtitles, metadata — so it
+   is body text, not decoration, and 2.75:1 was a real readability failure.
+   Measured, not eyeballed: see the contrast sweep in the scan.
+
+   Blueprint — Khayt's take on the Bed Ready design language.
+
+   Bed Ready dresses the app as a drafting instrument: a warm paper ground with
+   ink-dark type, and a blueprint-blue accent used as a drawn line rather than a
+   fill. Its dark mode is the distinctive half — not the usual neutral charcoal,
+   but a deep blueprint-blue ground with the accent LIGHTENED to sit on it, the
+   way white linework reads on a cyanotype.
+
+   The surface and ink values are lifted from renderer/bedready-theme.css so the
+   two products stay recognisably related; everything else is mapped onto the
+   token contract the shared Khayt renderer expects (see vivid/tokens.css).
+   Bed Ready itself is unaffected — it sets its own variables from
+   html[data-app="bedready"] and never reads this file. */
+
+html[data-design="blueprint"] {
+  /* ---- Surfaces (warm paper) ---- */
+  --bg:        #ece7db;   /* window backdrop — the paper */
+  --bg-2:      #e6e0d2;   /* sidebar wash */
+  --surface:   #f3efe6;   /* primary panel, lighter than the ground */
+  --surface-1: #f3efe6;
+  --surface-2: #e3dccc;   /* subtle panel / hover */
+  --surface-3: #dad2bf;
+  --panel:     #f3efe6;
+  --panel-2:   #e3dccc;
+
+  /* ---- Ink ---- */
+  --ink:       #21282c;
+  --ink-2:     #4c524f;
+  --ink-3:     #646862;
+  --ink-4:     #a6a79b;
+
+  /* ---- Lines (drawn, not filled — warm grey rather than pure black) ---- */
+  --line:      rgba(33,40,44,0.14);
+  --line-2:    rgba(33,40,44,0.09);
+  --line-soft: rgba(33,40,44,0.09);
+  --hairline:  rgba(33,40,44,0.07);
+
+  /* ---- Accent (blueprint blue) — HSL channels so applyAccent() can swap ---- */
+  --accent-h: 209;
+  --accent-s: 69%;
+  --accent-l: 35%;
+  --accent:      hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  --accent-ink:  #ffffff;
+  --on-accent:   #ffffff;
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.12);
+  --accent-line: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.40);
+  --accent-2:    #2a6b9c;
+
+  /* ---- Status palette. Muted to sit on paper without shouting; kept
+         independent of the accent so a recolour never restyles a warning. ---- */
+  --bp-blue:#1f5c8b;   --bp-blue-bg:#dde8f1;
+  --bp-green:#2f6b4f;  --bp-green-bg:#dfeade;
+  --bp-red:#a83a2f;    --bp-red-bg:#f4e0dc;
+  --bp-amber:#87601d;  --bp-amber-bg:#f3e7cf;
+  --bp-violet:#6a4c93; --bp-violet-bg:#e8e1f0;
+  --bp-teal:#276b6b;   --bp-teal-bg:#dcebe9;
+
+  /* ---- Shadows — paper lifts slightly; no heavy drop ---- */
+  --shadow-1: 0 1px 2px rgba(33,40,44,.07), 0 2px 6px rgba(33,40,44,.05);
+  --shadow-2: 0 6px 20px rgba(33,40,44,.10), 0 1px 2px rgba(33,40,44,.06);
+  --shadow-pop: var(--shadow-2);
+
+  /* ---- Radii — drafting-square corners, tighter than Vivid's 16px ---- */
+  --radius:    8px;
+  --radius-sm: 6px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
+  /* ---- Fonts. Grotesk for UI, mono for every figure: this is an instrument,
+         and columns of numbers should align. Both are already vendored under
+         renderer/fonts/ for the CSP — no new font is introduced here. ---- */
+  --font-ui:   "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-ar:   "IBM Plex Sans Arabic", var(--font-ui);
+  --font-sans: var(--font-ui);
+  --font-num:  var(--font-mono);
+  --mono:      var(--font-mono);
+
+  /* ---- Aliases the shared renderer reads ---- */
+  --text: var(--ink);
+  --text-dim: var(--ink-2);
+  --text-muted: var(--ink-3);
+  --text-faint: var(--ink-4);
+  --border: var(--line);
+  --border-2: rgba(33,40,44,0.22);
+  --border-soft: var(--line-2);
+  --primary: var(--accent);
+  --primary-soft: var(--accent-soft);
+  --success: var(--bp-green);
+  --warning: var(--bp-amber);
+  --danger: var(--bp-red);
+  --ok: var(--bp-green);
+  --bg-elev: var(--surface-2);
+  --bg-card: var(--surface);
+
+  --nav-w: 236px;
+}
+
+/* Dark — the cyanotype. Not a neutral charcoal: a deep blueprint-blue ground
+   with the accent lightened so the linework reads ON the blue instead of
+   disappearing into it. This is the half of Bed Ready's identity people
+   recognise, and it is why the accent lightness is overridden rather than the
+   whole accent being swapped for a different hue. */
+html[data-design="blueprint"][data-theme="dark"] {
+  --bg:        #0e2942;
+  --bg-2:      #0b2138;
+  --surface:   #123457;
+  --surface-1: #123457;
+  --surface-2: #163b60;
+  --surface-3: #1b446c;
+  --panel:     #123457;
+  --panel-2:   #163b60;
+
+  --ink:       #dce9f2;
+  --ink-2:     #9db8ce;
+  --ink-3:     #7f9eb7;
+  --ink-4:     #4a6683;
+
+  --line:      rgba(220,233,242,0.15);
+  --line-2:    rgba(220,233,242,0.10);
+  --line-soft: rgba(220,233,242,0.10);
+  --hairline:  rgba(220,233,242,0.08);
+  --border-2:  rgba(220,233,242,0.24);
+
+  --accent-l: 66%;
+  --accent-ink: #0b2138;
+  --on-accent:  #0b2138;
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.22);
+
+  /* Status fills darkened onto the blue ground; foregrounds lifted for AA. */
+  --bp-blue:#7fb6e6;   --bp-blue-bg:#14385c;
+  --bp-green:#5fc294;  --bp-green-bg:#12403a;
+  --bp-red:#f08a7d;    --bp-red-bg:#4a2626;
+  --bp-amber:#e0ad55;  --bp-amber-bg:#40341c;
+  --bp-violet:#b09ada; --bp-violet-bg:#2e2a4d;
+  --bp-teal:#68bdb8;   --bp-teal-bg:#153f45;
+
+  --shadow-1: 0 1px 2px rgba(0,0,0,.38);
+  --shadow-2: 0 8px 24px rgba(0,0,0,.46);
+}
+
+html[data-design="blueprint"],
+html[data-design="blueprint"] body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+html[data-design="blueprint"][dir="rtl"],
+html[data-design="blueprint"][dir="rtl"] body {
+  font-family: var(--font-ar);
+}

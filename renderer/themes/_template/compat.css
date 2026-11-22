@@ -1,0 +1,7 @@
+/* Optional component overrides for your custom theme. */
+
+html[data-design="custom:my-shop"] .btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+}

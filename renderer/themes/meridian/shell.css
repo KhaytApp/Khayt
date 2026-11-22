@@ -1,0 +1,392 @@
+/* Meridian — layout. This file carries real geometry, not decoration: the
+   sidebar removal, the top bar, and the schedule grid. See shell.js/screens.js.
+
+   The axis and the blocks share one unit — --mrd-hour px per hour — so a block
+   at --from:3 --span:2 lands exactly under the 3rd and 4th hour cells. If those
+   ever disagree the schedule is lying, which is why the number lives in
+   tokens.css and both sides read it rather than each hardcoding a width. */
+
+/* ---- 1. No left sidebar. The whole point of the layout.
+
+   Visually removed, but NOT display:none, for two reasons that both bite:
+
+   a) Tab visibility across the app is read as `btn.offsetParent === null`
+      (pro-only tabs, RBAC-restricted tabs). display:none on the sidebar makes
+      that true for EVERY button, so the top-bar proxy could not tell a hidden
+      tab from a shown one and rendered only the active item.
+   b) The proxy is aria-hidden, so the real sidebar is what a screen reader and
+      keyboard navigation still use. Removing it from the tree would leave this
+      shell with no accessible navigation at all.
+
+   Clipped to a 1px box instead: out of sight, still laid out, still focusable,
+   and offsetParent keeps meaning what the rest of the app thinks it means. ---- */
+body.khayt-meridian #appSidebar[data-mrd-hidden] {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* ---- 1a. The scroll chain.
+
+   html and body are `overflow: hidden` app-wide, so the page itself never
+   scrolls: every shell has to nominate an inner element that does. Meridian
+   nominated none, and `min-height: 100vh` let .khayt-app grow past the window
+   instead of filling it — so on any screen with more content than fits (the
+   inventory list, 1548px of it in a 700px window) everything below the fold was
+   simply unreachable. No scrollbar, no overflow, no way down.
+
+   .khayt-body also computed to `display: block`, which made the
+   grid-template-columns below it dead code. It is a flex row now, and states
+   what it means. ---- */
+body.khayt-meridian .khayt-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;      /* NOT min-height — it must fill the window, not grow */
+  overflow: hidden;
+}
+body.khayt-meridian .khayt-body {
+  display: flex;      /* was block: the nav column is gone, so one row */
+  flex: 1;
+  min-height: 0;      /* without this the flex child refuses to shrink */
+}
+body.khayt-meridian .khayt-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;   /* the scroll container Meridian was missing */
+}
+
+/* ---- 1b. Chrome every shell must claim.
+
+   The main column ships two page-head blocks (.ledger-pagehead and
+   .console-pagehead) and a shared .khayt-top toolbar, and NONE of them carry
+   base layout — each shell hides what it does not use and lays out the rest.
+   Workbench, Command and Vivid all do this; a shell that skips it renders two
+   stray "Dashboard" headings above its content and an unstyled column of
+   toolbar controls. Meridian carries its context in the top bar, so both page
+   heads go. ---- */
+body.khayt-meridian .ledger-pagehead,
+body.khayt-meridian .console-pagehead,
+body.khayt-meridian .ledger-masthead-brand,
+body.khayt-meridian .console-masthead-brand,
+body.khayt-meridian .console-path { display: none !important; }
+
+body.khayt-meridian .khayt-top {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-height: 40px;
+  height: auto;
+  padding: 5px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+body.khayt-meridian .khayt-toptitle { display: none; }  /* the nav bar names the screen */
+body.khayt-meridian .khayt-search { height: 28px; flex: 1 1 auto; min-width: 0; }
+body.khayt-meridian #mainContent { padding: 14px; }
+
+/* ---- 2. Horizontal top bar ---- */
+body.khayt-meridian .mrd-topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: var(--mrd-topbar);
+  padding: 0 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+body.khayt-meridian .mrd-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-inline-end: 10px;
+  border-inline-end: 1px solid var(--line);
+  height: 100%;
+}
+body.khayt-meridian .mrd-mark {
+  width: 9px; height: 9px; border-radius: 2px;
+  background: var(--accent);
+}
+body.khayt-meridian .mrd-wordmark { font-weight: 650; letter-spacing: -0.01em; }
+body.khayt-meridian .mrd-shellname {
+  font-family: var(--font-num);
+  font-size: 9.5px; letter-spacing: 0.13em;
+  color: var(--ink-4);
+}
+/* The nav strip scrolls, with arrows that appear only when there is more to
+   see on that side. Fading the edges is not enough on its own — the strip can
+   open scrolled (the active tab is pulled into view), so there has to be
+   something clickable saying which way the rest of the tabs are. */
+body.khayt-meridian .mrd-navwrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+body.khayt-meridian .mrd-nav {
+  display: flex; align-items: center; gap: 2px;
+  overflow-x: auto; scrollbar-width: none;
+  scroll-behavior: smooth;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+body.khayt-meridian .mrd-nav::-webkit-scrollbar { display: none; }
+
+body.khayt-meridian .mrd-navscroll {
+  position: absolute; top: 0; bottom: 0;
+  z-index: 2;
+  width: 26px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; cursor: pointer;
+  font: inherit; font-size: 15px; line-height: 1;
+  color: var(--ink-2);
+  padding: 0;
+}
+body.khayt-meridian .mrd-navscroll[hidden] { display: none; }
+body.khayt-meridian .mrd-navscroll:hover { color: var(--ink); }
+/* Each arrow sits over a fade of the bar's own background, so tabs slide under
+   it instead of being cut off mid-word. */
+body.khayt-meridian .mrd-navscroll.start {
+  inset-inline-start: 0;
+  background: linear-gradient(to right, var(--surface) 55%, transparent);
+}
+body.khayt-meridian .mrd-navscroll.end {
+  inset-inline-end: 0;
+  background: linear-gradient(to left, var(--surface) 55%, transparent);
+}
+body.khayt-meridian[dir="rtl"] .mrd-navscroll.start {
+  background: linear-gradient(to left, var(--surface) 55%, transparent);
+}
+body.khayt-meridian[dir="rtl"] .mrd-navscroll.end {
+  background: linear-gradient(to right, var(--surface) 55%, transparent);
+}
+body.khayt-meridian .mrd-navbtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--ink-2);
+  font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer;
+}
+body.khayt-meridian .mrd-navbtn:hover { background: var(--surface-2); color: var(--ink); }
+body.khayt-meridian .mrd-navbtn.active {
+  color: var(--ink); font-weight: 600;
+  background: var(--accent-soft);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+body.khayt-meridian .mrd-navbadge {
+  font-family: var(--font-num); font-size: 10px;
+  padding: 1px 5px; border-radius: 999px;
+  background: var(--surface-3); color: var(--ink-2);
+}
+body.khayt-meridian .mrd-when {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--font-num);
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid var(--line);
+  height: 100%;
+}
+body.khayt-meridian .mrd-date { font-size: 11.5px; color: var(--ink-3); }
+body.khayt-meridian .mrd-clock {
+  font-size: 14px; font-weight: 600; color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 3. The schedule ---- */
+body.khayt-meridian .mrd-dash { display: flex; flex-direction: column; gap: 14px; }
+
+body.khayt-meridian .mrd-sched {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+body.khayt-meridian .mrd-axis,
+body.khayt-meridian .mrd-lane {
+  display: grid;
+  grid-template-columns: var(--mrd-gutter) calc(var(--mrd-hour) * 14);
+  align-items: stretch;
+  min-width: max-content;
+}
+
+body.khayt-meridian .mrd-axis {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+body.khayt-meridian .mrd-axis-gutter {
+  display: flex; align-items: center;
+  padding: 0 12px; height: 30px;
+  font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ink-3);
+  border-inline-end: 1px solid var(--line);
+}
+body.khayt-meridian .mrd-axis-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(14, var(--mrd-hour));
+  height: 30px;
+}
+body.khayt-meridian .mrd-hour {
+  display: flex; align-items: center; justify-content: flex-start;
+  padding-inline-start: 5px;
+  font-family: var(--font-num); font-size: 10.5px; color: var(--ink-4);
+  border-inline-start: 1px solid var(--mrd-grid);
+}
+body.khayt-meridian .mrd-hour.strong {
+  border-inline-start-color: var(--mrd-grid-strong);
+  color: var(--ink-2);
+}
+
+/* The now-line. --at is hours-since-axis-start, set by screens.js. */
+body.khayt-meridian .mrd-nowline {
+  position: absolute; top: 0; bottom: 0;
+  inset-inline-start: calc(var(--at) * var(--mrd-hour));
+  width: 2px; background: var(--accent);
+  z-index: 3; pointer-events: none;
+}
+body.khayt-meridian .mrd-nowflag {
+  position: absolute; top: 2px; inset-inline-start: 3px;
+  font-family: var(--font-num); font-size: 9px; letter-spacing: 0.08em;
+  color: var(--accent-ink); background: var(--accent);
+  padding: 1px 4px; border-radius: 3px; text-transform: uppercase;
+}
+
+body.khayt-meridian .mrd-lanes { max-height: 46vh; overflow-y: auto; }
+body.khayt-meridian .mrd-lane { border-bottom: 1px solid var(--line-2); }
+body.khayt-meridian .mrd-lane:last-child { border-bottom: 0; }
+body.khayt-meridian .mrd-lane-gutter {
+  display: flex; align-items: center; gap: 7px;
+  padding: 0 12px; height: var(--mrd-lane-h);
+  border-inline-end: 1px solid var(--line);
+  background: var(--bg-2);
+  overflow: hidden;
+}
+body.khayt-meridian .mrd-lane-name {
+  font-size: 12.5px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+}
+body.khayt-meridian .mrd-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--mrd-idle); flex: 0 0 auto;
+}
+body.khayt-meridian .mrd-dot.on { background: var(--mrd-run); }
+
+/* The lane track repeats the same hour grid so blocks sit on the axis. */
+body.khayt-meridian .mrd-lane-track {
+  position: relative;
+  height: var(--mrd-lane-h);
+  background-image: repeating-linear-gradient(
+    to right, var(--mrd-grid) 0 1px, transparent 1px var(--mrd-hour));
+}
+body.khayt-meridian[dir="rtl"] .mrd-lane-track {
+  background-image: repeating-linear-gradient(
+    to left, var(--mrd-grid) 0 1px, transparent 1px var(--mrd-hour));
+}
+body.khayt-meridian .mrd-lane-empty {
+  position: absolute; inset-inline-start: 8px; top: 50%; transform: translateY(-50%);
+  font-size: 11px; color: var(--ink-4);
+}
+
+/* ---- 4. Job blocks — positioned from --from / --span, in hours ---- */
+body.khayt-meridian .mrd-block {
+  position: absolute; top: 6px; bottom: 6px;
+  inset-inline-start: calc(var(--from) * var(--mrd-hour));
+  width: calc(var(--span) * var(--mrd-hour) - 3px);
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 0 7px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  font: inherit; font-size: 11.5px; text-align: start;
+  cursor: pointer; overflow: hidden; min-width: 0;
+}
+body.khayt-meridian .mrd-block:hover { box-shadow: var(--shadow-2); z-index: 2; }
+body.khayt-meridian .mrd-block-label {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 550;
+}
+body.khayt-meridian .mrd-block-meta {
+  font-family: var(--font-num); font-size: 10px; opacity: 0.75; flex: 0 0 auto;
+}
+
+body.khayt-meridian .mrd-run   { color: var(--mrd-run);   background: var(--mrd-run-bg); }
+body.khayt-meridian .mrd-queue { color: var(--mrd-queue); background: var(--mrd-queue-bg); }
+body.khayt-meridian .mrd-late  { color: var(--mrd-late);  background: var(--mrd-late-bg); }
+body.khayt-meridian .mrd-done  { color: var(--mrd-done);  background: var(--mrd-done-bg); }
+body.khayt-meridian .mrd-hold  { color: var(--mrd-hold);  background: var(--mrd-hold-bg); }
+
+/* Projected work is hatched — it is inferred from the queue, not scheduled,
+   and must never read as a commitment. */
+body.khayt-meridian .mrd-proj {
+  background-image: repeating-linear-gradient(
+    45deg, transparent 0 5px, rgba(127,127,127,0.16) 5px 10px);
+}
+
+/* ---- 5. Legend + staging strip ---- */
+body.khayt-meridian .mrd-legend {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
+  font-size: 11.5px; color: var(--ink-3);
+}
+body.khayt-meridian .mrd-key { display: inline-flex; align-items: center; gap: 5px; }
+body.khayt-meridian .mrd-sw {
+  width: 11px; height: 11px; border-radius: 3px;
+  border: 1px solid currentColor; display: inline-block;
+}
+body.khayt-meridian .mrd-note { color: var(--ink-4); font-style: italic; }
+
+body.khayt-meridian .mrd-staging {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 14px;
+}
+body.khayt-meridian .mrd-staging h3 {
+  margin: 0 0 9px; font-size: 12.5px; display: flex; align-items: baseline; gap: 8px;
+}
+body.khayt-meridian .mrd-staging-sub { font-size: 11px; color: var(--ink-4); font-weight: 400; }
+body.khayt-meridian .mrd-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+body.khayt-meridian .mrd-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 9px; border-radius: 999px;
+  border: 1px solid currentColor; background: var(--surface-2);
+  font: inherit; font-size: 11.5px; cursor: pointer;
+}
+body.khayt-meridian .mrd-chip:hover { box-shadow: var(--shadow-1); }
+body.khayt-meridian .mrd-chip-h { font-family: var(--font-num); font-size: 10px; opacity: 0.8; }
+body.khayt-meridian .mrd-empty,
+body.khayt-meridian .mrd-empty-inline { color: var(--ink-4); font-size: 12px; padding: 14px; }
+body.khayt-meridian .mrd-empty-inline { padding: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  body.khayt-meridian .mrd-block:hover { box-shadow: none; }
+}
+
+/* ---- 6. Drag to assign.
+
+   The schedule is the natural place to say "put that job on that printer", so
+   an unstarted block or a staged chip can be dragged onto a lane. A RUNNING job
+   is deliberately not draggable — it is physically on that machine and moving
+   it would assert something untrue about the shop floor. ---- */
+body.khayt-meridian .mrd-movable { cursor: grab; }
+body.khayt-meridian .mrd-movable:active { cursor: grabbing; }
+body.khayt-meridian .mrd-dragging { opacity: 0.45; }
+
+/* The drop target reads as the LANE, because that is the unit being chosen —
+   the drop assigns a printer, not a start time, and highlighting a time slot
+   would promise a scheduling precision this does not have. */
+body.khayt-meridian .mrd-lane.mrd-drop .mrd-lane-track {
+  background-color: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+body.khayt-meridian .mrd-lane.mrd-drop .mrd-lane-gutter {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}

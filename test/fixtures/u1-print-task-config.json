@@ -1,0 +1,220 @@
+{
+ "filament_vendor": [
+  "Generic",
+  "Generic",
+  "Generic",
+  "Generic"
+ ],
+ "filament_type": [
+  "PETG",
+  "PLA",
+  "PLA",
+  "PLA"
+ ],
+ "filament_sub_type": [
+  "",
+  "",
+  "Silk",
+  ""
+ ],
+ "filament_color": [
+  4294967295,
+  4287402137,
+  4283283116,
+  4294967295
+ ],
+ "filament_color_rgba": [
+  "FFFFFFFF",
+  "8C9099FF",
+  "4DB6ACFF",
+  "FFFFFFFF"
+ ],
+ "filament_color_multi": [
+  {
+   "nums": 1,
+   "alpha": 255,
+   "mode": 0,
+   "colors": [
+    "FFFFFF"
+   ]
+  },
+  {
+   "nums": 1,
+   "alpha": 255,
+   "mode": 0,
+   "colors": [
+    "8C9099"
+   ]
+  },
+  {
+   "nums": 1,
+   "alpha": 255,
+   "mode": 0,
+   "colors": [
+    "4DB6AC"
+   ]
+  },
+  {
+   "nums": 1,
+   "alpha": 255,
+   "mode": 0,
+   "colors": [
+    "FFFFFF"
+   ]
+  }
+ ],
+ "filament_official": [
+  false,
+  false,
+  false,
+  false
+ ],
+ "filament_sku": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "filament_edit": [
+  true,
+  true,
+  true,
+  true
+ ],
+ "filament_exist": [
+  true,
+  true,
+  true,
+  true
+ ],
+ "filament_soft": [
+  false,
+  false,
+  false,
+  false
+ ],
+ "extruder_map_table": [
+  3,
+  1,
+  2,
+  3,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "extruders_used": [
+  false,
+  false,
+  false,
+  true
+ ],
+ "extruders_replenished": [
+  0,
+  1,
+  2,
+  3
+ ],
+ "time_lapse_camera": false,
+ "auto_bed_leveling": false,
+ "flow_calibrate": false,
+ "flow_calib_extruders": [
+  true,
+  true,
+  true,
+  true
+ ],
+ "shaper_calibrate": false,
+ "auto_replenish_filament": true,
+ "replenish_ignore_color": false,
+ "filament_entangle_detect": true,
+ "filament_entangle_sen": "low",
+ "end_led_turn_off": true,
+ "end_unload_filament": [
+  false,
+  false,
+  false,
+  false
+ ],
+ "reprint_info": {
+  "auto_bed_leveling": false,
+  "flow_calibrate": false,
+  "flow_calib_extruders": [
+   true,
+   true,
+   true,
+   true
+  ],
+  "time_lapse_camera": false,
+  "extruder_map_table": [
+   3,
+   1,
+   2,
+   3,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "extruders_used": [
+   false,
+   false,
+   false,
+   true
+  ],
+  "end_unload_filament": [
+   false,
+   false,
+   false,
+   false
+  ]
+ }
+}

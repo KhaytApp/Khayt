@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-mode="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Khayt · Cockpit — Proto B</title>
+<style>
+/* ============================================================
+   KHAYT COCKPIT  ·  Direction B  ·  dense pro command-center
+   light default · color-as-information · three-pane app shell
+   ============================================================ */
+:root{
+  --s1:4px;--s2:6px;--s3:8px;--s4:12px;--s5:16px;--s6:24px;
+  --r:6px;--r2:8px;--pill:999px;
+  --ctl:28px;
+  --font:'SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,system-ui,sans-serif;
+  --mono:'SF Mono',ui-monospace,'JetBrains Mono','IBM Plex Mono',Menlo,monospace;
+
+  /* MODULE ACCENT HUES — color codes meaning across the app */
+  --m-dash:#2f7fe0;   /* blue   */
+  --m-calc:#7c5cff;   /* violet */
+  --m-queue:#e0742f;  /* orange */
+  --m-fleet:#16a989;  /* teal   */
+  --m-inv:#c9942a;    /* amber  */
+  --m-clients:#d8425a;/* rose   */
+  --m-invoice:#1e9e6c;/* green  */
+  --m-analytics:#9b59b6;/*purple*/
+  --m-settings:#5a6b7b;/* slate */
+}
+html[data-mode="light"]{
+  --bg:#eef1f6; --bg-2:#e6eaf1; --panel:#ffffff; --panel-2:#f5f7fb; --panel-3:#eef1f6;
+  --hair:#e1e6ee; --hair-2:#d3dae5; --border:#d7dde7;
+  --ink:#16202b; --dim:#56657a; --faint:#8693a6; --ghost:#aab4c4;
+  --ok:#1e9e6c; --warn:#cf9012; --danger:#d8425a; --info:#2f7fe0;
+  --shadow:0 6px 22px rgba(20,40,70,.10);
+  --inset:inset 0 0 0 1px var(--hair);
+  --rail:#1d2530; --rail-ink:#aeb9c7;
+}
+html[data-mode="dark"]{
+  --bg:#0e1318; --bg-2:#0a0e12; --panel:#161c24; --panel-2:#1b232d; --panel-3:#11161c;
+  --hair:#222c38; --hair-2:#2a3644; --border:#2a3644;
+  --ink:#e7edf3; --dim:#9fb0c0; --faint:#6b7c8c; --ghost:#536272;
+  --ok:#46c08a; --warn:#f5b53d; --danger:#ef5a6f; --info:#4f9cf0;
+  --shadow:0 10px 34px rgba(0,0,0,.45);
+  --inset:inset 0 0 0 1px var(--hair);
+  --rail:#0a0e12; --rail-ink:#8493a4;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:var(--font);background:var(--bg);color:var(--ink);font-size:12.5px;line-height:1.45;-webkit-font-smoothing:antialiased;overflow:hidden;letter-spacing:-.05px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--hair-2);border-radius:9px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:var(--ghost);background-clip:padding-box}
+kbd{font-family:var(--mono);font-size:10px;background:var(--panel-2);border:1px solid var(--hair-2);border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--dim);line-height:1.4}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ============ APP SHELL — toolbar / 3-pane / status bar ============ */
+.app{display:grid;grid-template-rows:38px 1fr 24px;height:100vh}
+
+/* TOP TOOLBAR + TABS */
+.toolbar{display:flex;align-items:center;gap:var(--s4);padding:0 var(--s4);background:var(--panel);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:var(--s2);font-weight:700;font-size:13px;letter-spacing:.2px}
+.brand .mk{width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,var(--m-dash),var(--m-fleet));display:grid;place-items:center;color:#fff;font-size:11px;font-weight:800}
+.tabs{display:flex;align-items:stretch;height:100%}
+.tab{display:flex;align-items:center;gap:6px;padding:0 var(--s4);font-size:12px;color:var(--dim);border-bottom:2px solid transparent;position:relative}
+.tab:hover{color:var(--ink);background:var(--panel-2)}
+.tab.active{color:var(--ink);border-bottom-color:var(--tab-c,var(--info))}
+.tab .x{color:var(--faint);font-size:13px;opacity:0;width:12px}
+.tab:hover .x{opacity:1}
+.tab.active .x{opacity:.6}
+.tbspace{flex:1}
+.tb-search{display:flex;align-items:center;gap:var(--s2);height:24px;padding:0 var(--s3);background:var(--panel-2);border:1px solid var(--border);border-radius:var(--r);color:var(--faint);min-width:230px;font-size:11.5px}
+.tb-search kbd{margin-inline-start:auto}
+.tb-ic{width:26px;height:24px;border-radius:var(--r);color:var(--dim);display:grid;place-items:center;position:relative}
+.tb-ic:hover{background:var(--panel-2);color:var(--ink)}
+.tb-ic .dot{position:absolute;top:3px;inset-inline-end:4px;width:6px;height:6px;border-radius:50%;background:var(--danger);border:1.5px solid var(--panel)}
+
+/* BODY = rail + nav + work (+ inspector) */
+.body{display:grid;grid-template-columns:48px 212px 1fr;min-height:0;overflow:hidden;transition:grid-template-columns .15s}
+.body.has-insp{grid-template-columns:48px 212px 1fr 312px}
+.body.nav-collapsed{grid-template-columns:48px 0 1fr}
+.body.nav-collapsed.has-insp{grid-template-columns:48px 0 1fr 312px}
+
+/* (1) ICON RAIL */
+.rail{background:var(--rail);display:flex;flex-direction:column;align-items:center;padding:var(--s3) 0;gap:2px}
+.rail-ic{width:34px;height:34px;border-radius:var(--r2);display:grid;place-items:center;color:var(--rail-ink);font-size:16px;position:relative;transition:.12s}
+.rail-ic:hover{background:rgba(255,255,255,.07);color:#fff}
+.rail-ic.active{color:#fff;background:color-mix(in srgb,var(--rc) 30%,transparent)}
+.rail-ic.active::before{content:"";position:absolute;inset-inline-start:-7px;top:7px;bottom:7px;width:3px;border-radius:3px;background:var(--rc)}
+.rail-ic .rb{position:absolute;top:2px;inset-inline-end:2px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:var(--rc);color:#fff;font-size:9px;font-weight:800;display:grid;place-items:center;border:1.5px solid var(--rail)}
+.rail .sp{flex:1}
+
+/* (2) CONTEXT NAV COLUMN */
+.nav{background:var(--panel);border-inline-end:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.nav-hd{padding:var(--s4) var(--s4) var(--s3);display:flex;align-items:center;gap:var(--s2);font-weight:700;font-size:12.5px;border-bottom:1px solid var(--hair)}
+.nav-hd .accent{width:9px;height:9px;border-radius:3px;background:var(--ac)}
+.nav-scroll{overflow:auto;padding:var(--s2) var(--s3);flex:1}
+.nav-grp{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--faint);font-weight:700;padding:var(--s4) var(--s3) var(--s1)}
+.nav-grp:first-child{padding-top:var(--s2)}
+.nitem{display:flex;align-items:center;gap:var(--s3);padding:5px var(--s3);border-radius:var(--r);color:var(--dim);width:100%;text-align:start;font-size:12px;font-weight:500}
+.nitem:hover{background:var(--panel-2);color:var(--ink)}
+.nitem.active{background:color-mix(in srgb,var(--ai) 14%,transparent);color:var(--ink);font-weight:600}
+.nitem.active .ni{color:var(--ai)}
+.nitem .ni{width:15px;text-align:center;font-size:13px;color:var(--faint)}
+.nitem .nc{margin-inline-start:auto;font-size:10px;color:var(--faint);font-family:var(--mono)}
+.nitem .nbadge{margin-inline-start:auto;background:var(--danger);color:#fff;border-radius:var(--pill);font-size:9.5px;font-weight:800;padding:0 5px;min-width:16px;text-align:center}
+.nav-ft{border-top:1px solid var(--hair);padding:var(--s3) var(--s4);font-size:10.5px;color:var(--faint);display:flex;align-items:center;gap:6px}
+
+/* (3) WORK AREA */
+.work{display:flex;flex-direction:column;min-width:0;overflow:hidden;background:var(--bg)}
+.work-bar{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s5);background:var(--panel);border-bottom:1px solid var(--border);min-height:42px}
+.work-bar .title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:var(--s3)}
+.work-bar .title .mtag{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#fff;background:var(--ac);padding:2px 6px;border-radius:4px}
+.work-bar .sub{font-size:11px;color:var(--faint)}
+.spacer{flex:1}
+.work-scroll{flex:1;overflow:auto;padding:var(--s5)}
+
+/* (R) RIGHT INSPECTOR */
+.insp{background:var(--panel);border-inline-start:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.insp-hd{padding:var(--s4) var(--s5);border-bottom:1px solid var(--hair);display:flex;align-items:flex-start;gap:var(--s3)}
+.insp-hd .it{font-weight:700;font-size:13px}
+.insp-hd .ix{margin-inline-start:auto;color:var(--faint);font-size:16px;line-height:1}
+.insp-hd .ix:hover{color:var(--ink)}
+.insp-scroll{overflow:auto;flex:1;padding:var(--s5)}
+.insp-sec{font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);font-weight:700;margin:var(--s5) 0 var(--s3)}
+.insp-sec:first-child{margin-top:0}
+.kv{display:flex;justify-content:space-between;gap:var(--s4);padding:4px 0;border-bottom:1px solid var(--hair);font-size:12px}
+.kv:last-child{border:none}
+.kv .k{color:var(--dim)}
+.kv .v{font-weight:600;text-align:end;font-family:var(--mono)}
+.insp-ft{border-top:1px solid var(--hair);padding:var(--s4);display:flex;gap:var(--s2)}
+
+/* STATUS BAR */
+.status{display:flex;align-items:center;gap:var(--s5);padding:0 var(--s4);background:var(--rail);color:var(--rail-ink);font-size:10.5px;font-family:var(--mono)}
+.status .seg{display:flex;align-items:center;gap:5px}
+.status .seg b{color:#fff;font-weight:700}
+.status .sp{flex:1}
+.status .live{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 60%,transparent);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 55%,transparent)}70%{box-shadow:0 0 0 5px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+/* ============ PRIMITIVES ============ */
+.btn{height:var(--ctl);display:inline-flex;align-items:center;gap:6px;padding:0 var(--s4);border-radius:var(--r);border:1px solid var(--border);background:var(--panel);color:var(--ink);font-weight:600;font-size:12px;white-space:nowrap}
+.btn:hover{background:var(--panel-2);border-color:var(--hair-2)}
+.btn.sm{height:24px;padding:0 var(--s3);font-size:11.5px}
+.btn.xs{height:21px;padding:0 7px;font-size:11px;border-radius:5px}
+.btn.primary{background:var(--ac,var(--info));border-color:var(--ac,var(--info));color:#fff;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--dim)}
+.btn.ghost:hover{background:var(--panel-2);color:var(--ink)}
+.btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,var(--border))}
+.seg-ctl{display:inline-flex;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;height:var(--ctl)}
+.seg-ctl button{padding:0 var(--s3);font-size:11.5px;color:var(--dim);border-inline-end:1px solid var(--border)}
+.seg-ctl button:last-child{border:none}
+.seg-ctl button.on{background:var(--panel-3);color:var(--ink);font-weight:600}
+.inp{height:var(--ctl);border:1px solid var(--border);border-radius:var(--r);background:var(--panel);padding:0 var(--s3);font-size:12px;width:100%}
+.inp:focus{outline:none;border-color:var(--ac,var(--info));box-shadow:0 0 0 3px color-mix(in srgb,var(--ac,var(--info)) 16%,transparent)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 var(--s3);border:1px solid var(--border);border-radius:var(--pill);background:var(--panel);color:var(--dim);font-size:11.5px}
+.chip:hover{border-color:var(--hair-2);color:var(--ink)}
+.chip.on{background:color-mix(in srgb,var(--info) 12%,transparent);border-color:color-mix(in srgb,var(--info) 35%,transparent);color:var(--info);font-weight:600}
+
+/* color tokens used as data */
+.dotc{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.badge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:var(--pill);display:inline-flex;align-items:center;gap:4px;line-height:1.6}
+.b-blue{background:color-mix(in srgb,var(--info) 14%,transparent);color:var(--info)}
+.b-green{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.b-amber{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.b-red{background:color-mix(in srgb,var(--danger) 14%,transparent);color:var(--danger)}
+.b-violet{background:color-mix(in srgb,var(--m-calc) 14%,transparent);color:var(--m-calc)}
+.b-orange{background:color-mix(in srgb,var(--m-queue) 16%,transparent);color:var(--m-queue)}
+.b-gray{background:var(--panel-3);color:var(--dim)}
+
+/* ============ DASHBOARD ============ */
+.kstrip{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;margin-bottom:var(--s5)}
+.kpi{background:var(--panel);padding:var(--s4) var(--s5);position:relative}
+.kpi::before{content:"";position:absolute;top:0;inset-inline-start:0;width:3px;height:100%;background:var(--kc,var(--info))}
+.kpi .l{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);font-weight:700}
+.kpi .v{font-size:21px;font-weight:800;letter-spacing:-.6px;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:10.5px;font-weight:700;margin-top:1px}
+.up{color:var(--ok)}.down{color:var(--danger)}
+.dgrid{display:grid;grid-template-columns:1.5fr 1fr;gap:var(--s5)}
+@media(max-width:1180px){.dgrid{grid-template-columns:1fr}.kstrip{grid-template-columns:repeat(3,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden}
+.panel-hd{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s4);border-bottom:1px solid var(--hair);font-weight:700;font-size:12px}
+.panel-hd .ac{width:8px;height:8px;border-radius:3px}
+.panel-hd .more{margin-inline-start:auto;color:var(--faint);font-size:11px;font-weight:500}
+.panel-body{padding:var(--s4)}
+.lrow{display:flex;align-items:center;gap:var(--s3);padding:7px var(--s4);border-bottom:1px solid var(--hair);font-size:12px}
+.lrow:last-child{border:none}
+.lrow .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .sub{color:var(--faint);font-size:11px}
+.stack2{display:grid;gap:var(--s5)}
+
+/* mini bar gauge */
+.gauge{height:5px;border-radius:3px;background:var(--panel-3);overflow:hidden;flex:1}
+.gauge i{display:block;height:100%;background:var(--gc,var(--info))}
+
+/* ============ KANBAN ============ */
+.kanban{display:grid;grid-template-columns:repeat(5,minmax(190px,1fr));gap:var(--s4);align-items:start}
+@media(max-width:1280px){.kanban{grid-template-columns:repeat(3,1fr)}}
+.kcol{background:var(--panel-2);border:1px solid var(--border);border-top:3px solid var(--cc);border-radius:var(--r2);display:flex;flex-direction:column;max-height:100%}
+.kcol-hd{display:flex;align-items:center;gap:var(--s2);padding:var(--s3) var(--s4);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--cc)}
+.kcol-hd .cnt{margin-inline-start:auto;background:color-mix(in srgb,var(--cc) 16%,transparent);color:var(--cc);border-radius:var(--pill);font-size:10px;padding:0 7px;min-width:18px;text-align:center}
+.kcol-body{padding:0 var(--s3) var(--s3);overflow:auto;display:flex;flex-direction:column;gap:var(--s3)}
+.kcard{background:var(--panel);border:1px solid var(--border);border-inline-start:3px solid var(--pc,var(--info));border-radius:var(--r);padding:var(--s3);cursor:pointer;transition:.1s}
+.kcard:hover{border-color:var(--hair-2);box-shadow:var(--shadow);transform:translateY(-1px)}
+.kcard.sel{box-shadow:0 0 0 2px var(--ac,var(--m-queue));border-color:transparent}
+.kcard .id{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.kcard .t{font-weight:700;font-size:12.5px;margin:2px 0}
+.kcard .meta{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;margin-top:6px}
+.kcard .due{font-size:10.5px;color:var(--faint);font-family:var(--mono)}
+.avatar{width:18px;height:18px;border-radius:50%;background:var(--ac,var(--info));color:#fff;font-size:9px;font-weight:800;display:grid;place-items:center;flex:none}
+
+/* ============ TABLES ============ */
+.tablewrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{position:sticky;top:0;background:var(--panel-2);text-align:start;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--faint);font-weight:700;padding:7px var(--s4);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;z-index:2}
+thead th:hover{color:var(--ink)}
+thead th .sort{opacity:.4;font-size:9px}
+tbody td{padding:6px var(--s4);border-bottom:1px solid var(--hair);white-space:nowrap}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--panel-2)}
+tbody tr.sel{background:color-mix(in srgb,var(--ac,var(--info)) 10%,transparent);box-shadow:inset 3px 0 0 var(--ac,var(--info))}
+td.num{text-align:end;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.lowrow td:first-child{box-shadow:inset 3px 0 0 var(--danger)}
+
+/* ============ CALCULATOR ============ */
+.calc{display:grid;grid-template-columns:1fr 300px;gap:var(--s5);align-items:start}
+@media(max-width:1100px){.calc{grid-template-columns:1fr}}
+.field{margin-bottom:var(--s4)}
+.field label{display:block;font-size:11px;color:var(--dim);font-weight:600;margin-bottom:4px}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:var(--s4)}
+.frow3{grid-template-columns:1fr 1fr 1fr}
+.price{position:sticky;top:0}
+.price .total{font-size:30px;font-weight:800;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.price .bd{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--hair);font-size:12px}
+.price .bd .k{color:var(--dim)}
+.price .bd .v{font-family:var(--mono);font-weight:600}
+.price .bd.grand{border-top:2px solid var(--hair-2);margin-top:6px;padding-top:8px;font-weight:800}
+.cart-item{display:flex;align-items:center;gap:var(--s3);padding:7px 0;border-bottom:1px solid var(--hair);font-size:12px}
+.cart-item .sw{width:10px;height:10px;border-radius:3px;flex:none}
+
+/* analytics bars */
+.chart{display:flex;align-items:flex-end;gap:6px;height:160px;padding:var(--s4) 0 24px}
+.bar{flex:1;background:linear-gradient(180deg,var(--m-analytics),color-mix(in srgb,var(--m-analytics) 50%,transparent));border-radius:4px 4px 0 0;position:relative;min-width:6px}
+.bar:hover{filter:brightness(1.12)}
+.bar span{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:9px;color:var(--faint)}
+.legend{display:flex;gap:var(--s5);flex-wrap:wrap;font-size:11px;color:var(--dim)}
+.legend .li{display:flex;align-items:center;gap:5px}
+
+/* settings */
+.set-row{display:flex;align-items:center;gap:var(--s4);padding:var(--s4) 0;border-bottom:1px solid var(--hair)}
+.set-row .info{flex:1}
+.set-row .nm{font-weight:600;font-size:12.5px}
+.set-row .ds{font-size:11px;color:var(--faint)}
+.toggle{width:36px;height:20px;border-radius:var(--pill);background:var(--hair-2);position:relative;flex:none;transition:.15s}
+.toggle.on{background:var(--ok)}
+.toggle::after{content:"";position:absolute;top:2px;inset-inline-start:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.toggle.on::after{inset-inline-start:18px}
+.saved{font-size:10.5px;color:var(--ok);font-weight:600;opacity:0;transition:.2s}
+.saved.show{opacity:1}
+
+/* command-K palette */
+.pal-bg{position:fixed;inset:0;background:rgba(8,12,18,.45);backdrop-filter:blur(2px);display:none;align-items:flex-start;justify-content:center;padding-top:11vh;z-index:50}
+.pal-bg.show{display:flex}
+.pal{width:560px;max-width:92vw;background:var(--panel);border:1px solid var(--hair-2);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.pal input{width:100%;height:46px;border:none;border-bottom:1px solid var(--hair);padding:0 var(--s5);font-size:14px;background:transparent}
+.pal input:focus{outline:none}
+.pal-list{max-height:340px;overflow:auto;padding:var(--s2)}
+.pal-grp{font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);font-weight:700;padding:var(--s3) var(--s4) var(--s1)}
+.pal-it{display:flex;align-items:center;gap:var(--s3);padding:7px var(--s4);border-radius:var(--r);font-size:12.5px}
+.pal-it .pi{width:16px;text-align:center}
+.pal-it .pk{margin-inline-start:auto;font-size:10px;color:var(--faint)}
+.pal-it.on,.pal-it:hover{background:color-mix(in srgb,var(--info) 12%,transparent)}
+.pal-ft{display:flex;gap:var(--s4);padding:7px var(--s5);border-top:1px solid var(--hair);font-size:10.5px;color:var(--faint)}
+
+.hidden{display:none!important}
+.empty{display:grid;place-items:center;gap:var(--s3);padding:48px;color:var(--faint);text-align:center}
+.empty .big{font-size:30px;opacity:.5}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ TOP TOOLBAR + TABS ============ -->
+  <div class="toolbar">
+    <div class="brand"><span class="mk">خ</span> Khayt</div>
+    <div class="tabs" id="tabs"></div>
+    <div class="tbspace"></div>
+    <button class="tb-search" onclick="openPal()">
+      <span>🔍</span><span>Search orders, clients, SKUs…</span><kbd>⌘K</kbd>
+    </button>
+    <button class="tb-ic" title="Notifications"><span>🔔</span><span class="dot"></span></button>
+    <button class="tb-ic" id="modeBtn" title="Toggle theme (Shift+D)" onclick="toggleMode()"><span id="modeIcon">🌙</span></button>
+    <button class="tb-ic" title="Account">🧑</button>
+  </div>
+
+  <!-- ============ BODY: RAIL · NAV · WORK · INSPECTOR ============ -->
+  <div class="body" id="body">
+
+    <!-- (1) ICON RAIL -->
+    <div class="rail" id="rail"></div>
+
+    <!-- (2) CONTEXT NAV -->
+    <div class="nav" id="nav">
+      <div class="nav-hd"><span class="accent" id="navAccent"></span><span id="navTitle">Dashboard</span></div>
+      <div class="nav-scroll" id="navList"></div>
+      <div class="nav-ft"><span class="dotc" style="background:var(--ok)"></span> 4 printers online · LAN ready</div>
+    </div>
+
+    <!-- (3) WORK AREA -->
+    <div class="work">
+      <div class="work-bar" id="workBar"></div>
+      <div class="work-scroll" id="work"></div>
+    </div>
+
+    <!-- (R) INSPECTOR -->
+    <div class="insp" id="insp"></div>
+  </div>
+
+  <!-- ============ STATUS BAR ============ -->
+  <div class="status">
+    <span class="seg"><span class="live"></span> <b id="stFleet">4/5</b> printers active</span>
+    <span class="seg">queue <b id="stQueue">12</b></span>
+    <span class="seg">due today <b style="color:var(--warn)" id="stDue">3</b></span>
+    <span class="seg">low stock <b style="color:var(--danger)" id="stLow">2</b></span>
+    <span class="sp"></span>
+    <span class="seg">⌘K palette</span>
+    <span class="seg">today <b id="stRev">SAR 1,840</b></span>
+    <span class="seg" id="stClock">--:--:--</span>
+    <span class="seg">v4.0.0-cockpit</span>
+  </div>
+</div>
+
+<!-- command-K PALETTE -->
+<div class="pal-bg" id="palBg" onclick="if(event.target===this)closePal()">
+  <div class="pal">
+    <input id="palInput" placeholder="Type a command or search…  (try: new order, fleet, dark)" oninput="renderPal()" onkeydown="palKey(event)">
+    <div class="pal-list" id="palList"></div>
+    <div class="pal-ft"><kbd>↑↓</kbd> navigate <kbd>↵</kbd> run <kbd>esc</kbd> close</div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   MOCK DATA
+   ============================================================ */
+const MODULES=[
+  {id:'dashboard', icon:'◳', label:'Dashboard', c:'--m-dash',     grp:'Overview'},
+  {id:'calculator',icon:'∑', label:'Calculator',c:'--m-calc',     grp:'Work'},
+  {id:'queue',     icon:'▦', label:'Queue',     c:'--m-queue',    grp:'Work', badge:3},
+  {id:'fleet',     icon:'⚙', label:'Fleet',     c:'--m-fleet',    grp:'Work'},
+  {id:'inventory', icon:'▣', label:'Inventory', c:'--m-inv',      grp:'Catalog', badge:2},
+  {id:'clients',   icon:'☺', label:'Clients',   c:'--m-clients',  grp:'Catalog'},
+  {id:'invoices',  icon:'❖', label:'Invoices',  c:'--m-invoice',  grp:'Money'},
+  {id:'analytics', icon:'◔', label:'Analytics', c:'--m-analytics',grp:'Money'},
+  {id:'settings',  icon:'⛭', label:'Settings',  c:'--m-settings', grp:'System'},
+];
+
+const NAVS={
+  dashboard:{title:'Dashboard',accent:'--m-dash',items:[
+    {g:'Views'},{i:'◳',l:'Today',k:'',active:1},{i:'◷',l:'This week',k:''},{i:'⚑',l:'Alerts',n:5},
+    {g:'Pinned'},{i:'▦',l:'Production board',k:''},{i:'⚙',l:'Fleet status',k:''},{i:'◔',l:'Revenue',k:''},
+  ]},
+  calculator:{title:'Calculator',accent:'--m-calc',items:[
+    {g:'Build'},{i:'∑',l:'New quote',k:'',active:1},{i:'⊞',l:'From SKU',k:''},{i:'⤓',l:'Import G-code',k:''},
+    {g:'Profiles'},{i:'◆',l:'PLA · 0.20 std',k:''},{i:'◆',l:'PETG · 0.28 draft',k:''},{i:'◆',l:'Resin · 50µm',k:''},
+    {g:'Recent'},{i:'∑',l:'Q-1043 · Cosplay',k:''},{i:'∑',l:'Q-1042 · Brackets',k:''},
+  ]},
+  queue:{title:'Queue',accent:'--m-queue',items:[
+    {g:'Boards'},{i:'▦',l:'Production',k:'12',active:1},{i:'▥',l:'On hold',k:'2'},{i:'✓',l:'Completed',k:'48'},
+    {g:'Filter'},{i:'⚑',l:'Due today',n:3},{i:'★',l:'Priority',k:'4'},{i:'⚠',l:'At risk',k:'1'},
+    {g:'Assignee'},{i:'☺',l:'Faisal',k:'5'},{i:'☺',l:'Noura',k:'4'},{i:'☺',l:'Unassigned',k:'3'},
+  ]},
+  fleet:{title:'Fleet',accent:'--m-fleet',items:[
+    {g:'Machines'},{i:'⚙',l:'All printers',k:'5',active:1},{i:'●',l:'Printing',k:'3'},{i:'○',l:'Idle',k:'1'},{i:'✕',l:'Offline',k:'1'},
+    {g:'By type'},{i:'◆',l:'FDM',k:'4'},{i:'◆',l:'Resin',k:'1'},
+    {g:'Maintenance'},{i:'⚠',l:'Nozzle due',n:1},{i:'⤓',l:'Firmware',k:''},
+  ]},
+  inventory:{title:'Inventory',accent:'--m-inv',items:[
+    {g:'Stock'},{i:'▣',l:'All spools',k:'34',active:1},{i:'⚠',l:'Low / reorder',n:2},{i:'∅',l:'Empty',k:'5'},
+    {g:'Material'},{i:'◆',l:'PLA',k:'18'},{i:'◆',l:'PETG',k:'9'},{i:'◆',l:'TPU',k:'3'},{i:'◆',l:'Resin',k:'4'},
+    {g:'Location'},{i:'▤',l:'Shelf A',k:''},{i:'▤',l:'Shelf B',k:''},{i:'▤',l:'Dry box',k:''},
+  ]},
+  clients:{title:'Clients',accent:'--m-clients',items:[
+    {g:'Segments'},{i:'☺',l:'All clients',k:'86',active:1},{i:'★',l:'VIP / Gold',k:'12'},{i:'◷',l:'Recent',k:''},
+    {g:'Loyalty'},{i:'◆',l:'Gold',k:'12'},{i:'◆',l:'Silver',k:'28'},{i:'◆',l:'Bronze',k:'46'},
+    {g:'Owed'},{i:'❖',l:'Outstanding',n:3},
+  ]},
+  invoices:{title:'Invoices & Orders',accent:'--m-invoice',items:[
+    {g:'Status'},{i:'❖',l:'All invoices',k:'124',active:1},{i:'◷',l:'Unpaid',n:7},{i:'✓',l:'Paid',k:'110'},{i:'⚠',l:'Overdue',n:3},
+    {g:'ZATCA'},{i:'✓',l:'Reported',k:'118'},{i:'◷',l:'Pending',k:'6'},
+  ]},
+  analytics:{title:'Analytics',accent:'--m-analytics',items:[
+    {g:'Reports'},{i:'◔',l:'Revenue',k:'',active:1},{i:'◆',l:'Filament usage',k:''},{i:'⚙',l:'Machine P&L',k:''},{i:'⚠',l:'Waste & failures',k:''},
+    {g:'Range'},{i:'◷',l:'Last 30 days',k:''},{i:'◷',l:'This quarter',k:''},{i:'◷',l:'Year to date',k:''},
+  ]},
+  settings:{title:'Settings',accent:'--m-settings',items:[
+    {g:'Shop'},{i:'☻',l:'Business profile',k:'',active:1},{i:'💱',l:'Currency & tax',k:''},{i:'❖',l:'ZATCA e-invoice',k:''},
+    {g:'System'},{i:'🎨',l:'Appearance',k:''},{i:'🌐',l:'LAN & portal',k:''},{i:'⤓',l:'Backup',k:''},{i:'⌨',l:'Shortcuts',k:''},
+  ]},
+};
+
+const ORDERS=[
+  {id:'#1051',t:'Architecture model',client:'Saud Almutairi',pri:'high',  prog:62,due:'Today 16:00',mat:'PLA White',qty:1,price:480,printer:'Bambu X1C',asg:'F',status:'printing'},
+  {id:'#1050',t:'Phone stands ×24',  client:'Riyadh Tech Co',pri:'normal',prog:100,due:'Done',     mat:'PETG Black',qty:24,price:1200,printer:'P1S #2',asg:'N',status:'review'},
+  {id:'#1049',t:'Cosplay helmet',    client:'Layla Studio', pri:'high',  prog:0,  due:'Tomorrow',  mat:'PLA Grey', qty:1,price:950,printer:'—',asg:'F',status:'queued'},
+  {id:'#1048',t:'Gear set prototype',client:'Mech Labs',    pri:'urgent',prog:34, due:'Today 12:00',mat:'PETG-CF',qty:6,price:720,printer:'X1C #1',asg:'N',status:'printing'},
+  {id:'#1047',t:'Miniatures batch',  client:'Tabletop Guild',pri:'low',  prog:0,  due:'Fri',       mat:'Resin Grey',qty:18,price:540,printer:'—',asg:'-',status:'queued'},
+  {id:'#1046',t:'Custom enclosure',  client:'IoT Makers',   pri:'normal',prog:88, due:'Today 18:30',mat:'ABS Black',qty:2,price:610,printer:'P1S #3',asg:'F',status:'printing'},
+  {id:'#1045',t:'Sign letters',      client:'Café Noor',    pri:'normal',prog:100,due:'Picked up', mat:'PLA Gold', qty:8,price:340,printer:'P1S #2',asg:'N',status:'done'},
+  {id:'#1044',t:'Drone frame',       client:'SkyView',      pri:'high',  prog:100,due:'Ready',     mat:'PETG-CF',qty:1,price:280,printer:'X1C #1',asg:'F',status:'review'},
+  {id:'#1043',t:'Vase set',          client:'Bloom & Co',   pri:'low',   prog:55, due:'Sat',       mat:'PLA Silk',qty:5,price:425,printer:'P1S #3',asg:'-',status:'printing'},
+];
+const STAGES=[
+  {id:'queued', name:'Queued',   c:'--faint'},
+  {id:'printing',name:'Printing',c:'--m-queue'},
+  {id:'review', name:'Review',   c:'--m-calc'},
+  {id:'done',   name:'Ready',    c:'--ok'},
+  {id:'shipped',name:'Delivered',c:'--info'},
+];
+const PRI={urgent:['b-red','Urgent'],high:['b-orange','High'],normal:['b-blue','Normal'],low:['b-gray','Low']};
+
+const INVENTORY=[
+  {sku:'PLA-WHT-001',mat:'PLA',color:'White', brand:'Bambu',  rem:740,total:1000,cost:0.09,loc:'Shelf A',low:false,sw:'#f4f6f9'},
+  {sku:'PLA-BLK-002',mat:'PLA',color:'Black', brand:'eSUN',   rem:120,total:1000,cost:0.08,loc:'Shelf A',low:true, sw:'#16202b'},
+  {sku:'PETG-BLK-01',mat:'PETG',color:'Black',brand:'Bambu',  rem:880,total:1000,cost:0.11,loc:'Shelf B',low:false,sw:'#1b232d'},
+  {sku:'PETG-CF-002',mat:'PETG-CF',color:'Carbon',brand:'Polymaker',rem:60,total:750,cost:0.34,loc:'Dry box',low:true,sw:'#2a3644'},
+  {sku:'TPU-RED-001',mat:'TPU',color:'Red',   brand:'SainSmart',rem:430,total:500,cost:0.19,loc:'Shelf B',low:false,sw:'#d8425a'},
+  {sku:'PLA-GLD-003',mat:'PLA',color:'Gold',  brand:'eSUN',   rem:610,total:1000,cost:0.12,loc:'Shelf A',low:false,sw:'#c9942a'},
+  {sku:'RES-GRY-001',mat:'Resin',color:'Grey',brand:'Siraya', rem:380,total:1000,cost:0.06,loc:'Dry box',low:false,sw:'#8693a6'},
+  {sku:'ABS-BLK-001',mat:'ABS',color:'Black', brand:'Hatchbox',rem:520,total:1000,cost:0.07,loc:'Shelf B',low:false,sw:'#11161c'},
+];
+const PRINTERS=[
+  {name:'Bambu X1C',model:'X1 Carbon',state:'printing',job:'#1051 Arch model',prog:62,temp:'220° / 60°',eta:'1h 24m',nozzle:'0.4',mat:'PLA White',c:'--m-queue'},
+  {name:'X1C #1',   model:'X1 Carbon',state:'printing',job:'#1048 Gear set',  prog:34,temp:'255° / 80°',eta:'3h 10m',nozzle:'0.6',mat:'PETG-CF',c:'--m-queue'},
+  {name:'P1S #2',   model:'P1S',      state:'idle',    job:'—',               prog:0, temp:'24° / 24°', eta:'—',     nozzle:'0.4',mat:'—',c:'--faint'},
+  {name:'P1S #3',   model:'P1S',      state:'printing',job:'#1046 Enclosure', prog:88,temp:'240° / 90°',eta:'18m',   nozzle:'0.4',mat:'ABS Black',c:'--m-queue'},
+  {name:'Saturn 4', model:'Resin',    state:'offline', job:'—',               prog:0, temp:'—',         eta:'—',     nozzle:'—',  mat:'—',c:'--danger'},
+];
+const CLIENTS=[
+  {name:'Saud Almutairi',tier:'Gold',  orders:42,spent:18400,owed:0,   last:'Today'},
+  {name:'Riyadh Tech Co',tier:'Gold',  orders:31,spent:24100,owed:1200,last:'Today'},
+  {name:'Layla Studio',  tier:'Silver',orders:12,spent:6800, owed:0,   last:'2d ago'},
+  {name:'Mech Labs',     tier:'Gold',  orders:28,spent:15600,owed:720, last:'Today'},
+  {name:'Tabletop Guild',tier:'Silver',orders:9, spent:4200, owed:0,   last:'1w ago'},
+  {name:'Café Noor',     tier:'Bronze',orders:4, spent:980,  owed:0,   last:'3d ago'},
+  {name:'IoT Makers',    tier:'Silver',orders:16,spent:9100, owed:610, last:'Today'},
+];
+const TIER={Gold:'b-amber',Silver:'b-gray',Bronze:'b-orange'};
+const INVOICES=[
+  {id:'INV-2041',client:'Riyadh Tech Co',amt:1200,vat:180,status:'unpaid',zatca:'reported',date:'2026-06-15',due:'2026-06-22'},
+  {id:'INV-2040',client:'Mech Labs',     amt:720, vat:108,status:'overdue',zatca:'reported',date:'2026-06-01',due:'2026-06-08'},
+  {id:'INV-2039',client:'Café Noor',     amt:340, vat:51, status:'paid',  zatca:'reported',date:'2026-06-12',due:'2026-06-12'},
+  {id:'INV-2038',client:'IoT Makers',    amt:610, vat:91.5,status:'unpaid',zatca:'pending', date:'2026-06-14',due:'2026-06-21'},
+  {id:'INV-2037',client:'SkyView',       amt:280, vat:42, status:'paid',  zatca:'reported',date:'2026-06-10',due:'2026-06-10'},
+  {id:'INV-2036',client:'Bloom & Co',    amt:425, vat:63.8,status:'paid', zatca:'reported',date:'2026-06-09',due:'2026-06-09'},
+];
+const INVST={paid:'b-green',unpaid:'b-amber',overdue:'b-red'};
+
+/* ============================================================
+   STATE + ENGINE
+   ============================================================ */
+let state={module:'dashboard',inspector:null,sortKey:null,sortDir:1,navCollapsed:false,_sel:null};
+
+function fmt(n){return 'SAR '+n.toLocaleString('en-US',{maximumFractionDigits:0})}
+function el(html){const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstChild}
+
+/* ---- RAIL ---- */
+function renderRail(){
+  const r=document.getElementById('rail');r.innerHTML='';
+  MODULES.forEach(m=>{
+    const b=el(`<button class="rail-ic ${m.id===state.module?'active':''}" title="${m.label}" style="--rc:var(${m.c})">${m.icon}${m.badge?`<span class="rb">${m.badge}</span>`:''}</button>`);
+    b.onclick=()=>go(m.id);
+    r.appendChild(b);
+  });
+  r.appendChild(el('<div class="sp"></div>'));
+  const help=el('<button class="rail-ic" title="Help · ⌘K" style="--rc:var(--info)">?</button>');
+  help.onclick=openPal;r.appendChild(help);
+}
+
+/* ---- TABS ---- */
+const openTabs=['dashboard','queue','inventory'];
+function renderTabs(){
+  if(!openTabs.includes(state.module))openTabs.push(state.module);
+  const t=document.getElementById('tabs');t.innerHTML='';
+  openTabs.forEach(id=>{
+    const m=MODULES.find(x=>x.id===id);
+    const tab=el(`<button class="tab ${id===state.module?'active':''}" style="--tab-c:var(${m.c})">${m.icon} ${m.label}<span class="x">×</span></button>`);
+    tab.onclick=(e)=>{if(e.target.classList.contains('x')){closeTab(id);e.stopPropagation();}else go(id);};
+    t.appendChild(tab);
+  });
+}
+function closeTab(id){const i=openTabs.indexOf(id);if(openTabs.length<=1)return;openTabs.splice(i,1);if(state.module===id)go(openTabs[Math.max(0,i-1)]);else renderTabs();}
+
+/* ---- NAV ---- */
+function renderNav(){
+  const n=NAVS[state.module];
+  document.getElementById('navTitle').textContent=n.title;
+  document.getElementById('navAccent').style.setProperty('--ac',`var(${n.accent})`);
+  const list=document.getElementById('navList');list.innerHTML='';
+  list.style.setProperty('--ai',`var(${n.accent})`);
+  n.items.forEach(it=>{
+    if(it.g){list.appendChild(el(`<div class="nav-grp">${it.g}</div>`));return;}
+    const right=it.n?`<span class="nbadge">${it.n}</span>`:(it.k!==''&&it.k!=null?`<span class="nc">${it.k}</span>`:'');
+    list.appendChild(el(`<button class="nitem ${it.active?'active':''}"><span class="ni">${it.i}</span><span>${it.l}</span>${right}</button>`));
+  });
+}
+
+/* ---- INSPECTOR ---- */
+function renderInspector(){
+  const body=document.getElementById('body');
+  const insp=document.getElementById('insp');
+  if(!state.inspector){body.classList.remove('has-insp');insp.innerHTML='';return;}
+  body.classList.add('has-insp');
+  insp.innerHTML='';insp.appendChild(state.inspector());
+}
+function closeInspector(){state.inspector=null;state._sel=null;render();}
+
+function inspOrder(o){
+  return ()=>{
+    const ac=`var(--m-queue)`;
+    const st=STAGES.find(s=>s.id===o.status)||STAGES[0];
+    const wrap=el(`<div style="display:contents"></div>`);
+    wrap.appendChild(el(`
+      <div class="insp-hd" style="--ac:${ac}">
+        <div><div class="it">${o.t}</div><div class="mono" style="color:var(--faint);font-size:11px">${o.id} · ${o.client}</div></div>
+        <button class="ix" onclick="closeInspector()">×</button>
+      </div>`));
+    const s=el('<div class="insp-scroll"></div>');
+    s.innerHTML=`
+      <div style="display:flex;gap:6px;margin-bottom:var(--s4)">
+        <span class="badge ${PRI[o.pri][0]}">${PRI[o.pri][1]}</span>
+        <span class="badge" style="background:color-mix(in srgb,var(${st.c}) 16%,transparent);color:var(${st.c})">${st.name}</span>
+      </div>
+      <div class="insp-sec">Progress</div>
+      <div style="display:flex;align-items:center;gap:8px"><div class="gauge" style="--gc:var(--m-queue)"><i style="width:${o.prog}%"></i></div><span class="mono" style="font-weight:700">${o.prog}%</span></div>
+      <div class="insp-sec">Details</div>
+      <div class="kv"><span class="k">Order</span><span class="v">${o.id}</span></div>
+      <div class="kv"><span class="k">Client</span><span class="v" style="font-family:var(--font)">${o.client}</span></div>
+      <div class="kv"><span class="k">Quantity</span><span class="v">${o.qty}</span></div>
+      <div class="kv"><span class="k">Material</span><span class="v" style="font-family:var(--font)">${o.mat}</span></div>
+      <div class="kv"><span class="k">Printer</span><span class="v" style="font-family:var(--font)">${o.printer}</span></div>
+      <div class="kv"><span class="k">Assignee</span><span class="v" style="font-family:var(--font)">${o.asg==='F'?'Faisal':o.asg==='N'?'Noura':'Unassigned'}</span></div>
+      <div class="kv"><span class="k">Due</span><span class="v" style="font-family:var(--font);color:${/Today/.test(o.due)?'var(--warn)':'inherit'}">${o.due}</span></div>
+      <div class="insp-sec">Pricing</div>
+      <div class="kv"><span class="k">Subtotal</span><span class="v">${fmt(Math.round(o.price/1.15))}</span></div>
+      <div class="kv"><span class="k">VAT 15%</span><span class="v">${fmt(Math.round(o.price-o.price/1.15))}</span></div>
+      <div class="kv"><span class="k" style="font-weight:700">Total</span><span class="v" style="font-size:14px">${fmt(o.price)}</span></div>
+      <div class="insp-sec">Activity</div>
+      <div style="font-size:11.5px;color:var(--dim);line-height:1.7">
+        <div>● Print started · 2h ago</div>
+        <div>● Assigned to ${o.asg==='F'?'Faisal':'Noura'} · 3h ago</div>
+        <div>● Quote approved · yesterday</div>
+      </div>`;
+    wrap.appendChild(s);
+    wrap.appendChild(el(`<div class="insp-ft"><button class="btn primary sm" style="--ac:var(--m-queue);flex:1">Advance stage →</button><button class="btn sm">Invoice</button></div>`));
+    return wrap;
+  };
+}
+function inspSpool(it){
+  return ()=>{
+    const pct=Math.round(it.rem/it.total*100);
+    const wrap=el('<div style="display:contents"></div>');
+    wrap.appendChild(el(`<div class="insp-hd" style="--ac:var(--m-inv)"><div><div class="it">${it.mat} · ${it.color}</div><div class="mono" style="color:var(--faint);font-size:11px">${it.sku}</div></div><button class="ix" onclick="closeInspector()">×</button></div>`));
+    const s=el('<div class="insp-scroll"></div>');
+    s.innerHTML=`
+      <div style="display:flex;gap:6px;margin-bottom:var(--s4)">
+        <span class="badge ${it.low?'b-red':'b-green'}">${it.low?'⚠ Reorder':'In stock'}</span>
+        <span class="badge b-gray"><span class="dotc" style="background:${it.sw};box-shadow:var(--inset)"></span>${it.color}</span>
+      </div>
+      <div class="insp-sec">Remaining</div>
+      <div style="display:flex;align-items:center;gap:8px"><div class="gauge" style="--gc:${it.low?'var(--danger)':'var(--ok)'}"><i style="width:${pct}%"></i></div><span class="mono" style="font-weight:700">${pct}%</span></div>
+      <div class="mono" style="font-size:11px;color:var(--faint);margin-top:4px">${it.rem} g of ${it.total} g</div>
+      <div class="insp-sec">Spool</div>
+      <div class="kv"><span class="k">SKU</span><span class="v">${it.sku}</span></div>
+      <div class="kv"><span class="k">Brand</span><span class="v" style="font-family:var(--font)">${it.brand}</span></div>
+      <div class="kv"><span class="k">Cost / g</span><span class="v">SAR ${it.cost.toFixed(2)}</span></div>
+      <div class="kv"><span class="k">Value left</span><span class="v">${fmt(Math.round(it.rem*it.cost))}</span></div>
+      <div class="kv"><span class="k">Location</span><span class="v" style="font-family:var(--font)">${it.loc}</span></div>
+      <div class="insp-sec">Usage (FIFO)</div>
+      <div style="font-size:11.5px;color:var(--dim);line-height:1.7"><div>● #1051 used 120 g · today</div><div>● #1046 used 88 g · today</div><div>● Opened · 6 days ago</div></div>`;
+    wrap.appendChild(s);
+    wrap.appendChild(el(`<div class="insp-ft"><button class="btn primary sm" style="--ac:var(--m-inv);flex:1">${it.low?'Reorder now':'Adjust stock'}</button><button class="btn sm">Print tag</button></div>`));
+    return wrap;
+  };
+}
+function inspPrinter(p){
+  return ()=>{
+    const wrap=el('<div style="display:contents"></div>');
+    const stc=p.state==='printing'?'--ok':p.state==='idle'?'--faint':'--danger';
+    wrap.appendChild(el(`<div class="insp-hd" style="--ac:var(--m-fleet)"><div><div class="it">${p.name}</div><div style="color:var(--faint);font-size:11px">${p.model} · nozzle ${p.nozzle}</div></div><button class="ix" onclick="closeInspector()">×</button></div>`));
+    const s=el('<div class="insp-scroll"></div>');
+    s.innerHTML=`
+      <div style="margin-bottom:var(--s4)"><span class="badge" style="background:color-mix(in srgb,var(${stc}) 16%,transparent);color:var(${stc})"><span class="dotc" style="background:var(${stc})"></span>${p.state}</span></div>
+      <div class="insp-sec">Current job</div>
+      <div class="kv"><span class="k">Job</span><span class="v" style="font-family:var(--font)">${p.job}</span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin:8px 0"><div class="gauge" style="--gc:var(--m-fleet)"><i style="width:${p.prog}%"></i></div><span class="mono" style="font-weight:700">${p.prog}%</span></div>
+      <div class="insp-sec">Telemetry</div>
+      <div class="kv"><span class="k">Nozzle / Bed</span><span class="v">${p.temp}</span></div>
+      <div class="kv"><span class="k">ETA</span><span class="v">${p.eta}</span></div>
+      <div class="kv"><span class="k">Material</span><span class="v" style="font-family:var(--font)">${p.mat}</span></div>
+      <div class="insp-sec">Lifetime</div>
+      <div class="kv"><span class="k">Print hours</span><span class="v">1,284 h</span></div>
+      <div class="kv"><span class="k">Jobs done</span><span class="v">312</span></div>
+      <div class="kv"><span class="k">Next service</span><span class="v" style="color:var(--warn)">in 40 h</span></div>`;
+    wrap.appendChild(s);
+    wrap.appendChild(el(`<div class="insp-ft"><button class="btn primary sm" style="--ac:var(--m-fleet);flex:1">${p.state==='printing'?'Pause job':'Send job'}</button><button class="btn sm">Camera</button></div>`));
+    return wrap;
+  };
+}
+
+/* ============================================================
+   WORK AREA RENDERERS
+   ============================================================ */
+function workBar(html){document.getElementById('workBar').innerHTML=html;}
+function setWork(node){const w=document.getElementById('work');w.innerHTML='';w.appendChild(node);}
+
+const SCREENS={
+/* -------- DASHBOARD -------- */
+dashboard(){
+  workBar(`<div class="title"><span class="mtag" style="--ac:var(--m-dash)">Overview</span> Today · Mon 16 Jun</div>
+    <div class="sub">Live shop snapshot</div><div class="spacer"></div>
+    <div class="seg-ctl"><button class="on">Today</button><button>Week</button><button>Month</button></div>
+    <button class="btn primary" style="--ac:var(--m-dash)" onclick="go('calculator')">+ New order</button>`);
+  const v=el('<div></div>');
+  const kpis=[
+    {l:'Revenue today',v:'SAR 1,840',d:'▲ 12% vs avg',c:'--m-invoice',up:1},
+    {l:'Open queue',v:'12',d:'3 due today',c:'--m-queue'},
+    {l:'Printers active',v:'4 / 5',d:'92% utilization',c:'--m-fleet',up:1},
+    {l:'Low stock',v:'2',d:'reorder needed',c:'--m-inv'},
+    {l:'Unpaid',v:'SAR 2,530',d:'7 invoices',c:'--danger'},
+    {l:'Avg margin',v:'48%',d:'▲ 3 pts',c:'--m-analytics',up:1},
+  ];
+  v.appendChild(el(`<div class="kstrip">${kpis.map(k=>`<div class="kpi" style="--kc:var(${k.c})"><div class="l">${k.l}</div><div class="v">${k.v}</div><div class="d ${k.up?'up':''}">${k.d}</div></div>`).join('')}</div>`));
+
+  const grid=el('<div class="dgrid"></div>');
+  const left=el('<div class="stack2"></div>');
+  const board=el(`<div class="panel"><div class="panel-hd"><span class="ac" style="background:var(--m-queue)"></span>Production board<span class="more" onclick="go('queue')" style="cursor:pointer">View queue →</span></div></div>`);
+  const pb=el('<div></div>');
+  ORDERS.filter(o=>o.status==='printing').forEach(o=>{
+    const row=el(`<div class="lrow"><span class="dotc" style="background:var(--m-queue)"></span>
+      <div class="grow"><div>${o.t}</div><div class="sub">${o.id} · ${o.client}</div></div>
+      <div class="gauge" style="width:80px;--gc:var(--m-queue)"><i style="width:${o.prog}%"></i></div>
+      <span class="mono" style="width:34px;text-align:end;font-weight:700">${o.prog}%</span>
+      <span class="badge ${PRI[o.pri][0]}">${PRI[o.pri][1]}</span></div>`);
+    row.style.cursor='pointer';row.onclick=()=>openOrder(o);pb.appendChild(row);
+  });
+  board.appendChild(pb);left.appendChild(board);
+
+  const fleet=el(`<div class="panel"><div class="panel-hd"><span class="ac" style="background:var(--m-fleet)"></span>Fleet<span class="more">${PRINTERS.filter(p=>p.state==='printing').length} printing</span></div></div>`);
+  const fb=el('<div></div>');
+  PRINTERS.forEach(p=>{
+    const stc=p.state==='printing'?'--ok':p.state==='idle'?'--faint':'--danger';
+    const row=el(`<div class="lrow"><span class="dotc" style="background:var(${stc})"></span>
+      <div class="grow"><div>${p.name} <span class="sub">${p.job}</span></div></div>
+      ${p.state==='printing'?`<div class="gauge" style="width:70px;--gc:var(--m-fleet)"><i style="width:${p.prog}%"></i></div><span class="mono" style="width:48px;text-align:end;color:var(--faint)">${p.eta}</span>`:`<span class="badge b-gray">${p.state}</span>`}</div>`);
+    row.style.cursor='pointer';row.onclick=()=>{go('fleet');setTimeout(()=>openPrinter(p),40);};fb.appendChild(row);
+  });
+  fleet.appendChild(fb);left.appendChild(fleet);
+  grid.appendChild(left);
+
+  const right=el('<div class="stack2"></div>');
+  const alerts=el(`<div class="panel"><div class="panel-hd"><span class="ac" style="background:var(--danger)"></span>Alerts<span class="more">5</span></div></div>`);
+  const ab=el('<div></div>');
+  [['b-red','⚠','PETG-CF low — 60 g left','Reorder'],['b-red','⚠','PLA Black low — 120 g left','Reorder'],
+   ['b-amber','◷','#1048 due in 2h','Open'],['b-amber','◷','#1051 due 16:00','Open'],['b-blue','❖','INV-2040 overdue 8 days','Chase']]
+   .forEach(a=>{ab.appendChild(el(`<div class="lrow"><span class="badge ${a[0]}">${a[1]}</span><div class="grow">${a[2]}</div><button class="btn xs">${a[3]}</button></div>`));});
+  alerts.appendChild(ab);right.appendChild(alerts);
+
+  const today=el(`<div class="panel"><div class="panel-hd"><span class="ac" style="background:var(--m-invoice)"></span>Today's activity</div></div>`);
+  const tb=el('<div></div>');
+  [['SAR 480','#1051 quote approved','Saud A.'],['SAR 1,200','#1050 completed','Riyadh Tech'],['SAR 340','#1045 picked up','Café Noor'],['—','New client added','Bloom & Co']]
+   .forEach(t=>tb.appendChild(el(`<div class="lrow"><div class="grow"><div>${t[1]}</div><div class="sub">${t[2]}</div></div><span class="mono" style="font-weight:700;color:var(--ok)">${t[0]}</span></div>`)));
+  today.appendChild(tb);right.appendChild(today);
+  grid.appendChild(right);
+
+  v.appendChild(grid);setWork(v);
+},
+
+/* -------- QUEUE (kanban) -------- */
+queue(){
+  workBar(`<div class="title"><span class="mtag" style="--ac:var(--m-queue)">Work</span> Production Queue</div>
+    <div class="sub">${ORDERS.length} orders</div><div class="spacer"></div>
+    <button class="chip on">All</button><button class="chip">Due today</button><button class="chip">Priority</button>
+    <div class="seg-ctl"><button class="on">Board</button><button>List</button></div>
+    <button class="btn primary" style="--ac:var(--m-queue)" onclick="go('calculator')">+ New order</button>`);
+  const v=el('<div style="height:100%"></div>');
+  const board=el('<div class="kanban" style="height:100%"></div>');
+  STAGES.forEach(st=>{
+    const items=ORDERS.filter(o=>o.status===st.id);
+    const col=el(`<div class="kcol" style="--cc:var(${st.c})"><div class="kcol-hd">${st.name}<span class="cnt">${items.length}</span></div></div>`);
+    const body=el('<div class="kcol-body"></div>');
+    items.forEach(o=>{
+      const pc={urgent:'--danger',high:'--m-queue',normal:'--info',low:'--faint'}[o.pri];
+      const card=el(`<div class="kcard ${state._sel===o.id?'sel':''}" style="--pc:var(${pc})">
+        <div class="id">${o.id}</div><div class="t">${o.t}</div>
+        <div class="due">⏱ ${o.due}</div>
+        <div class="meta">
+          <span class="badge ${PRI[o.pri][0]}">${PRI[o.pri][1]}</span>
+          <span class="badge b-gray">${o.mat}</span>
+          ${o.prog>0&&o.prog<100?`<span class="mono" style="font-size:10px;color:var(--faint);margin-inline-start:auto">${o.prog}%</span>`:''}
+          <span class="avatar" style="--ac:var(${o.asg==='F'?'--m-invoice':o.asg==='N'?'--m-calc':'--faint'})">${o.asg}</span>
+        </div></div>`);
+      card.onclick=()=>openOrder(o);body.appendChild(card);
+    });
+    col.appendChild(body);board.appendChild(col);
+  });
+  v.appendChild(board);setWork(v);
+},
+
+/* -------- FLEET -------- */
+fleet(){
+  workBar(`<div class="title"><span class="mtag" style="--ac:var(--m-fleet)">Work</span> Fleet</div>
+    <div class="sub">${PRINTERS.filter(p=>p.state==='printing').length}/${PRINTERS.length} active</div><div class="spacer"></div>
+    <button class="chip on">All</button><button class="chip">Printing</button><button class="chip">Idle</button>
+    <button class="btn primary" style="--ac:var(--m-fleet)">Send job ↗</button>`);
+  const v=el('<div class="tablewrap"></div>');
+  const t=el(`<table><thead><tr><th>Printer</th><th>Model</th><th>State</th><th>Current job</th><th>Progress</th><th>Nozzle/Bed</th><th>ETA</th><th>Material</th></tr></thead></table>`);
+  const tb=el('<tbody></tbody>');
+  PRINTERS.forEach(p=>{
+    const stc=p.state==='printing'?'--ok':p.state==='idle'?'--warn':'--danger';
+    const tr=el(`<tr class="${state._sel===p.name?'sel':''}" style="--ac:var(--m-fleet)">
+      <td style="font-weight:700">${p.name}</td><td>${p.model}</td>
+      <td><span class="badge" style="background:color-mix(in srgb,var(${stc}) 16%,transparent);color:var(${stc})"><span class="dotc" style="background:var(${stc})"></span>${p.state}</span></td>
+      <td>${p.job}</td>
+      <td>${p.state==='printing'?`<div style="display:flex;align-items:center;gap:6px"><div class="gauge" style="width:60px;--gc:var(--m-fleet)"><i style="width:${p.prog}%"></i></div><span class="mono">${p.prog}%</span></div>`:'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="mono">${p.temp}</td><td class="mono">${p.eta}</td><td>${p.mat}</td></tr>`);
+    tr.onclick=()=>openPrinter(p);tb.appendChild(tr);
+  });
+  t.appendChild(tb);v.appendChild(t);setWork(v);
+},
+
+/* -------- INVENTORY -------- */
+inventory(){
+  workBar(`<div class="title"><span class="mtag" style="--ac:var(--m-inv)">Catalog</span> Inventory</div>
+    <div class="sub">${INVENTORY.length} spools · 2 low</div><div class="spacer"></div>
+    <input class="inp" style="width:180px" placeholder="Filter SKU / color…">
+    <button class="chip">Low only</button>
+    <button class="btn primary" style="--ac:var(--m-inv)">+ Add spool</button>`);
+  const v=el('<div class="tablewrap"></div>');
+  const cols=['SKU','Material','Color','Brand','Remaining','Cost/g','Value','Location'];
+  const t=el(`<table><thead><tr>${cols.map(c=>`<th>${c} <span class="sort">↕</span></th>`).join('')}</tr></thead></table>`);
+  const tb=el('<tbody></tbody>');
+  INVENTORY.forEach(it=>{
+    const pct=Math.round(it.rem/it.total*100);
+    const tr=el(`<tr class="${it.low?'lowrow':''} ${state._sel===it.sku?'sel':''}" style="--ac:var(--m-inv)">
+      <td class="mono" style="font-weight:600">${it.sku}</td>
+      <td><span class="badge b-gray">${it.mat}</span></td>
+      <td><span style="display:inline-flex;align-items:center;gap:6px"><span class="dotc" style="background:${it.sw};box-shadow:var(--inset)"></span>${it.color}</span></td>
+      <td>${it.brand}</td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="gauge" style="width:64px;--gc:${it.low?'var(--danger)':'var(--ok)'}"><i style="width:${pct}%"></i></div><span class="mono" style="color:${it.low?'var(--danger)':'var(--dim)'}">${it.rem}g</span></div></td>
+      <td class="num">${it.cost.toFixed(2)}</td>
+      <td class="num">${(it.rem*it.cost).toFixed(0)}</td>
+      <td>${it.loc}</td></tr>`);
+    tr.onclick=()=>openSpool(it);tb.appendChild(tr);
+  });
+  t.appendChild(tb);v.appendChild(t);setWork(v);
+},
+
+/* -------- CALCULATOR -------- */
+calculator(){
+  workBar(`<div class="title"><span class="mtag" style="--ac:var(--m-calc)">Work</span> Calculator</div>
+    <div class="sub">New quote · Q-1044</div><div class="spacer"></div>
+    <div class="seg-ctl"><button class="on">FDM</button><button>Resin</button></div>
+    <button class="btn sm">Save quote</button>`);
+  const v=el('<div class="calc"></div>');
+  const form=el('<div class="panel"><div class="panel-hd"><span class="ac" style="background:var(--m-calc)"></span>Build parts</div></div>');
+  const fb=el('<div class="panel-body"></div>');
+  fb.innerHTML=`
+    <div class="frow"><div class="field"><label>Part name</label><input class="inp" value="Drone frame"></div><div class="field"><label>Quantity</label><input class="inp" value="1"></div></div>
+    <div class="frow3">
+      <div class="field"><label>Material</label><input class="inp" value="PETG-CF"></div>
+      <div class="field"><label>Weight (g)</label><input class="inp" value="180"></div>
+      <div class="field"><label>Print time</label><input class="inp" value="6h 20m"></div>
+    </div>
+    <div class="frow3">
+      <div class="field"><label>Machine</label><input class="inp" value="X1C #1"></div>
+      <div class="field"><label>Infill %</label><input class="inp" value="35"></div>
+      <div class="field"><label>Layer (mm)</label><input class="inp" value="0.20"></div>
+    </div>
+    <div class="frow"><div class="field"><label>Margin %</label><input class="inp" value="45"></div><div class="field"><label>Failure risk %</label><input class="inp" value="8"></div></div>
+    <div class="insp-sec">Cart (2 parts)</div>
+    <div class="cart-item"><span class="sw" style="background:#2a3644"></span><div class="grow">Drone frame ×1</div><span class="mono">PETG-CF · 180g</span><span class="mono" style="font-weight:700;margin-inline-start:12px">SAR 188</span></div>
+    <div class="cart-item"><span class="sw" style="background:#f4f6f9;box-shadow:var(--inset)"></span><div class="grow">Mount clips ×4</div><span class="mono">PLA · 44g</span><span class="mono" style="font-weight:700;margin-inline-start:12px">SAR 92</span></div>
+    <button class="btn sm" style="margin-top:10px">+ Add part</button>`;
+  form.appendChild(fb);v.appendChild(form);
+
+  const price=el('<div class="panel price"><div class="panel-hd"><span class="ac" style="background:var(--m-calc)"></span>Live price</div></div>');
+  const pb=el('<div class="panel-body"></div>');
+  pb.innerHTML=`
+    <div class="total" style="color:var(--m-calc)">SAR 280</div>
+    <div style="color:var(--faint);font-size:11px;margin-bottom:12px">for 2 parts · 5 units</div>
+    <div class="bd"><span class="k">Material</span><span class="v">SAR 71</span></div>
+    <div class="bd"><span class="k">Machine time</span><span class="v">SAR 58</span></div>
+    <div class="bd"><span class="k">Electricity</span><span class="v">SAR 9</span></div>
+    <div class="bd"><span class="k">Labour</span><span class="v">SAR 24</span></div>
+    <div class="bd"><span class="k">Overhead</span><span class="v">SAR 12</span></div>
+    <div class="bd"><span class="k">Failure (8%)</span><span class="v">SAR 14</span></div>
+    <div class="bd"><span class="k">Margin (45%)</span><span class="v" style="color:var(--ok)">SAR 56</span></div>
+    <div class="bd"><span class="k">VAT 15%</span><span class="v">SAR 36</span></div>
+    <div class="bd grand"><span class="k">Total</span><span class="v">SAR 280</span></div>
+    <div style="display:flex;justify-content:space-between;margin:10px 0;font-size:11px;color:var(--faint)"><span>Cost SAR 188</span><span>Profit <b style="color:var(--ok)">SAR 56 · 48%</b></span></div>
+    <button class="btn primary" style="--ac:var(--m-calc);width:100%;height:34px;font-size:13px" onclick="go('queue')">Create order →</button>
+    <button class="btn" style="width:100%;margin-top:6px">Export quote PDF</button>`;
+  price.appendChild(pb);v.appendChild(price);
+  setWork(v);
+},
+
+/* -------- CLIENTS -------- */
+clients(){
+  workBar(`<div class="title"><span class="mtag" style="--ac:var(--m-clients)">Catalog</span> Clients</div>
+    <div class="sub">86 total · 12 VIP</div><div class="spacer"></div>
+    <input class="inp" style="width:180px" placeholder="Search clients…">
+    <button class="btn primary" style="--ac:var(--m-clients)">+ Add client</button>`);
+  const v=el('<div class="tablewrap"></div>');
+  const t=el(`<table><thead><tr><th>Client</th><th>Tier</th><th>Orders</th><th>Lifetime spend</th><th>Outstanding</th><th>Last order</th></tr></thead></table>`);
+  const tb=el('<tbody></tbody>');
+  CLIENTS.forEach(c=>{
+    const tr=el(`<tr style="--ac:var(--m-clients)">
+      <td style="font-weight:600;display:flex;align-items:center;gap:8px"><span class="avatar" style="--ac:var(--m-clients)">${c.name[0]}</span>${c.name}</td>
+      <td><span class="badge ${TIER[c.tier]}">★ ${c.tier}</span></td>
+      <td class="num">${c.orders}</td>
+      <td class="num" style="font-weight:600">${fmt(c.spent)}</td>
+      <td class="num">${c.owed?`<span style="color:var(--danger);font-weight:600">${fmt(c.owed)}</span>`:'<span style="color:var(--ok)">—</span>'}</td>
+      <td>${c.last}</td></tr>`);
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);v.appendChild(t);setWork(v);
+},
+
+/* -------- INVOICES -------- */
+invoices(){
+  workBar(`<div class="title"><span class="mtag" style="--ac:var(--m-invoice)">Money</span> Invoices & Orders</div>
+    <div class="sub">124 invoices · 7 unpaid</div><div class="spacer"></div>
+    <button class="chip on">All</button><button class="chip">Unpaid</button><button class="chip">Overdue</button>
+    <button class="btn primary" style="--ac:var(--m-invoice)">+ New invoice</button>`);
+  const v=el('<div class="tablewrap"></div>');
+  const t=el(`<table><thead><tr><th>Invoice</th><th>Client</th><th>Amount</th><th>VAT</th><th>Total</th><th>Status</th><th>ZATCA</th><th>Due</th></tr></thead></table>`);
+  const tb=el('<tbody></tbody>');
+  INVOICES.forEach(iv=>{
+    const tr=el(`<tr style="--ac:var(--m-invoice)" class="${iv.status==='overdue'?'lowrow':''}">
+      <td class="mono" style="font-weight:600">${iv.id}</td><td>${iv.client}</td>
+      <td class="num">${iv.amt.toFixed(0)}</td><td class="num">${iv.vat.toFixed(0)}</td>
+      <td class="num" style="font-weight:700">${(iv.amt+iv.vat).toFixed(0)}</td>
+      <td><span class="badge ${INVST[iv.status]}">${iv.status}</span></td>
+      <td><span class="badge ${iv.zatca==='reported'?'b-green':'b-amber'}">${iv.zatca==='reported'?'✓ reported':'◷ pending'}</span></td>
+      <td class="mono" style="${iv.status==='overdue'?'color:var(--danger)':''}">${iv.due.slice(5)}</td></tr>`);
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);v.appendChild(t);setWork(v);
+},
+
+/* -------- ANALYTICS -------- */
+analytics(){
+  workBar(`<div class="title"><span class="mtag" style="--ac:var(--m-analytics)">Money</span> Analytics</div>
+    <div class="sub">Revenue · last 14 days</div><div class="spacer"></div>
+    <div class="seg-ctl"><button>30d</button><button class="on">14d</button><button>QTD</button></div>
+    <button class="btn sm">Export ⤓</button>`);
+  const v=el('<div></div>');
+  const kpis=[['Revenue','SAR 24,180','▲ 12%','--m-invoice'],['Orders','148','▲ 6%','--m-queue'],['Avg margin','48%','▲ 3pts','--m-analytics'],['Filament used','38.4 kg','—','--m-inv'],['Failure rate','4.2%','▼ 1.1%','--ok'],['Machine util.','86%','▲ 4%','--m-fleet']];
+  v.appendChild(el(`<div class="kstrip">${kpis.map(k=>`<div class="kpi" style="--kc:var(${k[3]})"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d up">${k[2]}</div></div>`).join('')}</div>`));
+  const grid=el('<div class="dgrid"></div>');
+  const chart=el('<div class="panel"><div class="panel-hd"><span class="ac" style="background:var(--m-analytics)"></span>Daily revenue<span class="more">SAR</span></div></div>');
+  const cb=el('<div class="panel-body"></div>');
+  const data=[820,1100,640,1480,1840,920,1320,1560,780,1240,1680,1420,1140,1840];
+  const max=Math.max(...data);
+  cb.innerHTML=`<div class="chart">${data.map((d,i)=>`<div class="bar" style="height:${d/max*100}%" title="SAR ${d}"><span>${i+3}</span></div>`).join('')}</div>`;
+  chart.appendChild(cb);grid.appendChild(chart);
+
+  const mat=el('<div class="panel"><div class="panel-hd"><span class="ac" style="background:var(--m-inv)"></span>Filament mix</div></div>');
+  const mb=el('<div class="panel-body"></div>');
+  [['PLA',52,'--m-dash'],['PETG',26,'--m-queue'],['Resin',12,'--m-calc'],['TPU',6,'--m-clients'],['ABS',4,'--m-fleet']].forEach(m=>{
+    mb.appendChild(el(`<div class="lrow" style="padding:8px 0"><span class="dotc" style="background:var(${m[2]})"></span><div class="grow">${m[0]}</div><div class="gauge" style="width:120px;--gc:var(${m[2]})"><i style="width:${m[1]}%"></i></div><span class="mono" style="width:34px;text-align:end">${m[1]}%</span></div>`));
+  });
+  mat.appendChild(mb);grid.appendChild(mat);
+  v.appendChild(grid);setWork(v);
+},
+
+/* -------- SETTINGS -------- */
+settings(){
+  workBar(`<div class="title"><span class="mtag" style="--ac:var(--m-settings)">System</span> Settings</div>
+    <div class="sub">Business profile</div><div class="spacer"></div>
+    <span class="saved" id="savedMsg">✓ Saved</span>`);
+  const v=el('<div class="panel" style="max-width:720px"></div>');
+  const b=el('<div class="panel-body"></div>');
+  b.innerHTML=`
+    <div class="insp-sec">Shop</div>
+    <div class="set-row"><div class="info"><div class="nm">Shop name</div><div class="ds">Appears on quotes & invoices</div></div><input class="inp" style="width:240px" value="Khayt Print Studio" oninput="autoSave()"></div>
+    <div class="set-row"><div class="info"><div class="nm">Currency</div><div class="ds">Default pricing currency</div></div><input class="inp" style="width:240px" value="SAR — Saudi Riyal" oninput="autoSave()"></div>
+    <div class="set-row"><div class="info"><div class="nm">VAT rate</div><div class="ds">Applied to all invoices</div></div><input class="inp" style="width:240px" value="15%" oninput="autoSave()"></div>
+    <div class="insp-sec">e-Invoicing</div>
+    <div class="set-row"><div class="info"><div class="nm">ZATCA Phase 2</div><div class="ds">Report invoices to tax authority</div></div><button class="toggle on" onclick="this.classList.toggle('on');autoSave()"></button></div>
+    <div class="set-row"><div class="info"><div class="nm">Auto-attach QR</div><div class="ds">Embed compliant QR on PDFs</div></div><button class="toggle on" onclick="this.classList.toggle('on');autoSave()"></button></div>
+    <div class="insp-sec">System</div>
+    <div class="set-row"><div class="info"><div class="nm">Dark mode</div><div class="ds">Switch the cockpit theme</div></div><button class="toggle" id="setDark" onclick="toggleMode();autoSave()"></button></div>
+    <div class="set-row"><div class="info"><div class="nm">LAN customer portal</div><div class="ds">Let clients track jobs over Wi-Fi</div></div><button class="toggle on" onclick="this.classList.toggle('on');autoSave()"></button></div>
+    <div class="set-row" style="border:none"><div class="info"><div class="nm">Auto-backup</div><div class="ds">Nightly local snapshot</div></div><button class="toggle on" onclick="this.classList.toggle('on');autoSave()"></button></div>`;
+  v.appendChild(b);setWork(v);
+  syncDarkToggle();
+},
+};
+
+/* ============================================================
+   INTERACTIONS
+   ============================================================ */
+function openOrder(o){state._sel=o.id;state.inspector=inspOrder(o);render();}
+function openSpool(it){state._sel=it.sku;state.inspector=inspSpool(it);render();}
+function openPrinter(p){state._sel=p.name;state.inspector=inspPrinter(p);render();}
+
+function go(id){state.module=id;state.inspector=null;state._sel=null;render();}
+
+function render(){
+  renderRail();renderTabs();renderNav();
+  (SCREENS[state.module]||SCREENS.dashboard)();
+  renderInspector();
+  document.getElementById('body').classList.toggle('nav-collapsed',state.navCollapsed);
+}
+
+/* theme */
+function toggleMode(){
+  const h=document.querySelector('html');
+  h.dataset.mode=h.dataset.mode==='light'?'dark':'light';
+  document.getElementById('modeIcon').textContent=h.dataset.mode==='light'?'🌙':'☀';
+  syncDarkToggle();
+}
+function syncDarkToggle(){const t=document.getElementById('setDark');if(t)t.classList.toggle('on',document.querySelector('html').dataset.mode==='dark');}
+function autoSave(){const m=document.getElementById('savedMsg');if(!m)return;m.classList.add('show');clearTimeout(window._sv);window._sv=setTimeout(()=>m.classList.remove('show'),1400);}
+
+/* command-K palette */
+const PAL=[
+  {g:'Go to',items:MODULES.map(m=>({i:m.icon,l:'Open '+m.label,k:'',act:()=>go(m.id)}))},
+  {g:'Create',items:[
+    {i:'∑',l:'New quote',k:'⌘N',act:()=>go('calculator')},
+    {i:'▦',l:'New order',k:'',act:()=>go('queue')},
+    {i:'▣',l:'Add spool',k:'',act:()=>go('inventory')},
+    {i:'☺',l:'Add client',k:'',act:()=>go('clients')},
+    {i:'❖',l:'New invoice',k:'',act:()=>go('invoices')},
+  ]},
+  {g:'Toggle',items:[
+    {i:'🌓',l:'Toggle dark / light',k:'⇧D',act:()=>toggleMode()},
+    {i:'☰',l:'Toggle nav column',k:'⌘B',act:()=>{state.navCollapsed=!state.navCollapsed;render();}},
+  ]},
+];
+let palSel=0,palFlat=[];
+function openPal(){document.getElementById('palBg').classList.add('show');const i=document.getElementById('palInput');i.value='';palSel=0;renderPal();setTimeout(()=>i.focus(),20);}
+function closePal(){document.getElementById('palBg').classList.remove('show');}
+function renderPal(){
+  const q=(document.getElementById('palInput').value||'').toLowerCase();
+  const list=document.getElementById('palList');list.innerHTML='';palFlat=[];
+  PAL.forEach(grp=>{
+    const matches=grp.items.filter(it=>it.l.toLowerCase().includes(q));
+    if(!matches.length)return;
+    list.appendChild(el(`<div class="pal-grp">${grp.g}</div>`));
+    matches.forEach(it=>{
+      const idx=palFlat.length;palFlat.push(it);
+      const row=el(`<div class="pal-it ${idx===palSel?'on':''}"><span class="pi">${it.i}</span><span>${it.l}</span>${it.k?`<kbd class="pk">${it.k}</kbd>`:''}</div>`);
+      row.onclick=()=>{it.act();closePal();};
+      list.appendChild(row);
+    });
+  });
+  if(palSel>=palFlat.length)palSel=0;
+}
+function palKey(e){
+  if(e.key==='Escape')return closePal();
+  if(e.key==='ArrowDown'){palSel=Math.min(palSel+1,palFlat.length-1);renderPal();e.preventDefault();}
+  if(e.key==='ArrowUp'){palSel=Math.max(palSel-1,0);renderPal();e.preventDefault();}
+  if(e.key==='Enter'){if(palFlat[palSel]){palFlat[palSel].act();closePal();}}
+}
+
+/* global shortcuts */
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPal();}
+  else if(e.shiftKey&&e.key.toLowerCase()==='d'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){toggleMode();}
+  else if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='b'){e.preventDefault();state.navCollapsed=!state.navCollapsed;render();}
+  else if(e.key==='Escape'&&state.inspector){closeInspector();}
+});
+
+/* live clock */
+function tick(){const d=new Date();document.getElementById('stClock').textContent=d.toLocaleTimeString('en-GB');}
+setInterval(tick,1000);tick();
+
+/* boot */
+render();
+</script>
+</body>
+</html>

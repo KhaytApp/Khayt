@@ -1,0 +1,16 @@
+{
+  "id": "my-shop",
+  "name": "My Shop Theme",
+  "description": "Short description shown in Settings.",
+  "version": 1,
+  "author": "Your Name",
+  "shell": "default",
+  "defaultAppearance": "dark",
+  "defaultAccent": "brand",
+  "tokens": "tokens.css",
+  "compat": "compat.css",
+  "accents": {
+    "brand": { "h": 210, "s": "70%", "l": "52%", "label": "Brand Blue" },
+    "ember": { "h": 18, "s": "85%", "l": "55%", "label": "Ember" }
+  }
+}

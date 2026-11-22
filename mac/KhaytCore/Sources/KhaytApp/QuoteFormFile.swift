@@ -1,0 +1,594 @@
+import CryptoKit
+import Foundation
+import KhaytCore
+
+/// The model a visitor uploaded through the shop's embedded quote form
+/// (khayt-cloud #144), and how it gets from the cloud into the shop's library.
+///
+/// ── THE ORDER OF THE STEPS IS THE WHOLE DESIGN ────────────────────────────
+///
+/// `DELETE /intake/{id}` deletes the file on the cloud as well as the request.
+/// So, for a request that carries a file:
+///
+///   1. download it (`CloudIntake.file`);
+///   2. check it: its SHA-256 against BOTH the payload's `file.sha256` and the
+///      `X-Content-SHA256` header, and its length against `file.bytes`;
+///   3. put it in the library the way any imported model is put there
+///      (`LibraryImport.prepare`: its own `PF-…` folder, copied, read back);
+///   4. write the book — the job, and the library record it points at, in ONE
+///      write;
+///   5. and ONLY THEN drain the queue.
+///
+/// A file that is not a model (G-code and the rest) never goes in the library
+/// at step 3: it is kept beside the book instead (`heldFolder`), and a failure
+/// to keep it is a failure before 5 like any other.
+///
+/// Anything that fails before 5 leaves the request in the queue, with its
+/// file, for the next try. A file the cloud has already let expire (404
+/// `no-file`) is the one exception: there is nothing left to lose, so the
+/// request is imported without it, labelled as such, and then drained.
+/// A 404 `no-route` is the feature switched off on the cloud: nothing is
+/// written and nothing is drained.
+enum QuoteFormFile {
+
+    /// What the form showed the visitor — the cloud's own signed figure
+    /// (`payload.quote`, `verified: true`; khayt-cloud drops a price the
+    /// browser merely claims). Never binding: the shop confirms the price.
+    /// `grams` and `hours` are PER PIECE; `price` is for all `qty`.
+    struct Shown: Equatable, Sendable {
+        let price: Double
+        let currency: String
+        let qty: Int
+        let grams: Double
+        let hours: Double
+        let reliable: Bool
+
+        init?(_ payload: JSONValue) {
+            guard case .object(let p) = payload, case .object(let q)? = p["quote"],
+                  q["verified"] == .bool(true),
+                  case .number(let price)? = q["price"], price > 0, price.isFinite else { return nil }
+            func number(_ key: String) -> Double {
+                if case .number(let n)? = q[key], n.isFinite, n > 0 { return n }
+                return 0
+            }
+            self.price = price
+            if case .string(let c)? = q["currency"] { currency = c } else { currency = "" }
+            qty = max(1, Int(number("qty")))
+            grams = number("grams")
+            hours = number("hours")
+            reliable = q["reliable"] != .bool(false)
+        }
+
+        /// The line the job's notes carry, in the shop's words.
+        @MainActor func note(_ words: Words) -> String {
+            let amount = String(format: "%.2f", price) + (currency.isEmpty ? "" : " " + currency)
+            let key = reliable ? "mac.qfe_shown_note" : "mac.qfe_shown_note_unreliable"
+            return words.callIt(key, ["price": .string(amount), "qty": .number(Double(qty))])
+        }
+    }
+
+    /// What the quote form may put in the library: meshes and CAD a shop
+    /// slices itself. A machine file (G-code and the rest) from an anonymous
+    /// visitor is never filed where a job could send it to a printer.
+    static let modelKinds: Set<String> = ["stl", "3mf", "obj", "step", "stp", "iges", "igs", "amf", "ply"]
+
+    /// Where a file the library does not take is kept instead: beside the
+    /// book, one folder per request, never under a library root. The DELETE
+    /// that follows deletes the cloud's copy too (khayt-cloud #146 trusts
+    /// `X-Intake-File-Capable` to mean the Mac kept it), so a customer's
+    /// G-code must land here before the drain, not be dropped.
+    static func heldFolder(storeURL: URL, requestId: String) -> URL {
+        let safe = String(requestId.unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_"
+        }.map(Character.init))
+        return storeURL.deletingLastPathComponent()
+            .appending(path: "Quote form files", directoryHint: .isDirectory)
+            .appending(path: safe.isEmpty ? "request" : safe, directoryHint: .isDirectory)
+    }
+
+    /// The most a quote-form file can be (khayt-cloud `QUOTE_MAX_BYTES`
+    /// default), used when the request does not say its size.
+    static let maxBytes = 32 << 20
+
+    /// How far a visitor's 3MF may inflate while it is read — the LAN
+    /// server's rule for a stranger's upload.
+    static func inflateBudget(_ bytes: Int) -> Int { min(max(bytes, 1) * 250, LanServer.maxInflate) }
+
+    /// `payload.file`, as the cloud files it.
+    struct Meta: Equatable, Sendable {
+        let name: String
+        let bytes: Int
+        let sha256: String
+        let type: String
+        let expiresAt: Date?
+
+        /// Nil when the payload carries no file object. A file object with no
+        /// name is still a file: gating on the name would let the automatic
+        /// pass import and drain it, and the drain deletes the file.
+        init?(_ payload: JSONValue) {
+            guard case .object(let fields) = payload,
+                  case .object(let f)? = fields["file"] else { return nil }
+            if case .string(let name)? = f["name"], !name.isEmpty { self.name = name } else { self.name = "model" }
+            if case .number(let n)? = f["bytes"], n.isFinite, n >= 0, n < 1e15 { bytes = Int(n) } else { bytes = -1 }
+            if case .string(let s)? = f["sha256"] { sha256 = s.lowercased() } else { sha256 = "" }
+            if case .string(let s)? = f["type"] { type = s } else { type = "" }
+            if case .string(let s)? = f["expiresAt"] { expiresAt = QuoteFormFile.instant(s) } else { expiresAt = nil }
+        }
+
+        init(name: String, bytes: Int, sha256: String, type: String = "", expiresAt: Date? = nil) {
+            self.name = name; self.bytes = bytes; self.sha256 = sha256.lowercased()
+            self.type = type; self.expiresAt = expiresAt
+        }
+
+        /// The visitor's file name, made safe to put on disk: the last path
+        /// component only, no separators or control characters, bounded.
+        /// The name is from a stranger and is never trusted as a path.
+        var safeName: String {
+            var leaf = name.replacingOccurrences(of: "\\", with: "/")
+                .split(separator: "/").last.map(String.init) ?? ""
+            leaf = String(leaf.unicodeScalars.filter {
+                !CharacterSet.controlCharacters.contains($0) && $0 != ":"
+            }.map(Character.init))
+            leaf = leaf.trimmingCharacters(in: .whitespaces)
+            while leaf.hasPrefix(".") { leaf.removeFirst() }
+            // Bounded in UTF-8 bytes, which is what NAME_MAX (255) counts:
+            // 120 emoji are 120 Characters and far more bytes.
+            if leaf.utf8.count > 200 {
+                let ext = String((leaf as NSString).pathExtension.prefix(12))
+                var stem = (leaf as NSString).deletingPathExtension
+                while stem.utf8.count > 180 { stem.removeLast() }
+                leaf = ext.isEmpty ? stem : stem + "." + ext
+            }
+            return leaf.isEmpty ? "model" : leaf
+        }
+    }
+
+    /// Why a request with a file was left in the queue.
+    enum Refusal: Error, Equatable, Sendable {
+        /// 404 `no-route`: the cloud has the quote form switched off.
+        case notOffered
+        /// The download did not happen.
+        case download(String)
+        /// The payload did not say what the bytes should hash to.
+        case noChecksum
+        /// The bytes did not hash to what the payload and the header said.
+        case checksum
+        /// Not as many bytes as the payload said.
+        case size(expected: Int, got: Int)
+        /// This Mac has no library folder to put the file in.
+        case noLibrary
+        /// The cloud has no file for a request well before its keep-until
+        /// date: a fault on the cloud, so the request is kept.
+        case missingEarly
+        /// The library would not take the file (an unknown kind, a copy that
+        /// did not arrive intact…).
+        case library(LibraryImport.Failure)
+        /// The book would not take the write.
+        case write(String)
+    }
+
+    /// The bytes, checked. Nil when they are what the cloud said they are.
+    ///
+    /// The payload's hash is required: it is what the visitor's upload hashed
+    /// to when the cloud filed it, and without it nothing can be checked. The
+    /// header is checked whenever it is there, but its absence alone is not a
+    /// refusal — a proxy that strips an unknown response header would
+    /// otherwise strand every quote-form request in the queue for good.
+    static func verify(_ data: Data, meta: Meta, header: String?) -> Refusal? {
+        let expected = meta.sha256.trimmingCharacters(in: .whitespaces).lowercased()
+        guard expected.count == 64 else { return .noChecksum }
+        if meta.bytes >= 0, data.count != meta.bytes { return .size(expected: meta.bytes, got: data.count) }
+        let sent = (header ?? "").trimmingCharacters(in: .whitespaces).lowercased()
+        let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        guard actual == expected, sent.isEmpty || sent == expected else { return .checksum }
+        return nil
+    }
+
+    /// What the book is told about the file, inside the job write.
+    struct Attach: Sendable {
+        enum State: Sendable {
+            /// In the library as `printFileId`. `newRecord` is the library
+            /// record to add in the same write; nil when the library already
+            /// held these exact bytes and the job just points at that model.
+            case filed(printFileId: String, newRecord: [String: JSONValue]?)
+            /// The cloud had already deleted it. `note` goes on the job, in
+            /// the shop's words, so nobody goes looking for a model.
+            case expired(note: String)
+            /// Not a kind the quote form files (a machine file, an empty
+            /// one): not in the library, the note says why. `heldAt` is
+            /// where the bytes were kept instead; nil only for an empty file.
+            case notTaken(note: String, heldAt: String?)
+        }
+        let meta: Meta
+        let state: State
+    }
+
+    /// Put the file's facts on a job record — and, for a filed one, point
+    /// the job's parts at it. Called inside the write (`putOnlineOrder`).
+    static func stamp(_ attach: Attach, on record: inout [String: JSONValue]) {
+        var facts: [String: JSONValue] = [
+            "name": .string(attach.meta.safeName),
+            "bytes": .number(Double(max(0, attach.meta.bytes))),
+            "sha256": .string(attach.meta.sha256),
+        ]
+        if !attach.meta.type.isEmpty { facts["type"] = .string(attach.meta.type) }
+        switch attach.state {
+        case .filed(let id, _):
+            facts["printFileId"] = .string(id)
+            facts["expired"] = .bool(false)
+            // A quote-form request is one line (the visitor's request), so it
+            // is one part; every part not already pointing at a model points
+            // at this one.
+            if case .array(var parts)? = record["parts"] {
+                for i in parts.indices {
+                    guard case .object(var p) = parts[i] else { continue }
+                    if case .string(let had)? = p["printFileId"], !had.isEmpty { continue }
+                    p["printFileId"] = .string(id)
+                    parts[i] = .object(p)
+                }
+                record["parts"] = .array(parts)
+            }
+        case .notTaken(let note, let heldAt):
+            facts["expired"] = .bool(false)
+            facts["notTaken"] = .bool(true)
+            if let heldAt { facts["heldAt"] = .string(heldAt) }
+            let notes = Shop.plainString(record["notes"]) ?? ""
+            record["notes"] = .string(notes.isEmpty ? note : notes + "\n" + note)
+        case .expired(let note):
+            facts["expired"] = .bool(true)
+            let notes = Shop.plainString(record["notes"]) ?? ""
+            record["notes"] = .string(notes.isEmpty ? note : notes + "\n" + note)
+        }
+        record["quoteFile"] = .object(facts)
+    }
+
+    /// A sliced plate in 3MF clothing — Bambu/Orca `*.gcode.3mf`, or any 3MF
+    /// holding `Metadata/plate_N.gcode`. It is a MACHINE file: a job could
+    /// send it to a printer (`PrinterSend.slicedFiles` lists `.gcode.3mf`), so
+    /// a visitor's one is held beside the book like G-code, never filed.
+    static func isSlicedPlate(name: String, data: Data) -> Bool {
+        let lower = name.lowercased()
+        if lower.hasSuffix(".gcode.3mf") { return true }
+        guard lower.hasSuffix(".3mf") else { return false }
+        let probe = FileManager.default.temporaryDirectory
+            .appending(path: "khayt-3mf-probe-\(UUID().uuidString).3mf")
+        defer { try? FileManager.default.removeItem(at: probe) } // scratch
+        guard (try? data.write(to: probe)) != nil,
+              let entries = try? Zip.entries(of: probe) else { return false }
+        return entries.contains { e in
+            let n = e.name.lowercased()
+            return n.hasPrefix("metadata/") && n.hasSuffix(".gcode")
+        }
+    }
+
+    nonisolated static func instant(_ text: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text)
+    }
+}
+
+// MARK: - The import, step by step
+
+@MainActor
+extension Shop {
+
+    /// What importing one quote-form request did.
+    struct QuoteFormResult: Sendable {
+        /// What the book write did; nil when nothing was written.
+        var recorded: Recorded?
+        /// Why the request stayed in the queue (nothing written, nothing
+        /// drained). Nil when the import went ahead.
+        var refusal: QuoteFormFile.Refusal?
+        /// The file was gone (404 `no-file`): imported without it.
+        var expired = false
+        /// The file was not a kind the quote form files: not in the library.
+        var notTaken = false
+        /// Where such a file was kept instead (nil for an empty one).
+        var heldAt: URL?
+        /// The library model the job points at, when the file was filed.
+        var printFileId: String?
+        var drained = false
+        /// The drain's failure, after a successful write.
+        var drainProblem: String?
+        var webhooks: [KhaytEngine.WebhookDelivery] = []
+    }
+
+    /// Download → verify → into the library → write the book → drain.
+    ///
+    /// Static and handed everything, so a test can run the whole sequence
+    /// against a scratch book and library with the cloud answered by a seam.
+    /// See `QuoteFormFile` for why the steps are in this order.
+    static func recordQuoteForm(_ order: OnlineOrder, meta: QuoteFormFile.Meta,
+                                input: [String: JSONValue], paid: Bool,
+                                engine: KhaytEngine, now: Date = Date(),
+                                storeURL: URL, libraryRoot: URL?,
+                                existingModel: (String) -> String?,
+                                analyseRisk: Bool = false,
+                                notTakenNote: String = "",
+                                heldNote: ((String) -> String)? = nil,
+                                expiredNote: String,
+                                withoutFile: Bool = false,
+                                lostNote: String = "",
+                                owns: @escaping @Sendable () -> Bool,
+                                whoHasIt: @escaping @Sendable () -> String?,
+                                download: () async throws -> CloudIntake.FileAnswer,
+                                drain: () async throws -> Void) async -> QuoteFormResult {
+        // lock: callers — importQuoteForm
+        var result = QuoteFormResult()
+
+        // 1. DOWNLOAD.
+        let answer: CloudIntake.FileAnswer
+        do {
+            answer = try await download()
+        } catch CloudIntake.Failure.notOffered {
+            result.refusal = .notOffered
+            return result
+        } catch {
+            result.refusal = .download(ErrorText.plain(error))
+            return result
+        }
+
+        // 2. VERIFY, and 3. INTO THE LIBRARY.
+        let attach: QuoteFormFile.Attach
+        var preparedDir: URL?
+        let scratch = FileManager.default.temporaryDirectory
+            .appending(path: "khayt-quote-form-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: scratch) } // scratch
+        switch answer {
+        case .expired where meta.expiresAt.map({ $0 > now.addingTimeInterval(3600) }) ?? false:
+            // The cloud says the file is gone well before the date it gave
+            // for it — a storage fault, not an expiry. Draining now would
+            // lose a file that may still be in the bucket; it stays queued —
+            // unless the shop, told so, chose to take the request without it.
+            guard withoutFile else {
+                result.refusal = .missingEarly
+                return result
+            }
+            result.expired = true
+            attach = .init(meta: meta, state: .expired(note: lostNote))
+        case .expired:
+            result.expired = true
+            attach = .init(meta: meta, state: .expired(note: expiredNote))
+        case .file(let data, let header):
+            // Hashed off the main thread: up to 32 MB of SHA-256.
+            if let refusal = await PinWork.run({ QuoteFormFile.verify(data, meta: meta, header: header) }) {
+                result.refusal = refusal
+                return result
+            }
+            let kind = (meta.safeName as NSString).pathExtension.lowercased()
+            let name = meta.safeName
+            let sliced = await PinWork.run { QuoteFormFile.isSlicedPlate(name: name, data: data) }
+            if data.isEmpty || !QuoteFormFile.modelKinds.contains(kind) || sliced {
+                result.notTaken = true
+                if data.isEmpty {
+                    attach = .init(meta: meta, state: .notTaken(note: notTakenNote, heldAt: nil))
+                    break
+                }
+                // Kept beside the book, out of the library, BEFORE the
+                // drain deletes the cloud's copy. If it cannot be kept, the
+                // request stays in the queue with its file.
+                let folder = QuoteFormFile.heldFolder(storeURL: storeURL, requestId: order.id)
+                let held = folder.appending(path: meta.safeName)
+                let wrote: String? = await PinWork.run {
+                    do {
+                        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                        try data.write(to: held, options: .atomic)
+                        return nil
+                    } catch { return error.localizedDescription }
+                }
+                if let wrote {
+                    result.refusal = .write(wrote)
+                    return result
+                }
+                result.heldAt = held
+                attach = .init(meta: meta, state: .notTaken(note: heldNote?(held.path) ?? held.path, heldAt: held.path))
+                break
+            }
+            // The same bytes already in the library: the job points at that
+            // model rather than adding a second copy — what any import does.
+            if let existing = existingModel(meta.sha256) {
+                attach = .init(meta: meta, state: .filed(printFileId: existing, newRecord: nil))
+                result.printFileId = existing
+                break
+            }
+            guard let libraryRoot else {
+                result.refusal = .noLibrary
+                return result
+            }
+            let file = scratch.appending(path: meta.safeName)
+            let wrote: String? = await PinWork.run {
+                do {
+                    try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+                    try data.write(to: file, options: .atomic)
+                    return nil
+                } catch { return error.localizedDescription }
+            }
+            if let wrote {
+                result.refusal = .library(.failed(wrote))
+                return result
+            }
+            do {
+                // A stranger's 3MF is read with the LAN server's inflate
+                // budget, so a zip bomb stops early (PinWork carries it).
+                let made = try await Zip.$inflateBudget.withValue(QuoteFormFile.inflateBudget(data.count)) {
+                    try await LibraryImport.prepare(
+                        file, libraryRoot: libraryRoot, knownHashes: [], nameOfExisting: { _ in nil },
+                        engine: engine, analyseRisk: analyseRisk)
+                }
+                preparedDir = made.dir
+                let id = made.added.id
+                attach = .init(meta: meta, state: .filed(printFileId: id, newRecord: made.record))
+                result.printFileId = id
+            } catch let failure as LibraryImport.Failure {
+                result.refusal = .library(failure)
+                return result
+            } catch {
+                result.refusal = .library(.failed(ErrorText.plain(error)))
+                return result
+            }
+        }
+
+        // 4. THE BOOK.
+        //
+        // A visitor's request is a QUOTE, not an order: nothing was agreed and
+        // nothing paid, so it takes no invoice number. As an order it took the
+        // next one (`INV-…`) — a number the shop can then never delete, only
+        // cancel — for every stranger who pressed Send. The desktop has always
+        // imported these as quotes (`importIntakeAsQuote`).
+        var input = input
+        if !paid { input["asQuote"] = .bool(true) }
+        var put: PutOnline?
+        do {
+            try await StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
+                put = try await Self.putOnlineOrder(order, input: input, paid: paid, into: &root,
+                                                    engine: engine, now: now, file: attach)
+            }
+        } catch {
+            if let preparedDir { await PinWork.run { try? FileManager.default.removeItem(at: preparedDir) } }
+            // The held copy stays: the cloud still has the request, the next
+            // try writes the same bytes to the same place.
+            result.refusal = .write(ErrorText.plain(error))
+            return result
+        }
+        guard let put else {
+            if let preparedDir { await PinWork.run { try? FileManager.default.removeItem(at: preparedDir) } }
+            result.refusal = .write("the book did not take the change")
+            return result
+        }
+        // Already in the book (an earlier import whose drain failed): the
+        // copy made just now belongs to nothing, so it goes.
+        if !put.fileFiled, let preparedDir {
+            await PinWork.run { try? FileManager.default.removeItem(at: preparedDir) }
+            if case .filed(_, .some) = attach.state { result.printFileId = nil }
+        }
+        result.recorded = put.recorded
+        result.webhooks = put.webhooks
+
+        // 5. ONLY NOW, THE DRAIN.
+        do {
+            try await drain()
+            result.drained = true
+        } catch {
+            result.drainProblem = ErrorText.plain(error)
+        }
+        return result
+    }
+
+    /// The button, for a request that carries a file. `recordOnlineOrder`
+    /// hands over to this; the caller holds the busy flag.
+    ///
+    /// `withoutFile` is the shop's choice, made on the card after a
+    /// `missingEarly` refusal: take the request with a note instead of the file.
+    func recordQuoteFormOrder(_ order: OnlineOrder, meta: QuoteFormFile.Meta,
+                              fetch: CloudIntake.Fetch?, withoutFile: Bool = false) async {
+        guard permitted("orders", "create") else { return }
+        let outcome = await importQuoteForm(order, meta: meta, fetch: fetch, withoutFile: withoutFile)
+        guard case .success(let result) = outcome else {
+            if case .failure(let problem) = outcome, !problem.said.isEmpty { onlineProblem = problem.said }
+            if case .failure(.refused(.missingEarly, _)) = outcome { quoteFilesMissing.insert(order.id) }
+            return
+        }
+        quoteFilesMissing.remove(order.id)
+        if !result.webhooks.isEmpty { await fire(result.webhooks) }
+        switch result.recorded {
+        case .made(let jobId, _, _, _)?:
+            webStoreArrived.append(WebStoreArrival(
+                intakeId: order.id, reference: order.item.reference, jobId: jobId,
+                customer: order.customer, automatic: false))
+            onlineMade = (jobId, order.customer)
+            if result.expired { onlineNotice = words.callIt("mac.qfe_imported_expired") }
+            if result.notTaken {
+                onlineNotice = words.callIt(result.heldAt == nil ? "mac.qfe_imported_not_taken" : "mac.qfe_imported_held")
+            }
+        case .alreadyThere?:
+            onlineProblem = words.callIt("mac.online_already_recorded")
+        case nil:
+            break
+        }
+        if result.drained {
+            onlineOrders.removeAll { $0.id == order.id }
+            quoteRequestsWaiting = onlineOrders.filter(\.item.isQuoteForm).count
+        } else if let problem = result.drainProblem {
+            onlineProblem = words.callIt("mac.online_kept_in_queue") + " " + problem
+        }
+        await load(source)
+    }
+
+    /// Why an import of a request with a file did not go ahead.
+    enum QuoteFormProblem: Error {
+        case refused(QuoteFormFile.Refusal, said: String)
+        case other(String)
+        var said: String {
+            switch self { case .refused(_, let said), .other(let said): said }
+        }
+    }
+
+    /// The import of a request with a file, without touching the sheet:
+    /// shared by the button and the automatic pass.
+    func importQuoteForm(_ order: OnlineOrder, meta: QuoteFormFile.Meta,
+                         fetch: CloudIntake.Fetch?, withoutFile: Bool = false) async -> Result<QuoteFormResult, QuoteFormProblem> {
+        // The button checks `permitted`; the automatic pass is the owner's own
+        // setting, run only on the Mac holding the book.
+        // lock: callers — recordQuoteFormOrder, recordPaidWebStoreOrders
+        guard case .store(let build) = source, let engine else { return .failure(.other("")) }
+        // One import of a request at a time, whichever of the two started it.
+        guard quoteFormsInFlight.insert(order.id).inserted else { return .failure(.other("")) }
+        defer { quoteFormsInFlight.remove(order.id) }
+        let connection: CloudReader.Connection
+        let token: String
+        do {
+            connection = try CloudReader.connection(settingsDict)
+            token = try await Secrets.open(connection.storedToken, for: build)
+            guard !token.isEmpty else { throw CloudIntake.Failure.notConnected }
+        } catch {
+            return .failure(.other(words.callIt("mac.qfe_kept") + " "
+                + (ErrorText.plain(error))))
+        }
+        let network = fetch ?? Self.quoteFormNetwork
+        let cap = meta.bytes >= 0 ? meta.bytes : QuoteFormFile.maxBytes
+        // Streamed and stopped at the declared size, not buffered whole.
+        let download = fetch ?? CloudIntake.capped(CloudReader.session, maxBytes: cap)
+        let input = await onlineJobInput(order)
+        let files = self.files
+        let result = await Self.recordQuoteForm(
+            order, meta: meta, input: input, paid: false,
+            engine: engine, storeURL: build.storeURL,
+            libraryRoot: libraryRoots.map { URL(fileURLWithPath: $0.primary) },
+            existingModel: { hash in files.first { $0.contentHash == hash }?.id },
+            analyseRisk: analysesRiskAtImport,
+            notTakenNote: words.callIt("mac.qfe_file_not_taken_note", ["name": .string(meta.safeName)]),
+            heldNote: { [words] path in words.callIt("mac.qfe_file_held_note", ["name": .string(meta.safeName), "path": .string(path)]) },
+            expiredNote: words.callIt("mac.qfe_file_expired_note", ["name": .string(meta.safeName)]),
+            withoutFile: withoutFile,
+            lostNote: words.callIt("mac.qfe_file_lost_note", ["name": .string(meta.safeName)]),
+            owns: { StoreLock.weOwnIt(build) },
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
+            download: { try await CloudIntake.file(connection, token: token, id: order.id, maxBytes: cap, fetch: download) },
+            drain: { try await CloudIntake.drain(connection, token: token, id: order.id, fetch: network) })
+        if let refusal = result.refusal {
+            return .failure(.refused(refusal, said: words.callIt("mac.qfe_kept") + " " + saidRefusal(refusal)))
+        }
+        return .success(result)
+    }
+
+    /// A refusal in the shop's words.
+    func saidRefusal(_ refusal: QuoteFormFile.Refusal) -> String {
+        switch refusal {
+        case .notOffered: words.callIt("mac.qfe_err_not_offered")
+        case .download(let why): words.callIt("mac.qfe_err_download", ["why": .string(why)])
+        case .noChecksum, .checksum: words.callIt("mac.qfe_err_checksum")
+        case .size(let expected, let got):
+            words.callIt("mac.qfe_err_size", ["expected": .string(Format.fileSize(Int64(expected))),
+                                              "got": .string(Format.fileSize(Int64(got)))])
+        case .noLibrary: LibraryImport.Failure.noLibrary.said(words)
+        case .missingEarly: words.callIt("mac.qfe_err_missing_early")
+        case .library(let failure): failure.said(words)
+        case .write(let why): words.callIt("mac.qfe_err_write", ["why": .string(why)])
+        }
+    }
+
+    private static let quoteFormNetwork: CloudIntake.Fetch = { request in
+        try await CloudReader.session.data(for: request)
+    }
+}

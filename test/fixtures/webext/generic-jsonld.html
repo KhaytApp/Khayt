@@ -1,0 +1,15 @@
+<!doctype html>
+<!-- Written for the test: a site with no reader of its own, a 3DModel in
+     JSON-LD, a broken second JSON-LD block, a relative image, a repeated file
+     link and an http one that must be dropped. -->
+<html><head>
+<meta charset="utf-8">
+<title>Desk Organiser — Example Models</title>
+<link rel="canonical" href="https://models.example.com/item/desk-organiser?ref=home#reviews">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"3DModel","name":"Desk Organiser","author":{"@type":"Person","name":"Rana"},"license":"https://creativecommons.org/licenses/by-nc/4.0/","keywords":["desk","office"],"image":{"@type":"ImageObject","url":"/img/organiser.jpg"},"description":"Three trays and a pen cup."}</script>
+<script type="application/ld+json">{ this is not json }</script>
+</head><body>
+<a href="/files/organiser.stl">organiser.stl</a>
+<a href="/files/organiser.stl">duplicate</a>
+<a href="http://models.example.com/files/insecure.3mf">insecure</a>
+</body></html>

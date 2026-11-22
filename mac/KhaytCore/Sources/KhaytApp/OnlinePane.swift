@@ -1,0 +1,531 @@
+import SwiftUI
+import KhaytCore
+
+// MARK: - Online
+
+/// The LAN server's switch, port and PIN — the block the Electron page keeps
+/// under "Advanced: REST API…", in that page's own words.
+///
+/// Save restarts the server when the port or the PIN changed, because the
+/// server is started from the book and a save is a reload of the book. There
+/// is no separate Start button: on this app the switch IS the button, and a
+/// switch that could disagree with what is running is two sources of truth.
+struct OnlinePane: View {
+    let shop: Shop
+
+    struct Draft: Equatable {
+        var enabled = false
+        var port = "3219"
+        var bindLan = false
+        /// What was typed. Blank keeps the stored PIN — the rule's reading.
+        var pin = ""
+        /// Whether the book has a PIN at all, sealed or not.
+        var pinStored = false
+        /// The storefront webhook secrets as typed — blank keeps the stored
+        /// one, as for the PIN — and whether each is stored at all.
+        var sallaSecret = "", zidSecret = ""
+        var sallaStored = false, zidStored = false
+
+        @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
+            let lan = SettingsReader(settings: SettingsReader(settings: settings).object("lanApi"))
+            var d = Draft(enabled: lan.flag("enabled"),
+                          port: String(Int(lan.number("port", 3219))),
+                          bindLan: lan.flag("bindLan"),
+                          pin: "",
+                          pinStored: !lan.text("pin").isEmpty)
+            d.sallaStored = !lan.text("sallaWebhookSecret").isEmpty
+            d.zidStored = !lan.text("zidWebhookSecret").isEmpty
+            readQuote(settings, into: &d)
+            return d
+        }
+
+        var portNumber: Int { Int(port.trimmingCharacters(in: .whitespaces)) ?? 3219 }
+
+        /// A NEW PIN shorter than eight characters. The PIN is the only lock on
+        /// the whole book over the network, and a four-digit one falls to the
+        /// per-address limit in a day. The server holds the same rule
+        /// (`LanServer.minimumPin`), so a short PIN already stored opens
+        /// nothing until the shop sets a new one.
+        static let minimumPin = LanServer.minimumPin
+        var pinTooShort: Bool {
+            let p = pin.trimmingCharacters(in: .whitespaces)
+            return !p.isEmpty && p.count < Self.minimumPin
+        }
+
+        // ── WHAT A CUSTOMER MAY BE QUOTED ─────────────────────────────────
+        //
+        // Text, not numbers, for the same reason the product sheet's rates
+        // are: blank is not zero. A shop that has not said what a spool costs
+        // must not be read as saying it costs nothing.
+        var quoteOn = false
+        var presetId = ""
+        var filamentId = ""
+        /// Price a customer's upload by SLICING it, rather than estimating
+        /// from its shape. Off unless the shop turns it on: it is the only
+        /// setting in Khayt that writes a stranger's file down and points a
+        /// native binary at it.
+        var sliceUploads = false
+        /// Which slicer does that. Empty means the shop's default.
+        var sliceWithId = ""
+        var spoolCost = "", spoolWeight = "", margin = "", minPrice = "", waste = "", limit = ""
+
+        @MainActor static func readQuote(_ settings: [String: JSONValue], into d: inout Draft) {
+            let lan = SettingsReader(settings: SettingsReader(settings: settings).object("lanApi"))
+            let q = SettingsReader(settings: lan.object("intakeQuote"))
+            d.quoteOn = q.flag("enabled")
+            d.presetId = q.text("presetId")
+            d.filamentId = q.text("filamentId")
+            d.spoolCost = Money.fieldValue(q.number("spoolCost", 0))
+            d.spoolWeight = Money.fieldValue(q.number("spoolWeight", 1000))
+            d.margin = Money.fieldValue(q.number("marginPct", 0))
+            d.minPrice = Money.fieldValue(q.number("minPrice", 0))
+            // Stored as a fraction, shown as a percentage — the other app's
+            // page does the same, and storing what is shown would quietly
+            // multiply every shop's waste allowance by a hundred.
+            d.waste = Money.fieldValue(q.number("wastePct", 0) * 100)
+            d.limit = Money.fieldValue(q.number("hourlyLimit", 12))
+            d.sliceUploads = q.flag("sliceUploads")
+            d.sliceWithId = q.text("sliceWithId")
+        }
+
+        func quoteForm() -> [String: JSONValue] {
+            let n = { (t: String, fallback: Double) -> Double in
+                let cleaned = t.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
+                return cleaned.isEmpty ? fallback : (Double(cleaned) ?? fallback)
+            }
+            return [
+                "enabled": .bool(quoteOn),
+                "presetId": .string(presetId), "filamentId": .string(filamentId),
+                "spoolCost": .number(max(0, n(spoolCost, 0))),
+                "spoolWeight": .number(max(1, n(spoolWeight, 1000))),
+                "marginPct": .number(max(0, n(margin, 0))),
+                "minPrice": .number(max(0, n(minPrice, 0))),
+                "wastePct": .number(min(0.5, max(0, n(waste, 0) / 100))),
+                "hourlyLimit": .number(min(10_000, max(1, n(limit, 12)))),
+                "sliceUploads": .bool(sliceUploads),
+                "sliceWithId": .string(sliceWithId),
+            ]
+        }
+    }
+
+    @State private var draft = Draft()
+    @State private var original = Draft()
+    @State private var showQuote = false
+    @State private var newPresetName = ""
+    @State private var presetRates: [String: String] = [:]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
+                // ── ONLINE STORAGE, FIRST ───────────────────────────────
+                //
+                // It lived under Preferences, and the shop looked for Google
+                // Drive here, under Online. It saves itself as it changes, so
+                // the Save bar below is not its business.
+                CloudLibrarySettings(shop: shop)
+                // The Khayt Cloud plan is in Settings › Khayt Cloud (`CloudPane`),
+                // beside the sign-in it needs.
+                // The payment link and pay later are in Settings › Invoices &
+                // Payments, with the rest of how the shop is paid.
+                PortalCrossShopSetting(shop: shop)
+                ShopSlugSettings(shop: shop)
+                // The weekly cloud digest is chosen with the other email
+                // summary now, in Settings › Integrations (EmailSummarySettings).
+                // The cloud team and its devices are in Settings › Team & Access.
+                Section(shop.words.callIt("mac.online_title")) {
+                    Text(shop.words.callIt("mac.online_desc"))
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Toggle(shop.words.callIt("lan.enabled"), isOn: $draft.enabled)
+                    LabeledContent(shop.words.callIt("lan.port")) {
+                        TextField("", text: $draft.port)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 90)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    Toggle(shop.words.callIt("lan.bind_lan"), isOn: $draft.bindLan)
+                    Text(shop.words.callIt(draft.bindLan ? "lan.bind_lan_hint" : "lan.loopback_warn"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Section {
+                    LabeledContent(shop.words.callIt("lan.pin")) {
+                        // BORDERED, and that is the whole fix to "there is no
+                        // place to put the PIN": a field inside LabeledContent
+                        // draws with no bezel, and with no PIN stored yet its
+                        // placeholder was empty too — so the one field a shop
+                        // has to fill in before the server is safe was a blank
+                        // strip beside its own label. See #1489.
+                        SecureField(draft.pinStored ? shop.words.callIt("common.secret_unchanged") : "",
+                                    text: $draft.pin)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 220)
+                    }
+                    LanPinNotes(words: shop.words, tooShort: draft.pinTooShort,
+                                missing: draft.enabled && !draft.pinStored
+                                    && draft.pin.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                // Scoped tokens for scripts, beside the PIN they stand in for.
+                // Saves itself: a token is shown once, so it is in the book
+                // the moment it exists.
+                ApiTokensSection(shop: shop)
+                // ── ALERTS ON THE SHOP'S IPHONES ───────────────────────
+                //
+                // A finished print is sent to the shop's iPhones through
+                // Khayt Cloud. This sends a sample from here, the one app the
+                // Keychain gives the shop's sign-in to, so the whole chain can
+                // be checked without waiting for a print.
+                if Shop.cloudConnected(shop.settingsDict) {
+                    Section(shop.words.callIt("mac.alert_title")) {
+                        Text(shop.words.callIt("mac.alert_desc"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack {
+                            Button(shop.words.callIt("mac.alert_test")) { Task { await shop.sendTestAlert() } }
+                            if let said = shop.testAlertSaid {
+                                Text(said).font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+                // ── ORDERS FROM A STOREFRONT ──────────────────────────
+                //
+                // Salla and Zid sign every order they send with a secret the
+                // shop copies out of their dashboard. Without one here the
+                // address answers 403 to everybody, which is the point: an
+                // unsigned order is anyone on the network writing into the
+                // queue.
+                Section(shop.words.callIt("mac.storefront_hooks_title")) {
+                    LabeledContent(shop.words.callIt("lan.salla_secret")) {
+                        SecureField(draft.sallaStored ? shop.words.callIt("common.secret_unchanged") : "",
+                                    text: $draft.sallaSecret)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 220)
+                    }
+                    LabeledContent(shop.words.callIt("lan.zid_secret")) {
+                        SecureField(draft.zidStored ? shop.words.callIt("common.secret_unchanged") : "",
+                                    text: $draft.zidSecret)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 220)
+                    }
+                    Text(shop.words.callIt("mac.storefront_hooks_hint",
+                                           ["url": .string((shop.lanURL ?? "http://…/") + "api/webhook/")]))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                // Khayt as a printer in the slicer — rides on the server above.
+                SlicerUploadSection(shop: shop)
+                // The plaintext copy of the shop's customers for its own
+                // storefront — off, and shut until the privacy policy says so.
+                // Asked here rather than inside the sections, so that what a
+                // section draws is only what the shop holds — and so a
+                // photograph of it is of the state it was given.
+                CustomerRecordsSection(shop: shop)
+                    .task(id: shop.settingsValue) { await shop.refreshCustomerRecordsReady() }
+                WhatsAppReportsSection(shop: shop)
+                    .task { await shop.refreshWhatsAppHook() }
+                // ── LETTING A STRANGER SEE A PRICE ────────────────────
+                //
+                // Folded away, and off unless the shop turns it on: this is
+                // the only place in Khayt where a number is computed for
+                // somebody who is not the shop.
+                Section {
+                    DisclosureGroup(isExpanded: $showQuote) {
+                        Toggle(shop.words.callIt("lan.iq_enable"), isOn: $draft.quoteOn)
+                        Text(shop.words.callIt("lan.iq_enable_hint"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        // WHERE THE STOREFRONT'S PRICES WENT. The sheet is sent to
+                        // Khayt Cloud for a storefront to read, on a timer and on
+                        // every save here, and said so only to stderr: a shop
+                        // switching this on could not tell whether its storefront
+                        // had heard. Said here, like the lead time below.
+                        if draft.quoteOn && !Shop.cloudConnected(shop.settingsDict) {
+                            Label(shop.words.callIt("mac.qs_needs_cloud"), systemImage: "icloud.slash")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else if let said = shop.quoteSheetSaid {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(shop.words.callIt("mac.qs_last"))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                Text(said)
+                                    .font(.caption)
+                                    .foregroundStyle(shop.quoteSheetProblem
+                                                     ? AnyShapeStyle(Khayt.attention)
+                                                     : AnyShapeStyle(.secondary))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Spacer(minLength: 0)
+                                if let at = shop.quoteSheetAt {
+                                    Text(shop.words.say(at, Date.FormatStyle(date: .omitted, time: .shortened)))
+                                        .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                                }
+                            }
+                        }
+                        LabeledContent(shop.words.callIt("lan.iq_printer")) {
+                            Picker("", selection: $draft.presetId) {
+                                Text(shop.words.callIt("lan.iq_pick")).tag("")
+                                ForEach(shop.presets) { preset in
+                                    Text(preset.name).tag(preset.id)
+                                }
+                            }
+                            .labelsHidden().frame(maxWidth: 220)
+                        }
+                        // THE ONE THAT STOPS IT WORKING. The shared rule builds
+                        // a customer's price from a real preset and refuses
+                        // without one, so a shop with none is told here rather
+                        // than left to wonder why the form never answers.
+                        if shop.presets.isEmpty {
+                            Label(shop.words.callIt("mac.iq_no_preset"), systemImage: "exclamationmark.triangle")
+                                .font(.caption).foregroundStyle(Khayt.attention)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        LabeledContent(shop.words.callIt("lan.iq_filament")) {
+                            Picker("", selection: $draft.filamentId) {
+                                Text(shop.words.callIt("lan.iq_flat")).tag("")
+                                ForEach(shop.spools) { spool in
+                                    Text(spool.label(shop.words, unit: shop.unit(of: spool))).tag(spool.id)
+                                }
+                            }
+                            .labelsHidden().frame(maxWidth: 220)
+                        }
+                        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                            quoteRow("lan.iq_spool_cost", $draft.spoolCost, unit: shop.currency)
+                            quoteRow("lan.iq_spool_weight", $draft.spoolWeight, unit: shop.words.callIt("common.grams"))
+                            quoteRow("lan.iq_margin", $draft.margin, unit: "%")
+                            quoteRow("lan.iq_min", $draft.minPrice, unit: shop.currency)
+                            quoteRow("lan.iq_waste", $draft.waste, unit: "%")
+                            quoteRow("lan.iq_limit", $draft.limit, unit: "")
+                        }
+                        Text(shop.words.callIt("lan.iq_note"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        // ── PRICED BY THE SLICER, NOT BY THE SHAPE ────────
+                        //
+                        // The estimate above is worked out from the model's
+                        // geometry, and geometry cannot know about purge: on
+                        // the shop's own four-colour dragon the slicer said
+                        // 57 g where the shape said 13. Asking the slicer is
+                        // the only way to close that.
+                        //
+                        // It is also the only setting here that writes a
+                        // stranger's file down and points a native binary at
+                        // it, so it is off until the shop says otherwise and
+                        // the sentence beside it says what the check before
+                        // it does and does not promise.
+                        Divider()
+                        Toggle(shop.words.callIt("mac.iq_slice"), isOn: $draft.sliceUploads)
+                        Text(shop.words.callIt("mac.iq_slice_hint"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if draft.sliceUploads {
+                            LabeledContent(shop.words.callIt("mac.iq_slice_with")) {
+                                Picker("", selection: $draft.sliceWithId) {
+                                    Text(shop.words.callIt("mac.iq_slice_default")).tag("")
+                                    ForEach(shop.slicers) { slicer in
+                                        Text(slicer.name).tag(slicer.id)
+                                    }
+                                }
+                                .labelsHidden().frame(maxWidth: 220)
+                            }
+                            if shop.slicers.isEmpty {
+                                Label(shop.words.callIt("slicer.none"), systemImage: "exclamationmark.triangle")
+                                    .font(.caption).foregroundStyle(Khayt.attention)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        presetMaker
+                    } label: {
+                        Text(shop.words.callIt("lan.iq_enable")).font(.callout)
+                    }
+                }
+                // ── THE QUOTE FORM ON THE SHOP'S OWN STORE ────────────────
+                //
+                // Under the instant quote because it prices from the sheet
+                // that switch publishes. Saves itself; not the Save bar's.
+                QuoteFormEmbedSection(shop: shop)
+                Section {
+                    if let url = shop.lanURL {
+                        Text(shop.words.callIt("mac.lan_open")).font(.callout)
+                        Text(url)
+                            .font(.body.monospaced())
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("lan-url")
+                        // "…Customer form: /intake" — true here now.
+                        Text(shop.words.callIt("lan.same_wifi_hint"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        // The calendar subscription, in the other app's words.
+                        if let calendar = shop.calendarLink {
+                            Text(shop.words.callIt("icalDescription")).font(.callout).padding(.top, 6)
+                            Text(calendar)
+                                .font(.caption.monospaced())
+                                .textSelection(.enabled)
+                                .accessibilityIdentifier("calendar-url")
+                        }
+                    } else {
+                        Text(shop.words.callIt("lan.not_running")).foregroundStyle(.secondary)
+                    }
+                    if let problem = shop.lanProblem {
+                        Label(problem, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(Khayt.attention).font(.callout)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text(shop.words.callIt("mac.lan_restart_note"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    PairedPhones(shop: shop)
+
+                    // ── WHAT THE STOREFRONT WAS LAST TOLD ─────────────────
+                    //
+                    // The lead-time publisher runs on a timer, writes nothing
+                    // to the book, and reported only to stderr — so "did it
+                    // run at all" could be answered by somebody holding a
+                    // terminal and by nobody else. Its own comment says that
+                    // was the first question ever asked of it.
+                    //
+                    // Not an alert, deliberately: a storefront promise is not
+                    // worth interrupting a shop mid-work for. It is here, on
+                    // the pane a shop opens when it wonders about its
+                    // storefront.
+                    if let said = shop.leadTimeSaid {
+                        Divider()
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(shop.words.callIt("mac.lead_time_last"))
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text(said)
+                                .font(.caption)
+                                .foregroundStyle(shop.leadTimeProblem == nil
+                                                 ? AnyShapeStyle(.secondary)
+                                                 : AnyShapeStyle(Khayt.attention))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            if let at = shop.leadTimeAt {
+                                Text(shop.words.say(at, Date.FormatStyle(date: .omitted, time: .shortened)))
+                                    .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                            }
+                        }
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            SaveBar(shop: shop, dirty: draft != original && !draft.pinTooShort,
+                    save: { Task {
+                        await shop.saveLanSettings(enabled: draft.enabled, port: draft.portNumber,
+                                                   pin: draft.pin, bindLan: draft.bindLan,
+                                                   intakeQuote: draft.quoteForm(),
+                                                   storefrontSecrets: ["salla": draft.sallaSecret,
+                                                                       "zid": draft.zidSecret],
+                                                   opened: Shop.lanForm(
+                                                    enabled: original.enabled, port: original.portNumber,
+                                                    bindLan: original.bindLan,
+                                                    intakeQuote: original.quoteForm()))
+                        reset()
+                    } },
+                    revert: { draft = original })
+        }
+        .task(id: shop.settingsValue) { reset() }
+    }
+
+    /// Make a preset here, because the shop cannot make one anywhere else in
+    /// this app — and without one the whole section above does nothing. A name
+    /// and the seven figures a part is costed at, which is exactly what the
+    /// other app's calculator saves under "Save preset".
+    private var presetMaker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider()
+            Text(shop.words.callIt("mac.iq_new_preset")).font(.caption.weight(.semibold))
+            HStack(spacing: 8) {
+                TextField("", text: $newPresetName,
+                          prompt: Text(shop.words.callIt("calc.machine.preset_name_ph")))
+                    .textFieldStyle(.roundedBorder)
+                Button(shop.words.callIt("calc.machine.save_preset")) {
+                    Task {
+                        var rates: [String: Double] = [:]
+                        for key in Shop.Preset.rateKeys {
+                            let typed = (presetRates[key] ?? "").replacingOccurrences(of: ",", with: "")
+                                .trimmingCharacters(in: .whitespaces)
+                            rates[key] = max(0, Double(typed) ?? 0)
+                        }
+                        if let id = await shop.savePreset(name: newPresetName, rates: rates) {
+                            // Chosen straight away: a preset made and then not
+                            // picked is the same as no preset at all.
+                            draft.presetId = id
+                            newPresetName = ""
+                        }
+                    }
+                }
+                .disabled(newPresetName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                presetRow("calc.labor.rate", "laborRate", unit: shop.currency)
+                presetRow("calc.labor.prep", "prepTime", unit: shop.words.callIt("common.hours"))
+                presetRow("calc.labor.post", "postTime", unit: shop.words.callIt("common.hours"))
+                presetRow("calc.machine.wear", "wearRate", unit: shop.currency)
+                presetRow("calc.machine.power", "powerDraw", unit: shop.words.callIt("calc.machine.watts"))
+                presetRow("calc.machine.elec", "elecRate", unit: shop.words.callIt("calc.machine.per_kwh"))
+                presetRow("calc.labor.failure", "failureRate", unit: "%")
+                // A preset is shop-wide, so the shop's own record answers.
+                // Offered, never applied on its own.
+                GridRow {
+                    Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                    VStack(alignment: .leading, spacing: 2) {
+                        FailureHint(shop: shop, machineId: nil, material: nil,
+                                    current: Double(presetRates["failureRate"] ?? "")) { pct in
+                            presetRates["failureRate"] = Words.plain(.number(pct))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func quoteRow(_ key: String, _ text: Binding<String>, unit: String) -> some View {
+        GridRow {
+            Text(shop.words.callIt(key)).gridColumnAlignment(.trailing)
+                .font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                TextField("", text: text)
+                    .textFieldStyle(.roundedBorder).frame(width: 80).monospacedDigit()
+                if !unit.isEmpty { Text(unit).font(.caption2).foregroundStyle(.tertiary) }
+                Spacer()
+            }
+        }
+    }
+
+    private func presetRow(_ key: String, _ field: String, unit: String) -> some View {
+        quoteRow(key, Binding(get: { presetRates[field] ?? "" },
+                              set: { presetRates[field] = $0 }), unit: unit)
+    }
+
+    private func reset() {
+        original = .read(shop.settingsDict, shop: shop)
+        draft = original
+        Task {
+            if presetRates.isEmpty, let defaults = await shop.printRateDefaults() { presetRates = defaults }
+        }
+    }
+}
+
+/// What the owner PIN field says under itself: too short, or not set at all.
+/// Its own view so a snapshot can photograph it — the pane is a `Form`, which
+/// `ImageRenderer` draws blank.
+struct LanPinNotes: View {
+    let words: Words
+    let tooShort: Bool
+    let missing: Bool
+
+    var body: some View {
+        if tooShort {
+            Label(words.callIt("mac.lan_pin_short", ["n": .number(Double(OnlinePane.Draft.minimumPin))]),
+                  systemImage: "exclamationmark.triangle")
+                .font(.caption).foregroundStyle(Khayt.attention)
+        }
+        if missing {
+            Label(words.callIt("mac.lan_pin_missing"), systemImage: "exclamationmark.triangle")
+                .font(.caption).foregroundStyle(Khayt.attention)
+        }
+    }
+}

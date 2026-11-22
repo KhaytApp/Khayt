@@ -1,0 +1,159 @@
+/* NOTE: --ink-3 (aliased to --text-muted) is darkened/lightened to clear
+   WCAG AA 4.5:1 against BOTH --bg and --surface. It is used as a text colour in
+   192 CSS rules and 540 renderer call sites — hints, subtitles, metadata — so it
+   is body text, not decoration, and 2.75:1 was a real readability failure.
+   Measured, not eyeballed: see the contrast sweep in the scan.
+
+   Foreman — tokens for the triage shell.
+
+   Foreman's home is not a dashboard and not a schedule: it is a DOCKET, a
+   ranked list of decisions with a detail pane beside it, worked down to zero.
+   See shell.js for the chrome and screens.js for the docket itself.
+
+   The palette follows from what a triage list needs:
+
+   - Severity is the only colour that carries meaning. A row is critical, due,
+     or routine, and nothing else on screen may compete with that — so the
+     chrome is near-monochrome and the accent is used for FOCUS (which row you
+     are on), not for decoration.
+   - The ground is a soft warm grey rather than white. You read this list for
+     minutes at a time, top to bottom; a bright white field under dense rows is
+     the thing that makes long lists tiring.
+   - Rows need a clear focused state that is legible without colour, because
+     the list is keyboard-driven — hence a left edge bar plus a fill. */
+
+html[data-design="foreman"] {
+  /* ---- Surfaces ---- */
+  --bg:        #f0efec;   /* window backdrop */
+  --bg-2:      #e9e8e4;   /* docket column */
+  --surface:   #fbfbfa;   /* rows, detail pane */
+  --surface-1: #fbfbfa;
+  --surface-2: #f3f2ef;   /* hover */
+  --surface-3: #e6e5e0;
+  --panel:     #fbfbfa;
+  --panel-2:   #f3f2ef;
+
+  /* ---- Ink ---- */
+  --ink:       #1a1917;
+  --ink-2:     #55534e;
+  --ink-3:     #6f6b64;
+  --ink-4:     #adaaa2;
+
+  /* ---- Lines ---- */
+  --line:      #dedcd6;
+  --line-2:    #e7e5e0;
+  --line-soft: #eeece8;
+  --hairline:  rgba(26,25,23,0.06);
+
+  /* ---- Accent (focus, not decoration) ---- */
+  --accent-h: 158;
+  --accent-s: 46%;
+  --accent-l: 34%;
+  --accent:      hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  --accent-ink:  #ffffff;
+  --on-accent:   #ffffff;
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.12);
+  --accent-line: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.40);
+  --accent-2:    #2f6f57;
+
+  /* ---- Severity. The only meaningful colour in the UI. ---- */
+  --fm-crit:#a52418;   --fm-crit-bg:#f8e2df;   /* a machine has stopped   */
+  --fm-due:#8a5a00;    --fm-due-bg:#f7ecd6;    /* promised date missed    */
+  --fm-cash:#1d5e8f;   --fm-cash-bg:#e0edf7;   /* money owed to the shop  */
+  --fm-stock:#6a4a86;  --fm-stock-bg:#eee6f6;  /* material running out    */
+  --fm-idle:#5c6660;   --fm-idle-bg:#e9edeb;   /* capacity going unused   */
+  --fm-clear:#2c6b4a;                          /* nothing needs you       */
+
+  /* ---- Shadows: a list is flat. The detail pane lifts, nothing else. ---- */
+  --shadow-1: 0 1px 2px rgba(26,25,23,.05);
+  --shadow-2: 0 6px 20px rgba(26,25,23,.10);
+  --shadow-pop: var(--shadow-2);
+
+  --radius:    9px;
+  --radius-sm: 6px;
+  --r-sm: 6px;
+  --r-md: 9px;
+  --r-lg: 13px;
+
+  /* ---- Fonts. Already vendored under renderer/fonts/ for the CSP. ---- */
+  --font-ui:   "Newsreader", Georgia, "Times New Roman", serif;
+  --font-body: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-ar:   "IBM Plex Sans Arabic", var(--font-body);
+  --font-sans: var(--font-body);
+  --font-num:  var(--font-mono);
+  --mono:      var(--font-mono);
+
+  /* ---- Shell metrics ---- */
+  --fm-docket-w: 400px;   /* the list column */
+  --fm-bar-h:    38px;    /* the persistent docket counter */
+
+  /* ---- Aliases the shared renderer reads ---- */
+  --text: var(--ink);
+  --text-dim: var(--ink-2);
+  --text-muted: var(--ink-3);
+  --text-faint: var(--ink-4);
+  --border: var(--line);
+  --border-2: #cbc8c1;
+  --border-soft: var(--line-2);
+  --primary: var(--accent);
+  --primary-soft: var(--accent-soft);
+  --success: var(--fm-clear);
+  --warning: var(--fm-due);
+  --danger: var(--fm-crit);
+  --ok: var(--fm-clear);
+  --bg-elev: var(--surface-2);
+  --bg-card: var(--surface);
+
+  --nav-w: 212px;
+}
+
+html[data-design="foreman"][data-theme="dark"] {
+  --bg:        #16150f;
+  --bg-2:      #12110c;
+  --surface:   #1e1d17;
+  --surface-1: #1e1d17;
+  --surface-2: #26241d;
+  --surface-3: #2f2d24;
+  --panel:     #1e1d17;
+  --panel-2:   #26241d;
+
+  --ink:       #eceae2;
+  --ink-2:     #b0aca0;
+  --ink-3:     #89857a;
+  --ink-4:     #605d55;
+
+  --line:      #302e26;
+  --line-2:    #26241d;
+  --line-soft: #26241d;
+  --hairline:  rgba(236,234,226,0.06);
+  --border-2:  #3d3a30;
+
+  --accent-l: 48%;
+
+  --fm-crit:#f08579;   --fm-crit-bg:#3a1c18;
+  --fm-due:#dda944;    --fm-due-bg:#352a12;
+  --fm-cash:#6db2e4;   --fm-cash-bg:#14293a;
+  --fm-stock:#b797dd;  --fm-stock-bg:#2a2140;
+  --fm-idle:#8d968f;   --fm-idle-bg:#232724;
+  --fm-clear:#5cb98a;
+
+  --shadow-1: 0 1px 2px rgba(0,0,0,.5);
+  --shadow-2: 0 8px 24px rgba(0,0,0,.55);
+}
+
+/* The serif is for HEADINGS only — the docket itself is set in the grotesk,
+   because dense rows of small serif text is exactly the wrong trade. */
+html[data-design="foreman"],
+html[data-design="foreman"] body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+html[data-design="foreman"][dir="rtl"],
+html[data-design="foreman"] body[dir="rtl"] {
+  font-family: var(--font-ar);
+}

@@ -1,0 +1,252 @@
+/* Khayt — identity layer over the Workbench shell.
+
+   The theme declares shell: 'workbench', so applyBodyClasses() puts BOTH
+   .khayt-workbench (the grouped-sidebar layout) and .khayt-2026 (this hook) on
+   <body>. Everything here is additive — colour, type, shape — so if this file
+   failed to load the app would still be the complete Workbench layout.
+
+   Designed in figma.com/design/7Iqw0GcrLLRW7CLDEhTa1P. Logical properties
+   throughout, so Arabic mirrors without separate rules except where a
+   gradient or a box-shadow has a direction. */
+
+/* ---------- 1. Navy chrome ---------- */
+body.khayt-2026 .khayt-sidebar {
+  background: var(--kh-navy);
+  border-inline-end: 1px solid var(--kh-navy-line);
+  color: var(--kh-on-dark-soft);
+  padding: 16px 12px 12px;
+}
+html.platform-darwin body.khayt-2026 .khayt-titlebar {
+  background: var(--kh-navy);
+  border-bottom-color: var(--kh-navy-line);
+}
+/* The mark is the app icon itself (a navy tile), so it is shown as it is —
+   Workbench's white-out filter would turn the whole tile into a white square. */
+body.khayt-2026 .khayt-logo {
+  background: transparent;
+  box-shadow: none;
+}
+body.khayt-2026 .khayt-logo img { filter: none; border-radius: 8px; }
+body.khayt-2026 .sidebar-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  color: var(--kh-on-dark);
+}
+/* The subtitle is the shop's own name: body type, one line. */
+body.khayt-2026 .sidebar-subtitle {
+  font-size: 11px !important;
+  color: var(--kh-on-dark-soft) !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-inline-size: 160px;
+}
+
+/* Group heads are mono eyebrows, quiet on the navy. */
+body.khayt-2026 .khayt-navhead {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  color: var(--kh-on-dark-soft);
+  opacity: 0.72;
+  padding: 10px 12px 2px;
+}
+
+body.khayt-2026 .khayt-navitem {
+  color: var(--kh-on-dark-soft);
+  font-weight: 600;
+  padding: 5px 12px;
+  gap: 12px;
+}
+body.khayt-2026 .khayt-navitem:hover { background: var(--kh-navy-deep); color: var(--kh-on-dark); }
+body.khayt-2026 .khayt-navitem.on,
+body.khayt-2026 .khayt-navitem.active {
+  background: var(--kh-navy-line);
+  box-shadow: none;
+  color: var(--kh-on-dark);
+}
+/* The thread: the active screen is marked by the amber line, at the leading edge. */
+body.khayt-2026 .khayt-navitem.on::before,
+body.khayt-2026 .khayt-navitem.active::before {
+  background: var(--kh-thread);
+  inset-inline-start: 0;
+  block-size: 20px;
+  inline-size: 3px;
+}
+body.khayt-2026 .khayt-navitem:focus-visible { outline-color: var(--kh-thread); }
+body.khayt-2026 .khayt-navitem .khayt-pro,
+body.khayt-2026 .khayt-navitem .nav-badge,
+body.khayt-2026 .khayt-navitem .badge {
+  background: var(--kh-navy-line);
+  color: var(--kh-on-dark-soft);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+}
+body.khayt-2026 .khayt-navitem.active .nav-badge,
+body.khayt-2026 .khayt-navitem.active .badge {
+  background: var(--kh-thread);
+  color: var(--kh-navy-deep);
+}
+body.khayt-2026 .khayt-navfoot,
+body.khayt-2026 .khayt-navfoot * { color: var(--kh-on-dark-soft); }
+body.khayt-2026 .khayt-navfoot { border-top: 1px solid var(--kh-navy-line); }
+
+/* ---------- 2. Icons: one stroke set instead of the emoji and glyphs ---------- */
+/* The glyph stays in the DOM (other themes use it); here it is hidden and the
+   icon is drawn as a mask in currentColor, so it follows the item's colour. */
+body.khayt-2026 .khayt-navitem .nav-icon {
+  inline-size: 18px;
+  block-size: 18px;
+  flex: 0 0 18px;
+  font-size: 0;
+  color: inherit;
+  background: currentColor;
+  -webkit-mask: var(--kh-icon) center / 18px 18px no-repeat;
+  mask: var(--kh-icon) center / 18px 18px no-repeat;
+  opacity: 0.9;
+}
+body.khayt-2026 .khayt-navitem.active .nav-icon { color: var(--kh-thread); opacity: 1; }
+body.khayt-2026 .khayt-navitem[data-tab="dashboard-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='7' height='9' rx='1.5'/><rect x='14' y='3' width='7' height='5' rx='1.5'/><rect x='14' y='12' width='7' height='9' rx='1.5'/><rect x='3' y='16' width='7' height='5' rx='1.5'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="queue-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M10 6h11M10 12h11M10 18h11'/><path d='M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="calculator-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><rect x='4' y='2' width='16' height='20' rx='2'/><path d='M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="inventory-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><circle cx='12' cy='12' r='3'/><path d='M12 3v6M12 15v6'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="printfiles-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M21 8 12 3 3 8v8l9 5 9-5z'/><path d='m3 8 9 5 9-5M12 13v8'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="colorstudio-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><circle cx='13.5' cy='6.5' r='1'/><circle cx='17.5' cy='10.5' r='1'/><circle cx='8.5' cy='7.5' r='1'/><circle cx='6.5' cy='12.5' r='1'/><path d='M12 2a10 10 0 0 0 0 20c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a6 6 0 0 0 6-6c0-4.9-4.5-8.6-10-8.6z'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="converter-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12a9 9 0 0 1 15-6.7L21 8'/><path d='M21 3v5h-5'/><path d='M21 12a9 9 0 0 1-15 6.7L3 16'/><path d='M3 21v-5h5'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="hueforge-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='m12 2 10 5-10 5L2 7z'/><path d='m2 17 10 5 10-5M2 12l10 5 10-5'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="waste-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="catalog-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M4 19.5V5a2 2 0 0 1 2-2h14v18H6.5A2.5 2.5 0 0 1 4 18.5z'/><path d='M4 18.5A2.5 2.5 0 0 1 6.5 16H20'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="clients-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="gift-cards-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='8' width='18' height='4' rx='1'/><path d='M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7'/><path d='M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="portfolio-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2'/><circle cx='9' cy='9' r='2'/><path d='m21 15-5-5L5 21'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="logs-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><path d='M14 2v6h6M8 13h8M8 17h5'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="analytics-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3v18h18'/><path d='M7 16v-4M12 16V8M17 16v-7'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="expenses-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M4 2v20l3-2 3 2 2-2 2 2 3-2 3 2V2l-3 2-3-2-2 2-2-2-3 2z'/><path d='M8 8h8M8 12h8M8 16h5'/></svg>"); }
+body.khayt-2026 .khayt-navitem[data-tab="settings-tab"] .nav-icon { --kh-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><path d='M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1'/></svg>"); }
+
+/* ---------- 3. Work surface ---------- */
+body.khayt-2026 #topbarPageTitle,
+body.khayt-2026 .khayt-toptitle h1,
+body.khayt-2026 .console-pagehead h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+body.khayt-2026 .panel,
+body.khayt-2026 .card,
+body.khayt-2026 .stat-card,
+body.khayt-2026 .kpi {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+}
+body.khayt-2026 .panel h2, body.khayt-2026 .panel h3,
+body.khayt-2026 .card h2, body.khayt-2026 .card h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+body.khayt-2026 .stat-value,
+body.khayt-2026 .metric,
+body.khayt-2026 td.num,
+body.khayt-2026 .mono {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+body.khayt-2026 .modal-content,
+body.khayt-2026 .modal .modal-dialog {
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+}
+
+/* Eyebrows: mono caps after a 24×2 amber dash — the site's section marker. */
+body.khayt-2026 .main .eyebrow:not(.khayt-navhead),
+body.khayt-2026 .khayt-main .eyebrow:not(.khayt-navhead) {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+body.khayt-2026 .khayt-main .eyebrow:not(.khayt-navhead)::before {
+  content: "";
+  inline-size: 24px;
+  block-size: 2px;
+  background: var(--kh-thread);
+  flex: none;
+}
+
+/* ---------- 4. Buttons: pills ---------- */
+body.khayt-2026 .btn,
+body.khayt-2026 .topbar-actions .btn {
+  border-radius: 999px;
+  font-weight: 600;
+}
+body.khayt-2026 .btn.primary,
+body.khayt-2026 .btn-primary,
+body.khayt-2026 .topbar-actions .btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+body.khayt-2026 input:focus-visible,
+body.khayt-2026 select:focus-visible,
+body.khayt-2026 textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  border-color: var(--accent);
+}
+
+/* ---------- 5. Status: one colour per stage, shared with the Mac ---------- */
+/* A 14% tint of the stage colour, a dot in the stage colour, and text in that
+   stage's readable ink. Amber is never a stage colour — only "unpaid"/warning,
+   in its dark warn-ink, uses the amber family. */
+body.khayt-2026 .badge {
+  --kh-stage: var(--kh-quote);
+  --kh-stage-ink: var(--kh-quote-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--kh-stage) 14%, transparent);
+  color: var(--kh-stage-ink);
+}
+body.khayt-2026 .badge::before {
+  content: "";
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 50%;
+  background: var(--kh-stage);
+  flex: none;
+}
+body.khayt-2026 .badge.pending   { --kh-stage: var(--kh-pending);  --kh-stage-ink: var(--kh-pending-ink); }
+body.khayt-2026 .badge.printing,
+body.khayt-2026 .badge.post      { --kh-stage: var(--kh-printing); --kh-stage-ink: var(--kh-printing-ink); }
+body.khayt-2026 .badge.on_hold,
+body.khayt-2026 .badge.qc        { --kh-stage: var(--kh-hold);     --kh-stage-ink: var(--kh-hold-ink); }
+body.khayt-2026 .badge.completed { --kh-stage: var(--kh-ready);    --kh-stage-ink: var(--kh-ready-ink); }
+body.khayt-2026 .badge.shipped,
+body.khayt-2026 .badge.pay-paid  { --kh-stage: var(--kh-quote);    --kh-stage-ink: var(--kh-quote-ink); }
+body.khayt-2026 .badge.overdue,
+body.khayt-2026 .badge.late      { --kh-stage: var(--kh-late);     --kh-stage-ink: var(--kh-late-ink); }
+body.khayt-2026 .badge.pay-unpaid,
+body.khayt-2026 .badge.pay-partial {
+  --kh-stage: var(--kh-warn-ink);
+  --kh-stage-ink: var(--kh-warn-ink);
+  background: var(--kh-warn-wash);
+}
+
+/* Progress is the thread: every progress fill in the app is amber. Gray (idle)
+   and red (error) fills are set inline by the shell and still win. */
+body.khayt-2026 .wb-bar > i { background: var(--kh-thread); }
+body.khayt-2026 progress::-webkit-progress-value { background: var(--kh-thread); }
+body.khayt-2026 .progress-fill,
+body.khayt-2026 .progress > .bar,
+body.khayt-2026 .prog-fill { background: var(--kh-thread); }

@@ -1,0 +1,2247 @@
+import SwiftUI
+import AppKit
+import WebKit
+import CoreSpotlight
+import KhaytCore
+import KhaytWidgetData
+
+/// Not `@main`: `main.swift` is the entry point, because the writing direction
+/// has to be settled before AppKit starts. See `Direction.swift`.
+struct KhaytApp: App {
+    @State private var shop = Shop()
+    @NSApplicationDelegateAdaptor(Activator.self) private var activator
+
+    /// Which shell the window is wearing — see `ShopWindow`.
+    ///
+    /// Read HERE as well as there because the two shells want two different
+    /// windows: the old one puts its actions in a unified toolbar, and the new
+    /// one draws its own navy strip and wants no title bar at all. Nothing
+    /// short of the scene modifier achieves that: setting
+    /// `titlebarAppearsTransparent`, clearing the toolbar and inserting
+    /// `.fullSizeContentView` on the `NSWindow` by hand leaves a 32pt opaque
+    /// band painted over the strip — measured, at every one of those three
+    /// settings confirmed applied.
+    var body: some Scene {
+        shopScene
+
+        // ⌘, — the shop's own settings, written through the same rule the
+        // Electron page saves through. The scene puts "Settings…" in the app
+        // menu by itself.
+        // AFTER the window, deliberately — see the note on scene order above.
+
+        Settings {
+            SettingsWindow(shop: shop)
+                .modifier(ShopsLocale(words: shop.words))
+        }
+        // Resizable down to what the panes need, never below it.
+        .windowResizability(.contentMinSize)
+
+        // ⌘? — Khayt's own help, in a window BESIDE the app rather than on top
+        // of it: somebody reading "how do I file a download into groups" wants
+        // the library on screen while they read. See `HelpBook` for why this is
+        // not an Apple Help Book.
+        Window(Text(Words.upfront("mac.help_title")), id: HelpWindow.id) {
+            HelpWindow(shop: shop)
+                .modifier(ShopsLocale(words: shop.words))
+        }
+        .defaultSize(width: 940, height: 640)
+        .keyboardShortcut("?", modifiers: .command)
+
+        // View ▸ Kiosk — every machine at once, for a screen across the shop.
+        // A window of its own so it can be put on a second display and left
+        // full screen while this one is used. See `KioskWindow`.
+        Window(Text(Words.upfront("mac.kiosk_title")), id: KioskWindow.id) {
+            KioskWindow(shop: shop)
+                .modifier(ShopsLocale(words: shop.words))
+        }
+        .defaultSize(width: 1280, height: 760)
+        // No item of its own in the Window menu: a `Window` scene gets one by
+        // default, and it opened the kiosk from behind the staff lock. It is
+        // opened only by View ▸ Open Kiosk (`openWindow`), which the lock
+        // disables. Apple: "Removes all commands defined by the modified
+        // scene"; the window can still be opened programmatically.
+        .commandsRemoved()
+
+        // Tools ▸ HueForge Studio, Calibration Assistant, Filament Profiles —
+        // the Bed Ready tools, beside the shop's window rather than in it. Only
+        // the Tools menu opens it, and the staff lock disables that menu, so
+        // it has no Window-menu item of its own either.
+        Window(Text(Words.upfront("mac.st_title")), id: StudioWindow.id) {
+            StudioWindow(shop: shop)
+                .modifier(ShopsLocale(words: shop.words))
+        }
+        .defaultSize(width: 1100, height: 760)
+        .commandsRemoved()
+    }
+
+    /// The shop's window, with no title bar of its own.
+    ///
+    /// ── AND IT CANNOT BE A CHOICE HERE ────────────────────────────────────
+    ///
+    /// `SceneBuilder` takes no `if`, so the scene cannot be branched on which
+    /// shell is on: this is the window both of them get. The new shell is the
+    /// one that ships, so the scene is its shape — the 40pt navy strip IS the
+    /// title bar, and the traffic lights sit in it, which is why
+    /// `ShellTitleBar` starts 72pt in.
+    ///
+    /// The old shell asks for the bar back at the `NSWindow` — see
+    /// `WindowChrome`, which is also where the toolbar it needs is put back on.
+    /// That direction works by hand; the other one does not, which is what
+    /// decided this. Setting `titlebarAppearsTransparent`, clearing the toolbar
+    /// and inserting `.fullSizeContentView` — all three confirmed applied —
+    /// still left a 32pt opaque band painted over the navy strip.
+    private var shopScene: some Scene {
+        shopWindow.windowStyle(.hiddenTitleBar)
+    }
+
+    private var shopWindow: some Scene {
+        // THE WINDOW FIRST. SwiftUI treats the first scene in this builder as
+        // the app's primary one, and with `FloorMenuBar` ahead of it the app
+        // launched with no window at all — the menu bar icon appeared, the
+        // window's `.task` never ran, and the snapshot runner terminated
+        // because `Snapshot.subject` was never set. A menu bar extra is an
+        // addition to this app, not the front of it.
+        Window("Khayt", id: "shop") {
+            ShopWindow(shop: shop)
+                .modifier(ShopsLocale(words: shop.words))
+                // A FLOOR, so the window cannot be dragged into nonsense.
+                //
+                // "Choose a minimum and maximum size for each window to help
+                // keep your content looking great … If you don't set a minimum
+                // and maximum size, people could make it so small that UI
+                // elements overlap." There was none: the sidebar holds at 190
+                // and the inspector at 260, so everything else was taken out of
+                // the middle, and the jobs table's six columns — 644pt of
+                // minimums — collapsed into each other well before the window
+                // stopped shrinking.
+                //
+                // 900 leaves the table about 450pt with both side columns open,
+                // which is narrow and still legible; below that a shop is
+                // better served closing one of them. No maximum: a Mac has a
+                // large display and more of this app on it is better.
+                .frame(minWidth: 900, minHeight: 480)
+                // The app's own colour — the navy its icon lays filament on —
+                // and only when this Mac's owner has not chosen one of their
+                // own. The HIG is explicit that a chosen system accent replaces
+                // an app's; an app with an asset catalog gets that behaviour
+                // free, and this bundle is assembled by hand, so `appTint`
+                // asks the question and answers nil when the choice is theirs.
+                .tint(Khayt.appTint)
+                .task {
+                    // When this window began: a link or a drop handed over
+                    // long before it is not acted on (`Shop.isStale`).
+                    let windowOpenedAt = Date()
+                    Snapshot.subject = shop
+                    // The menu bar item, which is AppKit rather than a scene —
+                    // see `FloorStatus` for the profile that decided that.
+                    FloorStatus.shared.install(shop: shop)
+                    // Before the book is opened, so the very first write is
+                    // heard. Every path that changes the store lands in one
+                    // place and this listens there — see `StoreWriter.didWrite`.
+                    shop.listenForOwnWrites()
+                    // The shop's own book if there is one, the sample only when
+                    // there is not. Reading is safe, the source is named in the
+                    // toolbar, and an app that opens on invented data when real
+                    // data exists is answering a question nobody asked.
+                    await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
+                    // A new shop — an empty book, or no book on this Mac at
+                    // all — is offered the setup, once. See `ShopSetup.offers`.
+                    shop.offerSetupIfNew()
+                    // A model dropped on the Dock icon before the book was
+                    // open — the drop that launched the app.
+                    await shop.takeOpenedFiles(windowOpenedAt: windowOpenedAt)
+                    // A widget's row clicked while the app was closed.
+                    shop.takeOpenedLinks(windowOpenedAt: windowOpenedAt)
+                    // Opt-in crash reports and usage counts (#1789). Sends
+                    // nothing unless the book says so; see `Telemetry`.
+                    Telemetry.shared.start(shop: shop)
+                    // Pages saved with the browser extension, waiting in the
+                    // app group's inbox (`WebSaveInbox`). Never in a snapshot
+                    // run: that is the sample, which would refuse and drop them.
+                    if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] == nil {
+                        WebSaveInbox.shared.start(shop: shop)
+                    }
+                    // EVERY MOVED MODEL, ASKED FOR: on launch and once a day
+                    // while the app is open. After "Free up space" the cloud
+                    // holds the only copy, and nothing else ever looks again —
+                    // see `Shop.verifyCloudCopies`.
+                    while !Task.isCancelled {
+                        await shop.verifyCloudCopiesIfDue()
+                        // WHAT ANOTHER MAC DID IN THE VAULT, applied here: on
+                        // launch and every hour after (`Shop+VaultApply`).
+                        await shop.applyVaultChangesIfDue()
+                        try? await Task.sleep(for: .seconds(3600))
+                    }
+                }
+
+                // CHOOSING A MODEL IN SPOTLIGHT OPENS IT HERE.
+                //
+                // On the window rather than the App, because this has to reach
+                // the shop the window is showing: the activity carries a record
+                // id and nothing else, and `reveal` is the only thing that
+                // knows how to make that record visible.
+                //
+                // The book may not be open yet — a Spotlight result can be what
+                // LAUNCHES the app — so the request is held and retried once
+                // the library has rows. Without that, the very first thing a
+                // person ever does with this feature does nothing.
+                // A model dropped on the Dock icon while the app is open.
+                .onReceive(NotificationCenter.default.publisher(for: .khaytOpenedFiles)) { _ in
+                    Task { await shop.takeOpenedFiles() }
+                }
+                // A desktop widget's row, clicked while the app is open.
+                .onReceive(NotificationCenter.default.publisher(for: .khaytOpenedLinks)) { _ in
+                    shop.takeOpenedLinks()
+                }
+                .onContinueUserActivity(CSSearchableItemActionType) { activity in
+                    guard let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+                          let record = Spotlight.recordId(forItem: id) else { return }
+                    shop.revealWhenLoaded(fileId: record)
+                }
+        }
+        // Wide enough that all six columns are on screen with the inspector
+        // open, which is how the window opens. At 1180 the table was given
+        // ~650pt against 644pt of column minimums and "Owed" — the figure the
+        // toolbar is built around — was squeezed to a few pixels.
+        .defaultSize(width: 1320, height: 760)
+        .commands { KhaytCommands(shop: shop) }
+    }
+}
+
+/// A bare SwiftPM executable has no bundle, so nothing has told AppKit this is a
+/// normal windowed application: the window opens behind everything and never
+/// takes the menu bar.
+///
+/// `mac/make-app.sh` assembles a real bundle, and inside one none of this is
+/// wanted — an app that shoulders its way in front of whatever you were doing,
+/// every launch, is an app people learn to resent. So it is asked for only when
+/// there is no bundle identifier, which is exactly the `swift run` case.
+final class Activator: NSObject, NSApplicationDelegate {
+    /// Give the book back on the way out, so the next app to open does not have
+    /// to reason about a dead pid to know it is free.
+    func applicationWillTerminate(_ note: Notification) {
+        MainActor.assumeIsolated {
+            // THE MENU BAR TIMER FIRST, and this is the point of it: nothing
+            // was stopping it, so it went on firing on the main run loop while
+            // AppKit took the app apart around it. A repeating timer that
+            // outlives its application is a timer running against a runtime
+            // that is being dismantled.
+            FloorStatus.shared.remove()
+            // Every held Bambu connection: MQTT DISCONNECT and close, now —
+            // there is no later in which an async stop would run.
+            BambuWatch.shared.hangUpAll()
+            Snapshot.subject?.relinquish()
+        }
+    }
+
+    /// A model file dropped on the Dock icon, or opened with Khayt from the
+    /// Finder: New Job, seeded from it — see `Shop.newJob(fromDropped:)`.
+    /// Held on `Shop.openedFiles` because a drop can be what LAUNCHES the app,
+    /// before the window or its book exists; the window takes them once the
+    /// book is open. Only model files are kept from files; the one URL scheme
+    /// the app declares, khayt://, is a desktop widget's row (`DeepLink`).
+    func application(_ application: NSApplication, open urls: [URL]) {
+        // `khayt://job/new` first: read as a widget link it would be "job new".
+        let jobLinks = urls.compactMap(NewJobLink.init)
+        let links = urls.filter { NewJobLink($0) == nil }.compactMap(ShopWidgetSnapshot.Link.init)
+        let models = Shop.droppableModels(urls.filter(\.isFileURL))
+        guard !links.isEmpty || !models.isEmpty || !jobLinks.isEmpty else { return }
+        MainActor.assumeIsolated {
+            // The window first: with it closed (⌘W, the app kept alive by
+            // Settings, Help or the kiosk) nothing was listening, and the
+            // click did nothing until the window was next opened.
+            ShopWindowOpener.raise()
+            if !links.isEmpty { Shop.openedLinks += links }
+            if !jobLinks.isEmpty { Shop.openedJobLinks += jobLinks }
+            if !models.isEmpty { Shop.openedFiles += models }
+        }
+    }
+
+    func applicationDidFinishLaunching(_ note: Notification) {
+        // Yesterday's feedback reports — a masked book and a picture of the
+        // window each — out of the temporary directory. See `Feedback`.
+        DispatchQueue.global(qos: .utility).async { Feedback.sweepOldDrafts() }
+        if Bundle.main.bundleIdentifier == nil {
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        if let dir = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] {
+            Snapshot.run(into: URL(fileURLWithPath: dir))
+        }
+        if let n = ProcessInfo.processInfo.environment["KHAYT_CHURN"], let rounds = Int(n) {
+            Churn.run(rounds: rounds)
+        }
+    }
+}
+
+/// Switch screens, fast, the way a person does — and see what falls over.
+///
+/// ── WHY THIS EXISTS ───────────────────────────────────────────────────────
+///
+/// A crash arrived from a real run: `-[NSWindow _postWindowNeedsUpdateConstraints]`
+/// throwing, reached from `-[NSSplitViewItem _setCollapsed:animated:]` inside a
+/// CATransaction commit handler. That is the inspector COLLAPSING — and the
+/// inspector's `isPresented` here is a computed binding, so it opens and closes
+/// as a side effect of changing screen. Switching from Jobs to Machines
+/// collapses it; switching back opens it.
+///
+/// The snapshot runner switches screens too and had never once hit it, because
+/// it sets a shelf and then waits ~400ms for everything to settle before the
+/// next one. A person clicking down a sidebar does not wait. This driver does
+/// not either: it changes shelf on consecutive runloop turns, with animation
+/// on, which is the state the snapshot runner deliberately avoids.
+///
+/// Only runs when `KHAYT_CHURN` is set, and it exits with the count it managed.
+@MainActor enum Churn {
+    static func run(rounds: Int) {
+        // The pairs that make the inspector move. Jobs, Library and Customers
+        // have one; the rest close it. A pair where both sides agree changes
+        // nothing and proves nothing.
+        let shelves: [Shop.Shelf] = [.jobs(nil), .machines, .library(nil), .expenses,
+                                .customers, .reports, .jobs(nil), .calculator]
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1200))
+            guard let shop = Snapshot.subject else {
+                print("churn: no window"); exit(2)
+            }
+            var done = 0
+            for i in 0..<rounds {
+                // WITH animation, which is what a click gives you and what the
+                // crashing stack was inside.
+                withAnimation { shop.shelf = shelves[i % shelves.count] }
+                done += 1
+                // One runloop turn. Long enough for the collapse to start, far
+                // too short for it to finish — which is the point.
+                try? await Task.sleep(for: .milliseconds(16))
+            }
+            print("churn: survived \(done) switches")
+            exit(0)
+        }
+    }
+}
+
+/// The app photographs its own window.
+///
+/// SwiftUI's `ImageRenderer` returns a "cannot render" placeholder for anything
+/// AppKit-backed — which is `NavigationSplitView`, `Table` and the toolbar, i.e.
+/// everything that makes this a Mac app rather than a page. And `screencapture`
+/// needs a screen-recording grant. A window can always draw itself into a
+/// bitmap, so that is the route.
+///
+/// Two things it cannot show, both the photograph rather than the app:
+///
+/// * `NSVisualEffectView` draws nothing into an offline bitmap, so the sidebar
+///   comes out black and empty. Confirm a sidebar you doubt by running once with
+///   `.listStyle(.plain)`, which has no material, rather than by "fixing" it.
+///
+///   The pane shot of that sidebar is worse than empty, because it looks fine.
+///   Its appearance really is `vibrantDark`, and vibrant labels draw as an
+///   ALPHA MASK for the window server to composite: every pixel in
+///   `…-pane1.png` is RGB(0,0,0) varying only in alpha — counted, not guessed.
+///   Anything that shows transparency as white then renders a crisp picture of
+///   black text on white paper, which is indistinguishable from a dark mode
+///   that does not work. In the light run the same mask looks right by
+///   accident. Forcing the subtree out of vibrancy and flattening it onto
+///   `windowBackgroundColor` was tried: the labels still draw as a black mask,
+///   now on a dark ground, so they vanish instead. Judge the sidebar from the
+///   app, not from this file.
+/// `capturePanes` photographs each scrolling pane on its own, for when the window
+/// shot leaves a doubt. It has the opposite blind spot — it loses what a pane
+/// draws into its own layer, so thumbnails go missing there — which is why both
+/// exist.
+///
+/// A correction, since the wrong version was written down for a day: the library
+/// inspector once photographed as a solid black column, and this file blamed
+/// having two `NSScrollView`s on screen at once. It was not the capture. The
+/// inspector was attached inside `detail`, the detail content was laid out
+/// against a width that did not subtract the sidebar, and the inspector had
+/// nowhere to draw. Moving `.inspector` onto the `NavigationSplitView` fixed the
+/// picture and the app together. A capture limitation is a comfortable thing to
+/// blame; check the layout first.
+///
+/// Only runs when KHAYT_SNAPSHOT_DIR is set, so it costs a normal launch
+/// nothing and cannot fire by accident.
+@MainActor enum Snapshot {
+    /// The window's shop, so the run can move between shelves. Set once, on
+    /// launch; nil in a normal run because nothing else asks for it.
+    static weak var subject: Shop?
+
+    /// Photograph a view no book can reach.
+    ///
+    /// The empty states are the problem this solves. There are twenty of them
+    /// and the sample book fills every screen it has, so not one of the
+    /// fifty-one pictures this harness takes contains a single one — which
+    /// means they could be redrawn, or broken, and every screenshot would look
+    /// fine. That is the same trap as a screen that ships showing its empty
+    /// state, running the other way.
+    ///
+    /// `ImageRenderer` rather than a window: these are plain shapes and text,
+    /// which it draws correctly, and no book state has to be faked to see them.
+    /// A plate-ish rectangle, so the camera tile has something with edges in
+    /// it without a printer being switched on.
+    @MainActor
+    static func plateBytes() -> Data {
+        let image = NSImage(size: NSSize(width: 320, height: 180), flipped: false) { rect in
+            NSColor(red: 0.24, green: 0.35, blue: 0.44, alpha: 1).setFill(); rect.fill()
+            NSColor(red: 0.94, green: 0.92, blue: 0.90, alpha: 1).setFill()
+            NSRect(x: 60, y: 30, width: 200, height: 120).fill()
+            return true
+        }
+        return image.tiffRepresentation
+            .flatMap { NSBitmapImageRep(data: $0) }
+            .flatMap { $0.representation(using: NSBitmapImageRep.FileType.png, properties: [:]) } ?? Data()
+    }
+
+    @MainActor
+    private static func captureDetached(into dir: URL) {
+        let cases: [(String, AnyView)] = [
+            // THE WHOLE MARK SET, at the size it is read at and at four times
+            // it. A set is only a set if it holds together, and that cannot be
+            // judged from a table of coordinates — it needs looking at, all of
+            // it at once, which is what nobody had ever been able to do.
+            ("98-marks", AnyView(
+                VStack(alignment: .leading, spacing: 18) {
+                    ForEach([Array(Mark.allCases.prefix(6)),
+                             Array(Mark.allCases.dropFirst(6).prefix(6)),
+                             Array(Mark.allCases.dropFirst(12))], id: \.first) { row in
+                        HStack(spacing: 26) {
+                            ForEach(row, id: \.self) { mark in
+                                VStack(spacing: 9) {
+                                    Drawn(mark: mark, size: 64)
+                                    Drawn(mark: mark, size: 16)
+                                    Text(mark.rawValue).font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(width: 76)
+                            }
+                        }
+                    }
+                }
+                .foregroundStyle(.primary)
+                .padding(30)
+                .frame(width: 660, height: 430)
+                .background(Khayt.ground))),
+            ("98-empty-drawn", AnyView(
+                EmptyHere(title: "Nothing here yet",
+                          message: "A machine you add shows up here, with what it is printing.",
+                          mark: .machines)
+                    .frame(width: 460, height: 300)
+                    .background(Khayt.ground))),
+            // EVERY mark at the size and tint an empty screen draws it.
+            //
+            // A mark is legible at 64pt in `98-marks` and legible in the
+            // sidebar at 16pt; 44pt in the brand at half opacity on the ground
+            // colour is a third case and neither of the others proves it. The
+            // waste mark's purge tower and the reports mark's bars are the two
+            // that lose their inner lines first.
+            ("98-empty-marks", AnyView(
+                VStack(alignment: .leading, spacing: 20) {
+                    ForEach([Array(Mark.allCases.prefix(8)),
+                             Array(Mark.allCases.dropFirst(8))], id: \.first) { row in
+                        HStack(spacing: 22) {
+                            ForEach(row, id: \.self) { mark in
+                                VStack(spacing: 7) {
+                                    Drawn(mark: mark, size: 44)
+                                        .foregroundStyle(Khayt.brand.opacity(0.5))
+                                    Text(mark.rawValue).font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(width: 78)
+                            }
+                        }
+                    }
+                }
+                .padding(28)
+                .frame(width: 860, height: 240)
+                .background(Khayt.ground))),
+            ("98-empty-marks-dark", AnyView(
+                VStack(alignment: .leading, spacing: 20) {
+                    ForEach([Array(Mark.allCases.prefix(8)),
+                             Array(Mark.allCases.dropFirst(8))], id: \.first) { row in
+                        HStack(spacing: 22) {
+                            ForEach(row, id: \.self) { mark in
+                                VStack(spacing: 7) {
+                                    Drawn(mark: mark, size: 44)
+                                        .foregroundStyle(Khayt.brand.opacity(0.5))
+                                    Text(mark.rawValue).font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(width: 78)
+                            }
+                        }
+                    }
+                }
+                .padding(28)
+                .frame(width: 860, height: 240)
+                .background(Khayt.ground)
+                .environment(\.colorScheme, .dark))),
+            ("98-empty-drawn-dark", AnyView(
+                EmptyHere(title: "Nothing here yet",
+                          message: "A machine you add shows up here, with what it is printing.")
+                    .frame(width: 460, height: 300)
+                    .background(Khayt.ground)
+                    .environment(\.colorScheme, .dark))),
+            // ── THE CAMERA TILE, WHICH NO SAMPLE BOOK CAN REACH ──────────
+            //
+            // A camera needs a printer on this Mac's network answering with a
+            // JPEG. A sample book cannot have one, so giving its machines a
+            // `webcam` would put a permanent "Camera not answering" on the
+            // shop floor and call that a demonstration. This is exactly what
+            // `captureDetached` is for.
+            //
+            // The picture case draws its own frame rather than fetching one,
+            // so the shot does not depend on anything being switched on. What
+            // is being looked at is the tile — the rounding, the corner, and
+            // that the two EMPTY states have edges and say which nothing they
+            // are, which is the bug the first version had.
+            ("98-camera-tiles", AnyView(
+                VStack(spacing: 10) {
+                    CameraTile(frame: .picture(Snapshot.plateBytes()),
+                               webcam: nil, words: Snapshot.subject?.words)
+                    CameraTile(frame: .waiting, webcam: nil, words: Snapshot.subject?.words)
+                    CameraTile(frame: .paused(Snapshot.plateBytes()), webcam: nil,
+                               words: Snapshot.subject?.words)
+                    CameraTile(frame: .failed("unreachable"), webcam: nil,
+                               words: Snapshot.subject?.words)
+                }
+                .frame(width: 320)
+                .padding(18)
+                .background(Khayt.ground))),
+            ("98-layer-progress", AnyView(
+                VStack(alignment: .leading, spacing: 5) {
+                    // A figure, not a job name: an English sample string here
+                    // is still an English string on a screen, and the guard
+                    // that says so is right even about a picture nobody ships.
+                    Text("62%").font(.caption).monospacedDigit()
+                    ZStack(alignment: .leading) {
+                        LayerLinesShape().fill(Khayt.hot.opacity(0.16))
+                        LayerLinesShape(progress: 0.62).fill(Khayt.hot)
+                    }
+                    .frame(height: 26)
+                }
+                .padding(18)
+                .frame(width: 320)
+                .background(Khayt.surface))),
+        ]
+        for (name, view) in cases {
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 2
+            guard let image = renderer.nsImage,
+                  let tiff = image.tiffRepresentation,
+                  let rep = NSBitmapImageRep(data: tiff),
+                  let png = rep.representation(using: .png, properties: [:]) else {
+                FileHandle.standardError.write(Data("could not render \(name)\n".utf8))
+                continue
+            }
+            try? png.write(to: dir.appending(path: name + ".png"))
+            FileHandle.standardError.write(Data("wrote \(name).png\n".utf8))
+        }
+    }
+
+    /// Photograph a view that is not in a window.
+    ///
+    /// A `MenuBarExtra`'s panel is the case this exists for: it is not a window,
+    /// so `capture(named:window:)` cannot see it, and without this it would be
+    /// the one surface in the app that ships unlooked at.
+    @MainActor
+    static func captureView(named name: String, _ view: some View, into dir: URL) {
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        guard let image = renderer.nsImage,
+              let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else {
+            FileHandle.standardError.write(Data("could not render \(name)\n".utf8))
+            return
+        }
+        try? png.write(to: dir.appending(path: name + ".png"))
+        FileHandle.standardError.write(Data("wrote \(name).png\n".utf8))
+    }
+
+    /// `KHAYT_SNAPSHOT_SIZE=WxH` — photograph the app at somebody else's Mac.
+    ///
+    /// Every screen in this app had only ever been reviewed at one size, the
+    /// 1320x760 the window opens at, which is roughly a small laptop. That is
+    /// the size a layout is least likely to be wrong at, because it is the one
+    /// it was built against. A shop runs this full screen: a 13-inch Air is
+    /// 1470 points wide, a 16-inch 1710, a Studio Display 2560, an XDR 3008 —
+    /// and a column with a fixed maximum width looks composed at one of those
+    /// and abandoned at another.
+    ///
+    /// The size is set in POINTS on the content view, so it is independent of
+    /// how the display is scaled.
+    ///
+    /// ── IT CANNOT EXCEED THE SCREEN, WHATEVER THIS USED TO CLAIM ──────────
+    ///
+    /// The comment here said an off-screen window still lays out, "which is the
+    /// whole reason a 6K layout can be checked on a laptop". It does — but the
+    /// window never gets off-screen to begin with: AppKit constrains a titled
+    /// window to its screen's VISIBLE frame, the screen less the menu bar and
+    /// the Dock. On the 16-inch this is written on that is 1710x995 pt, so
+    /// `KHAYT_SNAPSHOT_SIZE=1500x1700` produced a 1500x995 window and a run
+    /// that reported 1500x1700 on stderr.
+    ///
+    /// Bypassing it means overriding `constrainFrameRect(_:to:)`, which needs
+    /// an `NSWindow` subclass, and SwiftUI owns this window. So the flag is
+    /// honest about what it got rather than pretending: WIDTH is genuinely
+    /// reviewable up to the screen's width and height is not, and a run says so
+    /// when it has been cut down. Checking a layout taller than this Mac needs a
+    /// taller Mac.
+    private static func resizeIfAsked() {
+        guard let spec = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SIZE"] else { return }
+        let parts = spec.lowercased().split(separator: "x")
+        guard parts.count == 2, let w = Double(parts[0]), let h = Double(parts[1]),
+              w >= 480, h >= 360 else {
+            FileHandle.standardError.write(Data("bad KHAYT_SNAPSHOT_SIZE \(spec)\n".utf8))
+            return
+        }
+        // ── AND SAY WHAT WAS ACTUALLY GOT, WHICH IS NOT ALWAYS WHAT WAS ASKED ─
+        //
+        // AppKit constrains a titled window to its screen's VISIBLE frame — the
+        // screen less the menu bar and the Dock. Ask for 1500x1700 on a 16-inch
+        // MacBook Pro and the window becomes 1500x995, because 995 is all the
+        // height there is. `contentMaxSize` is not the limiter and never was:
+        // it reads as unbounded before the call and the clamp happens anyway.
+        //
+        // This used to print the size it had ASKED for, unconditionally, so a
+        // review of a tall layout was carried out at the wrong height by
+        // somebody who had been told otherwise — which is worse than not having
+        // the flag, because the screenshot looks deliberate. The number below
+        // is read back off the window.
+        var reports: [String] = []
+        for window in NSApp.windows where window.isVisible && window.contentView != nil {
+            window.setContentSize(NSSize(width: w, height: h))
+            let got = window.contentView?.frame.size ?? .zero
+            guard got.width > 0, got.height > 0 else { continue }
+            if abs(got.width - w) > 1 || abs(got.height - h) > 1 {
+                let room = window.screen?.visibleFrame.size ?? .zero
+                reports.append("""
+                    KHAYT_SNAPSHOT_SIZE asked for \(Int(w))x\(Int(h)) pt and the window is \
+                    \(Int(got.width))x\(Int(got.height)) — a window cannot be larger than its \
+                    screen's visible frame, which here is \(Int(room.width))x\(Int(room.height)) pt. \
+                    The shots are at the size above, NOT the one asked for.
+                    """)
+            } else {
+                reports.append("window set to \(Int(got.width))x\(Int(got.height)) pt")
+            }
+        }
+        for line in Set(reports).sorted() {
+            FileHandle.standardError.write(Data((line + "\n").utf8))
+        }
+    }
+
+    /// Every snapshot run photographs the invented book — unless it was
+    /// asked for the shop's own with KHAYT_SNAPSHOT_REAL=1.
+    ///
+    /// ── WHY IT IS NO LONGER OPT-IN ────────────────────────────────────────
+    ///
+    /// `KHAYT_BOOK=sample` used to be the only thing that pinned the run, so
+    /// a run without it opened this Mac's real book and swapped back to it for
+    /// several screens. #1108 fixed the dark run to load the sample; alpha.58's
+    /// review found `KHAYT_SNAPSHOT_DARK=1` photographing the REAL book again,
+    /// because the launch itself still opened it. Pictures of a shop's real
+    /// customers and figures are not design review material, and they are one
+    /// upload away from a public page. So the default is the sample, for every
+    /// mode, and the real book is the one that has to be asked for.
+    /// (`KHAYT_BOOK=sample` still means what it did, outside a snapshot too.)
+    static var forcedSample: Bool { usesSample(ProcessInfo.processInfo.environment) }
+
+    nonisolated static func usesSample(_ env: [String: String]) -> Bool {
+        if env["KHAYT_BOOK"] == "sample" { return true }
+        guard let dir = env["KHAYT_SNAPSHOT_DIR"], !dir.isEmpty else { return false }
+        return env["KHAYT_SNAPSHOT_REAL"] != "1"
+    }
+
+    /// Which parts of the run KHAYT_SNAPSHOT_SKIP asks to leave out.
+    ///
+    /// A comma-separated list. Nothing is skipped by default, and a skipped
+    /// section prints a line to stderr — a short run that says nothing is a
+    /// complete run as far as anybody reading the folder can tell.
+    static func skipped(_ name: String) -> Bool {
+        guard let list = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SKIP"] else { return false }
+        return list.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .contains(name)
+    }
+
+    static func run(into dir: URL) {
+        // Every write below is `try?`, so a directory that is not there costs a
+        // whole run and says nothing at all — 31 "wrote …" lines and no files.
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        Task { @MainActor in
+            // BEFORE the window settles, if this run is the dark one.
+            //
+            // Flipping the appearance afterwards left the sidebar light: its
+            // list is an `NSTableView` whose cells were already built with
+            // light label colours, and a change of appearance does not rebuild
+            // them without a real redisplay. The content area flipped fine,
+            // which is what made it look like the capture rather than the app.
+            // Built dark from the outset, the whole window is dark.
+            // DARK AND LIGHT ARE SEPARATE RUNS, not two halves of one.
+            //
+            // Changing `NSApp.appearance` partway through is what took this
+            // harness down, every time, at the same frame:
+            //
+            //     -[NSSearchFieldCell drawInteriorWithFrame:inView:]
+            //     -[NSButtonCell _controlViewDidChangeEffectiveAppearance:]
+            //     _invalidateIntrinsicContentSizeDirtyingConstraints:
+            //     -[NSWindow _postWindowNeedsUpdateConstraints]  → abort
+            //
+            // The search field attaches its cancel-button cell the first time
+            // it draws under the new appearance, and invalidating constraints
+            // from inside a layout pass is the one thing AppKit will not
+            // forgive. Three attempts to drain the layout BEFORE the capture
+            // all failed, because the invalidation is caused BY the draw and
+            // does not exist until it happens.
+            //
+            // A process that never changes appearance never reaches that
+            // frame. `KHAYT_SNAPSHOT_DARK=1` photographs the dark screens and
+            // stops; any other value, or none, is an ordinary light run. Two
+            // invocations give both sets, and neither can abort. Verified over
+            // three dark and three light runs, all clean, where the combined
+            // run had aborted three times out of three.
+            let dark = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DARK"] == "1"
+            // BOTH WAYS, and the light one is a choice rather than a default.
+            //
+            // Splitting the runs left the light one setting no appearance at
+            // all, so it followed whatever this Mac happened to be set to —
+            // fine until the Mac switches itself at dusk, after which the same
+            // command writes dark pictures under light names. An Arabic pass
+            // run at teatime came back dark and the app was not at fault.
+            //
+            // Set ONCE, here, before anything has been drawn. That is what
+            // makes it safe: what took this runner down was changing the
+            // appearance PART WAY THROUGH, and this never changes it again.
+            //
+            // Two earlier attempts are worth not repeating. In
+            // `applicationWillFinishLaunching` it never reaches the window,
+            // because SwiftUI attaches its delegate adaptor after AppKit has
+            // already sent that. In `main.swift`, before `KhaytApp.main()`,
+            // `NSApp` is still nil and the process dies on the spot.
+            let want: NSAppearance.Name = dark ? .darkAqua : .aqua
+            NSApp.appearance = NSAppearance(named: want)
+            for window in NSApp.windows { window.appearance = NSAppearance(named: want) }
+            startWatchdog()
+            resizeIfAsked()
+            captureDetached(into: dir)
+            // The window has to have laid out and drawn once. Two seconds is
+            // generous; capturing an unlaid-out window yields a blank sheet.
+            try? await Task.sleep(for: .seconds(2))
+            // Says whether this run holds the book. Ownership is the gate on
+            // every write, and a gate nobody checked is a gate that is open.
+            FileHandle.standardError.write(Data(
+                "ownership: \(shopOwnership())\n".utf8))
+            // Whether the shop's book got today's backup. A shop running only
+            // this app has no other, so "did it actually write one" is worth
+            // seeing in every run rather than trusted.
+            if let shop = subject {
+                let line = "backup: " + (shop.lastBackup ?? "none")
+                    + (shop.backupProblem.map { " — \($0)" } ?? "") + "\n"
+                FileHandle.standardError.write(Data(line.utf8))
+            }
+            // ── EVERY SCREEN, FROM THE SHOP'S OWN BOOK (KHAYT_SNAPSHOT_REAL=1) ──
+            //
+            // The run above is for reviewing the DESIGN, so it deliberately
+            // swaps to the sample for most screens. That hides what only the
+            // shop's real records can show: a night's review of the three live
+            // screens found four real bugs (▼3 on three full spools, an
+            // unanswering printer called faulted and free). This walks every
+            // shelf of the real book and photographs it, and does nothing
+            // else: navigation only, no sheets, no gestures. Writes are gated
+            // on owning the book, and a running Khayt holds it.
+            // Only the library phase-1a scenes, on the sample, in whichever
+            // appearance and language this run was started in.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBRARY"] == "1", let shop = subject {
+                await captureLibrary1a(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // How long opening the Library holds the main thread — see
+            // `timeLibrary`. Pair with KHAYT_SNAPSHOT_REAL=1 for a big book.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBTIME"] == "1", let shop = subject {
+                await timeLibrary(shop, into: dir)
+                NSApp.terminate(nil)
+                return
+            }
+            // The End of Day Report: its page as HTML, and the sheet showing it.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_EOD"] == "1", let shop = subject {
+                await shop.askForEndOfDay()
+                try? shop.pendingDayReport?.html.write(to: dir.appending(path: "eod.html"),
+                                                       atomically: true, encoding: .utf8)
+                await settle(); await settle()
+                // The sheet is a window of its own; the main window behind it
+                // is only dimmed. Closed again before quitting: a window with
+                // a sheet up holds `terminate` and the run never ends.
+                if let window = NSApp.windows.first(where: { $0.isVisible && $0.frame.width >= 600 }) {
+                    capture(named: "eod", window: window.attachedSheet ?? window, into: dir)
+                }
+                shop.pendingDayReport = nil
+                await settle()
+                NSApp.terminate(nil)
+                return
+            }
+            // Only the Settings window, at its opening size and its smallest,
+            // with what runs off its edge — see `captureSettingsOnly`.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SETTINGS"] == "1", let shop = subject {
+                await captureSettingsOnly(shop, into: dir)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only the model page and the multi-select pane (library
+            // inspector redesign), on the sample, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBINSP"] == "1", let shop = subject {
+                await captureLibraryInspector(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only the library grid's scenes — sizes, the list, a selection,
+            // the empty states, and a 600-model library — on the sample.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBGRID"] == "1", let shop = subject {
+                await captureLibraryGrid(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only the smart folders, saved searches and ranges, on the
+            // sample and a 600-model library in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBSMART"] == "1", let shop = subject {
+                await captureLibrarySmart(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only library stage 3a: printer chips on the tiles, the Fits
+            // filter and column, and the ⌘J palette — on the sample and a
+            // 600-model library, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBSTAGE3A"] == "1", let shop = subject {
+                await captureLibraryStage3a(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only library stage 3b: stacks closed and open, the Variants
+            // section's suggestion and mirror caveat, Find Similar's focus, and
+            // a two-plate project in the Views section — over the sample, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBSTAGE3B"] == "1", let shop = subject {
+                await captureLibraryStage3b(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only Save to Khayt: the Saved from web folder, a saved page in
+            // the inspector, and the Settings row — on the sample, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_WEBSAVE"] == "1", let shop = subject {
+                await captureWebSave(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only compressed files as folders: a real zip indexed into a
+            // throwaway book, laid over the sample in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBARCHIVE"] == "1", let shop = subject {
+                await captureLibraryArchive(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only Library Health and Print next, on the sample, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBHEALTH"] == "1", let shop = subject {
+                await captureLibraryHealth(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only the menu bar item's label states and its fleet panel, on
+            // the sample, in memory (`SnapshotMenuBar.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_MENUBAR"] == "1", let shop = subject {
+                await captureMenuBar(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only the beta.5 scenes (live printer cards, the camera, Pair a
+            // phone, filed VAT periods), on the sample, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_B5"] == "1", let shop = subject {
+                await captureBeta5(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only the beta.13 scenes (licence warning and credit, the proof
+            // sheet, the From-slicer inbox, payment terms), on the sample, in
+            // memory (`SnapshotBeta13.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_B13"] == "1", let shop = subject {
+                await captureBeta13(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only the vault over its plan (khayt-cloud #143): the plan pane,
+            // the library banner and the vault sheets, not over / read-only /
+            // deleting, on the sample, in memory (`SnapshotVaultLapse.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_VAULTLAPSE"] == "1", let shop = subject {
+                await captureVaultLapse(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DELETE"] == "1", let shop = subject {
+                await captureLibraryStorage(shop, into: dir)
+                NSApp.terminate(nil)
+                return
+            }
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_REAL"] == "1", let shop = subject {
+                if let real = Shop.available.first(where: \.isReal) { await shop.load(real) }
+                // Long enough for the printers to answer, which the dashboard
+                // and the machines screen draw.
+                try? await Task.sleep(for: .seconds(4))
+                let shelves: [(String, Shop.Shelf)] = [
+                    ("dashboard", .dashboard), ("jobs", .jobs(nil)), ("board", .board),
+                    ("library", .library(nil)), ("catalogue", .catalogue), ("customers", .customers),
+                    ("machines", .machines), ("inventory", .inventory), ("expenses", .expenses),
+                    ("waste", .waste), ("reports", .reports), ("portfolio", .portfolio),
+                    ("gift-cards", .giftCards), ("calculator", .calculator), ("colour", .colour),
+                ]
+                for (name, shelf) in shelves {
+                    // How long the window takes to arrive at each screen — the
+                    // shop felt the library "lag" (Sep 2026); this says where.
+                    let began = Date()
+                    shop.shelf = shelf
+                    await settle()
+                    FileHandle.standardError.write(Data(String(format: "shelf %@: %.0f ms\n",
+                        name, Date().timeIntervalSince(began) * 1000).utf8))
+                    try? await Task.sleep(for: .milliseconds(600))
+                    capture(named: "real-" + name, into: dir)
+                }
+                NSApp.terminate(nil)
+                return
+            }
+            // DARK FIRST, then light, then everything else in light.
+            //
+            // A Mac app is used in both and every screenshot this runner has
+            // ever taken was light, so the dark side of it was never once
+            // looked at. Two screens is enough to catch the failure that
+            // matters — a colour written as a literal rather than taken from
+            // the system, which is invisible against one background and only
+            // one.
+            if dark {
+                capture(named: "00-dark-dashboard", into: dir)
+                // Panes as well as the whole window: the sidebar is an AppKit
+                // visual-effect view and does not draw into the window's own
+                // bitmap, so in the composite it comes out as bare white — in
+                // light mode that looks right by accident and in dark mode it
+                // looks like a bug the app does not have.
+                capturePanes(named: "00-dark-dashboard", into: dir)
+                subject?.shelf = .library(nil)
+                try? await Task.sleep(for: .milliseconds(700))
+                capture(named: "03-dark-library", into: dir)
+                capturePanes(named: "03-dark-library", into: dir)
+                // A model selected, its inspector and the storage badges, dark.
+                if let subject { await captureLibrary1a(subject, into: dir, dark: true) }
+                if let subject { await captureBeta5(subject, into: dir, dark: true) }
+                subject?.shelf = .jobs(nil)
+                try? await Task.sleep(for: .milliseconds(700))
+                capture(named: "01-dark-jobs", into: dir)
+                // The shelf, because it is the one screen in the app whose
+                // content is COLOUR. Everything else here is text on a ground
+                // and survives a theme by construction; a spool is a drawn
+                // shape whose ring, hub and bare flange are three tones that
+                // have to stay apart on both — a white spool against a light
+                // card and a black one against a dark card are different
+                // problems, and only one of them had ever been photographed.
+                // On the SAMPLE book, which the dark run had no reason to load
+                // until now: this Mac's own book has three spools with no colour
+                // and no record of what they weighed new, so every ring it can
+                // draw is the same dashed full circle. The three tones this
+                // screen has to keep apart only exist on a shelf that has a
+                // white spool, a black one and a nearly-empty one.
+                if let subject { await subject.load(.sample) }
+                subject?.shelf = .inventory
+                try? await Task.sleep(for: .milliseconds(700))
+                capturePanes(named: "08-dark-inventory", into: dir)
+                // ── AND SETTINGS › PREFERENCES, DARK ──────────────────────
+                //
+                // The pane with the switches (notifications, the menu bar's
+                // style, the browser extension) and the one that crashed in
+                // beta.7: Safari answered on its own queue into a main-actor
+                // closure. It asks the REAL Safari here, unpretended, so this
+                // picture existing is the proof that it no longer traps.
+                if !skipped("settings") {
+                    doing("settings-window-dark")
+                    let main = NSApp.windows.first { $0.isVisible && $0.contentView != nil }
+                    if let item = NSApp.mainMenu?.items.first?.submenu?.items.first(where: { $0.keyEquivalent == "," }) {
+                        NSApp.sendAction(item.action ?? #selector(NSApplication.terminate(_:)), to: item.target, from: item)
+                    }
+                    await settle()
+                    try? await Task.sleep(for: .seconds(1))
+                    if let settings = NSApp.windows.first(where: {
+                        $0.isVisible && $0 !== main && $0.contentView != nil
+                            && $0.frame.width >= 300 && $0.frame.height >= 300
+                    }) {
+                        subject?.settingsPane = .general
+                        await settle()
+                        try? await Task.sleep(for: .milliseconds(700))
+                        capture(named: "17-dark-settings-general", window: settings, into: dir)
+                        capturePanes(named: "17-dark-settings-general", window: settings, into: dir)
+                        settings.close()
+                        await settle()
+                    } else {
+                        FileHandle.standardError.write(Data("no settings window (dark)\n".utf8))
+                    }
+                }
+                // Stop here. Everything below is photographed by the light run.
+                NSApp.terminate(nil)
+                return
+            }
+            capture(named: "00-dashboard", into: dir)
+            // Again once the printers have answered: the live strip is the one
+            // thing on this screen that is not read from the book, so a first
+            // photograph taken before the first poll cannot show it.
+            try? await Task.sleep(for: .seconds(3))
+            capture(named: "00c-dashboard-live", into: dir)
+
+            guard let shop = subject else { NSApp.terminate(nil); return }
+            // The sample too: a shop whose jobs are auto-logged from printer
+            // history has no prices, and a dashboard of zeros shows nothing
+            // about the design.
+            await shop.load(.sample)
+            await settle()
+            // The menu bar as AppKit actually built it. A Commands block that
+            // compiles proves nothing about what a person can reach.
+            //
+            // AFTER a book is open, not before. The stages are named from the
+            // shop's own catalogue, which is loaded with the book — dumped at
+            // launch every one of them read "queue.quote", which is what a
+            // missing translation looks like and was only an early photograph.
+            FileHandle.standardError.write(Data("menus: \(menuTree())\n".utf8))
+            capture(named: "00b-dashboard-sample", into: dir)
+
+            // ── AND THE FRONT DOOR WITH THE MACHINES RUNNING ──────────────
+            //
+            // The single liveliest thing in this product is the machine strip
+            // on Triage with a print on it, and NO PICTURE OF IT HAS EVER
+            // EXISTED. Neither book can produce one: the sample's printers are
+            // somebody else's addresses and this Mac never knocks on them, and
+            // the real book's jobs are finished. So the running tile — the one
+            // a shop looks at most, on the screen it leaves open all day — was
+            // drawn by nobody and reviewed by nobody, and shipped saying
+            // "+48%" as though a print in progress were a rise in a figure.
+            //
+            // Readings are put in place rather than polled, the same
+            // concession `07c-machines-band` already makes for the same
+            // reason. `mac.no_protocol` needs the opposite of this picture,
+            // which `00b` above is.
+            // ONLY THE MACHINES THAT COULD ACTUALLY ANSWER. A laser and a UV
+            // flatbed have no protocol in this repo at all, so planting a
+            // reading on them would photograph a state that cannot happen —
+            // and leaving them alone is better than neutral: the picture then
+            // carries the running tiles AND the quiet ones side by side, which
+            // is what a real floor looks like and what the four sentences of
+            // `Shop.Quiet` have to be legible against.
+            for (i, machine) in shop.machines.enumerated()
+            where shop.kind(of: machine)?.polled ?? true {
+                shop.printers.setReadingForTesting(machine.id, PrinterWatch.Reading(
+                    status: KhaytEngine.PrinterStatus(
+                        state: i == 2 ? "idle" : "printing",
+                        progress: [9, 48, 0, 77, 96][i % 5], progressSource: "layers",
+                        filename: "falcon-hood-v4.gcode", timeRemaining: 2.6 * 3600,
+                        tempNozzle: 245, tempBed: 60, type: "moonraker"),
+                    problem: nil, at: Date()))
+            }
+            await settle()
+            try? await Task.sleep(for: .milliseconds(900))
+            capture(named: "00d-dashboard-running", into: dir)
+            shop.printers.clearReadingsForTesting()
+            await settle()
+
+            // ── AND THE JOBS TABLE, WHILE THE SAMPLE IS OPEN ──────────────
+            //
+            // The reason three lines above applies to the screen a shop LIVES
+            // in and was not being applied to it: `01-jobs` was shot against
+            // the real book alone, and a book auto-logged from printer history
+            // has no prices — nineteen rows reading 0.00, "Delivered",
+            // "settled", every one of them. Every column that carries money,
+            // every stage but one, and the part counts were invisible.
+            //
+            // Shot here rather than after the swap so the sample is not loaded
+            // a third time; the live book still gets its own picture below,
+            // because what a shop's own data looks like is worth seeing too.
+            shop.shelf = .jobs(nil)
+            await settle()
+            capture(named: "01b-jobs-sample", into: dir)
+
+            // ── AND THE SAME TABLE WITH THE PRINTERS ANSWERING ────────────
+            //
+            // The stage cell draws a live print differently — the layer stack
+            // and the percentage instead of the word — and that branch is
+            // reachable only when a job in the book is printing on a machine
+            // this app can hear. Neither book can produce it here: the sample's
+            // printers are somebody else's addresses, and the real one's jobs
+            // are finished. So the branch would ship having been drawn for
+            // nobody, which is exactly what `07c-machines-band` exists to stop.
+            //
+            // The sample seeds five printing jobs across three machines, and
+            // THREE OF THEM ARE ON ONE PRINTER — so this picture also carries
+            // the case `Shop.livePrint` is deliberately narrow about: all three
+            // show that machine's progress, because the book says all three are
+            // printing and the fix for that is in the book.
+            for machine in shop.machines {
+                shop.printers.setReadingForTesting(machine.id, PrinterWatch.Reading(
+                    status: KhaytEngine.PrinterStatus(
+                        state: "printing", progress: [7, 48, 93][abs(machine.id.hashValue) % 3],
+                        progressSource: "layers", filename: "falcon-hood-v4.gcode",
+                        timeRemaining: 2.6 * 3600, tempNozzle: 245, tempBed: 60,
+                        type: "moonraker"),
+                    problem: nil, at: Date()))
+            }
+            await settle()
+            // Past the growth: the stack animates to its reading, and a picture
+            // taken during it is a picture of a bar on its way somewhere.
+            try? await Task.sleep(for: .milliseconds(1200))
+            capture(named: "01c-jobs-live", into: dir)
+            shop.printers.clearReadingsForTesting()
+            await settle()
+
+            shop.selection = (shop.shown.first { !$0.isSettled } ?? shop.shown.first)?.id
+            await settle()
+            capture(named: "02b-job-selected-sample", into: dir)
+            shop.selection = nil
+
+            // ── AND THE PRINT-RISK SECTION, FOR THE SAME REASON ───────────
+            //
+            // Exactly the case the note above describes. The library screen is
+            // photographed against the real book, and no record in it carries
+            // an overhang summary — so the only state ever captured is "not
+            // looked yet", and the three that matter had never been seen.
+            //
+            // The sample book seeds three on purpose: a falcon hood that needs
+            // supports, a vase-mode vase whose walls are thinner than the
+            // nozzle, and a bracket with nothing to report — because a section
+            // that only speaks up when something is wrong leaves a shop unable
+            // to tell "checked, fine" from "not checked".
+            shop.shelf = .library(nil)
+            await settle()
+            for (name, id) in [("03c-library-risk", "PF-sample-falcon"),
+                               ("03d-library-risk-thin", "PF-sample-vase"),
+                               ("03e-library-risk-clear", "PF-sample-bracket")]
+                where shop.files.contains(where: { $0.id == id }) {
+                shop.fileSelection = [id]
+                await settle()
+                // The findings are judged by the runtime after the screen
+                // appears, like the colour matches and the P&L.
+                try? await Task.sleep(for: .milliseconds(700))
+                capture(named: name, into: dir)
+                capturePanes(named: name, into: dir)
+            }
+            shop.fileSelection = []
+            await settle()
+            await captureLibrary1a(shop, into: dir)
+            await captureBeta5(shop, into: dir, dark: false)
+
+            await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
+            await settle()
+            shop.shelf = .jobs(nil)
+            await settle()
+            capture(named: "01-jobs", into: dir)
+
+            // An unsettled job for preference — the money lines are the point
+            // of this panel — but ANY job rather than none. A store whose jobs
+            // are all settled photographed an empty detail pane, which looks
+            // like an inspector that does not work.
+            shop.selection = (shop.shown.first { !$0.isSettled } ?? shop.shown.first)?.id
+            await settle()
+            capture(named: "02-job-selected", into: dir)
+            // The panes as well: the job inspector is where the money lines and
+            // the payment button live, and a window shot that simply does not
+            // contain it cannot tell you whether it is closed or broken.
+            capturePanes(named: "02-job-selected", into: dir)
+
+            shop.shelf = .library(nil)
+            await settle()
+            capture(named: "03-library", into: dir)
+            // A model SELECTED, so the inspector is in the picture — the size,
+            // the triangle count and whether it goes on a bed the shop owns all
+            // live there, and a grid shot cannot show any of them. Picked as
+            // the largest measured model, because "too big" is the answer worth
+            // being able to see.
+            if let biggest = shop.files
+                .compactMap({ f in f.mesh.map { (f, max($0.x, $0.y)) } })
+                .max(by: { $0.1 < $1.1 })?.0 {
+                shop.fileSelection = [biggest.id]
+                await settle()
+                capture(named: "03b-library-selected", into: dir)
+                capturePanes(named: "03b-library-selected", into: dir)
+                shop.fileSelection = []
+                await settle()
+            }
+
+            shop.fileSelection = Set(shop.visibleFiles.prefix(1).map(\.id))
+            await settle()
+            capture(named: "04-model-selected", into: dir)
+            // The Model menu should now be live: library shelf, one model
+            // selected, and the book is ours to change. Dumped a SECOND time
+            // for exactly that reason: a menu built at launch and never rebuilt
+            // is indistinguishable from a correct one until something it reads
+            // changes, and the titles here depend on a selection made after the
+            // first dump.
+            FileHandle.standardError.write(Data("menus (after selection): \(menuTree())\n".utf8))
+            capturePanes(named: "04-model-selected", into: dir)
+
+            // Several selected: the shape a shop is in when it files the
+            // Kings as one collection.
+            shop.fileSelection = Set(shop.visibleFiles.prefix(4).map(\.id))
+            await settle()
+            capture(named: "04b-many-selected", into: dir)
+            shop.fileSelection = Set(shop.visibleFiles.prefix(1).map(\.id))
+
+            if let group = shop.groups.first {
+                shop.shelf = .library(group)
+                shop.fileSelection = []
+                await settle()
+                capture(named: "05-group", into: dir)
+            }
+
+            // The sample for the last two. A shop whose jobs are auto-logged
+            // from printer history has no customers and no prices — true, and
+            // no use at all for looking at a design.
+            await shop.load(.sample)
+            shop.shelf = .board
+            await settle()
+            // TWICE, and the second one is not superstition. The inspector is
+            // dismissed on this shelf — `wantsPanel` excludes the board — but
+            // dismissal is ANIMATED, and one settle photographs it half
+            // collapsed: a 310-point column still reserved and empty, which
+            // takes two and a half of the seven columns off the picture. The
+            // board is fine; the photograph was not, and a reviewer reading it
+            // would file a bug against a layout that does not have one.
+            await settle()
+            capture(named: "09-board", into: dir)
+
+            // The sheets. Each is its own window and the window shot cannot see
+            // them, so they are photographed on their own — six were built
+            // before there was a picture of any.
+            shop.shelf = .jobs(nil)
+            await settle()
+            if let job = shop.orders.first {
+                let subject = Shop.PendingHold(id: job.id, project: job.project)
+                for (name, open) in [
+                    ("10-hold", { shop.pendingHold = subject }),
+                    ("11-payment", { shop.pendingPayment = subject }),
+                    ("12-edit-job", { shop.pendingEdit = subject }),
+                    ("13-qc-fail", { shop.pendingQcFail = subject }),
+                ] as [(String, () -> Void)] {
+                    open()
+                    await settle()
+                    captureSheet(named: name, into: dir)
+                    shop.clearQuestion()
+                    await settle()
+                }
+            }
+            // THE PLAN, ON A JOB THAT HAS ONE. Not on `orders.first`: a job
+            // with no plan draws the sheet's empty state, which is the half
+            // that was already easy to see. The sample book carries one plan
+            // mid-collection precisely so the rows can be looked at.
+            if let planned = shop.orders.first(where: { !$0.instalments.isEmpty }) {
+                shop.planFor = planned
+                await settle()
+                captureSheet(named: "11b-payment-plan", into: dir)
+                shop.planFor = nil
+                await settle()
+            }
+            // And the empty half, which is a different screen: what a plan
+            // would be, and what the job owes before one exists.
+            if let unplanned = shop.orders.first(where: { $0.instalments.isEmpty && $0.price > 0 }) {
+                shop.planFor = unplanned
+                await settle()
+                captureSheet(named: "11c-payment-plan-empty", into: dir)
+                shop.planFor = nil
+                await settle()
+            }
+            // What can run together on one plate, with the suggestion already
+            // made — the button's own output is the screen worth looking at.
+            shop.planningBatch = true
+            await settle()
+            await shop.planBatch()
+            await settle()
+            captureSheet(named: "26b-batch", into: dir)
+            shop.planningBatch = false
+            await settle()
+            shop.takingAJob = true
+            await settle()
+            captureSheet(named: "14-new-job", into: dir)
+            shop.takingAJob = false
+            await settle()
+            // And the sheet as the catalogue opens it: a product's parts,
+            // costed, and its price. This is the path that opened at nothing
+            // twice, and a photograph is how the second time was found.
+            for row in shop.catalogueRows {
+                guard let product = await shop.productForEditing(row.id),
+                      case .array(let parts)? = product.rest["parts"],
+                      parts.compactMap(NewJobSheet.Draft.from).contains(where: \.isComplete) else { continue }
+                shop.takeJob(from: product)
+                await settle()
+                await settle()
+                captureSheet(named: "14b-new-job-from-product", into: dir)
+                shop.takingAJob = false
+                await settle()
+                break
+            }
+            // And as "Quote this model…" opens it, on two models at once: one
+            // sliced, one only the mesh has measured — so both labels are in
+            // one picture. Seeded directly: the sample book refuses
+            // `startJob`, as it refuses every write.
+            var toQuote = shop.files.filter { $0.id == "PF-sample-dallah" }
+            for file in shop.files where shop.estimates[file.id] != nil {
+                if let made = await shop.modelPart(from: file), !made.estimated.isEmpty {
+                    toQuote.append(file); break
+                }
+            }
+            if let seed = await shop.jobFromModels(toQuote, asQuote: true) {
+                shop.takeJob(seed)
+                await settle()
+                await settle()
+                captureSheet(named: "14c-quote-from-model", into: dir)
+                shop.takingAJob = false
+                await settle()
+            }
+
+            // The menu bar's panel, which no window shot can reach.
+            doing("27-menu-bar")
+            captureView(named: "27-menu-bar",
+                        FloorPanel(shop: shop).background(Khayt.ground), into: dir)
+
+            // Where the waiting work would go.
+            //
+            // The sample gives every one of its 42 jobs a printer, so this
+            // photographs the panel's EMPTY state — which is the honest picture
+            // of that book and still proves the sheet opens and says the right
+            // thing. Photographed against a sample with unassigned work it
+            // shows six proposals; that was checked by hand before shipping.
+            // The panel asks the engine on `.task`, which a settle alone does
+            // not wait for.
+            shop.forgetSchedule()
+            shop.schedulingWork = true
+            await settle()
+            try? await Task.sleep(for: .milliseconds(700))
+            let rows = shop.orderRows.count
+            let waiting = shop.schedulableRows.count
+            let fleet = shop.machines.count
+            let placed = shop.schedulePlan?.assignments.count ?? -1
+            let why = shop.scheduleProblem ?? "-"
+            captureSheet(named: "26-schedule", into: dir)
+            shop.schedulingWork = false
+            await settle()
+
+            shop.editingCustomer = Shop.newCustomer()
+            await settle()
+            captureSheet(named: "15-new-customer", into: dir)
+            shop.editingCustomer = nil
+            await settle()
+            // A customer WITH terms: the sheet's lower half — agreed prices
+            // and a standing order — is empty on a new customer, and an empty
+            // section is the half that was never the question.
+            if let terms = shop.clients.first(where: { $0.recurring != nil && !$0.priceList.isEmpty }) {
+                shop.editingCustomer = terms
+                await settle()
+                captureSheet(named: "15b-edit-customer", into: dir)
+                shop.editingCustomer = nil
+                await settle()
+            }
+
+            // The assistant's screen, in its EMPTY state — which is the state
+            // that has to work hardest. A blank box with a cursor in it is a
+            // test a shop can fail, so what is drawn before the first question
+            // is the suggestions and the sentence saying what leaves the Mac.
+            shop.askingTheBook = true
+            await settle()
+            captureSheet(named: "31-ask-the-book", into: dir)
+            shop.askingTheBook = false
+            await settle()
+
+            // THE PRODUCT SHEET WAS PHOTOGRAPHED BY NOTHING.
+            //
+            // It has been editable on this app for months and no shot in this
+            // harness contained it, so its picture strip — a horizontal row of
+            // cards, which is exactly the shape that breaks when the window is
+            // mirrored — could have been drawn wrong in Arabic for a whole
+            // release with every screenshot looking fine.
+            //
+            // An EXISTING product rather than a new one: a new one has no
+            // pictures, and the empty strip is the half that was never the
+            // question.
+            if let id = shop.catalogueRows.first?.id,
+               let product = await shop.productForEditing(id) {
+                shop.editingProduct = product
+                await settle()
+                captureSheet(named: "30-edit-product", into: dir)
+                shop.editingProduct = nil
+                await settle()
+            }
+
+            // The document itself. It is built by the runtime and drawn by
+            // WebKit AFTER the sheet appears, so it gets longer than a settle:
+            // photographed too early this is a spinner, which is exactly what
+            // a broken invoice would also look like.
+            if let job = shop.orders.first(where: { !$0.parts.isEmpty }) ?? shop.orders.first {
+                shop.showInvoice(job.id)
+                // Straight away, before the runtime has built anything: this is
+                // the sheet's own chrome with no web view under it, and it is
+                // the only shot in which that chrome is visible. `cacheDisplay`
+                // does not draw SwiftUI's layers once a WKWebView is in the
+                // hierarchy — the document comes through and the title and the
+                // buttons around it do not. Two pictures, because one of them
+                // would otherwise look like a header that never drew.
+                await settle()
+                captureSheet(named: "16-invoice-building", into: dir)
+                // WAITED FOR, NOT SLEPT THROUGH. Two seconds was enough until
+                // the machine was busy, and then both invoice pictures came
+                // back as an empty sheet — written without complaint, exactly
+                // like a document that failed to build. The paper's own `drawn`
+                // flag is `@State` inside the sheet and cannot be reached from
+                // here, but the WKWebView it makes is in the view tree and
+                // knows when it has finished.
+                await waitForTheDocument(upTo: 20)
+                captureSheet(named: "16-invoice", into: dir)
+                shop.clearQuestion()
+                await settle()
+            }
+
+            // The Settings window: opened the way ⌘, opens it, one picture per
+            // pane.
+            //
+            // "NOT THE SHOP'S WINDOW" IS NOT ENOUGH TO FIND IT. The menu bar's
+            // NSStatusItem has a window too, and it is visible and it is not the
+            // main one — so `first(where:)` found it and six settings pictures
+            // were 30×34 photographs of the nozzle glyph for as long as the menu
+            // bar has existed. Nothing failed: the harness wrote six PNGs and
+            // said so.
+            let main = NSApp.windows.first { $0.isVisible && $0.contentView != nil }
+            /// A window big enough to be a window somebody reads, which the
+            /// status item's 30×34 is not.
+            func settingsWindow() -> NSWindow? {
+                NSApp.windows.first {
+                    $0.isVisible && $0 !== main && $0.contentView != nil
+                        && $0.frame.width >= 300 && $0.frame.height >= 300
+                }
+            }
+            // Through the menu item ⌘, is bound to, whatever selector SwiftUI
+            // gave it this release — sending `showSettingsWindow:` by name
+            // opened nothing.
+            if let item = NSApp.mainMenu?.items.first?.submenu?.items.first(where: { $0.keyEquivalent == "," }) {
+                NSApp.sendAction(item.action ?? #selector(NSApplication.terminate(_:)), to: item.target, from: item)
+            }
+            await settle()
+            try? await Task.sleep(for: .seconds(1))
+            // What the shop spent and what it wasted. The sample, because this
+            // Mac's own book has neither and an empty table is a picture of
+            // nothing — and because the sample is what most people will open
+            // these two screens in first.
+            shop.period = .all
+            // ── SKIPPABLE, BECAUSE IT CAN HANG ────────────────────────────
+            //
+            // Laying out the expenses screen puts AppKit into a runaway
+            // constraint pass — 132 frames of `_layoutSubtreeWithOldSize:`
+            // recursing under one `AppKitScrollView`, sampled rather than
+            // guessed at. It takes the whole run with it, and everything
+            // photographed AFTER this point (the reports, the machines, the
+            // shelf, the colour studio) is lost with it.
+            //
+            // Until that is fixed, `KHAYT_SNAPSHOT_SKIP=spending` steps over
+            // the two screens rather than losing the eleven behind them. The
+            // skip prints to stderr, so a short run cannot pass for a
+            // complete one.
+            // ── TWO SCREENS, TWO SKIPS ────────────────────────────────────
+            //
+            // `spending` used to cover both, and only one of them is the
+            // problem: the EXPENSES screen is what puts AppKit into a runaway
+            // constraint pass. Waste simply stood behind it in the queue, so
+            // the one skip every run of this harness is told to pass — see the
+            // README — has also been throwing away the waste screen since the
+            // day the skip was written. Its trend card had never been
+            // photographed from the running app at all.
+            //
+            // `spending` still means both, because that is what every note and
+            // every habit in this repo says to pass.
+            if skipped("spending") || skipped("expenses") {
+                FileHandle.standardError.write(Data("skipping expenses\n".utf8))
+            } else {
+                shop.shelf = .expenses
+                await settle()
+                capture(named: "18-expenses", into: dir)
+            }
+            if skipped("spending") || skipped("waste") {
+                FileHandle.standardError.write(Data("skipping waste\n".utf8))
+            } else {
+                shop.shelf = .waste
+                await settle()
+                // The trend card is a chart that grows to its reading, so a
+                // picture taken on the settle is a picture of it arriving.
+                try? await Task.sleep(for: .milliseconds(900))
+                capture(named: "19-waste", into: dir)
+                capturePanes(named: "19-waste", into: dir)
+            }
+            shop.shelf = .reports
+            await settle()
+            // The P&L is computed by the runtime after the screen appears, so
+            // it gets longer than a settle — photographed too early it is the
+            // "no data yet" placeholder, which is what a broken one looks like.
+            try? await Task.sleep(for: .seconds(1))
+            capture(named: "20-reports", into: dir)
+            // AND THE WHOLE COLUMN. This window is 760 points tall and the
+            // report column is far longer — the cost-trends chart lives below
+            // the fold, so the only picture this harness has ever taken of it
+            // is the one that cuts it off. Same reason the settings panes get
+            // this treatment.
+            capturePanes(named: "20-reports", into: dir)
+            // The other half of the screen: what the shop is still owed.
+            shop.reportPage = .owing
+            await settle()
+            try? await Task.sleep(for: .milliseconds(600))
+            capture(named: "20b-owing", into: dir)
+
+            // The two pages added since — neither had ever been photographed
+            // from the running app, only through `ImageRenderer`, which cannot
+            // host a `ScrollView` and draws AppKit controls as placeholders.
+            shop.reportPage = .quoting
+            await settle()
+            capture(named: "20c-quoting", into: dir)
+            shop.reportPage = .machines
+            await settle()
+            capture(named: "20d-by-machine", into: dir)
+            shop.reportPage = .profit
+            await settle()
+            // And the third: who the money came from. Same reason as the P&L —
+            // the lists are computed by the runtime after the screen appears.
+            shop.reportPage = .best
+            await settle()
+            try? await Task.sleep(for: .milliseconds(600))
+            capture(named: "20c-best", into: dir)
+            shop.reportPage = .profit
+            await settle()
+
+            shop.shelf = .machines
+            await settle()
+            // THE SAMPLE SHOP'S PRINTERS ARE SOMEBODY ELSE'S ADDRESSES, so this
+            // Mac never knocks on them and the band has nothing it can time. It
+            // draws its "cannot time any of these yet" line, which is the right
+            // answer and IS worth a picture — it is what a shop sees on day one.
+            try? await Task.sleep(for: .milliseconds(900))
+            capture(named: "07-machines", into: dir)
+
+            // And then with the printers answering, because the band is the
+            // point of this screen and the shot above shows none of it. The
+            // readings are put in place rather than polled: a snapshot runner
+            // cannot wait on three machines that are not on this network.
+            for (i, machine) in shop.machines.enumerated() {
+                var status = KhaytEngine.PrinterStatus(
+                    state: "printing", progress: [56, 22, 8][i % 3], progressSource: "layers",
+                    filename: "", timeRemaining: [3.8, 5.1, 41.6][i % 3] * 3600,
+                    tempNozzle: 245, tempBed: 60, type: "moonraker")
+                // THE RICHER CARD'S BRANCHES, spread across the three so each
+                // is drawn for somebody: targets and layers on all, a chamber
+                // on the first, a speed override on the second, and a runout
+                // with the printer's own message on the third.
+                status.targetNozzle = 245; status.targetBed = 60
+                status.layer = Double([420, 61, 30][i % 3]); status.totalLayers = Double([750, 280, 380][i % 3])
+                status.fanPart = [100, 60, 0][i % 3]
+                if i % 3 == 0 { status.tempChamber = 37 }
+                if i % 3 == 1 { status.speedFactor = 120 }
+                if i % 3 == 2 { status.filamentOut = true; status.message = "Filament runout on e1" }
+                shop.printers.setReadingForTesting(machine.id, PrinterWatch.Reading(
+                    status: status, problem: nil, at: Date()))
+            }
+            await settle()
+            try? await Task.sleep(for: .milliseconds(900))
+            capture(named: "07c-machines-band", into: dir)
+
+            // AND A FARM. The band has a second density that only appears above
+            // four machines, and nothing in this repo has more than three — so
+            // without this the layout a ten-printer shop actually sees would
+            // ship having been looked at by nobody. Same concession as the
+            // readings above: the runner cannot put nine printers on this wifi.
+            shop.standUpFarmForSnapshot(10)
+            for (i, machine) in shop.machines.enumerated() {
+                shop.printers.setReadingForTesting(machine.id, PrinterWatch.Reading(
+                    status: KhaytEngine.PrinterStatus(
+                        state: i == 7 ? "idle" : "printing",
+                        progress: [56, 22, 8, 71, 94, 33, 12, 0, 48, 66][i % 10],
+                        progressSource: "layers", filename: "",
+                        timeRemaining: [3.8, 5.1, 41.6, 2.2, 0.7, 18.4, 27.0, 0, 9.5, 6.1][i % 10] * 3600,
+                        tempNozzle: 245, tempBed: 60, type: "moonraker"),
+                    problem: nil, at: Date()))
+            }
+            await settle()
+            try? await Task.sleep(for: .milliseconds(1200))
+            capture(named: "07d-machines-farm", into: dir)
+            // And the real book, because the live card only exists there: the
+            // sample's printers are somebody else's addresses on somebody
+            // else's network, so this app never knocks on them. The poll needs
+            // longer than a settle — it is a request to a machine on the wifi.
+            await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
+            shop.shelf = .machines
+            await settle()
+            try? await Task.sleep(for: .seconds(3))
+            capture(named: "07b-machines-live", into: dir)
+            await shop.load(.sample)
+            await settle()
+            if let machine = shop.machines.first {
+                shop.editingMachine = machine
+                await settle()
+                try? await Task.sleep(for: .milliseconds(600))
+                captureSheet(named: "22-machine", into: dir)
+                shop.editingMachine = nil
+                await settle()
+                // And its Connection tab: the printer's address, its camera and
+                // the plug it sits on, none of which the first tab shows.
+                MachineSheet.opensOn = "connection"
+                shop.editingMachine = machine
+                await settle()
+                try? await Task.sleep(for: .milliseconds(600))
+                captureSheet(named: "22b-machine-connection", into: dir)
+                shop.editingMachine = nil
+                MachineSheet.opensOn = "printer"
+                await settle()
+            }
+            // The Value tab, on the sample machine that carries depreciation,
+            // so the preview line and the rows it depends on are drawn.
+            if let valued = shop.machines.first(where: { $0.depreciation != nil }) {
+                MachineSheet.opensOn = "value"
+                shop.editingMachine = valued
+                await settle()
+                try? await Task.sleep(for: .milliseconds(900))
+                captureSheet(named: "22c-machine-value", into: dir)
+                shop.editingMachine = nil
+                MachineSheet.opensOn = "printer"
+                await settle()
+            }
+            shop.shelf = .inventory
+            await settle()
+            capture(named: "08-inventory", into: dir)
+            // Correcting a spool, which is what a shelf screen is for.
+            if let spool = shop.spools.first {
+                shop.editingSpool = spool
+                await settle()
+                captureSheet(named: "21-spool", into: dir)
+                shop.editingSpool = nil
+                await settle()
+            }
+
+            // The two screens added last, and both conditional in the sidebar
+            // — the portfolio only appears once a job has been photographed —
+            // so a picture is the only way to see either of them work.
+            shop.shelf = .colour
+            await settle()
+            // The match list is computed by the runtime after the screen
+            // appears, like the P&L below.
+            try? await Task.sleep(for: .seconds(1))
+            capture(named: "23-colour", into: dir)
+            if !shop.snapshots.isEmpty {
+                shop.shelf = .portfolio
+                await settle()
+                capture(named: "24-portfolio", into: dir)
+            }
+            // THE TWO NOBODY HAD EVER SEEN. This harness wrote 56 pictures and
+            // neither of these was among them, so the calculator — the screen a
+            // shop prices a job on, which is the highest-stakes screen in the
+            // app — and the product catalogue had never been looked at once.
+            // A screen with no picture is a screen no review can reach.
+            shop.shelf = .calculator
+            await settle()
+            capture(named: "28-calculator", into: dir)
+
+            // AND THE CALCULATOR WITH A PART IN IT. Empty it is two fields and
+            // a sentence; everything the screen exists for only appears once
+            // there is a weight, and until now nobody had ever seen that.
+            setenv("KHAYT_SNAPSHOT_PART", "180", 1)
+            setenv("KHAYT_SNAPSHOT_HOURS", "4.5", 1)
+            setenv("KHAYT_SNAPSHOT_MULTI", "1", 1)
+            shop.shelf = .dashboard
+            await settle()
+            shop.shelf = .calculator
+            await settle()
+            try? await Task.sleep(for: .milliseconds(700))
+            capture(named: "28b-calculator-priced", into: dir)
+            unsetenv("KHAYT_SNAPSHOT_PART")
+            unsetenv("KHAYT_SNAPSHOT_HOURS")
+            unsetenv("KHAYT_SNAPSHOT_MULTI")
+
+            shop.shelf = .catalogue
+            await settle()
+            capture(named: "29-catalogue", into: dir)
+
+            shop.shelf = .giftCards
+            await settle()
+            capture(named: "25-gift-cards", into: dir)
+            shop.issuingGiftCard = true
+            await settle()
+            captureSheet(named: "25b-gift-card-sheet", into: dir)
+            shop.issuingGiftCard = false
+            await settle()
+
+            shop.shelf = .customers
+            shop.customerSelection = shop.shownCustomers.max { $0.owed < $1.owed }?.id
+            await settle()
+            capture(named: "06-customers", into: dir)
+            capturePanes(named: "06-customers", into: dir)
+            // The customer with the most written about them, for the pane's
+            // lower half: agreed prices, the standing order, and the log.
+            if let spoken = shop.customers.max(by: { ($0.record?.commLog.count ?? 0) < ($1.record?.commLog.count ?? 0) }),
+               spoken.record?.commLog.isEmpty == false {
+                shop.customerSelection = spoken.id
+                await settle()
+                capturePanes(named: "06b-customer-terms", into: dir)
+            }
+
+            // ── SETTINGS IS PHOTOGRAPHED LAST, AND THAT IS DELIBERATE ─────
+            //
+            // It hangs. Roughly one run in two the main thread goes into an
+            // AppKit constraint-layout pass on `17-settings-preferences` and
+            // never comes out — `sample` shows 1,576 of 1,576 samples inside
+            // `_layoutViewTree`, with a dynamic colour provider consulted from
+            // within it. That predates this note: `KHAYT_SNAPSHOT_SKIP` above
+            // was added "while bisecting a hang", and the cause was never
+            // found.
+            //
+            // What that cost was NINETEEN OTHER CAPTURES. Settings sat at
+            // position seventeen of thirty-six, so a stall there took the
+            // machines, the shelf, the calculator, the catalogue and the
+            // reports with it — and a run that dies two-thirds of the way
+            // through looks, in the output directory, like a run that simply
+            // has fewer screens.
+            //
+            // Moving it to the end does not fix the hang. It makes the hang
+            // cost one screen instead of twenty, which is worth doing on its
+            // own and is worth saying plainly rather than dressing up as a fix.
+            // KHAYT_SNAPSHOT_SKIP=settings leaves the Settings window shut.
+            //
+            // Added while bisecting a hang, and kept because iterating on one
+            // screen should not cost a full run of sixty captures. The value is
+            // a comma-separated list matched against the names below.
+            // Named before the attempt, not after it: opening this window is
+            // itself what hangs, intermittently, and a step that only reports
+            // once it has finished cannot report the thing that never does.
+            doing("settings-window")
+            if skipped("settings") {
+                // Say so, so a short run is never mistaken for a complete one.
+                FileHandle.standardError.write(Data("skipping settings\n".utf8))
+            } else if let settings = settingsWindow() {
+                for pane in SettingsPane.allCases {
+                    shop.settingsPane = pane
+                    await settle()
+                    capture(named: "17-settings-\(pane.rawValue)", window: settings, into: dir)
+                    // AND THE SCROLL, because the window is 728 points tall and
+                    // three of these panes are longer. Everything below the
+                    // fold — the WIP limits, the QC block, the expense budgets
+                    // — was outside every picture ever taken of this window.
+                    capturePanes(named: "17-settings-\(pane.rawValue)", window: settings, into: dir)
+                }
+                // AND AT ITS SMALLEST. The window resizes (#2130), and the
+                // opening size is not where a pane breaks: Nov 1, the Online
+                // pane ran off the right edge at the narrowest width a shop
+                // can drag it to, in a picture nobody had taken.
+                let opening = settings.frame
+                settings.setContentSize(settings.contentMinSize)
+                await settle()
+                FileHandle.standardError.write(Data(
+                    "settings at its smallest: \(Int(settings.frame.width))×\(Int(settings.frame.height))\n".utf8))
+                for pane in SettingsPane.allCases {
+                    shop.settingsPane = pane
+                    await settle()
+                    capture(named: "17m-settings-\(pane.rawValue)", window: settings, into: dir)
+                    FileHandle.standardError.write(Data((paneFit(settings, "min \(pane.rawValue)") + "\n").utf8))
+                }
+                settings.setFrame(opening, display: true)
+                settings.close()
+                await settle()
+            } else {
+                // Loudly, and with what WAS open: a silent miss here is how the
+                // nozzle glyph got photographed six times.
+                // `×`, not an `x`: the units guard reads a letter between two
+                // numbers as a unit written in Swift, and it is right to — it
+                // cannot tell this line from one a shop would read. The proper
+                // multiplication sign is what the rest of the app uses anyway.
+                let open = NSApp.windows.filter(\.isVisible)
+                    .map { "\(type(of: $0)) \(Int($0.frame.width))×\(Int($0.frame.height))" }
+                FileHandle.standardError.write(Data(
+                    "no settings window to capture — open: \(open.joined(separator: ", "))\n".utf8))
+            }
+
+            try? await Task.sleep(for: .milliseconds(300))
+            NSApp.terminate(nil)
+        }
+    }
+
+    /// The menu bar as AppKit built it: what is there, and what key reaches it.
+    ///
+    /// DELIBERATELY DOES NOT REPORT ENABLED STATE. It used to, and it cost two
+    /// afternoons: AppKit validates items against the responder chain when a
+    /// menu is about to open, and a snapshot run never establishes one — so
+    /// every item reads as disabled, including Cut, Copy and Paste. That looks
+    /// exactly like a broken focused value and is nothing of the kind.
+    ///
+    /// What IS trustworthy here is structure. The Book menu's picker is built
+    /// inside an `if let shop`, so its presence says the shop reached the menu;
+    /// its absence says it did not.
+    /// The menu bar as AppKit actually built it.
+    ///
+    /// `update()` FIRST, on every submenu. SwiftUI does not rewrite an
+    /// NSMenuItem's title the moment the value behind it changes — AppKit asks
+    /// the menu to refresh itself when it is about to be shown, and a headless
+    /// run never shows one. Reading the titles without asking gives whatever
+    /// they were when the menu was first built, which reads exactly like a
+    /// broken menu: every stage named "queue.quote", every title stuck on its
+    /// placeholder. Both were photographs of a menu nobody had opened.
+    private static func menuTree() -> String {
+        guard let main = NSApp.mainMenu else { return "none" }
+        for top in main.items { top.submenu?.update() }
+        return main.items.compactMap { top -> String? in
+            guard let sub = top.submenu else { return top.title }
+            let items = sub.items.filter { !$0.isSeparatorItem }.map { item -> String in
+                item.title + (item.keyEquivalent.isEmpty ? "" : "[\(shortcut(item))]")
+            }
+            return "\(top.title){\(items.joined(separator: ", "))}"
+        }.joined(separator: " | ")
+    }
+
+    private static func shortcut(_ item: NSMenuItem) -> String {
+        var out = ""
+        if item.keyEquivalentModifierMask.contains(.command) { out += "⌘" }
+        if item.keyEquivalentModifierMask.contains(.shift) { out += "⇧" }
+        if item.keyEquivalentModifierMask.contains(.option) { out += "⌥" }
+        return out + item.keyEquivalent.uppercased()
+    }
+
+    private static func shopOwnership() -> String {
+        guard let shop = subject else { return "no shop" }
+        guard shop.source.isReal else { return "sample — nothing to own" }
+        return shop.canWrite ? "held, this app may write"
+                             : "not held — \(shop.owner ?? "unknown holder")"
+    }
+
+    /// Let SwiftUI apply the change and AppKit redraw before photographing it.
+    /// Without this the picture is of the previous state, which is worse than
+    /// no picture: it looks like the change did nothing.
+    static func settle() async {
+        try? await Task.sleep(for: .milliseconds(700))
+    }
+
+    /// ── THE LIBRARY REDESIGN, PHASE 1a ────────────────────────────────────
+    ///
+    /// Search tokens and their chips, the Archived view, an archived model's
+    /// note and Restore, and the Storage section with the tile badges — none
+    /// of which the sample book reaches on its own: nothing in it is archived,
+    /// and a sample has no remote and no cloud state index.
+    ///
+    /// ALL IN MEMORY. The archived model is the sample's rows with one date
+    /// added, put up with `pretendLibrary`; the remote is an identity string
+    /// and the index a throwaway file under the temporary folder. The sample
+    /// on disk is never written, and the sample is loaded again at the end so
+    /// nothing here leaks into the shots that follow.
+    ///
+    /// `dark`: only the storage scene, under the dark run's own name.
+    static func captureLibrary1a(_ shop: Shop, into dir: URL, dark: Bool = false) async {
+        await shop.load(.sample)
+        shop.pretendsWritable = true
+        defer { shop.pretendsWritable = false }
+        shop.clearLibraryFilter()
+        shop.libraryFlat = true
+        shop.shelf = .library(nil)
+        shop.fileSelection = []
+        await settle()
+        if !dark {
+            // (a) The search the review asked for — tokens and free text,
+            // which finds nothing in the sample — and one that finds the Kings.
+            for (name, query) in [("03f-library-tokens", "tag:dragon material:PLA dragon"),
+                                  ("03g-library-tokens-found", "tag:relief material:PLA king")] {
+                shop.search = query
+                await settle()
+                capture(named: name, into: dir)
+            }
+            shop.search = ""
+            await settle()
+
+            // (b) One model put aside, and the Archived view.
+            var rows = shop.libraryRows
+            if let i = rows.firstIndex(where: {
+                if case .object(let o) = $0, case .string("PF-sample-lantern")? = o["id"] { return true }
+                return false
+            }), case .object(var o) = rows[i] {
+                o["archivedAt"] = .string("2026-10-12T09:30:00.000Z")
+                rows[i] = .object(o)
+                shop.pretendLibrary(rows)
+                shop.libraryRows = rows
+                shop.libraryShowArchived = true
+                await shop.settleLibraryFacets()
+                await settle()
+                capture(named: "03h-library-archived", into: dir)
+                // (d) Its inspector: the Archived note, with Restore.
+                shop.fileSelection = ["PF-sample-lantern"]
+                await settle()
+                capture(named: "03i-archived-inspector", into: dir)
+                capturePanes(named: "03i-archived-inspector", into: dir)
+                shop.fileSelection = []
+                shop.libraryShowArchived = false
+            }
+            await shop.load(.sample)
+            shop.clearLibraryFilter()
+            shop.libraryFlat = true
+            shop.shelf = .library(nil)
+            await settle()
+        }
+
+        // (c) Storage: a pretend bucket, and an index with all three states
+        // and a keep, so the tiles carry their badges and the inspector its
+        // Storage section and rename pencil.
+        let scratch = FileManager.default.temporaryDirectory
+            .appending(path: "khayt-snapshot-sync-\(UUID().uuidString)")
+        let remote = CloudLibrary.bucketIdentity(endpoint: "https://snapshot.example", bucket: "sample", prefix: "")
+        let ids = shop.visibleFiles.map(\.id)
+        let index = LibrarySyncIndex.migrate(primary: scratch.appending(path: "vault").path, folder: scratch,
+                                             roots: [], models: ids.map { .init(id: $0, externalPath: nil) })
+        var states: Shop.FileStates = [:]
+        for (i, id) in ids.enumerated() {
+            let state: LibrarySyncIndex.State = [.backedUp, .online, .local, .backedUp][i % 4]
+            states[id] = ["model.3mf": .init(state: state, remote: state == .local ? nil : remote)]
+        }
+        index.record(states)
+        if ids.count > 2 { index.setKeep(ids[2], true) }
+        shop.syncIndex = index
+        shop.libraryRemoteId = remote
+        shop.libraryHasRemote = true
+        shop.syncIndexChanged()
+        await shop.settleLibraryFacets()
+        let chosen = ids.count > 2 ? ids[2] : ids.first
+        shop.fileSelection = chosen.map { [$0] } ?? []
+        await settle()
+        shop.libraryInspectorScrollTo = "model-title"
+        await settle()
+        let name = dark ? "03f-dark-library-storage" : "03j-library-storage"
+        capture(named: name, into: dir)
+        capturePanes(named: name, into: dir)
+        shop.libraryInspectorScrollTo = "model-storage"
+        await settle()
+        capturePanes(named: name + "-section", into: dir)
+        shop.libraryInspectorScrollTo = nil
+        shop.fileSelection = []
+        shop.syncIndex = nil
+        try? FileManager.default.removeItem(at: scratch)
+        await shop.load(.sample)
+        await settle()
+    }
+
+    /// `KHAYT_SNAPSHOT_DELETE=1`: the library's storage surfaces — Rescan
+    /// Storage, its progress banner, an online-only model's inspector, and
+    /// every variant of the delete question — on whatever book is open (a
+    /// throwaway one under `CFFIXED_USER_HOME`; it never presses a button).
+    ///
+    /// The question's plans are SET rather than worked out, so each variant
+    /// is drawn whatever the book holds; the first shot is the real plan as
+    /// the book's own files make it. Nothing is confirmed: every question is
+    /// closed with its Cancel state, by clearing it.
+    static func captureLibraryStorage(_ shop: Shop, into dir: URL) async {
+        shop.shelf = .library(nil)
+        await settle()
+        capture(named: "40-library-rescan", into: dir)
+        // A scan running: its count, and the Stop a scan (never a move) has.
+        shop.libraryScanStop = ScanStop()
+        shop.libraryMoveProgress = (done: 3, total: 12, name: "dragon-head.3mf")
+        await settle()
+        capture(named: "41-rescan-progress", into: dir)
+        // Still walking the folders, before there is a count.
+        shop.libraryMoveProgress = nil
+        await settle()
+        capture(named: "41b-rescan-looking", into: dir)
+        // Stop pressed: greyed while the file it is on finishes, then said.
+        shop.libraryScanStopping = true
+        await settle()
+        capture(named: "41c-rescan-stopping", into: dir)
+        shop.libraryScanStop = nil
+        shop.importNote = shop.words.callIt("mac.scan_stopped", ["n": .number(3)])
+        await settle()
+        capture(named: "41d-rescan-stopped", into: dir)
+        shop.importNote = nil
+        if let online = shop.files.first(where: { shop.isInCloudOnly($0) }) {
+            shop.fileSelection = [online.id]
+            await settle()
+            capture(named: "42-online-model", into: dir)
+            capturePanes(named: "42-online-model", into: dir)
+        } else {
+            FileHandle.standardError.write(Data("no online-only model in this book for 42\n".utf8))
+        }
+        shop.fileSelection = []
+        let some = Array(shop.visibleFiles.prefix(4))
+        guard let first = some.first, some.count == 4 else {
+            FileHandle.standardError.write(Data("the delete question needs four models on screen\n".utf8))
+            return
+        }
+        let ids = some.map(\.id)
+        func plan(_ edit: (inout LibraryDeletePlan) -> Void) -> LibraryDeletePlan {
+            var p = LibraryDeletePlan(); edit(&p); return p
+        }
+        let variants: [(String, Bool, LibraryDeletePlan?)] = [
+            ("43a-delete-one-as-planned", true, nil),
+            ("43b-delete-one-online", true, plan {
+                $0.ids = [first.id]; $0.keptOnline = [first.id]; $0.online = [first.id: ["bucket:k"]] }),
+            ("43c-delete-one-only-here", true, plan { $0.ids = [first.id]; $0.onlyHere = [first.id] }),
+            ("43d-delete-one-cloud-only", true, plan {
+                $0.ids = [first.id]; $0.cloudOnly = [first.id]; $0.handPlaced = [first.id]
+                $0.online = [first.id: ["bucket:k"]] }),
+            ("43e-delete-one-in-place", true, plan { $0.ids = [first.id]; $0.inPlace = [first.id] }),
+            ("44a-delete-many-mixed", false, plan {
+                $0.ids = ids; $0.keptOnline = [ids[0]]; $0.onlyHere = [ids[1], ids[2]]; $0.cloudOnly = [ids[3]]
+                $0.handPlaced = [ids[3]]; $0.online = [ids[0]: ["bucket:a"], ids[3]: ["bucket:d"]] }),
+            ("44b-delete-many-only-here", false, plan { $0.ids = ids; $0.onlyHere = ids }),
+            ("44c-delete-many-online", false, plan {
+                $0.ids = ids; $0.keptOnline = ids; $0.inPlace = []
+                $0.online = Dictionary(uniqueKeysWithValues: ids.map { ($0, ["bucket:" + $0]) }) }),
+        ]
+        for (name, single, p) in variants {
+            // The plan FIRST: the question is drawn once, when it opens.
+            if let p { shop.deletePlan = p }
+            if single { shop.pendingLibraryDelete = first } else { shop.pendingLibraryDeletes = some }
+            await settle()
+            await settle()
+            captureSheet(named: name, into: dir)
+            shop.pendingLibraryDelete = nil
+            shop.pendingLibraryDeletes = []
+            shop.deletePlan = nil
+            await settle()
+        }
+    }
+
+    // ── A HANG SHOULD BE LOUD ────────────────────────────────
+    //
+    // This runner spins sometimes: AppKit enters a layout pass it never
+    // finishes, pins a core, and the process sits there. From outside that
+    // looked like a folder with forty-two files in it and no error — a short
+    // run is indistinguishable from a complete one unless somebody counts the
+    // pictures, and nobody counts the pictures. It cost most of an afternoon
+    // and three wrong diagnoses before anybody established that a clean tree
+    // does it too.
+    //
+    // The watchdog cannot live on the main actor, because the main actor is
+    // the thing that is stuck. It is a plain thread reading a plain variable,
+    // which is all a diagnostic needs.
+
+    /// The step the run is on, and when it started. Written by the main actor,
+    /// read by the watchdog thread — `nonisolated(unsafe)` because a torn read
+    /// of a diagnostic is not worth a lock, and the worst case is one wrong
+    /// step name in a message that is already telling somebody to look.
+    nonisolated(unsafe) private static var step = "starting"
+    nonisolated(unsafe) private static var stepAt = Date()
+
+    /// Name the step about to run, for the watchdog to blame.
+    private static func doing(_ name: String) {
+        step = name
+        stepAt = Date()
+    }
+
+    /// Start the thread that gives up on our behalf.
+    ///
+    /// `exit(3)` rather than a crash: a hung run should end in a way a shell
+    /// can test, and a stack from the watchdog thread would only ever show the
+    /// watchdog. Whoever needs the stack can `sample` the process before the
+    /// deadline — the message says so.
+    /// KHAYT_SNAPSHOT_DEADLINE overrides the deadline, in seconds.
+    ///
+    /// Chiefly so the watchdog itself can be tested: set it to 1 and an
+    /// ordinary healthy run trips it, which proves the thread runs, reads the
+    /// step and exits — a watchdog nobody has seen bark is a watchdog nobody
+    /// should rely on.
+    private static func startWatchdog(seconds: Double = 90) {
+        let seconds = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DEADLINE"]
+            .flatMap(Double.init) ?? seconds
+        let thread = Thread {
+            while true {
+                Thread.sleep(forTimeInterval: 5)
+                let stuck = Date().timeIntervalSince(stepAt)
+                guard stuck > seconds else { continue }
+                let note = "snapshot run STUCK at \(step) for \(Int(stuck))s — giving up.\n"
+                    + "The main thread is almost certainly in an AppKit layout loop; "
+                    + "`sample Khayt` before the deadline to see where.\n"
+                FileHandle.standardError.write(Data(note.utf8))
+                exit(3)
+            }
+        }
+        thread.name = "khayt.snapshot.watchdog"
+        thread.stackSize = 64 * 1024
+        thread.start()
+    }
+
+    /// Photograph each scrolling pane on its own.
+    ///
+    /// The whole-window shot loses a pane sometimes — two `NSScrollView`s on
+    /// screen at once and only one comes back. Capturing them individually says
+    /// whether the pane is empty or merely unphotographed, which is the
+    /// difference between a bug and a picture of one.
+    static func capturePanes(named name: String, into dir: URL) {
+        capturePanes(named: name, window: nil, into: dir)
+    }
+
+    /// The same, for a window that is not the first visible one.
+    ///
+    /// The settings window needs this. `capturePanes` took whichever window
+    /// came first out of `NSApp.windows`, which is the main one — so the
+    /// settings panes only ever got the WINDOW shot, and a settings window is
+    /// 728 points tall while the Operations pane is far longer than that. Its
+    /// WIP limits and its QC block sit below the fold and had never been seen
+    /// at all, on top of the six panes that had never been photographed.
+    static func capturePanes(named name: String, window: NSWindow?, into dir: URL) {
+        guard let window = window
+                ?? NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }),
+              let root = window.contentView else { return }
+        var found: [NSScrollView] = []
+        func walk(_ v: NSView) {
+            if let scroll = v as? NSScrollView { found.append(scroll) }
+            v.subviews.forEach(walk)
+        }
+        walk(root)
+        for (i, scroll) in found.enumerated() {
+            let target = scroll.documentView ?? scroll
+            let bounds = target.bounds
+            guard bounds.width > 1, bounds.height > 1,
+                  let rep = target.bitmapImageRepForCachingDisplay(in: bounds) else { continue }
+            target.effectiveAppearance.performAsCurrentDrawingAppearance {
+                target.cacheDisplay(in: bounds, to: rep)
+            }
+            guard let png = rep.representation(using: .png, properties: [:]) else { continue }
+            try? png.write(to: dir.appending(path: "\(name)-pane\(i).png"))
+            FileHandle.standardError.write(Data(
+                "  pane\(i): \(type(of: target)) \(Int(bounds.width))x\(Int(bounds.height))\n".utf8))
+        }
+    }
+
+    /// Photograph a sheet, which `capture` cannot see.
+    ///
+    /// A sheet is its OWN window, attached to the main one — so the window shot
+    /// finds the main window first and photographs the screen behind the sheet.
+    /// Six sheets were built before anybody noticed there was no picture of any
+    /// of them.
+    ///
+    /// `attachedSheet` is the honest way to find it: it is the sheet AppKit is
+    /// actually showing, rather than whichever window happens to be frontmost.
+    /// Wait until the sheet's web view has finished loading.
+    ///
+    /// Says so when it gives up, because the picture it would otherwise write
+    /// is a blank sheet and a blank sheet is what a broken invoice looks like
+    /// too. Nothing about the file, its name or the harness's exit code
+    /// distinguishes the two.
+    @MainActor
+    static func waitForTheDocument(upTo seconds: Int) async {
+        func webView(in view: NSView) -> WKWebView? {
+            if let web = view as? WKWebView { return web }
+            for sub in view.subviews { if let found = webView(in: sub) { return found } }
+            return nil
+        }
+        for _ in 0..<(seconds * 10) {
+            try? await Task.sleep(for: .milliseconds(100))
+            guard let host = NSApp.windows.first(where: { $0.isVisible && $0.attachedSheet != nil }),
+                  let sheet = host.attachedSheet, let root = sheet.contentView,
+                  let web = webView(in: root) else { continue }
+            if !web.isLoading && web.estimatedProgress >= 1 {
+                // A frame for WebKit to paint what it has just finished laying
+                // out; `didFinish` is the load, not the draw.
+                try? await Task.sleep(for: .milliseconds(400))
+                return
+            }
+        }
+        FileHandle.standardError.write(Data(
+            "the invoice never finished drawing — 16-invoice.png is an empty sheet\n".utf8))
+    }
+
+    static func captureSheet(named name: String, into dir: URL) {
+        // CHECK IN, like the window captures do.
+        //
+        // `doing()` used to be called only from `capture()`, so the eleven
+        // sheets that follow the board never moved the marker — and a run that
+        // hung after the last of them was reported as "STUCK at 09-board",
+        // which is a screen it had already photographed successfully. Every
+        // investigation this message ever sent anybody on went to the wrong
+        // screen; the real hang was opening the settings window, eleven steps
+        // later, which is why those six panes stayed unphotographed.
+        doing(name)
+        guard let host = NSApp.windows.first(where: { $0.isVisible && $0.attachedSheet != nil }),
+              let sheet = host.attachedSheet,
+              let view = sheet.contentView,
+              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+            FileHandle.standardError.write(Data("no sheet to capture for \(name)\n".utf8))
+            return
+        }
+        // `cacheDisplay` asks each view to draw itself, and SwiftUI does not
+        // draw itself — so every sheet here comes back with its AppKit-backed
+        // controls (fields, pickers, the default button) present and its
+        // SwiftUI labels, headings and explanations MISSING. Rendering the
+        // layer tree instead was tried and gets the same text back: nothing,
+        // upside down. Capturing the words needs either a screen-recording
+        // grant this process does not have or `ImageRenderer`, which cannot
+        // host a WKWebView — so the shots below show a sheet's LAYOUT, and
+        // `SnapshotTests` renders the same views through `ImageRenderer` to
+        // show its words.
+        // INSIDE THE APPEARANCE, and this is not a detail.
+        //
+        // `cacheDisplay` draws with whatever `NSAppearance.current` happens to
+        // be, and outside a real draw cycle that is aqua — so every dynamic
+        // system colour resolved LIGHT no matter what the app was set to. The
+        // first dark-mode screenshot this runner ever took came back with a
+        // white sidebar and black text, which is a picture of the capture
+        // rather than of the app.
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            view.cacheDisplay(in: view.bounds, to: rep)
+        }
+        guard let png = rep.representation(using: .png, properties: [:]) else { return }
+        try? png.write(to: dir.appending(path: name + ".png"))
+        FileHandle.standardError.write(Data(
+            "wrote \(name).png (\(Int(view.bounds.width))x\(Int(view.bounds.height))) [sheet]\n".utf8))
+    }
+
+    static func capture(named name: String, into dir: URL) {
+        doing(name)
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }) else {
+            FileHandle.standardError.write(Data("no window to capture\n".utf8))
+            return
+        }
+        capture(named: name, window: window, into: dir)
+    }
+
+    /// Photograph one particular window — the Settings window, which is not
+    /// the first visible one.
+    ///
+    /// ── THE SIDEBAR IS NOT MISSING, IT IS NOT PHOTOGRAPHABLE ─────────────
+    ///
+    /// Every shot this function takes comes back with the navigation column
+    /// blank — white on one screen, solid black on the next. The sidebar is
+    /// fine. `capturePanes` photographs that same view directly and gets all
+    /// twenty rows, their counts and their stage dots.
+    ///
+    /// The column is an `NSVisualEffectView`, and vibrancy is composited by the
+    /// window server rather than drawn by `-drawRect:`. `cacheDisplay` only
+    /// asks views to draw, so the material contributes nothing and whatever was
+    /// in the bitmap stays there. The same thing happens one level down, to the
+    /// selection material behind a selected row: it is why the selected item in
+    /// `*-pane1.png` is a black pill rather than a tinted one.
+    ///
+    /// So READ THE PANE SHOT FOR THE SIDEBAR, and do not go looking for a
+    /// layout bug in the window shot. Capturing it properly needs a screen
+    /// recording grant this process does not have.
+    static func capture(named name: String, window: NSWindow, into dir: URL) {
+        doing(name)
+        guard // The theme frame, not the content view. A unified toolbar sits
+              // in the title bar, which is a sibling of the content rather than
+              // inside it, so photographing the content alone drops the source
+              // menu, the owed figure and the inspector toggle.
+              let view = window.contentView?.superview ?? window.contentView,
+              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+            FileHandle.standardError.write(Data("no window to capture\n".utf8))
+            return
+        }
+        // ── THE APPEARANCE, WHICH THIS PATH ALONE WAS MISSING ────────────
+        //
+        // `captureSheet` explains why this wrapper exists and `capturePanes`
+        // has it too. This function — which takes THIRTY of the thirty-six
+        // shots — did not. `cacheDisplay` draws with whatever
+        // `NSAppearance.current` happens to be, and outside a real draw cycle
+        // that is aqua, so every dynamic system colour in every full-window
+        // screenshot resolved LIGHT regardless of what the app was set to.
+        //
+        // In light mode that is right by luck, which is why it survived: the
+        // shot and the app agreed for the wrong reason. It is exactly the bug
+        // this repo keeps writing down — a fix with a caller in two places out
+        // of three — and the third was the one doing most of the work.
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            view.cacheDisplay(in: view.bounds, to: rep)
+        }
+        guard let png = rep.representation(using: .png, properties: [:]) else { return }
+        try? png.write(to: dir.appending(path: name + ".png"))
+
+        FileHandle.standardError.write(Data("wrote \(name).png (\(Int(view.bounds.width))x\(Int(view.bounds.height)))\n".utf8))
+    }
+}

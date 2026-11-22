@@ -1,0 +1,1085 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      # Khayt's own line, and the only tag lane. `v*` does NOT match `bedready-v*`
+      # — the glob anchors at the start — which is what kept the two apart while
+      # Bed Ready still had a tag trigger.
+      - 'v*'
+  # Bed Ready is a separate flavor of this repo on an independent version line
+  # (1.0.0-*, see scripts/build-bedready.mjs) whose downloads live in
+  # KhaytApp/bedready. It used to be triggered by pushing a `bedready-v*` tag HERE,
+  # and that tag was the problem: electron-updater picks a release by walking this
+  # repo's releases.atom, and that feed lists TAGS, whether or not a release exists
+  # for them. A `bedready-v*` tag therefore appeared in Khayt's own update feed, and
+  # whenever it was the newest entry a Khayt user with beta updates on resolved it,
+  # then asked for
+  #   /KhaytApp/Khayt/releases/download/bedready-v1.0.0/latest-mac.yml
+  # which is a 404, because that release lives in the other repo. Their update check
+  # simply failed. Cutting Bed Ready 1.0 would have opened exactly that window and
+  # held it until Khayt's next tag.
+  #
+  # So Bed Ready is dispatched instead of tagged. Nothing is pushed to this repo's
+  # tag namespace; the release tag is still created, but by `gh release create` in
+  # KhaytApp/bedready, where it belongs.
+  workflow_dispatch:
+    inputs:
+      bedready_version:
+        description: 'Bed Ready version to release, e.g. 1.0.0 or 1.0.0-beta.10 (no "v")'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ── Create the GitHub Release first so parallel build jobs can publish to it ─
+  create-release:
+    name: Create GitHub Release
+    # Tag pushes only: a workflow_dispatch is Bed Ready's, and its ref_name is a
+    # branch, which the old `!startsWith(ref_name,'bedready-')` test would have let through.
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    outputs:
+      prerelease: ${{ steps.flags.outputs.prerelease }}
+    steps:
+      # THE NOTES COME OUT OF THE REPO, SO THE REPO HAS TO BE HERE.
+      #
+      # This job only ever needed `gh`, so it never checked anything out — and
+      # when the release body started being built from CHANGELOG.md the call to
+      # scripts/changelog-section.js failed with "file not found", the guard fell
+      # through to its fallback, and v3.7.0-beta.24 published the same "See
+      # README" line every release before it had. The script was right and the
+      # call was right; the job they ran in had no repo.
+      #
+      # Fetch-depth 1 on purpose: this reads one file at the tagged commit.
+      - name: Check out the tagged commit (for the release notes)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Detect pre-release
+        id: flags
+        run: |
+          if echo "${{ github.ref_name }}" | grep -qE '\-(beta|rc|alpha)'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Decides from what EXISTS, never from an exit code — see the note below.
+      - name: Create release (or refuse to re-run a published one)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ steps.flags.outputs.prerelease }}
+        run: |
+          # `gh release create --draft` SUCCEEDS against a tag that already has a
+          # PUBLISHED release: a draft carries no real tag, so GitHub does not
+          # consider it a duplicate. The `|| echo "already exists"` guard this
+          # replaced therefore never fired on a re-run — it created a SECOND
+          # release and the run's outputs split between the two. electron-builder
+          # (`--publish always`, resolves by tag) put binaries AND its freshly
+          # computed manifests into the new draft, while `publish`'s backstop
+          # (`gh release upload "$TAG"`) put Linux installers into the LIVE one.
+          # The published release was left carrying re-run binaries beside
+          # first-run manifests whose sha512 no longer matched them: a broken
+          # auto-update, shipped silently, with every job green. That is exactly
+          # what happened to v3.6.0-beta.19 on 2026-08-12.
+          #
+          # `--paginate` with `--jq` runs the filter per PAGE, so this deliberately
+          # emits one line per matching release and classifies afterwards rather
+          # than reducing inside jq, which would emit one answer per page.
+          # A FAILED lookup must not read as "no release exists": that is the
+          # dangerous branch, and falling into it on a transient API error would
+          # recreate the very duplicate this step exists to prevent.
+          if ! MATCHES=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\") | if .draft then \"draft\" else \"published\" end"); then
+            echo "::error::could not list releases to check whether $TAG already exists — refusing to guess."
+            exit 1
+          fi
+
+          if [ -z "$MATCHES" ]; then
+            FLAGS=""
+            if [ "$PRERELEASE" = "true" ]; then FLAGS="--prerelease"; fi
+            # THE NOTES ARE THE RELEASE'S OWN CHANGELOG ENTRY, not a link to one.
+            #
+            # Every release before this carried the same sentence — "See README
+            # for full release notes" — and that string is what electron-updater
+            # hands the app. Khayt's update dialog has a panel built for notes
+            # and has never had anything to put in it, so it says "Release notes
+            # were not included with this update" and asks you to install
+            # something it cannot describe. A shop also cannot AGREE to changes
+            # it is not shown, which is what lib/major-changes.js needs.
+            #
+            # Falls back to the old sentence rather than failing the release: a
+            # missing section is worth a warning, not a lost build. The guard
+            # that stops it getting this far is scripts/check-release-claims.js.
+            NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+            if node scripts/changelog-section.js "${TAG#v}" > "$NOTES_FILE"; then
+              echo "release notes: $(wc -l < "$NOTES_FILE") lines from CHANGELOG.md"
+            else
+              echo "::warning::no CHANGELOG section for ${TAG#v} — publishing with the fallback note."
+              echo "See [README](https://github.com/${GITHUB_REPOSITORY}#readme) for full release notes." > "$NOTES_FILE"
+            fi
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Khayt $TAG" \
+              --notes-file "$NOTES_FILE" \
+              --draft \
+              $FLAGS
+          elif echo "$MATCHES" | grep -qx published; then
+            echo "::error::$TAG is already PUBLISHED."
+            echo "Re-running this workflow would create a SECOND release with the same tag,"
+            echo "split this run's artifacts across the two, and leave the live release with"
+            echo "manifests that no longer match its binaries — a silently broken auto-update."
+            echo "To add a platform to a version that is already out, cut a NEW tag."
+            exit 1
+          else
+            # Draft only: a previous attempt got part-way and never published.
+            # Finishing it is safe precisely because nothing is live yet.
+            echo "Draft release for $TAG exists — continuing to finish it."
+          fi
+
+  # ── macOS Apple Silicon DMG ───────────────────────────────────────────────
+  #
+  # The three build jobs and `publish` all need `create-release`, and a job whose
+  # dependency was skipped is skipped too. That one `if:` above is therefore what
+  # keeps this entire Khayt lane off a Bed Ready run — do not add
+  # `if: always()` to anything below without restoring the guard explicitly.
+  # (`publish` now does exactly that, and says so.)
+
+  # macOS is OPT-IN, because it is the expensive one: GitHub bills macOS minutes
+  # at 10x, so one mac build costs more than the Windows and Linux builds and the
+  # whole CI run for the release PR put together. Betas go out every few days;
+  # they do not all need a mac binary.
+  #
+  # To include macOS in the next tag:
+  #     gh variable set BUILD_MAC --repo KhaytApp/Khayt --body true
+  #     …push the tag…
+  #     gh variable delete BUILD_MAC --repo KhaytApp/Khayt
+  #
+  # The variable is deliberately sticky rather than per-tag: there is one
+  # workflow_dispatch on this file and it belongs to Bed Ready, and bending it to
+  # take a second, unrelated meaning is how that lane got tangled the last time.
+  # Leaving it set costs money silently, so `carry-mac-manifest` below prints the
+  # current state on every release either way.
+  build-mac:
+    name: macOS (Apple Silicon)
+    needs: create-release
+    if: ${{ vars.BUILD_MAC == 'true' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── THE SIGNING KEYCHAIN IS BUILT HERE, NOT BY ELECTRON-BUILDER ──────
+      #
+      # `v3.7.0` failed on the macOS runner with:
+      #
+      #     security: SecKeychainUnlock: The user name or passphrase you
+      #     entered is not correct.
+      #     Command failed: /usr/bin/security set-key-partition-list
+      #       -S apple-tool:,apple: -s -k *** <temp>.keychain
+      #
+      # — electron-builder failing to unlock a temp keychain IT had just
+      # created, with the password IT had just generated. Nothing in this repo
+      # changed: `v3.7.0-beta.25` signed fine on 2026-09-03 with the same
+      # secrets and the same electron-builder, on runner image
+      # macos-26-arm64/20260728.0273. This run got 20260907.0351.
+      #
+      # So the keychain is created here, where the password is ours and the
+      # steps are visible, and electron-builder is handed a keychain that is
+      # already unlocked and already holds the identity. `CSC_KEYCHAIN` is what
+      # it reads when `CSC_LINK` is absent — so CSC_LINK must NOT be passed to
+      # the build step below, or it imports all over again and we are back
+      # inside the code that broke.
+      #
+      # `codesign:` is in the partition list and is not in electron-builder's.
+      # Without it, `codesign` prompts for keychain access, and a prompt on a
+      # runner is a hang.
+      - name: Prepare the signing keychain
+        env:
+          CSC_LINK:         ${{ secrets.APPLE_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CSC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/khayt-signing.keychain-db"
+          # Ours, random, and never echoed. The failure above was a password
+          # mismatch, so the one thing this step must not do is be clever about
+          # where the password comes from.
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          P12="$RUNNER_TEMP/khayt-cert.p12"
+
+          echo "$CSC_LINK" | base64 --decode > "$P12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # No auto-lock. A keychain that relocks part-way through a long
+          # notarised build fails at codesign with the same unhelpful error.
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$P12" -k "$KEYCHAIN" -P "$CSC_KEY_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          # Searchable, and the login keychain kept — the notary tool reads it.
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$P12"
+
+          # ── AND PROVE THE IDENTITY IS ACTUALLY IN THERE ──────────────────
+          #
+          # electron-builder will happily produce an UNSIGNED app when it finds
+          # no identity, and say so in one line among two hundred. An unsigned
+          # build that publishes is worse than this job failing, because it
+          # reaches people.
+          if ! security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "Developer ID Application"; then
+            echo "::error::No Developer ID Application identity in the signing keychain — refusing to build an app that would ship unsigned."
+            security find-identity -v -p codesigning "$KEYCHAIN" || true
+            exit 1
+          fi
+          security find-identity -v -p codesigning "$KEYCHAIN" | sed 's/[0-9A-F]\{40\}/<hash>/'
+
+          echo "CSC_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+      - name: Build & publish macOS Apple Silicon DMG
+        run: npx electron-builder --mac --arm64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # CSC_LINK is deliberately NOT here — see the step above. Passing it
+          # sends electron-builder back into its own keychain import, which is
+          # the thing that failed.
+          CSC_KEYCHAIN:                ${{ env.CSC_KEYCHAIN }}
+          APPLE_ID:                    ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
+
+      # Open what a macOS shop's updater downloads — the signed, notarized zip —
+      # before anything goes public, as build-linux and build-windows do. Needed
+      # because macOS is built again (BUILD_MAC) until the native Mac app reaches
+      # beta, and the last Electron macOS build before that was v3.7.0. Extracted
+      # with ditto, not unzip, so the signature and its symlinks survive.
+      - name: Launch the packaged app before it goes public
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          v="${GITHUB_REF_NAME#v}"
+          zip="build/Khayt-$v-arm64-mac.zip"
+          [ -f "$zip" ] || { echo "::error::no $zip"; ls build; exit 1; }
+          dest="$RUNNER_TEMP/mac-gate"; rm -rf "$dest"; mkdir -p "$dest"
+          ditto -x -k "$zip" "$dest"
+          node scripts/verify-release.mjs --app "$dest/Khayt.app" --version "$v"
+
+      # Runners are ephemeral, so this is hygiene rather than a fix — but a
+      # keychain left in the search list confuses anything that runs after it
+      # in the same job, and `always()` means a failed build still tidies up.
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/khayt-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/khayt-cert.p12"
+
+  # ── Windows x64 (NSIS installer + portable + MSIX for Store) ──────────────
+  build-windows:
+    name: Windows (x64)
+    needs: create-release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & publish Windows installers
+        # Only nsis + portable are published to GitHub Releases.
+        run: npx electron-builder --win nsis portable --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIN_CSC_IDENTITY_AUTO_DISCOVERY: false
+          # ── Windows code signing (uncomment when HARICA cert is ready) ───────
+          # WIN_CSC_LINK:         ${{ secrets.WIN_CSC_LINK }}         # base64 .pfx
+          # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      # Install the Setup exe that was just built — silently, into a scratch
+      # folder — and open what it installed. The upload above went to the DRAFT
+      # release; `publish` and `submit-store` both need this job, so an
+      # installer that does not install, or an app that does not start, never
+      # reaches a shop or the Store. build-linux proves the asar; this proves
+      # the Windows installer, which nothing else here ever ran.
+      - name: Install and launch the packaged app before it goes public
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          # electron-builder writes "Khayt Setup X.exe" (spaces); the upload
+          # renames it with dashes. Find it by pattern, and insist on exactly one.
+          shopt -s nullglob
+          found=(build/*Setup*"$v".exe)
+          if [ "${#found[@]}" -ne 1 ]; then
+            echo "::error::expected one Setup installer for $v in build/, found ${#found[@]}"; ls build; exit 1
+          fi
+          node scripts/verify-release.mjs --app "${found[0]}" --version "$v"
+
+      - name: Add Windows SDK makeAppx to PATH
+        # electron-builder needs makeAppx.exe; find the latest installed SDK version
+        shell: pwsh
+        run: |
+          $kitsBase = "C:\Program Files (x86)\Windows Kits\10\bin"
+          if (Test-Path $kitsBase) {
+            $latest = Get-ChildItem $kitsBase -Directory |
+                      Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } |
+                      Sort-Object Name -Descending |
+                      Select-Object -First 1
+            if ($latest) {
+              $sdkBin = Join-Path $latest.FullName "x64"
+              Write-Host "Adding SDK bin to PATH: $sdkBin"
+              Add-Content $env:GITHUB_PATH $sdkBin
+            } else {
+              Write-Warning "No versioned SDK folder found under $kitsBase"
+            }
+          } else {
+            Write-Warning "Windows Kits directory not found — skipping PATH addition"
+          }
+
+      - name: Build MSIX for Microsoft Store
+        # Unsigned — Partner Center signs it during certification.
+        id: build-appx
+        continue-on-error: true
+        run: npx electron-builder --win appx --x64 --publish never
+        env:
+          WIN_CSC_IDENTITY_AUTO_DISCOVERY: false
+          DEBUG: electron-builder
+
+      - name: Debug — dump generated AppxManifest.xml
+        if: always()
+        shell: pwsh
+        run: |
+          $manifest = "build\__appx-x64\AppxManifest.xml"
+          if (Test-Path $manifest) {
+            Write-Host "=== AppxManifest.xml ==="
+            Get-Content $manifest
+          } else {
+            Write-Host "Manifest not found at expected path. Searching..."
+            Get-ChildItem build -Recurse -Filter "AppxManifest.xml" -ErrorAction SilentlyContinue |
+              ForEach-Object { Write-Host $_.FullName; Get-Content $_.FullName }
+          }
+
+      - name: Fail job if appx build failed
+        if: steps.build-appx.outcome == 'failure'
+        run: exit 1
+
+      # 90 days, not the default 30. While the Store submission is done by hand,
+      # this artifact is the ONLY copy of the package — the .appx is deliberately
+      # not published to the GitHub release (unsigned MSIX cannot be sideloaded,
+      # so it would only mislead people who downloaded it). At 30 days a stable
+      # release older than a month lost its package permanently, and the only
+      # recovery is a new tag: re-running a completed Build & Release forks it
+      # into a duplicate draft and breaks the published manifests.
+      # 90 is the maximum GitHub allows on a public repository.
+      - name: Upload MSIX as workflow artifact
+        if: steps.build-appx.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-store-msix
+          path: build/*.appx
+          retention-days: 90
+
+  # ── Microsoft Store submission ────────────────────────────────────────────
+  #
+  # Until this existed the MSIX was built every release and submitted never: it
+  # went to a 30-day workflow artifact and stopped there, so Store users sat on
+  # whatever was last uploaded by hand while GitHub users updated normally. A
+  # user reported their Store copy was "very old and I never updated it" — that
+  # was this gap, working exactly as built.
+  #
+  # STABLE ONLY. Betas and release candidates reach their audience through the
+  # GitHub pre-release channel that electron-updater reads; the Store has no
+  # equivalent and every submission costs a certification pass.
+  #
+  # Inert until configured, like the Windows signing wiring: with no credentials
+  # the job announces itself and succeeds, so it can be merged before anyone has
+  # touched Partner Center.
+  #
+  # IF THIS JOB FAILS, DO NOT RE-RUN THE WORKFLOW. By the time it runs the GitHub
+  # release is already published, and re-running a completed Build & Release forks
+  # it into a duplicate draft and breaks the published update manifests. Re-run
+  # THIS JOB alone from the Actions UI, or finish the submission in Partner Center.
+  submit-store:
+    name: Microsoft Store submission
+    needs: [create-release, build-windows]
+    if: ${{ github.event_name == 'push' && needs.create-release.outputs.prerelease == 'false' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Is the Store configured
+        id: gate
+        shell: bash
+        env:
+          TENANT_ID:  ${{ secrets.AZURE_AD_TENANT_ID }}
+          PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+        run: |
+          if [ -n "$TENANT_ID" ] && [ -n "$PRODUCT_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Store submission skipped — no credentials. See docs/MICROSOFT-STORE.md to enable."
+          fi
+
+      - name: Install dependencies
+        if: steps.gate.outputs.configured == 'true'
+        run: npm ci
+
+      - name: Download the MSIX built by the Windows job
+        if: steps.gate.outputs.configured == 'true'
+        uses: actions/download-artifact@v7
+        with:
+          name: windows-store-msix
+          path: build
+
+      # Runs before anything is sent. A listing that breaks a Store limit fails
+      # here in seconds rather than in a certification queue hours later.
+      - name: Build and validate the listing metadata
+        if: steps.gate.outputs.configured == 'true'
+        shell: bash
+        run: node scripts/build-store-metadata.mjs --version "${GITHUB_REF_NAME#v}"
+
+      - name: Configure Microsoft Store CLI
+        if: steps.gate.outputs.configured == 'true'
+        uses: microsoft/microsoft-store-apppublisher@v1.1
+
+      - name: Sign in to Partner Center
+        if: steps.gate.outputs.configured == 'true'
+        run: >
+          msstore reconfigure
+          --tenantId ${{ secrets.AZURE_AD_TENANT_ID }}
+          --sellerId ${{ secrets.SELLER_ID }}
+          --clientId ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          --clientSecret ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+
+      # --noCommit is what makes the package and the listing ONE submission.
+      # Without it `msstore publish` commits immediately, the metadata update
+      # opens a second submission, and the release costs two certification
+      # passes that can land out of order.
+      - name: Stage the package (no commit)
+        if: steps.gate.outputs.configured == 'true'
+        shell: pwsh
+        run: |
+          $msix = Get-ChildItem build -Filter *.appx -Recurse | Select-Object -First 1
+          if (-not $msix) { throw "No .appx found in build/" }
+          Write-Host "Publishing $($msix.FullName)"
+          msstore publish --inputFile $msix.FullName -id ${{ vars.STORE_PRODUCT_ID }} --noCommit
+
+      - name: Stage the listing metadata
+        if: steps.gate.outputs.configured == 'true'
+        shell: pwsh
+        run: |
+          $metadata = Get-Content -Raw "${{ github.workspace }}/store/microsoft/metadata.json"
+          msstore submission updateMetadata ${{ vars.STORE_PRODUCT_ID }} $metadata
+
+      - name: Commit the submission for certification
+        if: steps.gate.outputs.configured == 'true'
+        run: msstore submission publish ${{ vars.STORE_PRODUCT_ID }}
+
+      - name: Report the submission status
+        if: steps.gate.outputs.configured == 'true'
+        continue-on-error: true
+        run: msstore submission status ${{ vars.STORE_PRODUCT_ID }}
+
+  # ── Keep macOS auto-update working on a release with no mac build ─────────
+  #
+  # electron-updater picks a release by walking this repo's releases.atom and
+  # then fetches the manifest for its own platform. A release with no
+  # latest-mac.yml therefore 404s for every macOS user with beta updates on, and
+  # lib/updater.js turns that into a visible "Update check failed" — the exact
+  # failure the bedready-v* tag caused, documented at the top of this file.
+  #
+  # So when macOS is skipped, copy the manifest forward from the last release
+  # that HAS one. macOS users then resolve to the newest version a mac binary
+  # actually exists for, and are told they are up to date rather than shown an
+  # error. That is true: there is no newer mac build.
+  #
+  # The manifest cannot be copied VERBATIM, and this is the part that looks
+  # finished but is not: electron-updater builds the download URL from the tag it
+  # found in the feed, not from the version written inside the manifest. A
+  # carried file naming `Khayt-<prev>-arm64-mac.zip` therefore resolves under
+  # THIS tag, which has no mac assets — that being why it was carried — and
+  # 404s. It hides well, because the only user who requests it is one far enough
+  # behind to treat the carried version as an update; anyone already on it is
+  # told they are up to date and downloads nothing.
+  #
+  # scripts/carry-mac-manifest.js rewrites each reference to `../<prev>/<file>`
+  # so the tag this workflow's release prepends is cancelled by the URL parser,
+  # and picks a source release that holds a real mac binary rather than another
+  # carried manifest. Its reasoning is at the top of that file, and
+  # test/carry-mac-manifest.test.js pins the resolved URLs — which is the only
+  # way to test this without cutting a release.
+  carry-mac-manifest:
+    name: macOS manifest (carried forward)
+    needs: create-release
+    if: ${{ github.event_name == 'push' && vars.BUILD_MAC != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      # The DEFAULT BRANCH, not the tag being released. This job is release
+      # infrastructure, not part of the app: it asks the API which release
+      # currently holds a mac build, so it already reasons about now rather
+      # than about the tagged tree, and its tooling should match.
+      #
+      # Checking out the tag also breaks outright on any commit older than the
+      # script. `cut-release.yml` accepts any ancestor of the default branch as
+      # a tag target, and `v3.7.0-beta.4` is already such a commit — tagging it
+      # would check out a tree with no scripts/carry-mac-manifest.js, fail on
+      # MODULE_NOT_FOUND, and take `publish` with it, since publish requires
+      # this job to be success or skipped. The release would sit as a draft
+      # with every installer attached and nothing published.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Copy latest-mac.yml from the most recent release with a mac build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "BUILD_MAC is not 'true' — macOS was skipped for $TAG (macOS bills at 10x)."
+          releases=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=50" \
+            --jq '[.[] | {tagName: .tag_name, draft: .draft, publishedAt: .published_at, assets: [.assets[].name]}]')
+          prev=$(printf '%s' "$releases" | node scripts/carry-mac-manifest.js pick --current "$TAG")
+          if [ -z "$prev" ]; then
+            echo "No earlier release ships a mac build — nothing to carry forward."
+            echo "macOS users have no build to update to either way, so this is not a regression."
+            exit 0
+          fi
+          echo "Carrying latest-mac.yml forward from $prev"
+          gh release download "$prev" --repo "$GITHUB_REPOSITORY" --pattern latest-mac.yml --dir .
+          node scripts/carry-mac-manifest.js rewrite --source "$prev" latest-mac.yml
+          echo "--- carried manifest ---"
+          cat latest-mac.yml
+          gh release upload "$TAG" latest-mac.yml --repo "$GITHUB_REPOSITORY" --clobber
+          echo "macOS updaters resolve to $prev: up to date if already there, and a"
+          echo "working download from $prev if further behind."
+
+  # ── Linux x64 (AppImage + deb) ────────────────────────────────────────────
+  build-linux:
+    name: Linux (x64)
+    needs: create-release
+    # Pinned, not ubuntu-latest: GitHub moves that label to Ubuntu 26 from
+    # 2026-10-19 (done by 2026-11-19). This job builds the AppImage and .deb
+    # on the runner and launches them under xvfb-run; a newer host can quietly
+    # raise the glibc floor of what ships to shops. 24.04 is supported for two
+    # more years; moving to 26 is its own PR, with this job watched.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev \
+            libgtk-3-dev libdrm-dev libgbm-dev rpm
+          # libfuse2 was renamed libfuse2t64 on Ubuntu 24.04 (ubuntu-latest)
+          sudo apt-get install -y libfuse2t64 2>/dev/null || \
+          sudo apt-get install -y libfuse2 2>/dev/null || \
+          echo "FUSE2 not available — AppImage will use extraction fallback"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `--publish always`, like macOS and Windows above — NOT `never`.
+      #
+      # Every Linux release from v3.2.0 to v3.4.0 shipped without the
+      # `latest-linux.yml` update feed, so the update check the app runs on every
+      # platform asked for a manifest that was not there. Nothing failed loudly;
+      # Linux users were quietly stranded on whatever they first installed.
+      #
+      # The cause was the UPLOAD, not the build. `--publish never` still WRITES
+      # the manifest — it only skips uploading — and the step below globbed
+      # `*.AppImage` and `*.deb`, so the file was generated on every run and left
+      # behind on the runner. Proof: Bed Ready builds with `--publish never`
+      # (scripts/build-bedready.mjs) and its releases carry latest-linux.yml.
+      #
+      # `always` is used anyway rather than widening the glob, because it makes
+      # all three platforms work the same way and puts the manifest and the
+      # binaries it describes on the release in one step, from the one process
+      # that computed their hashes.
+      - name: Build & publish Linux AppImage + deb
+        run: npx electron-builder --linux --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPIMAGE_EXTRACT_AND_RUN: 1
+
+      # Open the AppImage that was just built — the file a shop downloads — and
+      # see whether it runs. The upload above went to the DRAFT release; `publish`
+      # needs this job, so a build that does not open never goes public.
+      #
+      # This is the only launch check a release has when BUILD_MAC is off:
+      # scripts/verify-release.mjs used to be macOS-only, and v3.8.0 shipped
+      # Windows/Linux-only with nothing having opened the packaged app at all.
+      # The asar is the same on every platform, so a module missing from
+      # `build.files` fails here whichever platforms a release carries.
+      - name: Launch the packaged app before it goes public
+        # A hang must FAIL the release, not hold it for the job's six hours.
+        # Normal is about ten seconds; a broken build takes ~2.5 minutes to be
+        # named (a 120 s launch timeout, then a 15 s diagnosis run).
+        timeout-minutes: 10
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          xvfb-run -a node scripts/verify-release.mjs --app "build/Khayt-$v.AppImage" --version "$v"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-x64
+          path: |
+            build/*.AppImage
+            build/*.deb
+
+  # ── Publish: upload Linux artifacts + mark release public ─────────────────
+  publish:
+    name: Publish Release
+    needs: [create-release, build-mac, build-windows, build-linux, carry-mac-manifest]
+    # `publish` is what removes the draft flag, so if it is skipped the release
+    # never becomes visible. A job whose dependency was SKIPPED is skipped too —
+    # the trap named at the top of this file — and build-mac is now skipped on
+    # every release that does not opt into macOS. Without this condition,
+    # switching macOS off would have silently left every release a permanent
+    # draft.
+    #
+    # `always()` is required to run at all once a dependency can be skipped, and
+    # the comment above build-mac says never to add it without restoring the Bed
+    # Ready guard explicitly. That guard is the create-release line below: it is
+    # skipped on a workflow_dispatch, so requiring it to have SUCCEEDED keeps this
+    # whole lane off a Bed Ready run exactly as `needs:` alone used to.
+    #
+    # mac may be 'success' or 'skipped'; it may not be 'failure'. A mac build that
+    # was asked for and broke must not publish a release missing its binary.
+    if: >-
+      ${{ always()
+      && needs.create-release.result == 'success'
+      && needs.build-windows.result == 'success'
+      && needs.build-linux.result == 'success'
+      && (needs.build-mac.result == 'success' || needs.build-mac.result == 'skipped')
+      && (needs.carry-mac-manifest.result == 'success' || needs.carry-mac-manifest.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-x64
+          path: linux-files
+
+      # electron-builder now uploads the Linux artifacts itself (see
+      # `--publish always` above), so this is a belt-and-braces re-upload rather
+      # than the only path. `--clobber` makes it idempotent, and it keeps the
+      # release complete if a direct upload is ever dropped.
+      #
+      # It deliberately does NOT re-upload the update manifest: electron-builder
+      # is the only thing that computes latest-linux.yml's hashes and sizes, and
+      # a stale copy from a previous run overwriting a fresh one would point
+      # every Linux client at the wrong bytes.
+      - name: Upload Linux artifacts to release (backstop)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          shopt -s nullglob
+          files=(linux-files/*.AppImage linux-files/*.deb)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no Linux installers were built"
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" \
+            --clobber \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Publish release (remove draft)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ needs.create-release.outputs.prerelease }}
+        run: |
+          FLAGS=""
+          [ "$PRERELEASE" = "true" ] && FLAGS="--prerelease"
+          gh release edit "$TAG" \
+            --draft=false \
+            $FLAGS \
+            --repo "$GITHUB_REPOSITORY"
+          echo "✅ Release $TAG published"
+          echo "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+
+      # Tell the website straight away rather than waiting on its hourly cron.
+      #
+      # This used to live in notify-website.yml, listening for `release:
+      # published`. It never fired once — not for v3.2.0 nor any of the 61 betas
+      # — for two independent reasons: the release above is created as a draft
+      # (drafts emit no release event at all), and the publish is done with
+      # GITHUB_TOKEN, whose events deliberately do not cascade into other
+      # workflows. Dispatching from here removes both, because it runs in the
+      # same job that just published.
+      #
+      # Never fails the release: the artifacts are already live at this point,
+      # and the website's own hourly schedule is the backstop.
+      - name: Notify website
+        continue-on-error: true
+        env:
+          SYNC_TOKEN: ${{ secrets.WEBSITE_SYNC_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ -z "$SYNC_TOKEN" ]; then
+            echo "::warning::WEBSITE_SYNC_TOKEN is not set — skipping the instant site sync."
+            echo "The site will still pick this release up via its hourly schedule."
+            echo "To make it instant, add a repo secret WEBSITE_SYNC_TOKEN with a PAT"
+            echo "that has contents:write on the khayt-website repository."
+            exit 0
+          fi
+          # One dispatch, one repo. This used to loop over KhaytApp/khayt-website
+          # and Alballaa/khayt-website as though they were two sites; they are the
+          # same repository (id 1246893244) — the Alballaa path is a leftover
+          # transfer redirect. Dispatching both would start two concurrent
+          # sync-release runs that race to push, and the loser dies on
+          # `! [rejected] main -> main (fetch first)`.
+          REPO=KhaytApp/khayt-website
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $SYNC_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$REPO/dispatches" \
+            -d "{\"event_type\":\"khayt-release\",\"client_payload\":{\"tag\":\"$TAG\"}}")
+          if [ "$CODE" = "204" ]; then
+            echo "✅ $REPO notified for $TAG"
+          else
+            echo "::warning::$REPO dispatch returned HTTP $CODE (hourly sync will cover it)"
+          fi
+
+  # ══ Bed Ready ═══════════════════════════════════════════════════════════════
+  #
+  # Same repo, same commit, different flavor: its own appId, icon, output dir and
+  # an independent 1.0.0-* version line (scripts/build-bedready.mjs), with
+  # downloads in the public KhaytApp/bedready repo.
+  #
+  # Two things about this lane are deliberate and easy to "fix" wrongly:
+  #
+  # 1. `--publish never`, then upload with `gh`. electron-builder's GitHub
+  #    publisher derives its tag from the package version (`v${version}`), which
+  #    here would be `v1.0.0-beta.8` — NOT the `bedready-v*` tag this workflow
+  #    creates in KhaytApp/bedready, and not what the releases already in that repo
+  #    use. Letting it publish would quietly start a second tag convention in the
+  #    same repo. `never` still WRITES the update manifests; it only skips upload.
+  #
+  # 2. The uploads therefore MUST include latest*.yml and the .blockmaps, not
+  #    just the installers. Globbing only installers is exactly what stranded
+  #    Linux users on v3.2.0–v3.4.0 (see the Khayt Linux job above). Each
+  #    platform emits its own manifest — latest-mac.yml / latest.yml /
+  #    latest-linux.yml — so the three jobs never overwrite each other's.
+  bedready-release:
+    name: Bed Ready — create release
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+      # The release tag, created in KhaytApp/bedready by `gh release create` and
+      # nowhere in this repo. Downstream jobs take it from here rather than from
+      # github.ref_name, which is now a branch.
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      # The notes come from CHANGELOG.md, so the job needs the repo they are in.
+      # The Khayt lane shipped a release without this and nobody noticed, because
+      # the missing file falls through to a fallback and the build stays green.
+      - name: Check out the tagged commit (for the release notes)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Require a cross-repo token
+        env:
+          TOKEN: ${{ secrets.BEDREADY_RELEASE_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::BEDREADY_RELEASE_TOKEN is not set."
+            echo "Bed Ready publishes to KhaytApp/bedready, a DIFFERENT repository."
+            echo "The automatic GITHUB_TOKEN is scoped to this repo only and cannot"
+            echo "create a release there. Add a repo secret BEDREADY_RELEASE_TOKEN"
+            echo "holding a PAT with contents:write on KhaytApp/bedready."
+            exit 1
+          fi
+
+      - name: Derive version
+        id: v
+        env:
+          VERSION_IN: ${{ inputs.bedready_version }}
+        run: |
+          # Tolerate a leading v or the old bedready-v prefix, so muscle memory
+          # from the tag days does not fail a release for a cosmetic reason.
+          VERSION="${VERSION_IN#bedready-}"
+          VERSION="${VERSION#v}"
+          # Checked against a real version shape rather than "something non-empty":
+          # a typo would otherwise sail through and fail much later, inside
+          # electron-builder, with a far worse message.
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::'$VERSION_IN' is not a version of the form X.Y.Z[-beta.N]"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=bedready-v$VERSION" >> "$GITHUB_OUTPUT"
+          if echo "$VERSION" | grep -qE '\-(beta|rc|alpha)'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Bed Ready $VERSION"
+
+      # Same reasoning as the Khayt lane's create step — see the long note there.
+      # Bed Ready is MORE exposed to it, not less: its version is a dispatch
+      # input, so re-running a finished dispatch re-uses the same version by
+      # definition, where a tag push at least requires a new tag to be made.
+      - name: Create release (or refuse to re-run a published one)
+        env:
+          GH_TOKEN: ${{ secrets.BEDREADY_RELEASE_TOKEN }}
+          TAG: ${{ steps.v.outputs.tag }}
+          VERSION: ${{ steps.v.outputs.version }}
+          PRERELEASE: ${{ steps.v.outputs.prerelease }}
+        run: |
+          # As in the Khayt lane: a failed lookup must not read as "none".
+          if ! MATCHES=$(gh api "repos/KhaytApp/bedready/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\") | if .draft then \"draft\" else \"published\" end"); then
+            echo "::error::could not list KhaytApp/bedready releases to check whether $TAG exists — refusing to guess."
+            exit 1
+          fi
+
+          if [ -z "$MATCHES" ]; then
+            FLAGS=""
+            if [ "$PRERELEASE" = "true" ]; then FLAGS="--prerelease"; fi
+            # THE SAME NOTES AS KHAYT, FOR THE SAME REASON.
+            #
+            # This passed one fixed sentence — "See the Khayt CHANGELOG for what
+            # changed" — so a Bed Ready release carried no `Before you update`
+            # section, EVER. lib/major-changes.js reads the release body, finds
+            # no heading, and returns needsConsent:false. Bed Ready runs the
+            # identical renderer and updater, so its shops were the ones being
+            # asked to install a change nobody had shown them: the one thing the
+            # gate exists to prevent, unconditionally, for a whole flavour.
+            NOTES_FILE="$RUNNER_TEMP/bedready-notes.md"
+            if node scripts/changelog-section.js "${TAG#v}" > "$NOTES_FILE"; then
+              echo "release notes: $(wc -l < "$NOTES_FILE") lines from CHANGELOG.md"
+            else
+              echo "::warning::no CHANGELOG section for ${TAG#v} — publishing with the fallback note."
+              echo "Built from KhaytApp/Khayt@${GITHUB_SHA}. See the Khayt CHANGELOG for what changed." > "$NOTES_FILE"
+            fi
+            gh release create "$TAG" \
+              --repo KhaytApp/bedready \
+              --title "Bed Ready $VERSION" \
+              --notes-file "$NOTES_FILE" \
+              --draft \
+              $FLAGS
+          elif echo "$MATCHES" | grep -qx published; then
+            echo "::error::$TAG is already PUBLISHED in KhaytApp/bedready."
+            echo "Re-running this dispatch would create a SECOND release with the same tag"
+            echo "and split this run's artifacts across the two, leaving the live release"
+            echo "with manifests that no longer match its binaries."
+            echo "Dispatch again with a NEW bedready_version instead."
+            exit 1
+          else
+            echo "Draft release for $TAG exists — continuing to finish it."
+          fi
+
+  bedready-mac:
+    name: Bed Ready — macOS (Apple Silicon)
+    needs: bedready-release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+
+      # The same keychain the Khayt mac job builds, for the same reason — this
+      # lane signs with the same identity through the same electron-builder and
+      # would fail the same way. See the long note on "Prepare the signing
+      # keychain" above; it is not repeated here, only applied.
+      - name: Prepare the signing keychain
+        env:
+          CSC_LINK:         ${{ secrets.APPLE_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CSC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/khayt-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          P12="$RUNNER_TEMP/khayt-cert.p12"
+          echo "$CSC_LINK" | base64 --decode > "$P12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$P12" -k "$KEYCHAIN" -P "$CSC_KEY_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$P12"
+          if ! security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "Developer ID Application"; then
+            echo "::error::No Developer ID Application identity in the signing keychain — refusing to build an app that would ship unsigned."
+            exit 1
+          fi
+          echo "CSC_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+      - name: Build Bed Ready (mac arm64)
+        run: node scripts/build-bedready.mjs --mac --arm64 --publish never
+        env:
+          BEDREADY_VERSION: ${{ needs.bedready-release.outputs.version }}
+          # CSC_LINK deliberately absent — see above.
+          CSC_KEYCHAIN:                ${{ env.CSC_KEYCHAIN }}
+          APPLE_ID:                    ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/khayt-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/khayt-cert.p12"
+
+      - name: Upload macOS artifacts + update feed
+        env:
+          GH_TOKEN: ${{ secrets.BEDREADY_RELEASE_TOKEN }}
+          TAG: ${{ needs.bedready-release.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          files=(build-bedready/*.dmg build-bedready/*-mac-*.zip \
+                 build-bedready/*.blockmap build-bedready/latest-mac.yml)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no macOS artifacts were produced"; exit 1
+          fi
+          if [ ! -f build-bedready/latest-mac.yml ]; then
+            echo "::error::latest-mac.yml is missing — the app could not auto-update"; exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber --repo KhaytApp/bedready
+
+  bedready-windows:
+    name: Bed Ready — Windows (x64)
+    needs: bedready-release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Bed Ready (win x64)
+        run: node scripts/build-bedready.mjs --win --x64 --publish never
+        env:
+          BEDREADY_VERSION: ${{ needs.bedready-release.outputs.version }}
+
+      - name: Upload Windows artifacts + update feed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.BEDREADY_RELEASE_TOKEN }}
+          TAG: ${{ needs.bedready-release.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          files=(build-bedready/*.exe build-bedready/*.blockmap build-bedready/latest.yml)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no Windows artifacts were produced"; exit 1
+          fi
+          if [ ! -f build-bedready/latest.yml ]; then
+            echo "::error::latest.yml is missing — the app could not auto-update"; exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber --repo KhaytApp/bedready
+
+  bedready-linux:
+    name: Bed Ready — Linux (x64)
+    needs: bedready-release
+    # Pinned, not ubuntu-latest: GitHub moves that label to Ubuntu 26 from
+    # 2026-10-19 (done by 2026-11-19). Bed Ready's Linux build: a newer host
+    # can quietly raise the glibc floor of what ships. 24.04 is supported for
+    # two more years; moving to 26 is its own PR, with this job watched.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev \
+            libgtk-3-dev libdrm-dev libgbm-dev rpm
+          sudo apt-get install -y libfuse2t64 2>/dev/null || \
+          sudo apt-get install -y libfuse2 2>/dev/null || \
+          echo "FUSE2 not available — AppImage will use extraction fallback"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Bed Ready (linux x64)
+        run: node scripts/build-bedready.mjs --linux --x64 --publish never
+        env:
+          BEDREADY_VERSION: ${{ needs.bedready-release.outputs.version }}
+          APPIMAGE_EXTRACT_AND_RUN: 1
+
+      - name: Upload Linux artifacts + update feed
+        env:
+          GH_TOKEN: ${{ secrets.BEDREADY_RELEASE_TOKEN }}
+          TAG: ${{ needs.bedready-release.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          files=(build-bedready/*.AppImage build-bedready/*.deb build-bedready/latest-linux.yml)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no Linux artifacts were produced"; exit 1
+          fi
+          if [ ! -f build-bedready/latest-linux.yml ]; then
+            echo "::error::latest-linux.yml is missing — the app could not auto-update"; exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber --repo KhaytApp/bedready
+
+  bedready-publish:
+    name: Bed Ready — publish
+    needs: [bedready-release, bedready-mac, bedready-windows, bedready-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release (remove draft)
+        env:
+          GH_TOKEN: ${{ secrets.BEDREADY_RELEASE_TOKEN }}
+          TAG: ${{ needs.bedready-release.outputs.tag }}
+          PRERELEASE: ${{ needs.bedready-release.outputs.prerelease }}
+        run: |
+          FLAGS=""
+          [ "$PRERELEASE" = "true" ] && FLAGS="--prerelease"
+          gh release edit "$TAG" --draft=false $FLAGS --repo KhaytApp/bedready
+          echo "✅ Bed Ready $TAG published"
+          echo "https://github.com/KhaytApp/bedready/releases/tag/$TAG"

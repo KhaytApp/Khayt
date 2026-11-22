@@ -1,0 +1,24 @@
+{
+  "phonePrivate": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+  "phonePublic": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9/AsrhtHHw=",
+  "macPrivate": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8=",
+  "macPublic": "eaYx7t4b+cmPEgMs3q3Q56B5OY/HhriMyEbsia+FpRo=",
+  "shared": "rkRAzI1/rdsolBcreOPXRcr6AJi8wQ1+4P2gj6hami4=",
+  "deviceId": "dev_k7Qm2xLp9Rt4",
+  "key": "e8D9m4rfuYvAJUCq66wJ6jCNdvATl9RfHOvTZScho7k=",
+  "patch": {
+    "body": "{\"status\":\"printing\"}",
+    "canonical": "khayt-req-v1\nPATCH\n/api/orders/o_123?x=1%202\n1792396800\n00112233445566778899aabbccddeeff\n598f25910a269f61ae91d2ae3e7bf10cba09a67a071554a5fe042fb513daa94d",
+    "mac": "tohMsmM7rbZN5aRy1D1bRM/NfYBJ2PziYlr4ltKm+ME="
+  },
+  "get": {
+    "canonical": "khayt-req-v1\nGET\n/api/store\n1792396800\nffeeddccbbaa99887766554433221100\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mac": "j6O0aPwkfxlpTkgs/2m7avHkP0IWhX+tcxX9bIgFob0="
+  },
+  "enrol": {
+    "identitySeed": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8=",
+    "identityPublic": "zRSzf5VulTGU/3+3Oz2B3MVh1hp1OAlLfD4aZD7l86o=",
+    "message": "khayt-enrol:dev_k7Qm2xLp9Rt4:eaYx7t4b+cmPEgMs3q3Q56B5OY/HhriMyEbsia+FpRo=:B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9/AsrhtHHw=",
+    "sig": "yBVEX1IwNYvW5Uw9ksi71TeZwIm9iAm0o7PvyF/fptCQAmwhZhl7Ofb1TP7e15r3WwYKvMU9fGbV0ixNUEssDA=="
+  }
+}

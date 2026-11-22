@@ -1,0 +1,208 @@
+import Foundation
+
+/// Orders → the row shape the accountant's CSV is laid out from.
+///
+/// ── WHY THIS IS ITS OWN RULE ──────────────────────────────────────────────
+///
+/// The exporter is a FORMATTER: give it rows with a rate and a tax mode on them
+/// and it lays out columns. Everything that decides what those rows say lived in
+/// the other app's renderer — which orders count, that a quote is not an
+/// invoice, that an order with no price is not one either, what the shop's VAT
+/// rate and pricing mode are, and which customer a `clientId` belongs to.
+///
+/// So an app calling the formatter directly gets a file that looks right and is
+/// wrong in four ways at once. Measured, on a real order of 1,150 at 15%
+/// inclusive:
+///
+///     VAT        0.00   instead of 150.00
+///     Subtotal   1150   instead of 1000
+///     Customer   empty
+///     and a quote exported as though it were an invoice
+///
+/// That is a file a shop hands an accountant, and two apps disagreeing about a
+/// VAT figure is a disagreement an auditor finds.
+public enum AccountingRows {
+
+    /// The shop's VAT rate and whether its prices include it.
+    public struct Tax: Sendable, Equatable {
+        public let rate: Double
+        public let mode: String
+        public init(rate: Double, mode: String) {
+            self.rate = rate
+            self.mode = mode
+        }
+    }
+
+    /// The same sum the original does over a tax profile's rates.
+    ///
+    /// The PROFILE is still `lib/tax.js`'s — eight bundled modules read it, so
+    /// it has not moved — and this only adds its rates up. `+r.percent || 0`,
+    /// so a rate written as text still counts and a missing one counts as zero.
+    public static func tax(profile: JSONValue?) -> Tax {
+        // Anything that is not a profile answers what a shop with no tax module
+        // at all gets. The original throws on a `null` profile — it reads
+        // `.rates` straight off it — and takes the whole export with it.
+        guard case .object(let p)? = profile else { return Tax(rate: 0, mode: "inclusive") }
+        var rate = 0.0
+        if case .array(let rates)? = p["rates"] {
+            for row in rates {
+                guard case .object(let r) = row else { continue }
+                let percent = JSSemantics.number(r["percent"])
+                rate += (percent.isNaN || percent == 0) ? 0 : percent
+            }
+        }
+        return Tax(rate: rate, mode: JSSemantics.text(p["mode"]))
+    }
+
+    /// Is this record an invoice the accountant should see? `isInvoice` in
+    /// `lib/accounting-rows.js`, line for line.
+    ///
+    /// Not a QUOTE (nor one on hold awaiting its answer), not a CANCELLED job, not a VOIDED invoice, not one CREDITED
+    /// IN FULL, not a print marked NOT BUSINESS, and not a SPLIT PARENT — its
+    /// sub-orders carry its price between them, so exporting it as well
+    /// invoiced the job twice.
+    public static func isInvoice(_ o: [String: JSONValue]) -> Bool {
+        let status: String? = { if case .string(let s)? = o["status"] { return s }; return nil }()
+        if status == "quote" || status == "cancelled" { return false }
+        // A quote parked ON HOLD, its yes not yet recorded, is still a quote
+        // (`awaitingApproval` in lib/order-new.js): no invoice number yet.
+        if status == "on_hold", JSSemantics.truthy(o["hasQuote"]),
+           !JSSemantics.truthy(o["quoteAcceptedAt"]), !JSSemantics.truthy(o["clientApprovedAt"]) {
+            return false
+        }
+        if JSSemantics.truthy(o["voidedAt"]) || JSSemantics.truthy(o["creditedAt"]) { return false }
+        if case .bool(true)? = o["nonBusiness"] { return false }
+        if status == "split", case .array(let into)? = o["splitInto"], !into.isEmpty { return false }
+        return true
+    }
+
+    /// The price less every credit note, never below zero, to the cent —
+    /// `netPrice` in `lib/accounting-rows.js`. A credit note is taken against
+    /// the price in the price's own terms, so the row says what the shop
+    /// actually invoiced and kept.
+    public static func netPrice(_ o: [String: JSONValue]) -> Double {
+        let raw = JSSemantics.number(o["price"])
+        let price = raw.isNaN ? 0 : raw
+        var credited = 0.0
+        if case .array(let notes)? = o["creditNotes"] {
+            for note in notes {
+                guard case .object(let cn) = note else { continue }
+                let amount = JSSemantics.number(cn["amount"])
+                credited += (amount.isNaN || amount == 0) ? 0 : amount
+            }
+        }
+        guard credited > 0 else { return raw }
+        return max(0, ((price - credited) * 100).rounded() / 100)
+    }
+
+    /// The number an order's invoice prints — `KhaytInvoiceDocument
+    /// .documentNumber`, with `KhaytOrderNew.beganAsQuote` inside it.
+    ///
+    /// A job that began as a quote (accepted, or still carrying a `QUO-` id)
+    /// is invoiced under the number it was given when the customer said yes;
+    /// every other job's id IS its invoice number.
+    public static func documentNumber(_ o: [String: JSONValue], settings: [String: JSONValue]) -> String {
+        let id: String
+        switch o["id"] {
+        case .none, .null?: id = ""
+        case let value?: id = JSSemantics.text(value)
+        }
+        if o["status"] == .string("quote") { return id }
+        var began = JSSemantics.truthy(o["quoteAcceptedAt"]) || JSSemantics.truthy(o["clientApprovedAt"])
+        if !began {
+            let prefix = (JSSemantics.truthy(settings["quotePrefix"])
+                          ? JSSemantics.text(settings["quotePrefix"]) : "QUO") + "-"
+            if case .string(let s)? = o["id"], s.hasPrefix(prefix) { began = true }
+        }
+        guard began else { return id }
+        if JSSemantics.truthy(o["invoiceNumber"]) { return JSSemantics.text(o["invoiceNumber"]) }
+        if JSSemantics.truthy(o["invoiceNum"]) { return JSSemantics.text(o["invoiceNum"]) }
+        return id
+    }
+
+    /// The whole print log in; the rows that come back are the ones that are
+    /// invoices.
+    ///
+    /// A QUOTE IS NOT AN INVOICE and an order with no price is not one either.
+    /// Both exclusions are here rather than at the call site because both are
+    /// facts about accounting, not about a screen.
+    ///
+    /// `toBase` is the one part that needs a host — how an order's currency
+    /// converts to the shop's base. Passing none gives EMPTY base columns
+    /// rather than a base figure that is silently the foreign one: an empty
+    /// column is a column an accountant asks about, and a wrong one is not.
+    public static func invoiceRows(orders: [JSONValue], settings: [String: JSONValue],
+                                   clients: [JSONValue], tax: Tax,
+                                   currencyOf: ((JSONValue) -> String)? = nil,
+                                   toBase: ((Double, String, JSONValue) -> Double)? = nil,
+                                   localName: ((JSONValue) -> String)? = nil) -> [JSONValue] {
+        let baseCurrency = JSSemantics.truthy(settings["currency"])
+            ? JSSemantics.text(settings["currency"]) : "SAR"
+
+        var out: [JSONValue] = []
+        for order in orders {
+            guard JSSemantics.truthy(order), case .object(let o) = order else { continue }
+            guard isInvoice(o) else { continue }
+            // NET OF CREDIT NOTES — see `netPrice`.
+            let price = netPrice(o)
+            guard price > 0 else { continue }   // `!(price > 0)` — NaN too
+
+            let currency = currencyOf?(order)
+                ?? (JSSemantics.truthy(o["currency"]) ? JSSemantics.text(o["currency"])
+                                                      : baseCurrency)
+            // `c.id === o.clientId` is STRICT, so a client id written as a
+            // number does not match one written as text. That is the other
+            // app's answer and a shop's book is consistent within itself.
+            var client: JSONValue?
+            if let wanted = o["clientId"], JSSemantics.truthy(wanted) {
+                client = clients.first { row in
+                    guard JSSemantics.truthy(row), case .object(let c) = row else { return false }
+                    return c["id"] == wanted
+                }
+            }
+            var name = ""
+            if let client { name = localName?(client) ?? {
+                guard case .object(let c) = client else { return "" }
+                return JSSemantics.truthy(c["name"]) ? JSSemantics.text(c["name"]) : ""
+            }() }
+            if name.isEmpty {
+                name = JSSemantics.truthy(o["clientName"]) ? JSSemantics.text(o["clientName"])
+                     : JSSemantics.truthy(o["client"]) ? JSSemantics.text(o["client"]) : ""
+            }
+
+            // The day the invoice was ISSUED (`invoiceDateOf`, which is
+            // `PaymentTerms.invoiceDate`): an accepted quote's acceptance, not
+            // the quote's own `date` — the VAT summary already read it so, and
+            // the CSV put the same sale in the quarter before. No day from
+            // that rule: the stored `date`, as before.
+            let issued = PaymentTerms.invoiceDate(o)
+            var row: [String: JSONValue] = [
+                "date": !issued.isEmpty ? .string(issued)
+                    : JSSemantics.truthy(o["date"]) ? (o["date"] ?? .string("")) : .string(""),
+                "clientName": .string(name),
+                "price": .number(price.isNaN ? 0 : price),
+                "currency": .string(currency),
+                "vatRate": .number(tax.rate),
+                "taxMode": .string(tax.mode),
+                "baseCurrency": .string(toBase == nil ? "" : baseCurrency),
+            ]
+            // `id` and `status` are copied ACROSS rather than defaulted: the
+            // original writes `o.id` whatever it is, and a field that is not
+            // there at all disappears from the row when it is written out
+            // rather than arriving as a null.
+            //
+            // The number the INVOICE prints, not the record's id: an accepted
+            // quote is invoiced as `INV-…` and its id is still `QUO-…`
+            // (`documentNumber`, `KhaytInvoiceDocument.documentNumber`).
+            if o["id"] != nil { row["id"] = .string(documentNumber(o, settings: settings)) }
+            if let status = o["status"] { row["status"] = status }
+            // `undefined` disappears from the row entirely when there is no
+            // converter, rather than arriving as a null the exporter would
+            // print as a figure of nothing.
+            // The order goes too, so a host can use the rate it was saved at.
+            if let toBase { row["baseAmount"] = .number(toBase(price.isNaN ? 0 : price, currency, order)) }
+            out.append(.object(row))
+        }
+        return out
+    }
+}

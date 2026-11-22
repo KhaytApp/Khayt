@@ -1,0 +1,57 @@
+/* Custom theme tokens — scope ALL rules to html[data-design="custom:YOUR_ID"] */
+
+html[data-design="custom:my-shop"] {
+  --bg: #101418;
+  --bg-elev: #151a20;
+  --bg-2: #151a20;
+  --surface: #1c222b;
+  --surface-1: #1c222b;
+  --surface-2: #242b36;
+  --surface-3: #2c3542;
+  --border: rgba(255,255,255,0.08);
+  --border-2: rgba(255,255,255,0.14);
+  --border-soft: rgba(255,255,255,0.06);
+  --hairline: rgba(255,255,255,0.06);
+
+  --text: #eef2f7;
+  --text-dim: #a8b2c2;
+  --text-muted: #6f7a8c;
+  --text-faint: #566070;
+
+  --accent-h: 210;
+  --accent-s: 70%;
+  --accent-l: 52%;
+  --accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.14);
+  --primary: var(--accent);
+  --primary-2: hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l) - 6%));
+
+  --success: #3fb87f;
+  --warning: #e0a93c;
+  --danger: #e5544b;
+  --info: #5b9cf0;
+  --ok: var(--success);
+  --warn: var(--warning);
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+
+  --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-num: "Geist Mono", ui-monospace, monospace;
+  --font-ui: var(--font-sans);
+  --font-mono: var(--font-num);
+}
+
+html[data-design="custom:my-shop"][data-theme="light"] {
+  --bg: #f3f5f8;
+  --bg-elev: #ffffff;
+  --surface: #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #f7f9fc;
+  --text: #1a2230;
+  --text-dim: #5a6478;
+  --text-muted: #8a93a8;
+}

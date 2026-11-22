@@ -1,0 +1,73 @@
+/* ============================================================
+   KHAYT — Direction A "Studio" (dark instrument) tokens,
+   written with the PRODUCTION APP's variable names.
+   Drop-in replacement for the :root / [data-theme="light"]
+   blocks at the top of renderer/styles.css.
+   Source design: design prototype `Khayt Redesign.html` (khayt/ds.css).
+   ============================================================ */
+
+:root {
+  /* surfaces */
+  --bg:           #0b0d12;
+  --bg-elev:      #0f1218;
+  --surface:      #14181f;
+  --surface-1:    #14181f;
+  --surface-2:    #1a1f28;
+  --border:       rgba(255,255,255,0.07);
+  --border-soft:  rgba(255,255,255,0.05);
+
+  /* text */
+  --text:         #eef1f6;
+  --text-dim:     #a4adbb;
+  --text-muted:   #6c7689;
+
+  /* brand + status — primary is Filament Cyan (from the app icon).
+     Keep status colors INDEPENDENT of the brand accent. */
+  --primary:      hsl(187 76% 53%);
+  --primary-2:    hsl(187 76% 46%);
+  --success:      #3fb87f;
+  --warning:      #e0a93c;
+  --danger:       #e5544b;
+  --info:         #5b9cf0;
+  --cyan:         hsl(187 76% 53%);
+  --accent:       hsl(187 76% 53%);   /* unify accent with primary in this direction */
+
+  /* shape + depth */
+  --radius:       14px;
+  --radius-sm:    7px;
+  --shadow-1:     0 1px 2px rgba(0,0,0,0.4);
+  --shadow-2:     0 6px 22px rgba(0,0,0,0.38), 0 2px 6px rgba(0,0,0,0.3);
+  --shadow-3:     0 24px 60px rgba(0,0,0,0.55), 0 6px 16px rgba(0,0,0,0.4);
+
+  /* type — vendor these as local .woff2 (CSP blocks Google Fonts).
+     Fallback chain keeps the app usable without them. */
+  --font-sans:    "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Cairo", "Tajawal", sans-serif;
+  --font-num:     "Geist Mono", "SF Mono", ui-monospace, "Menlo", monospace;
+}
+
+/* Warm-paper light variant (secondary in this direction) */
+[data-theme="light"] {
+  --bg:           #ece8e1;
+  --bg-elev:      #f4f1ea;
+  --surface:      #ffffff;
+  --surface-1:    #ffffff;
+  --surface-2:    #f7f4ee;
+  --border:       rgba(40,34,24,0.10);
+  --border-soft:  rgba(40,34,24,0.07);
+  --text:         #20242c;
+  --text-dim:     #58616f;
+  --text-muted:   #8a93a3;
+  --shadow-1:     0 1px 2px rgba(40,34,24,0.08);
+  --shadow-2:     0 8px 24px rgba(40,34,24,0.10), 0 2px 6px rgba(40,34,24,0.06);
+  --shadow-3:     0 24px 60px rgba(40,34,24,0.16);
+}
+
+/* Extra tokens this direction introduces (referenced by the prototype):
+   add alongside the block above. */
+:root {
+  --accent-soft:  hsl(187 76% 53% / 0.14);  /* selected nav item bg, focus rings */
+  --ok-soft:      rgba(63,184,127,0.14);
+  --warn-soft:    rgba(224,169,60,0.14);
+  --danger-soft:  rgba(229,84,75,0.14);
+  --info-soft:    rgba(91,156,240,0.14);
+}
