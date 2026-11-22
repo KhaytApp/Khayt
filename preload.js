@@ -247,6 +247,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   telemetryPurge: ()      => ipcRenderer.invoke('hub:telemetry-purge'),
   telemetryRecord: (o)    => ipcRenderer.invoke('hub:telemetry-record', o),
   activeCountGet: ()      => ipcRenderer.invoke('hub:active-count-get'),
+  outboundDescribe: ()    => ipcRenderer.invoke('hub:outbound-describe'),
+  outboundSetLocal: (p)   => ipcRenderer.invoke('hub:outbound-set-local', p),
   activeCountSet: (on)    => ipcRenderer.invoke('hub:active-count-set', !!on),
   requestFullWipe: ()     => ipcRenderer.invoke('hub:request-full-wipe'),
   verifyOperatorPin: (opts) => ipcRenderer.invoke('hub:verify-operator-pin', opts),

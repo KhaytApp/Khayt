@@ -1,0 +1,93 @@
+'use strict';
+/**
+ * lib/main/outbound-fetch.js: the desktop's gate for the "make no internet
+ * calls" switch (P8 PR 2), and the read before the book is in memory that
+ * keeps Sentry from starting while the shop is offline.
+ */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { createOutboundGate, OutboundBlocked, isBlocked, offlineAtStartup } = require('../lib/main/outbound-fetch.js');
+
+function gate(over = {}) {
+  let settings = over.settings === undefined ? {} : over.settings;
+  let local = over.local || {};
+  let countOff = !!over.countOff;
+  let t = 1_700_000_000_000;
+  const g = createOutboundGate({
+    getSettings: () => settings, readLocal: () => local, writeLocal: (v) => { local = v; },
+    readInstallCountOff: () => countOff, now: () => t,
+  });
+  return { g, set: (s) => { settings = s; }, setCountOff: (v) => { countOff = v; }, tick: () => { t += 1000; } };
+}
+
+test('online, nothing changes; offline, a purpose is refused and counted', () => {
+  const { g, set } = gate();
+  assert.equal(g.check('updates').allowed, true);
+  set({ network: { offline: true } });
+  const r = g.check('updates');
+  assert.deepEqual([r.allowed, r.reason], [false, 'offline']);
+  assert.deepEqual(g.blocked().updates.count, 1);
+  assert.throws(() => g.gate('cloud'), (e) => e instanceof OutboundBlocked && isBlocked(e) && e.purpose === 'cloud' && e.reason === 'offline');
+  set({ network: { offline: true, keep: ['cloud'] } });
+  assert.equal(g.gate('cloud').reason, 'kept');
+});
+
+test('opted-out is not a block: telemetryConsent asks often, and most shops never opt in', () => {
+  const { g } = gate({ settings: { telemetry: { crashOptIn: false } } });
+  for (let i = 0; i < 5; i++) assert.equal(g.check('crash-reports').reason, 'opted-out');
+  assert.equal(g.blocked()['crash-reports'], undefined);
+});
+
+test('this computer can be stricter, and the install count keeps its own switch (D3)', () => {
+  const { g, setCountOff } = gate();
+  assert.equal(g.check('install-count').allowed, true);
+  setCountOff(true);
+  assert.equal(g.check('install-count').reason, 'opted-out');
+  g.setLocal({ offline: true });
+  assert.equal(g.check('webhooks').reason, 'offline-here');
+  assert.equal(g.local().offline, true);
+  g.setLocal({ offline: 'yes' });
+  assert.equal(g.local().offline, false, 'setLocal writes a boolean');
+});
+
+test('the book not read yet: wait', () => {
+  const { g } = gate({ settings: null });
+  assert.equal(g.check('install-count').reason, 'settings-unknown');
+});
+
+test('for(purpose) gates before the real fetch, every time', async () => {
+  const { g, set } = gate();
+  let calls = 0;
+  const f = g.for('storage', async () => { calls += 1; return 'ok'; });
+  assert.equal(await f('https://s3.example.com'), 'ok');
+  set({ network: { offline: true } });
+  await assert.rejects(f('https://s3.example.com'), (e) => isBlocked(e));
+  assert.equal(calls, 1);
+});
+
+test('describe carries the counts for the Settings list', () => {
+  const { g } = gate({ settings: { network: { offline: true } } });
+  g.check('updates'); g.check('updates');
+  const row = g.describe().find((r) => r.purpose === 'updates');
+  assert.deepEqual([row.allowed, row.blockedCount, typeof row.lastBlockedAt], [false, 2, 'string']);
+});
+
+test('offlineAtStartup: the store or this computer says offline; unreadable fails toward offline', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-outbound-'));
+  const store = path.join(dir, 'khayt-store.json'), local = path.join(dir, 'network-local.json');
+  fs.writeFileSync(store, JSON.stringify({ settings: { telemetry: { crashOptIn: true } } }));
+  assert.equal(offlineAtStartup(fs, store, local), false);
+  fs.writeFileSync(store, JSON.stringify({ settings: { network: { offline: true } } }));
+  assert.equal(offlineAtStartup(fs, store, local), true);
+  fs.writeFileSync(store, JSON.stringify({ settings: { network: { offline: false } } }));
+  fs.writeFileSync(local, JSON.stringify({ offline: true }));
+  assert.equal(offlineAtStartup(fs, store, local), true, 'this computer');
+  fs.rmSync(local);
+  fs.writeFileSync(store, '{"settings":{"network":{"offline":true');
+  assert.equal(offlineAtStartup(fs, store, local), true, 'a cut-off file');
+  assert.equal(offlineAtStartup(fs, path.join(dir, 'none.json'), local), true, 'no store: Sentry would not start anyway');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

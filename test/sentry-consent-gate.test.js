@@ -36,8 +36,16 @@ test('the gate fails closed, not open', () => {
   // raised before the store loads is dropped rather than sent. Pin that shape.
   const fn = main.slice(main.indexOf('function telemetryConsent'),
                         main.indexOf('function readTelemetryQueue'));
-  assert.match(fn, /!!tm\.crashOptIn/, 'consent is not coerced to a strict boolean');
-  assert.match(fn, /\|\| \{\}/, 'a missing store must resolve to no-consent');
+  // Since P8 the decision is lib/outbound.js's (the opt-in AND the "make no
+  // internet calls" switch): an unread book is settings-unknown, which is no,
+  // and anything that throws is no.
+  assert.match(fn, /let crash = false, usage = false;/, 'no consent until the gate says yes');
+  assert.match(fn, /crash = outboundGate\.check\('crash-reports'\)\.allowed;/);
+  assert.match(fn, /\} catch \(_\) \{ crash = false; usage = false; \}/, 'a throw is no-consent');
+  const O = require('../lib/outbound.js');
+  assert.equal(O.allowed(null, 'crash-reports').allowed, false, 'the book not read yet');
+  assert.equal(O.allowed({ telemetry: {} }, 'crash-reports').allowed, false, 'not opted in');
+  assert.equal(O.allowed({ telemetry: { crashOptIn: 'yes' } }, 'crash-reports').allowed, false, 'strictly true');
 });
 
 test('crash reporting still defaults to off', () => {
