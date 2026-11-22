@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: Find printers remembers what it found (no screen yet; draft, on the desktop's found-printers work).** Each scan the owner starts adds what it saw to a short list kept on that Mac, outside the book: one entry per printer, three days, forty at most, by the shared rule (`lib/found-printers.js`). It is the same file the Windows/Linux app keeps, so a Mac running both shares one list. Nothing shows it yet: the picker with earlier finds waits for its frame.
+
 - **Windows/Linux: printers found on the network are remembered for three days, so a printer that missed this scan's few seconds is not lost.** Every scan (Find printers, and the background look for a printer whose address moved) adds what it saw to a list on this computer, with when each printer was first and last seen. A printer is matched by its serial when it announces one, so a new address updates it rather than adding a second one. Entries not seen for three days are dropped, and the list holds at most 40 printers. The list stays on this computer: it is not part of the shop's data, is never sent to phones and never leaves the network. Nothing on screen changes yet: the scan result now carries the earlier finds (`found`, each with `seenNow` and `lastSeen`) for the picker to show once its design is signed off. (`lib/found-printers.js`)
 
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
