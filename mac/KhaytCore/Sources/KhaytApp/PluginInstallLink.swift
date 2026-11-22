@@ -84,6 +84,8 @@ extension Shop {
         case otherVersion
         /// Khayt withdrew this version.
         case withdrawn
+        /// The listed version needs a newer Khayt than this one.
+        case newer
         /// The manifest could not be fetched, or is not the signed bytes promised.
         case manifest
     }
@@ -109,18 +111,31 @@ extension Shop {
     /// The same, from an index already read. `signedBy` is the key id the
     /// index's signature was verified with, or nil: an index nobody signed is
     /// refused by the shared rule (`checkIndex`), as is an expired one.
+    ///
+    /// `appVersion` and `schema` are this Mac's, as an update check passes
+    /// them (`prepareConnectorCheck`): a row may `require` a newer Khayt, and
+    /// a link must not get past what an update would be held to.
     func offerConnector(from link: PluginInstallLink, index: JSONValue, signedBy: String?,
-                        now: Date = Date()) async -> InstallLinkRefusal? {
+                        now: Date = Date(), appVersion: String? = nil, schema: Int? = nil) async -> InstallLinkRefusal? {
         guard mayInstallConnectors, let engine else { return .notAllowed }
         let fetch = connectorFetch ?? Self.fetchConnectorBytes
+        let version = appVersion ?? (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")
+        let ownSchema: Int
+        if let schema { ownSchema = schema } else { ownSchema = (try? await engine.pluginUpdateSchema()) ?? 1 }
         let ctx = JSONValue.object([
             "signedBy": signedBy.map(JSONValue.string) ?? .null,
             "nowMs": .number((now.timeIntervalSince1970 * 1000).rounded()),
+            "platform": .string("mac"),
+            "appVersion": .string(version),
+            "schema": .number(Double(ownSchema)),
         ])
         guard let found = try? await engine.pluginIndexListing(index: index, ctx: ctx, id: link.id), found.ok else { return .index }
         guard let row = found.row else { return .unlisted }
         if found.revoked.contains(link.version) { return .withdrawn }
         guard row.version == link.version else { return .otherVersion }
+        // BEFORE anything is downloaded: a connector this Khayt is too old
+        // for is said so, and its manifest is never fetched.
+        if found.needsNewer { return .newer }
         guard let url = URL(string: row.url),
               let data = try? await fetch(url, Self.connectorManifestMaxBytes),
               let manifest = await verifiedConnectorManifest(data, sha256: row.sha256, engine: engine),

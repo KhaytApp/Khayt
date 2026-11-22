@@ -2525,6 +2525,7 @@
  "mac.pil_unlisted": "La liste de Khayt ne contient aucun connecteur nommé {id}. Rien n'a été installé.",
  "mac.pil_otherVersion": "La version {v} de {id} n'est pas celle que Khayt liste actuellement. Rien n'a été installé. Rouvrez sa page pour la version actuelle.",
  "mac.pil_withdrawn": "Khayt a retiré la version {v} de {id}. Rien n'a été installé.",
+ "mac.pil_newer": "La version {v} de {id} nécessite un Khayt plus récent que celui-ci. Rien n'a été installé. Mettez Khayt à jour, puis rouvrez sa page.",
  "mac.pil_manifest": "Khayt n'a pas pu obtenir une copie fiable de {id}. Rien n'a été installé.",
  "mac.send_printer": "Imprimante",
  "mac.send_start": "Démarrer l’impression à l’arrivée",

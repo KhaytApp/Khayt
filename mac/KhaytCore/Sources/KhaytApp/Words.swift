@@ -6303,6 +6303,7 @@ final class Words {
         "mac.pil_unlisted": ["en": "Khayt's list has no connector called {id}. Nothing was installed.", "ar": "لا يوجد في قائمة Khayt موصِّل باسم {id}. لم يُثبَّت شيء."],
         "mac.pil_otherVersion": ["en": "Version {v} of {id} is not the one Khayt lists now. Nothing was installed. Open its page again for the current version.", "ar": "الإصدار {v} من {id} ليس الإصدار المدرج في Khayt الآن. لم يُثبَّت شيء. افتح صفحته من جديد للإصدار الحالي."],
         "mac.pil_withdrawn": ["en": "Khayt withdrew version {v} of {id}. Nothing was installed.", "ar": "سحب Khayt الإصدار {v} من {id}. لم يُثبَّت شيء."],
+        "mac.pil_newer": ["en": "Version {v} of {id} needs a newer Khayt than this one. Nothing was installed. Update Khayt, then open its page again.", "ar": "الإصدار {v} من {id} يحتاج إلى إصدار أحدث من Khayt. لم يُثبَّت شيء. حدِّث Khayt ثم افتح صفحته مجددًا."],
         "mac.pil_manifest": ["en": "Khayt could not get a copy of {id} it can trust. Nothing was installed.", "ar": "تعذّر على Khayt الحصول على نسخة موثوقة من {id}. لم يُثبَّت شيء."],
         "mac.send_not_sliced": ["en": "That is a model, not a sliced file. Slice it first, then send the result.",
                                 "ar": "هذا نموذج وليس ملفًا مُقطّعًا. قطّعه أولًا ثم أرسل الناتج."],

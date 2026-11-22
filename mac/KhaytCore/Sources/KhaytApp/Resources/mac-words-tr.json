@@ -2525,6 +2525,7 @@
  "mac.pil_unlisted": "Khayt'ın listesinde {id} adlı bir bağlayıcı yok. Hiçbir şey yüklenmedi.",
  "mac.pil_otherVersion": "{id} bağlayıcısının {v} sürümü Khayt'ın şu anda listelediği sürüm değil. Hiçbir şey yüklenmedi. Güncel sürüm için sayfasını yeniden açın.",
  "mac.pil_withdrawn": "Khayt, {id} bağlayıcısının {v} sürümünü geri çekti. Hiçbir şey yüklenmedi.",
+ "mac.pil_newer": "{id} bağlayıcısının {v} sürümü, bundan daha yeni bir Khayt gerektiriyor. Hiçbir şey yüklenmedi. Khayt’i güncelleyin, sonra sayfasını yeniden açın.",
  "mac.pil_manifest": "Khayt, {id} için güvenebileceği bir kopya alamadı. Hiçbir şey yüklenmedi.",
  "mac.send_printer": "Yazıcı",
  "mac.send_start": "Ulaştığında yazdırmaya başla",
