@@ -210,15 +210,6 @@ public enum NetworkSwitch {
         }
     }
 
-    /// When the switch is turned OFF here: whether `offline: false` is sent.
-    /// ONLY when a value is published there (Dev Hub, Nov 22), whatever this
-    /// computer's own option says: an `offline: true` left there would keep
-    /// reaching every computer that starts. With nothing published (the shop
-    /// never shared the switch, or its owner stopped sharing) nothing is
-    /// sent, even with the option on: turning a switch off publishes nothing
-    /// new.
-    public static func sendsOff(publishedThere: Bool) -> Bool { publishedThere }
-
     /// Whether a value is stamped further ahead of `now` than is allowed.
     public static func isAhead(_ value: Value, now: Date) -> Bool {
         guard let when = date(value.changedAt) else { return true }

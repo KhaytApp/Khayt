@@ -281,6 +281,8 @@ final class Shop {
     /// The owner is changing the switch here right now: a second change and a
     /// check from Khayt Cloud both wait their turn.
     var outboundChanging = false
+    /// A retry of an unsent "off" is in flight (`retryUnsentOff`): one at a time.
+    var networkSwitchRetrying = false
     /// The gate this shop tells and asks; the app's, unless a test hands one in.
     var outboundGate: OutboundGate = .app
     /// Where this Mac keeps its own "make no internet calls" switch.

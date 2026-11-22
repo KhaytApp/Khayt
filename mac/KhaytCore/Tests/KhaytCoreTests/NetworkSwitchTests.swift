@@ -146,12 +146,6 @@ import Testing
         #expect(hear(own: "2026-11-01T00:00:00.000Z", at: NetworkSwitch.date("2026-11-22T07:50:01Z")!) == .apply(Self.value()))
     }
 
-    @Test("turning the switch off: sent only when a value is published there")
-    func turningOff() {
-        #expect(NetworkSwitch.sendsOff(publishedThere: true))
-        #expect(!NetworkSwitch.sendsOff(publishedThere: false), "nothing published: nothing is sent, whatever the option says")
-    }
-
     @Test("the book: a value applied as it travelled and marked as from Khayt Cloud; the highest stamp only goes up")
     func book() {
         let before: JSONValue = .object(["offline": .bool(false), "keep": .array([.string("ai")]), "dropSwitchSync": .bool(true),

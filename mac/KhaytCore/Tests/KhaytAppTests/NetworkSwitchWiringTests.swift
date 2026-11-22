@@ -667,15 +667,145 @@ struct NetworkSwitchWiringTests {
         #expect(shop.networkSwitchUnsentOff == nil)
         #expect(await server.asked.isEmpty)
 
-        // A 409 on the retry asks the owner, as it would have at the time, and stops retrying.
+        // A 409 on the retry: beaten by something newer. The old "off" is dropped and
+        // NOTHING is asked: a question here would hold the newer value back (review).
         (shop, server, book) = await Self.shop(option: true, network: on)
         await server.answerGet(200, there)
         await server.answerPut(503, Data())
         #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
         await server.answerPut(409, Data(#"{"changedAt":"\#(StoreWriter.iso(Date().addingTimeInterval(5)))"}"#.utf8))
-        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .changedElsewhere)
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .superseded)
         #expect(shop.networkSwitchUnsentOff == nil)
-        #expect(shop.networkSwitchAsk != nil)
+        #expect(shop.networkSwitchAsk == nil && shop.networkSwitchHeld == nil, "a retry never asks")
+    }
+
+    @Test("a retried off never goes over a newer setting: the other computer's ON is heard and applied, with no question")
+    func retryNeverBeatsNewer() async throws {
+        let on: JSONValue = .object(["offline": .bool(true), "changedAt": .string(Self.stamp(3600)), "via": .string("cloud")])
+        let old = try Self.published(.init(offline: true, keep: [], changedAt: Self.stamp(3600), changedBy: nil))
+        let (shop, server, book) = await Self.shop(option: true, network: on)
+        await server.answerGet(200, old)
+        await server.answerPut(503, Data())
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+        let mine = try #require(shop.networkSwitchUnsentOff)
+        #expect(Self.obj(book.network)["offline"] == .bool(false))
+        // Another computer turns the switch ON after that, and publishes it.
+        let theirs = StoreWriter.iso(try #require(NetworkSwitch.date(mine)).addingTimeInterval(1))
+        await server.answerGet(200, try Self.published(.init(offline: true, keep: [], changedAt: theirs, changedBy: "Noura")))
+        await server.answerPut(200, Data(#"{"ok":true}"#.utf8))
+        await server.forget()
+        await Self.gated(shop) { await shop.checkNetworkSwitch() }
+        let asked = await server.asked
+        #expect(!asked.contains { $0.method == "PUT" }, "the older off is not sent over the newer on")
+        #expect(shop.networkSwitchUnsentOff == nil)
+        #expect(shop.networkSwitchAsk == nil, "nothing is asked: the shop's newer word is simply followed")
+        #expect(Self.obj(book.network)["offline"] == .bool(true), "this Mac follows the shop offline at this very check")
+        #expect(shop.outboundGate.isOffline)
+    }
+
+    @Test("an off that did arrive (its answer was lost) is not sent again, and the owner is not asked about their own change")
+    func lostAnswerIsNotAConflict() async throws {
+        let on: JSONValue = .object(["offline": .bool(true), "changedAt": .string(Self.stamp(3600)), "via": .string("cloud")])
+        let old = try Self.published(.init(offline: true, keep: [], changedAt: Self.stamp(3600), changedBy: nil))
+        let (shop, server, _) = await Self.shop(option: true, network: on)
+        await server.answerGet(200, old)
+        await server.answerPut(503, Data())   // as this Mac saw it; the server had stored it
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+        let mine = try #require(shop.networkSwitchUnsentOff)
+        await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: mine, changedBy: nil)))
+        await server.answerPut(409, Data(#"{"changedAt":"\#(mine)"}"#.utf8))
+        await server.forget()
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .sent)
+        #expect(await server.asked.map(\.method) == ["GET"], "found there with its own stamp: nothing is sent")
+        #expect(shop.networkSwitchUnsentOff == nil && shop.networkSwitchAsk == nil)
+        #expect(shop.outboundToldOthers != nil, "the others were told")
+    }
+
+    @Test("a refusal that will never pass ends the retry; one that may pass keeps it; never under this Mac's own switch")
+    func retryStops() async throws {
+        let on: JSONValue = .object(["offline": .bool(true), "changedAt": .string(Self.stamp(3600)), "via": .string("cloud")])
+        let old = try Self.published(.init(offline: true, keep: [], changedAt: Self.stamp(3600), changedBy: nil))
+        for (status, kept) in [(403, false), (400, false), (413, false), (429, true), (500, true), (408, true)] {
+            #expect(Shop.refusalMayPass(status) == kept)
+            let (shop, server, _) = await Self.shop(option: true, network: on)
+            await server.answerGet(200, old)
+            await server.answerPut(status, Data())
+            #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+            #expect((shop.networkSwitchUnsentOff != nil) == kept, Comment(rawValue: "\(status)"))
+            if !kept {
+                await server.forget()
+                #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == nil)
+                #expect(await server.asked.isEmpty, "not asked again at every check")
+            }
+        }
+        // This Mac's own switch: the retry makes no call and keeps the change for later.
+        let (shop, server, _) = await Self.shop(option: true, network: on)
+        await server.answerGet(200, old)
+        await server.answerPut(503, Data())
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+        shop.outboundDefaults.set(true, forKey: Shop.offlineHereKey)
+        shop.tellOutboundGate()
+        await server.forget()
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .unsent)
+        #expect(await server.asked.isEmpty && shop.networkSwitchUnsentOff != nil)
+        // One at a time.
+        shop.outboundDefaults.set(false, forKey: Shop.offlineHereKey)
+        shop.tellOutboundGate()
+        shop.networkSwitchRetrying = true
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == nil)
+        #expect(await server.asked.isEmpty)
+    }
+
+    @Test("the owner's read applies BOTH floors: older than the 409's stamp is not it; older than a later change here ends the question")
+    func bothFloors() async throws {
+        // Offline here by the shop's switch, set at `own`; a question waits from a 409 that named `conflict`.
+        let own = Self.stamp(60), conflict = Self.stamp(600)
+        let on: JSONValue = .object(["offline": .bool(true), "changedAt": .string(own)])
+        func asking() async -> (Shop, Server, NetworkBookForTests) {
+            let (shop, server, book) = await Self.shop(option: true, network: on)
+            shop.outboundDefaults.set(conflict, forKey: Shop.heldStampKey(Self.shopId))
+            shop.networkSwitchAsk = .changedElsewhere(at: NetworkSwitch.date(conflict), turningOn: true)
+            return (shop, server, book)
+        }
+        // Older than the 409's stamp: an old value replayed. Not it; the question stays.
+        var (shop, server, book) = await asking()
+        await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: Self.stamp(900), changedBy: nil)))
+        #expect(await Self.gated(shop) { await shop.readNewerSetting() } == .unreached)
+        // At or after the 409's stamp, but older than the change made here since: overtaken.
+        await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: Self.stamp(300), changedBy: nil)))
+        #expect(await Self.gated(shop) { await shop.readNewerSetting() } == .overtaken)
+        await Self.gated(shop) { await shop.answerNetworkSwitch(apply: true) }
+        #expect(shop.networkSwitchAsk == nil && shop.networkSwitchAnswerProblem == nil, "ended, and not as \"could not be reached\"")
+        #expect(Self.obj(book.network)["offline"] == .bool(true) && Self.obj(book.network)["changedAt"] == .string(own),
+                "the older value is not applied over the owner's later change")
+        // Newer than both: read.
+        (shop, server, book) = await asking()
+        let newer = Self.stamp(5)
+        await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: newer, changedBy: nil)))
+        if case .read(let value) = await Self.gated(shop, { await shop.readNewerSetting() }) { #expect(value.changedAt == newer) }
+        else { Issue.record("a value newer than both floors was not read") }
+        // With no stamp from the 409 (a restart lost it), this Mac's own change is still a floor.
+        (shop, server, book) = await asking()
+        shop.outboundDefaults.removeObject(forKey: Shop.heldStampKey(Self.shopId))
+        await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: Self.stamp(300), changedBy: nil)))
+        #expect(await Self.gated(shop) { await shop.readNewerSetting() } == .overtaken)
+    }
+
+    @Test("only the handler of the owner's answer asks the gate for a token")
+    func oneTokenCallSite() throws {
+        var sites: [String] = []
+        let files = try FileManager.default.contentsOfDirectory(at: Self.sources, includingPropertiesForKeys: nil)
+        for url in files where url.pathExtension == "swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for line in text.split(separator: "\n") where line.contains(".answerToken()") && !line.trimmingCharacters(in: .whitespaces).hasPrefix("//") {
+                sites.append(url.lastPathComponent)
+            }
+        }
+        #expect(sites == ["Shop+NetworkSwitch.swift"], "\(sites)")
+        let src = try String(contentsOf: Self.sources.appending(path: "Shop+NetworkSwitch.swift"), encoding: .utf8)
+        let read = try #require(src.range(of: "func readNewerSetting("))
+        let token = try #require(src.range(of: "outboundGate.answerToken()"))
+        #expect(token.lowerBound > read.lowerBound, "made inside the answer's own read")
     }
 
     @Test("the three sentences are said in words, and the question's buttons wait while the answer reads")

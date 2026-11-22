@@ -93,16 +93,28 @@ public final class OutboundGate: @unchecked Sendable {
     /// switch (never this Mac's own, never an unread book), once, and for
     /// `ANSWER_MS` at most.
     ///
-    /// A token is made HERE, by `answerToken()`, from the code that handles
-    /// the press. It has no initialiser a caller can reach and is never read
-    /// from a request, a file or another process.
+    /// A token cannot be forged: it has no initialiser a caller can reach,
+    /// and is never read from a request, a file or another process. It CAN
+    /// be asked for by any code in the app (`answerToken()` is public, since
+    /// the app is another module): nothing here ties it to a button. The one
+    /// place that asks is the handler of the owner's answer
+    /// (`Shop.readNewerSetting`), and `NetworkSwitchWiringTests` holds the
+    /// app to that one call site.
     public final class Answer: @unchecked Sendable {
         private let lock = NSLock()
         private var token: JSONValue
         fileprivate init(_ token: JSONValue) { self.token = token }
         fileprivate var current: JSONValue {
-            get { lock.lock(); defer { lock.unlock() }; return token }
-            set { lock.lock(); token = newValue; lock.unlock() }
+            lock.lock(); defer { lock.unlock() }
+            return token
+        }
+        /// Read the token, ask, and keep what `use` hands back, as ONE step:
+        /// two gates asked at the same moment cannot both find it unused.
+        fileprivate func using<T>(_ use: (JSONValue) -> (T, JSONValue?)) -> T {
+            lock.lock(); defer { lock.unlock() }
+            let (result, next) = use(token)
+            if let next { token = next }
+            return result
         }
     }
 
@@ -160,7 +172,6 @@ public final class OutboundGate: @unchecked Sendable {
         public init(allowed: Bool, reason: String, once: Bool? = nil) {
             self.allowed = allowed; self.reason = reason; self.once = once
         }
-        public static func == (a: Verdict, b: Verdict) -> Bool { a.allowed == b.allowed && a.reason == b.reason }
     }
 
     /// One row of the Settings list (`describe`).
@@ -241,14 +252,10 @@ public final class OutboundGate: @unchecked Sendable {
         }
     }
 
-    private func context(host: String?, answer: Answer? = nil) -> JSONValue {
+    private func context(host: String?) -> JSONValue {
         var ctx: [String: JSONValue] = ["local": .object(["offline": .bool(local.offline),
                                                          "installCountOff": .bool(local.installCountOff)])]
         if let host { ctx["host"] = .string(host) }
-        if let answer {
-            ctx["answer"] = answer.current
-            ctx["now"] = nowMs
-        }
         return .object(ctx)
     }
 
@@ -262,21 +269,28 @@ public final class OutboundGate: @unchecked Sendable {
     /// only for `switch-sync`. When the rule says `once`, the token is spent
     /// here, before the lock is given up, so a second call cannot use it.
     private func unlockedVerdict(_ purpose: OutboundPurpose, host: String?, answer: Answer? = nil) -> Verdict {
-        guard let rule = rule(),
-              let verdict = try? rule.call2("KhaytOutbound.allowed(ARG0, ARG1, ARG2)",
-                                            [settingsArgument, .string(purpose.rawValue), context(host: host, answer: answer)],
-                                            as: Verdict.self) else {
-            return Verdict(allowed: false, reason: "settings-unknown")
+        guard let rule = rule() else { return Verdict(allowed: false, reason: "settings-unknown") }
+        func ask(_ token: JSONValue?) -> Verdict? {
+            var ctx = context(host: host)
+            if let token, case .object(var o) = ctx {
+                o["answer"] = token
+                o["now"] = nowMs
+                ctx = .object(o)
+            }
+            return try? rule.call2("KhaytOutbound.allowed(ARG0, ARG1, ARG2)",
+                                   [settingsArgument, .string(purpose.rawValue), ctx], as: Verdict.self)
         }
-        if let answer, verdict.allowed, verdict.once == true {
+        guard let answer else { return ask(nil) ?? Verdict(allowed: false, reason: "settings-unknown") }
+        return answer.using { token in
+            guard let verdict = ask(token) else { return (Verdict(allowed: false, reason: "settings-unknown"), nil) }
+            guard verdict.allowed, verdict.once == true else { return (verdict, nil) }
             // If the token cannot be marked used, the call is refused: an
             // answer that could be used twice is worse than one not used.
-            guard let spent = try? rule.call2("KhaytOutbound.spend(ARG0)", [answer.current], as: JSONValue.self) else {
-                return Verdict(allowed: false, reason: "settings-unknown")
+            guard let spent = try? rule.call2("KhaytOutbound.spend(ARG0)", [token], as: JSONValue.self) else {
+                return (Verdict(allowed: false, reason: "settings-unknown"), nil)
             }
-            answer.current = spent
+            return (verdict, spent)
         }
-        return verdict
     }
 
     /// Ask before a call. Throws `OutboundBlocked` when the switch refuses it,

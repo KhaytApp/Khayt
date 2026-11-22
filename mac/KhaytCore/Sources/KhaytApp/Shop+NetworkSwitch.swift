@@ -9,8 +9,10 @@ import KhaytCore
 ///
 /// ── WHAT THIS MAC SENDS, AND WHEN ────────────────────────────────────────
 ///
-/// Only when the switch CHANGES, at the owner's hand, and only this one
-/// setting, sealed with the shop's key:
+/// Only a change the owner made, and only this one setting, sealed with the
+/// shop's key. It is sent when the switch changes; an "off" that could not
+/// be sent then is sent again at a later check, the same change with the
+/// same stamp (`retryUnsentOff`), never anything the owner did not do:
 ///
 ///   turned ON   with the option on, one PUT as this Mac's last call before
 ///               it stops, capped at ten seconds; then it stops either way.
@@ -263,19 +265,30 @@ extension Shop {
 
     /// What became of saying "off".
     enum ToldOff: Equatable {
-        /// Sent and accepted.
+        /// Sent and accepted, or found already published with this very stamp.
         case sent
         /// Nothing is published there (the shop never shared the switch, or
         /// its owner stopped sharing): nothing to send.
         case nothingPublished
         /// Another computer changed the switch at or after this moment: asked.
+        /// Only for the owner's own change, never for a retry.
         case changedElsewhere
-        /// Not signed in, Khayt Cloud not reached, or the PUT refused or
-        /// failed: the others may still be offline. Tried again.
+        /// A retry found a newer value there, or was beaten: the old "off" is
+        /// dropped and the newer value is heard like any other.
+        case superseded
+        /// Khayt Cloud will not take it from this computer (not the owner's
+        /// token, or a request it rejects): not tried again.
+        case refused
+        /// Not signed in, Khayt Cloud not reached, or a failure that may
+        /// pass: the others may still be offline. Tried again.
         case unsent
         /// This Mac's book holds no switch to send.
         case nothingToSend
     }
+
+    /// Whether a refused PUT is worth sending again: a timeout, "too many",
+    /// or the server's own fault. Anything else it will refuse every time.
+    nonisolated static func refusalMayPass(_ status: Int) -> Bool { status == 408 || status == 429 || status >= 500 }
 
     /// The switch was turned OFF here, by the owner: a GET first, then
     /// `offline: false` ONLY if a value is published there (Dev Hub, Nov 22;
@@ -288,10 +301,18 @@ extension Shop {
     /// published, and this Mac is the one that knows it was turned off. The
     /// stamp is remembered and `retryUnsentOff` sends the SAME change, with
     /// the same stamp, at each check until it is sent or superseded.
+    ///
+    /// A RETRY (`retry: true`) IS NOT THE OWNER'S PRESS, so it never asks and
+    /// never sends over something newer: a value published there with a later
+    /// stamp, or a 409, drops the old "off" and leaves the newer value to be
+    /// heard and applied like any other. Raising the "changed at another
+    /// computer" question from a retry held that newer value back, and left
+    /// this Mac online against the shop until somebody answered (review).
     @discardableResult
-    func tellOthersSwitchedOff(_ network: JSONValue, seenBefore: String?) async -> ToldOff {
+    func tellOthersSwitchedOff(_ network: JSONValue, seenBefore: String?, retry: Bool = false) async -> ToldOff {
         // lock: callers — setOutboundOffline, retryUnsentOff
-        guard let value = NetworkSwitch.value(of: network, purposes: outboundPurposeIds), !value.offline else {
+        guard let value = NetworkSwitch.value(of: network, purposes: outboundPurposeIds), !value.offline,
+              let mine = NetworkSwitch.date(value.changedAt) else {
             forgetUnsentOff()
             return .nothingToSend
         }
@@ -303,6 +324,9 @@ extension Shop {
             return .unsent
         }
         let (heard, _) = await Self.networkSwitchGet(connection, token: token, fetch: networkSwitchFetcher)
+        // The retry waited on the network: if the switch was changed here
+        // meanwhile, this "off" is no longer the shop's word.
+        if retry, !unsentOffStillStands(value.changedAt) { forgetUnsentOff(); return .superseded }
         switch heard {
         case .failed:
             // Not known whether a value is published there: neither sent nor
@@ -311,23 +335,42 @@ extension Shop {
             rememberUnsentOff(value.changedAt, seenBefore: seenBefore)
             return .unsent
         case .none:
+            // Nothing is published: nothing to send, and nothing failed.
             forgetUnsentOff()
+            outboundDefaults.set(false, forKey: Self.tellFailedKey)
             return .nothingPublished
-        case .published:
-            break
+        case .published(let there):
+            if let thereAt = NetworkSwitch.date(there) {
+                // Already there with this very stamp: an earlier send whose
+                // answer was lost. Sending it again would be refused as
+                // stale, and read as another computer's change.
+                if thereAt == mine {
+                    forgetUnsentOff()
+                    noteTold(.told(Date()))
+                    outboundRevision &+= 1
+                    return .sent
+                }
+                if retry, thereAt > mine { forgetUnsentOff(); return .superseded }
+            }
         }
-        guard NetworkSwitch.sendsOff(publishedThere: true) else { return .nothingPublished }
         let sent = await Self.networkSwitchPut(value, connection: connection, token: token, dek: dek, fetch: networkSwitchFetcher)
-        afterSending(sent, turningOn: false, option: outboundTellsOthers)
         switch sent {
         case .ok:
+            afterSending(sent, turningOn: false, option: outboundTellsOthers)
             forgetUnsentOff()
             return .sent
         case .stale:
             forgetUnsentOff()
+            if retry { return .superseded }
+            afterSending(sent, turningOn: false, option: outboundTellsOthers)
             await holdPublished(connection, token: token, dek: dek, seenBefore: seenBefore)
             return .changedElsewhere
+        case .refused(let status) where !Self.refusalMayPass(status):
+            afterSending(sent, turningOn: false, option: outboundTellsOthers)
+            forgetUnsentOff()
+            return .refused
         case .refused, .failed:
+            afterSending(sent, turningOn: false, option: outboundTellsOthers)
             rememberUnsentOff(value.changedAt, seenBefore: seenBefore)
             return .unsent
         }
@@ -369,13 +412,17 @@ extension Shop {
     /// superseded; kept when it still cannot be sent.
     @discardableResult
     func retryUnsentOff() async -> ToldOff? {
-        guard let stamp = networkSwitchUnsentOff else { return nil }
+        // One at a time: the check runs on a timer and beside each sync, and
+        // two retries sending the same stamp read each other as a conflict.
+        guard !networkSwitchRetrying, let stamp = networkSwitchUnsentOff else { return nil }
         guard unsentOffStillStands(stamp) else { forgetUnsentOff(); return nil }
         // Only the owner's own change is ever sent, and only where this Mac
         // may make the call at all.
         guard !outboundOfflineHere, lockAllows("security", "edit") else { return .unsent }
+        networkSwitchRetrying = true
+        defer { networkSwitchRetrying = false }
         let seenBefore = outboundDefaults.string(forKey: Self.unsentOffSeenBeforeKey(networkSwitchShopId))
-        return await tellOthersSwitchedOff(.object(networkSettings), seenBefore: seenBefore)
+        return await tellOthersSwitchedOff(.object(networkSettings), seenBefore: seenBefore, retry: true)
     }
 
     private func afterSending(_ sent: Sent, turningOn: Bool, option: Bool = true) {
@@ -543,6 +590,18 @@ extension Shop {
             case .unreached:
                 networkSwitchAnswerProblem = words.callIt("mac.net_ask_unreached")
                 return
+            case .overtaken:
+                // The owner changed the switch on this Mac after the question
+                // was asked, and that change is newer than the other
+                // computer's. Khayt Cloud WAS reached; there is nothing to
+                // apply and nothing left to ask. Saying "could not be
+                // reached" here was false (review).
+                guard networkSwitchAsk == ask else { return }
+                networkSwitchAsk = nil
+                networkSwitchHeld = nil
+                holdStamp(nil)
+                outboundDefaults.removeObject(forKey: Self.heldTurningOnKey(networkSwitchShopId))
+                return
             }
             // Asked while the read was in flight: the question may have been
             // answered by a check that heard the value, or the book changed.
@@ -602,6 +661,9 @@ extension Shop {
         case nothingPublished
         /// Not signed in, not reached, refused, or a value that fails a check.
         case unreached
+        /// Read, and older than a change made on this Mac since the question
+        /// was asked: the question is about a switch the owner has since set.
+        case overtaken
     }
 
     /// The ONE `switch-sync` GET the owner's answer makes. The value must
@@ -632,7 +694,7 @@ extension Shop {
             // this Mac's own change. Either alone lets an older value replayed
             // behind the 409 answer the question.
             if let conflict = networkSwitchHeldStamp.flatMap(NetworkSwitch.date), when < conflict { return .unreached }
-            if let own = networkSwitchOwnStamp.flatMap(NetworkSwitch.date), when < own { return .unreached }
+            if let own = networkSwitchOwnStamp.flatMap(NetworkSwitch.date), when < own { return .overtaken }
             return .read(value)
         }
     }
