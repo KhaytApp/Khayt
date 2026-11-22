@@ -1146,6 +1146,22 @@ function writePreWipeBackup() {
 }
 
 // --- Daily auto-backup (new in 1.3) ---
+/* A backup or restore point the WINDOW wrote is restored by the owner, so what
+ * it holds must be what this role may write: a manager's file carrying the
+ * lock, people's roles, the outbound switch or the sharing opt-ins would
+ * otherwise reach the book the day the owner restores it (security review of
+ * #2636, LOW-2). The same guard as a save, against the book on disk; no
+ * sign-in is spent on it. Lock off on disk: unchanged. Null: refuse. */
+function guardedSnapshot(parsed) {
+  let disk = null;
+  try { disk = readStoreDecryptedFromDisk(); } catch (_) { disk = null; }
+  if (!disk || !disk.settings) return parsed;
+  try {
+    const g = PrinterPermission.guardSave(parsed, disk, { verified: () => false, consume: () => {} });
+    return g.store || null;
+  } catch (_) { return null; }
+}
+
 ipcMain.handle('hub:write-backup', async (event, jsonString) => {
   if (!jsonString || typeof jsonString !== 'string' || jsonString.length > MAX_STORE_BYTES) {
     return { ok: false, error: 'Backup data too large or invalid' };
@@ -1157,6 +1173,8 @@ ipcMain.handle('hub:write-backup', async (event, jsonString) => {
   const fullPath = path.join(backupsDir(), filename);
   let parsed;
   try { parsed = safeJsonParse(jsonString); } catch (e) { return { ok: false, error: 'Invalid JSON in backup data' }; }
+  parsed = guardedSnapshot(parsed);
+  if (!parsed) return { ok: false, error: 'Invalid JSON in backup data' };
   const encrypted = JSON.stringify(encryptForDisk(parsed));
   await fs.promises.writeFile(fullPath, encrypted, 'utf8');
   // Keep only the most recent 30 backups
@@ -1272,6 +1290,8 @@ ipcMain.handle('hub:create-restore-point', async (_e, { json, label } = {}) => {
   if (!json || typeof json !== 'string' || json.length > MAX_STORE_BYTES) return { ok: false, error: 'Invalid data' };
   let parsed;
   try { parsed = safeJsonParse(json); } catch (e) { return { ok: false, error: 'Invalid JSON' }; }
+  parsed = guardedSnapshot(parsed);
+  if (!parsed) return { ok: false, error: 'Invalid data' };
   const safeLabel = sanitizeRpLabel(label);
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `${stamp}__${safeLabel.replace(/\s+/g, '_')}.json`;
@@ -2333,6 +2353,8 @@ function enqueueTelemetry(kind, rawPayload) {
 }
 
 // Opt-out purges everything queued locally, immediately.
+// No role check on purpose: emptying this computer's queue can only mean LESS
+// is sent, never more (security review of #2636, NIT).
 ipcMain.handle('hub:telemetry-purge', async () => {
   try { fs.unlinkSync(TELEMETRY_QUEUE_FILE()); } catch (_) {}
   return { ok: true };
@@ -2490,15 +2512,29 @@ ipcMain.handle('hub:outbound-set-local', async (_e, patch) => {
   // Only the owner changes the switch under the staff lock, this computer's
   // own included (Turki, Nov 22 round 2). The book's settings.network is held
   // by the save guard (PrinterPermission SECURITY_SETTINGS).
-  if (!PrinterPermission.mayChangeNetwork(lanServerStore)) return { ok: false, error: 'not_permitted' };
+  if (!PrinterPermission.mayChangeNetwork(bookForPrivacyCheck())) return { ok: false, error: 'not_permitted' };
   try { return { ok: true, local: outboundGate.setLocal(patch) }; } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
+
+/* The book the owner-only switches are judged against. Main's copy is `{}`
+ * until a window loads the book, and on a fresh install nothing loads it
+ * before the first save, so `{}` read as "locked, nobody signed in" and
+ * refused even with no lock (security review of #2636, LOW-1). The disk when
+ * main has not read it yet; no book at all is no lock. */
+function bookForPrivacyCheck() {
+  if (lanServerStore && lanServerStore.settings) return lanServerStore;
+  let disk = null;
+  try { disk = readStoreDecryptedFromDisk(); } catch (_) { disk = null; }
+  if (disk && disk.settings) return disk;
+  try { if (fs.existsSync(dataFilePath())) return null; } catch (_) { return null; }   // a book we cannot read: refused
+  return { settings: {} };
+}
 
 ipcMain.handle('hub:active-count-get', async () => ({ ready: activeCountReady(), on: !readActiveCount().off }));
 ipcMain.handle('hub:active-count-set', async (_e, on) => {
   // Owner-only under the staff lock, like the outbound switch (Turki, Nov 22).
   // It is this computer's own file, so no save guard sees it: the check is here.
-  if (!PrinterPermission.mayChangePrivacy(lanServerStore)) return { ok: false, error: 'not_permitted' };
+  if (!PrinterPermission.mayChangePrivacy(bookForPrivacyCheck())) return { ok: false, error: 'not_permitted' };
   // Off keeps the dates, so turning it back on does not count this as new.
   writeActiveCount({ ...readActiveCount(), off: !on });
   if (on) sendActiveCount().catch(() => {});

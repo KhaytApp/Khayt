@@ -5363,7 +5363,8 @@ function renderTelemetrySettings() {
     </div>`;
 
   const persist = async () => {
-    await setTelemetryConsent(!!el.querySelector('#tel_crash')?.checked, !!el.querySelector('#tel_usage')?.checked);
+    // Refused (the owner's, under the lock): said already, and not "saved" too (review LOW-3).
+    if (await setTelemetryConsent(!!el.querySelector('#tel_crash')?.checked, !!el.querySelector('#tel_usage')?.checked) === false) return;
     toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
   };
   renderActiveCountRow(el);

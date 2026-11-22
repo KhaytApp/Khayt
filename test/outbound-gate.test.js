@@ -283,7 +283,7 @@ test('round 2 (Nov 22): only the owner changes the switch under the staff lock, 
   // This computer's own switch: main asks the same rule first.
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
   const h = main.slice(main.indexOf("ipcMain.handle('hub:outbound-set-local'"));
-  assert.match(h.slice(0, 400), /if \(!PrinterPermission\.mayChangeNetwork\(lanServerStore\)\) return \{ ok: false, error: 'not_permitted' \};/);
+  assert.match(h.slice(0, 400), /if \(!PrinterPermission\.mayChangeNetwork\(bookForPrivacyCheck\(\)\)\) return \{ ok: false, error: 'not_permitted' \};/);
 });
 
 test('round 2 (Nov 22): the online store\'s cloud routes ask `storefront`, every other cloud request `cloud`', async () => {

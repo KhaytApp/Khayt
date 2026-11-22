@@ -56,11 +56,20 @@ try {
       if (typeof flushSave === 'function') await flushSave();
     });
     await w.waitForTimeout(500);
+    // A restore point the manager makes carries no opt-ins the owner would
+    // restore later (security review LOW-2).
+    const rp = await w.evaluate(() => window.hubAPI.createRestorePoint({ json: JSON.stringify({ ...buildExportPayload({ redactSecrets: false }), settings: { ...settings, telemetry: { crashOptIn: true, usageOptIn: true, installId: 'abcdef0123456789', consentAt: '2026-11-22T00:00:00Z' } } }), label: 'friendly' }));
+    ok(rp && rp.ok, 'a manager can still make a restore point');
+    globalThis.__rpName = rp.filename;
   });
   const t1 = onDisk(mgr).settings.telemetry || {};
   ok(t1.crashOptIn !== true && t1.usageOptIn !== true && !t1.installId, 'a forced save is put back: nothing turned on on disk');
   const ac1 = (() => { try { return JSON.parse(fs.readFileSync(path.join(mgr, 'active-count.json'), 'utf8')); } catch (_) { return {}; } })();
   ok(ac1.off !== true, 'and the install count is not switched off');
+  const rpDir = fs.readdirSync(mgr).find((d) => /restore/i.test(d));
+  const rpFile = rpDir && path.join(mgr, rpDir, globalThis.__rpName);
+  const rpBook = rpFile && fs.existsSync(rpFile) ? JSON.parse(fs.readFileSync(rpFile, 'utf8')) : null;
+  ok(rpBook && (rpBook.settings.telemetry || {}).crashOptIn !== true, 'and the restore point holds the opt-ins as on disk, not as the manager sent them');
 
   // 2. Lock on, the owner signed in: both change.
   const own = bookAs({ lock: true, who: 'op-owner' });
@@ -79,6 +88,17 @@ try {
     ok(r && r.ok === true, 'lock off: the install count switches');
     ok(await w.evaluate(async () => (await setTelemetryConsent(false, true)) === true), 'lock off: the opt-ins change');
   });
+
+  // 4. A fresh install, before anything is saved: no lock, so the switch works
+  // (security review LOW-1: main's copy of the book was still empty).
+  const fresh = makeUserDataDir();
+  {
+    const { electronApp, window } = await launchApp(fresh);
+    try {
+      const r = await window.evaluate(() => window.hubAPI.activeCountSet(false));
+      ok(r && r.ok === true, 'a fresh install switches the install count before its first save');
+    } finally { await electronApp.close(); }
+  }
 
   console.log('\ne2e-privacy-owner-only: ok');
 } catch (e) {
