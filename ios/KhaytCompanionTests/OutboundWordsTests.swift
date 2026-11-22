@@ -55,7 +55,11 @@ final class OutboundWordsTests: XCTestCase {
     /// the same thing in the same language.
     func testArabicIsTheDesktopsSentence() {
         L10n.setLanguage(.ar)
-        XCTAssertEqual(PhoneOutbound.words(purpose: .cloud, reason: "offline"),
+        // L10n.format isolates the inserted purpose (U+2068 … U+2069) so it
+        // reads right inside Arabic; the words are compared without them.
+        let isolates = CharacterSet(charactersIn: "\u{2068}\u{2069}")
+        XCTAssertEqual(PhoneOutbound.words(purpose: .cloud, reason: "offline").unicodeScalars.filter { !isolates.contains($0) }
+                        .map(String.init).joined(),
                        "خيط مضبوط على عدم الاتصال بالإنترنت. هذا الإجراء يحتاج إلى سحابة خيط.")
         XCTAssertEqual(PhoneOutbound.words(purpose: .cloud, reason: "settings-unknown"),
                        "خيط قيد التشغيل. حاول مرة أخرى بعد لحظة.")
