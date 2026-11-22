@@ -6185,6 +6185,8 @@
   "outbound.blocked.lan-host-missing": "Khayt est configuré pour n'effectuer aucune connexion Internet, et l'adresse nécessaire n'est pas sur le réseau de votre boutique.",
   "outbound.blocked.settings-unknown": "Khayt démarre. Réessayez dans un instant.",
   "err.refused_network": "Utilisation d'Internet (« Aucune connexion Internet »)",
+  "err.refused_telemetry": "les rapports de plantage et les statistiques d’utilisation",
+  "err.refused_active_count": "le comptage anonyme de cette installation",
   "iu.in.unrouted": "une adresse hors du réseau de votre boutique",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

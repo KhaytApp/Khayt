@@ -2496,6 +2496,9 @@ ipcMain.handle('hub:outbound-set-local', async (_e, patch) => {
 
 ipcMain.handle('hub:active-count-get', async () => ({ ready: activeCountReady(), on: !readActiveCount().off }));
 ipcMain.handle('hub:active-count-set', async (_e, on) => {
+  // Owner-only under the staff lock, like the outbound switch (Turki, Nov 22).
+  // It is this computer's own file, so no save guard sees it: the check is here.
+  if (!PrinterPermission.mayChangePrivacy(lanServerStore)) return { ok: false, error: 'not_permitted' };
   // Off keeps the dates, so turning it back on does not count this as new.
   writeActiveCount({ ...readActiveCount(), off: !on });
   if (on) sendActiveCount().catch(() => {});

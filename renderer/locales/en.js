@@ -6186,6 +6186,8 @@
   "outbound.blocked.lan-host-missing": "Khayt is set to make no internet calls, and the address this needs is not on your shop’s network.",
   "outbound.blocked.settings-unknown": "Khayt is starting. Try again in a moment.",
   "err.refused_network": "Internet use (“Make no internet calls”)",
+  "err.refused_telemetry": "crash reports and usage statistics",
+  "err.refused_active_count": "the anonymous install count",
   "iu.in.unrouted": "an address outside your shop’s network",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -777,6 +777,8 @@ function _saveRefused(refused) {
     // "Make no internet calls" is the owner's, under the lock: said as itself,
     // not as "the shop lock" (P8 PR 5).
     else if (s === 'settings.network') parts.add(t('err.refused_network'));
+    // The crash and usage opt-ins: the owner's under the lock (Nov 22).
+    else if (s === 'settings.telemetry') parts.add(t('err.refused_telemetry'));
     else if (s.startsWith('settings.') || s === 'settings') parts.add(t('err.refused_lock'));
     else if (s.startsWith('operators')) parts.add(t('err.refused_people'));
     else if (s.startsWith('machines.')) parts.add(t('err.refused_printer'));
