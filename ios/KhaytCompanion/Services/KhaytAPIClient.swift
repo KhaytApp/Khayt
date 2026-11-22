@@ -2396,8 +2396,29 @@ final class KhaytAPIClient: ObservableObject {
                     throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
                 }
             } else {
-                let key = settings.macIdentityKey
-                guard !key.isEmpty, await proves(host: settings.host, port: settings.port, key: key) else {
+                // Unsigned. A Mac with #2643 refuses a LARGE upload (a photo
+                // over 1 MB, a big estimate file) from its headers, before the
+                // body, and that refusal carries no signature (docs/LAN_API.md).
+                // So ask the small signed route and act on ITS answer.
+                switch await signedRevocation(device) {
+                case .revoked:
+                    break   // signed and verified: signed out, below
+                case .notRevoked:
+                    // The Mac took a signed request: the unsigned refusal was
+                    // not the Mac's word about this phone.
+                    throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+                case .noSignedAnswer:
+                    // An older Mac (it never signs), or an impostor. NEVER a
+                    // wipe on unsigned words alone (Dev Hub, from #2643's
+                    // review): the answerer proves the pinned key, and then the
+                    // phone stops showing the book as live and asks to pair
+                    // again, as for `.unknown`, keeping its PIN, enrolment and
+                    // key. A good signed request later clears it.
+                    let key = settings.macIdentityKey
+                    if !key.isEmpty, await proves(host: settings.host, port: settings.port, key: key) {
+                        settings.needsPairAgain = true
+                        throw KhaytAPIError.unauthorized
+                    }
                     throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
                 }
             }
@@ -2407,6 +2428,27 @@ final class KhaytAPIClient: ObservableObject {
         case nil:
             return (data, response)
         }
+    }
+
+    private enum Revocation { case revoked, notRevoked, noSignedAnswer }
+
+    /// After an UNSIGNED `device-revoked`: one small signed request
+    /// (`GET /api/devices/self`), whose refusal a Mac with #2643 signs over
+    /// its nonce. `.revoked` only for a 401 `device-revoked` whose reply MAC
+    /// verifies; `.notRevoked` when the Mac took the signed request (2xx);
+    /// anything else (an older Mac's unsigned 401 or 404, no answer) is
+    /// `.noSignedAnswer`.
+    private func signedRevocation(_ device: DeviceKey.Credential) async -> Revocation {
+        guard let url = try? makeURL(path: "/api/devices/self") else { return .noSignedAnswer }
+        let nonce = MacIdentity.nonce()
+        guard let (data, response) = try? await send(url, method: "GET", body: nil, auth: .device(device), nonce: nonce),
+              let http = response as? HTTPURLResponse else { return .noSignedAnswer }
+        if (200...299).contains(http.statusCode) { return .notRevoked }
+        guard http.statusCode == 401, DeviceKey.refusal(data) == .revoked,
+              DeviceKey.verifiesReply(device, nonce: nonce, status: 401, body: data,
+                                      replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+        else { return .noSignedAnswer }
+        return .revoked
     }
 
     private enum Auth { case none, pin, device(DeviceKey.Credential) }
