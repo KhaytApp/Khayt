@@ -186,11 +186,9 @@ extension Shop {
         if !filled(ai["apiKey"]), ai["provider"] != .string("compatible") { missing.insert(.ai) }
         if !ZatcaSubmit.phase2Ready(settings: s) { missing.insert(.taxAuthority) }
         if !makerRunLinked { missing.insert(.makerrun) }
-        // The switch is asked of Khayt Cloud only by a shop that shares it
-        // there: signed in, and either this Mac's option is on or the switch
-        // came through Khayt Cloud. Otherwise nothing is asked, whatever the
-        // switch says, and the row says so.
-        if !cloudConnected || !(outboundTellsOthers || networkSwitchViaCloud) { missing.insert(.switchSync) }
+        // Every Mac signed in to Khayt Cloud asks it for the shop's switch
+        // while it may; one that is not signed in asks nothing.
+        if !cloudConnected { missing.insert(.switchSync) }
         return missing
     }
 

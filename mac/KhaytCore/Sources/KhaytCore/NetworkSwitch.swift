@@ -35,6 +35,9 @@ public enum NetworkSwitch {
     /// The cap on the one last call when the switch is turned on.
     public static let lastCallCap: TimeInterval = 10
     public static let maxChangedBy = 80
+    /// How far ahead of this computer's clock a stamp may be: the server's
+    /// own limit. A stamp further ahead is not applied and not remembered.
+    public static let aheadAllowed: TimeInterval = 10 * 60
     /// Never in a `keep` list: `lan` is always allowed, and the switch-sync
     /// call is each computer's own choice, kept by the rule's own test.
     public static let neverKept: Set<String> = ["lan", "switch-sync"]
@@ -71,6 +74,8 @@ public enum NetworkSwitch {
         case old
         /// `offline` is not a boolean, or a stamp is not a strict UTC stamp.
         case malformed
+        /// Stamped more than ten minutes ahead of this computer's clock.
+        case future
     }
 
     // MARK: - The stamp
@@ -196,6 +201,9 @@ public enum NetworkSwitch {
         switch read(published, shopId: shopId, dek: dek, highestSeen: seen, purposes: purposes) {
         case .failure(let why): return .ignore(why)
         case .success(let value):
+            // The server refuses a stamp more than ten minutes ahead; one that
+            // is, here, did not come through an honest server and clock.
+            if isAhead(value, now: now) { return .ignore(.future) }
             if let heldStamp, heldStamp == value.changedAt { return .askChangedElsewhere(value) }
             if asksFirst(value, hasOwnStamp: seen != nil, now: now) { return .askOld(value) }
             return .apply(value)
@@ -208,6 +216,12 @@ public enum NetworkSwitch {
     /// left there would keep reaching every computer that starts); yes when
     /// this computer's option is on; otherwise nothing is sent.
     public static func sendsOff(publishedThere: Bool, optionOn: Bool) -> Bool { publishedThere || optionOn }
+
+    /// Whether a value is stamped further ahead of `now` than is allowed.
+    public static func isAhead(_ value: Value, now: Date) -> Bool {
+        guard let when = date(value.changedAt) else { return true }
+        return when > now.addingTimeInterval(aheadAllowed)
+    }
 
     /// The later of two stamps: how `highestSeen` only ever goes up.
     public static func later(_ a: String?, _ b: String?) -> String? {

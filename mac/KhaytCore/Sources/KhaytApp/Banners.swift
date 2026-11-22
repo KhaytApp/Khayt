@@ -35,8 +35,9 @@ struct MoveBanners: View {
         if let ask = shop.networkSwitchAsk {
             Banner(text: NetworkSwitchWords.sentence(ask, words: shop.words), symbol: "wifi.exclamationmark", tint: Khayt.attention) {
                 HStack(spacing: 8) {
-                    Button(shop.words.callIt("mac.net_ask_apply")) { Task { await shop.answerNetworkSwitch(apply: true) } }
-                    Button(shop.words.callIt("mac.net_ask_leave")) { Task { await shop.answerNetworkSwitch(apply: false) } }
+                    ForEach(ask.choices, id: \.key) { choice in
+                        Button(shop.words.callIt(choice.key)) { Task { await shop.answerNetworkSwitch(apply: choice.apply) } }
+                    }
                 }
                 .disabled(!shop.lockAllows("security", "edit"))
             }

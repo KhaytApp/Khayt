@@ -141,6 +141,9 @@ import Testing
                 "the value a 409 named waits for the person, however often it is read")
         #expect(NetworkSwitch.hearing(p, shopId: Self.shop, dek: Self.otherDek, highestSeen: nil, ownStamp: nil, heldStamp: nil,
                                       purposes: Self.purposes, now: now) == .ignore(.key))
+        // A stamp more than ten minutes ahead of this computer's clock is not applied.
+        #expect(hear(own: "2026-11-01T00:00:00.000Z", at: NetworkSwitch.date("2026-11-22T07:49:59Z")!) == .ignore(.future))
+        #expect(hear(own: "2026-11-01T00:00:00.000Z", at: NetworkSwitch.date("2026-11-22T07:50:01Z")!) == .apply(Self.value()))
     }
 
     @Test("turning the switch off: sent when a value is published there, even with this computer's option off")

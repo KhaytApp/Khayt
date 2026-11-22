@@ -72,7 +72,7 @@ extension Shop {
     func tellOutboundGate() {
         guard feedsOutboundGate else { return }
         outboundGate.update(local: outboundLocal)
-        outboundGate.update(book: .settings(Self.outboundBook(real: source.isReal, settings: settingsDict,
+        outboundGate.update(book: .settings(Self.outboundBook(real: source.isReal || networkBookForTests != nil, settings: settingsDict,
                                                               defaults: outboundDefaults)))
         outboundRevision &+= 1
     }
@@ -165,18 +165,8 @@ extension Shop {
 
     private func writeNetwork(_ change: @escaping @Sendable (JSONValue?) -> JSONValue) async -> Bool {
         // lock: callers — setOutboundOffline, setOutboundKeep
-        guard let build = source.build else { moveProblem = words.callIt("mac.move_sample"); return false }
-        do {
-            try await StoreWriter.updateOffMain(build) { root in
-                var settings: [String: JSONValue] = { if case .object(let o)? = root["settings"] { return o }; return [:] }()
-                settings["network"] = change(settings["network"])
-                root["settings"] = .object(settings)
-            }
-            return true
-        } catch {
-            moveProblem = ErrorText.plain(error)
-            return false
-        }
+        if networkBookForTests == nil, source.build == nil { moveProblem = words.callIt("mac.move_sample"); return false }
+        return await writeNetworkSettings(change, says: true)
     }
 
     /// Turn the shop's switch on or off. The owner's alone.
@@ -193,9 +183,18 @@ extension Shop {
         moveProblem = nil
         guard permitted("security", "edit") else { return false }
         let name: String? = lockInForce ? signedIn?.name : nil
+        // One change at a time: a second click while the last call is in
+        // flight would be judged against a book that is about to change.
+        guard !outboundChanging else { return false }
+        outboundChanging = true
+        defer { outboundChanging = false }
         let before = networkSettings
         let next = Self.network(.object(before), offline: on, by: name, at: now)
         let changed = Self.offlineOf(.object(before)) != on
+        let stamp: String? = { if changed, case .object(let n) = next, case .string(let s)? = n["changedAt"] { return s }; return nil }()
+        // What this Mac had seen before this change, for judging what another
+        // computer set at the same moment.
+        let seenBefore = NetworkSwitch.later(networkSwitchHighestSeen, networkSwitchOwnStamp)
         // TURNED ON, WITH THE OPTION ON: the one last call, while this Mac may
         // still make it. Ten seconds at most; then it stops whatever came back.
         // It "came through Khayt Cloud" only if that call was answered: then
@@ -203,21 +202,18 @@ extension Shop {
         // turned on with nothing sent, or turned off, is this Mac's alone.
         var told = false
         if on, changed { told = await tellOthersSwitchedOn(next) }
+        // Sent, so seen: whatever becomes of the write below, the value this
+        // Mac itself published is never taken for another computer's.
+        if told, let stamp { sawNetworkSwitchStamp(stamp, now: now) }
         let via: Bool? = changed ? (on && told) : nil
         guard await writeNetwork({ Self.network($0, offline: on, by: name, at: now, viaCloud: via) }) else { return false }
-        // Before the reload, which awaits: told now from what was written.
-        var held = settingsDict
-        held["network"] = Self.network(held["network"], offline: on, by: name, at: now, viaCloud: via)
-        settingsValue = .object(held)
-        if changed, case .object(let n) = next, case .string(let stamp)? = n["changedAt"] {
-            if let later = NetworkSwitch.later(networkSwitchHighestSeen, stamp) { outboundDefaults.set(later, forKey: Self.highestSeenKey) }
-        }
+        if let stamp { sawNetworkSwitchStamp(stamp, now: now) }
         // TURNED OFF: this Mac is online again; its first calls say so to
         // Khayt Cloud if a value is published there (`Shop+NetworkSwitch`).
-        if !on, changed { await tellOthersSwitchedOff(next) }
+        if !on, changed { await tellOthersSwitchedOff(next, seenBefore: seenBefore) }
         if !on, !outboundGate.isOffline { outboundGate.clearCounts() }
         if !on { outboundNotice = nil }
-        await load(source)
+        await reloadAfterNetworkWrite()
         return true
     }
 
@@ -229,7 +225,7 @@ extension Shop {
         guard Self.keepable.contains(purpose) else { return false }
         guard await writeNetwork({ Self.network($0, keep: purpose, kept) }) else { return false }
         if kept { outboundNotice = nil }
-        await load(source)
+        await reloadAfterNetworkWrite()
         tellOutboundGate()
         return true
     }
