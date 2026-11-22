@@ -1,5 +1,5 @@
 {
- "about": "lib/outbound.js allowed(settings, purpose, ctx). Master switch in settings.network (book), stricter-only local override in ctx.local, each purpose's own opt-in after. lan is never blocked but must be a private address or LAN name while offline (or while the book is unread). Decided Nov 22 (D1-D6 as recommended). Mac and iPhone run this file through JSC. Round 2 (Nov 22): storefront, the shop's online store (Medusa, Salla, Zid; the desktop's Khayt Cloud storefront routes), a purpose of its own, keepable. ctx.answer is a person's one-call token (answerToken), live for ANSWER_MS (20 s) from `at` by ctx.now; an allowed answer also returns once:true, and the host keeps spend(token).",
+ "about": "lib/outbound.js allowed(settings, purpose, ctx). Master switch in settings.network (book), stricter-only local override in ctx.local, each purpose's own opt-in after. lan is never blocked but must be a private address or LAN name while offline (or while the book is unread). Decided Nov 22 (D1-D6 as recommended). Mac and iPhone run this file through JSC. Round 2 (Nov 22): storefront, the shop's online store (Medusa, Salla, Zid; the desktop's Khayt Cloud storefront routes), a purpose of its own, keepable. ctx.answer is a person's one-call token (answerToken), live for ANSWER_MS (20 s) from `at` by ctx.now; an allowed answer also returns once:true (want.once; absent means the result carries no once), and the host keeps spend(token).",
  "purposes": [
   "updates",
   "install-count",
@@ -1179,7 +1179,8 @@
    "purpose": "switch-sync",
    "want": {
     "allowed": true,
-    "reason": "kept"
+    "reason": "kept",
+    "once": true
    },
    "ctx": {
     "answer": {
@@ -1201,7 +1202,8 @@
    "purpose": "switch-sync",
    "want": {
     "allowed": true,
-    "reason": "kept"
+    "reason": "kept",
+    "once": true
    },
    "ctx": {
     "answer": {
@@ -1432,6 +1434,96 @@
     "now": 1795000001000
    },
    "settings": {}
+  },
+  {
+   "why": "an answer is live from the moment it is made (now === at)",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "kept",
+    "once": true
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000000000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer whose window is empty (until <= at): blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000000000,
+     "spent": false
+    },
+    "now": 1795000000000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer whose spent is not exactly false: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": 0
+    },
+    "now": 1795000000001
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "switch-sync already kept through Khayt Cloud: allowed without spending the answer (no once)",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000000001
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud"
+    }
+   }
   }
  ]
 }
