@@ -1450,7 +1450,7 @@
 /* Pairing by number and floor mode (frames 254:2, Nov 22) */
 "pair.code.title" = "اقترن بجهاز Mac";
 "pair.code.body" = "على جهاز Mac: الإعدادات ▸ عبر الإنترنت ▸ إقران هاتف. يظهر الرقم نفسه هناك.";
-"pair.code.device" = "%@ · Khayt iPhone %@";
+"pair.code.device" = "%@ · خيط للآيفون %@";
 "pair.code.starting" = "يطلب رقمًا من جهاز Mac…";
 "pair.code.waiting" = "بانتظار موافقة أحدهم على جهاز Mac…";
 "pair.code.foot" = "وافق فقط إذا تطابق الرقمان. إن لم يتطابقا فارفض على جهاز Mac: شيء آخر يطلب الاقتران.";
@@ -1478,10 +1478,10 @@
 "pair.not.refused.title" = "رد جهاز Mac لم يجتز التحقق";
 "pair.not.refused.body" = "لم يُقترن شيء. ابدأ من جديد.";
 "pair.not.unreachable.title" = "لم يرد جهاز Mac";
-"pair.not.unreachable.body" = "تأكد أن هذا الهاتف على شبكة Wi-Fi الخاصة بالمتجر وأن Khayt مفتوح على جهاز Mac.";
+"pair.not.unreachable.body" = "تأكد أن هذا الهاتف على شبكة Wi-Fi الخاصة بالمتجر وأن خيط مفتوح على جهاز Mac.";
 "pair.not.again" = "ابدأ من جديد";
 "pair.older.title" = "أدخل رمز المالك";
-"pair.older.body" = "لا يستطيع جهاز Mac هذا الاقتران بالرقم بعد (يحتاج Khayt 4.0 beta مع إقران الهاتف). رمز المالك يقرن هذا الهاتف بصفة المالك كما كان.";
+"pair.older.body" = "لا يستطيع جهاز Mac هذا الاقتران بالرقم بعد (يحتاج خيط 4.0 beta مع إقران الهاتف). رمز المالك يقرن هذا الهاتف بصفة المالك كما كان.";
 "pair.older.foot" = "يقرن الرمز هذا الهاتف مرة واحدة. عندما يسجّل جهاز Mac الهاتف لا يُحفظ الرمز عليه.";
 "pair.older.pair" = "اقتران";
 "floor.today.title" = "اليوم";

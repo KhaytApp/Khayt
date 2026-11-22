@@ -66,8 +66,18 @@ struct FloorLine: View {
 struct FloorTodayView: View {
     @EnvironmentObject private var settings: ConnectionSettings
     @EnvironmentObject private var api: KhaytAPIClient
+    /// The live readings, as the Printers tab shows them (the sample shop's
+    /// and the cloud's come only through here).
+    @EnvironmentObject private var live: LivePrinters
 
-    @State private var printers: [MachineLiveStatus] = []
+    @State private var fetched: [MachineLiveStatus] = []
+    /// What each printer last said: the shared live store's word, else the
+    /// route's answer.
+    private var printers: [MachineLiveStatus] {
+        let byId = Dictionary(fetched.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let ids = Array(Set(byId.keys).union(live.byMachine.keys)).sorted()
+        return ids.compactMap { live.reading(for: $0) ?? byId[$0] }
+    }
     @State private var queue: [QueueOrder] = []
     @State private var problem: String?
     @State private var openOrder: QueueOrder?
@@ -113,6 +123,7 @@ struct FloorTodayView: View {
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await load() }
             .task { await load() }
+            .watchesPrinters(when: true)
             .sheet(isPresented: $showSettings) { SettingsView(showsClose: true) }
             .navigationDestination(item: $openOrder) { order in
                 OrderDetailPage(order: order, facts: nil) { await load() }
@@ -179,7 +190,7 @@ struct FloorTodayView: View {
         if let progress = p.progress { parts.append("\(progress)%") }
         if let left = p.timeRemaining, left > 0 {
             let done = now.addingTimeInterval(TimeInterval(left))
-            parts.append(L10n.format("floor.today.done_at", done.formatted(date: .omitted, time: .shortened)))
+            parts.append(L10n.format("floor.today.done_at", done.formatted(.dateTime.hour().minute().locale(L10n.locale))))
         }
         return parts.joined(separator: " · ")
     }
@@ -196,9 +207,9 @@ struct FloorTodayView: View {
 
     private func load() async {
         do {
-            async let live = api.fetchMachinesLive()
+            async let liveRows = api.fetchMachinesLive()
             async let q = api.fetchQueue()
-            printers = (try? await live) ?? printers
+            fetched = (try? await liveRows) ?? fetched
             queue = try await q
             problem = nil
         } catch {
