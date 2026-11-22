@@ -696,16 +696,19 @@ extension Shop {
     /// The write itself: `bedClearedAt` on the machine, then the book is read
     /// again and the dispatcher asked. ONE place, so the Mac's button and a
     /// phone's (`phoneBedClear`) cannot come to mean different things.
-    /// Returns the stamp written.
+    /// Returns the stamp written, or nil when the book on disk has no such
+    /// machine and nothing was written.
     @discardableResult
-    func stampBedClear(_ machineId: String, at: Date) async throws -> String {
+    func stampBedClear(_ machineId: String, at: Date) async throws -> String? {
         // lock: callers — markBedClear, phoneBedClear
         guard let build = source.build else { throw CocoaError(.fileNoSuchFile) }
         let stamp = StoreWriter.iso(at)
-        try await StoreWriter.updateRecordOffMain(build, collection: "machines", id: machineId) { record in
+        let wrote: Bool? = try await StoreWriter.updateRecordOffMain(build, collection: "machines", id: machineId) { record in
             record["bedClearedAt"] = .string(stamp)
+            return true
         }
         await load(source)
+        guard wrote == true else { return nil }
         await planDispatch()
         return stamp
     }

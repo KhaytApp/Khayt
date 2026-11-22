@@ -102,12 +102,24 @@ struct LanBedClearTests {
 
     @Test("the sample book is not written to, and the phone is told")
     func sample() async throws {
+        // Before the app has started there is no answer yet: busy, not "no such printer".
+        let starting = Shop()
+        if starting.engine == nil {
+            let (status, body) = await starting.phoneBedClear("anything")
+            #expect(status == 503 && body.contains("busy"))
+        }
         let shop = Shop()
+        shop.useEngine(OperatorLockTests.sharedEngine)
         await shop.load(.sample)
         let machine = try #require(shop.machinesInUse.first)
         let (status, body) = await shop.phoneBedClear(machine.id)
         #expect(status == 409 && body.contains("read-only"))
         let (missing, said) = await shop.phoneBedClear("no-such-machine")
         #expect(missing == 404 && said.contains("not-found"))
+        // The route in the real server is this function, not only the bench's stub.
+        let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let server = try String(contentsOf: app.appending(path: "LanServer.swift"), encoding: .utf8)
+        #expect(server.contains("await self?.phoneBedClear(id)"))
     }
 }
