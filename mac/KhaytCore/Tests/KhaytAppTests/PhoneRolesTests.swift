@@ -49,6 +49,26 @@ struct PhoneRolesTests {
             #expect(JSONValue.array(try await engine.deviceRolesGrantable(by: role).map(JSONValue.string)) == want, Comment(rawValue: role))
         }
         #expect(try await engine.deviceDefaultRole() == "operator")
+        // What the servers call: the request with its body and the stored job.
+        guard case .array(let requests)? = v["requests"], case .array(let settable)? = v["settableRoles"] else {
+            Issue.record("no request vectors"); return
+        }
+        #expect(requests.count >= 22 && settable.count >= 5)
+        for value in requests {
+            let c = Self.obj(value), want = Self.obj(c["want"])
+            guard case .string(let role)? = c["role"], case .string(let path)? = c["path"], case .string(let method)? = c["method"] else { continue }
+            let why: Comment = { if case .string(let s)? = c["why"] { return Comment(rawValue: s) }; return "?" }()
+            let got = try await engine.deviceAllowsRequest(role: role, path: path, method: method, body: c["body"] ?? .null, job: c["job"] ?? .null)
+            #expect(JSONValue.bool(got.ok) == want["ok"], why)
+            let required: JSONValue = got.required.map(JSONValue.string) ?? .null
+            #expect(required == (want["required"] ?? .null), why)
+        }
+        for value in settable {
+            let c = Self.obj(value)
+            guard case .string(let approver)? = c["approver"] else { continue }
+            let got = try await engine.deviceRolesSettable(on: c["device"] ?? .null, by: approver)
+            #expect(JSONValue.array(got.map(JSONValue.string)) == c["want"], "\(String(describing: c["why"]))")
+        }
     }
 
     // MARK: - The device store

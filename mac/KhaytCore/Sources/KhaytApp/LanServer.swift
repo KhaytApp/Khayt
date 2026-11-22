@@ -2650,53 +2650,33 @@ final class LanServer {
         }
         let device = KhaytEngine.deviceRecord(kind: stored["kind"], role: stored["role"],
                                               rolesVersion: stored["rolesVersion"].flatMap(Int.init))
-        guard let answer = try? await host.engine.deviceAllows(device, path: request.path, method: request.method) else {
+        // The rule is asked about the REQUEST, not only the route: on a job
+        // write the body decides too (a price, a new quote, or moving a quote
+        // on is pricing, `quote:write`, whatever route carries it).
+        let write = jobWrite(request)
+        guard let answer = try? await host.engine.deviceAllowsRequest(
+            device, path: request.path, method: request.method,
+            bodyText: write.map { _ in String(decoding: request.body, as: UTF8.self) }, job: write?.job) else {
             return signedForPhone(.json(403, #"{"reason":"role-scope","required":"owner"}"#), request)
         }
-        if answer.ok {
-            // ── PRICING THROUGH A JOB UPDATE ─────────────────────────────
-            //
-            // The table gives an operator `orders:write` (move a job, notes,
-            // photos) and keeps pricing for `quote:write`. But the job routes
-            // take a `price`, and a `status` that moves a QUOTE on, which
-            // accepts it: an invoice number is drawn and the customer is told.
-            // Those two are pricing whatever route carries them, so a role
-            // without `quote:write` is refused them here (security review of
-            // the first draft; the shared rule sees only the path).
-            if await pricesThroughJobRoute(request),
-               let scopes = try? await host.engine.deviceScopes(role: answer.role), !scopes.contains("quote:write") {
-                return signedForPhone(.json(403, #"{"reason":"role-scope","required":"quote:write"}"#), request)
-            }
-            return nil
-        }
+        if answer.ok { return nil }
         let body = (try? JSONEncoder().encode(["reason": "role-scope", "required": answer.required ?? "owner"])) ?? Data()
         // Signed back: a phone acts on this answer (it steps down to its floor
         // mode), so a device on the Wi-Fi must not be able to forge it.
         return signedForPhone(.json(403, String(decoding: body, as: UTF8.self)), request)
     }
 
-    /// Whether a write to `/api/orders` or `/api/orders/<id>` sets a price or
-    /// moves a quote on. A body that cannot be read is treated as doing so:
-    /// the route would refuse it anyway, and this never guesses "harmless".
-    func pricesThroughJobRoute(_ request: Request) async -> Bool {
-        guard ["POST", "PATCH", "PUT"].contains(request.method) else { return false }
-        let path = Self.routePath(request.path)
-        let parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+    /// A write to `/api/orders` or `/api/orders/<id>`: the stored job the
+    /// path names (nil for a create, or an id the book does not have). Nil
+    /// for every other request, whose body the rule does not read.
+    func jobWrite(_ request: Request) -> (job: JSONValue?, Void)? {
+        guard ["POST", "PATCH", "PUT"].contains(request.method) else { return nil }
+        let parts = Self.routePath(request.path).split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         // ["", "api", "orders"] or ["", "api", "orders", "<id>"]
-        guard parts.count == 3 || parts.count == 4, parts[1] == "api", parts[2] == "orders" else { return false }
-        guard !request.body.isEmpty else { return false }
-        guard case .object(let fields)? = try? JSONDecoder().decode(JSONValue.self, from: request.body) else { return true }
-        if fields["price"] != nil { return true }
-        guard let status = fields["status"] else { return false }
-        if parts.count == 3 { return status == .string("quote") }
-        // An existing job: a status sent for one that is a quote now.
-        let id = parts[3]
-        guard case .array(let orders)? = host.store()["printLog"] else { return true }
-        for order in orders {
-            guard case .object(let o) = order, o["id"] == .string(id) else { continue }
-            return o["status"] == .string("quote") && status != .string("quote")
-        }
-        return false
+        guard parts.count == 3 || parts.count == 4, parts[1] == "api", parts[2] == "orders" else { return nil }
+        guard parts.count == 4, case .array(let orders)? = host.store()["printLog"] else { return (nil, ()) }
+        let found = orders.first { if case .object(let o) = $0 { return o["id"] == .string(parts[3]) }; return false }
+        return (found, ())
     }
 
     /// The answer with `x-khayt-reply-mac`, as a connector's answers carry

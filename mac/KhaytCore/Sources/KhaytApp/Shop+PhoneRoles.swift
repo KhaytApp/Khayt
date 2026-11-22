@@ -132,8 +132,14 @@ extension Shop {
     func setPhoneRole(_ id: String, _ role: String) async -> PhoneRoleRefusal? {
         guard permitted("security", "edit") else { return .notAllowed }
         guard await phoneRolesGrantable().contains(role) else { return .roleNotGrantable }
+        // What may be set on THIS phone is the shared rule's (`settableRoles`):
+        // a phone paired with the owner PIN can only be the owner.
         if let phone = lanDeviceStore.list().first(where: { $0.id == id && $0.kind == nil }),
-           !phone.codePaired, role != "owner" { return .pairedWithPin }
+           let engine, let approver = phoneApproverRole {
+            let record = KhaytEngine.deviceRecord(kind: phone.kind, role: phone.role, rolesVersion: phone.rolesVersion)
+            let settable = (try? await engine.deviceRolesSettable(on: record, by: approver)) ?? []
+            guard settable.contains(role) else { return phone.codePaired ? .roleNotGrantable : .pairedWithPin }
+        }
         guard lanDeviceStore.setRole(id, role) else { return .nothingToApprove }
         refreshPairedPhones()
         return nil
