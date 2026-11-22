@@ -60,6 +60,7 @@ enum FoundPrintersStore {
 
     /// "Forget": the file goes. Nothing to forget is not a failure.
     static func forget(_ build: StoreReader.Build) {
+        // lock: callers — forgetFoundPrinters
         try? FileManager.default.removeItem(at: url(build))
     }
 }
