@@ -66,3 +66,17 @@ test('loads in JavaScriptCore\'s shape: no require, the global only', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'device-roles.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.doesNotMatch(src, /\brequire\(|\bprocess\.|\bBuffer\b|\bglobal\b(?!This)/);
 });
+
+// Mac's security review of the phone-roles draft (MED): a job write can price.
+for (const c of V.requests) test('request: ' + c.why, () => assert.deepEqual(D.allowsRequest(c.role, c.path, c.method, c.body, c.job), c.want));
+for (const c of V.settableRoles) test('settable: ' + c.why, () => assert.deepEqual(D.settableRoles(c.device, c.approver), c.want));
+
+test('allowsRequest never allows more than allows on the same route', () => {
+  for (const c of V.requests) {
+    const route = D.allows(c.role, c.path, c.method);
+    if (!route.ok) assert.equal(D.allowsRequest(c.role, c.path, c.method, c.body, c.job).ok, false, c.why);
+  }
+  // allowsDeviceRequest is roleOf then allowsRequest.
+  assert.equal(D.allowsDeviceRequest({ rolesVersion: 1, role: 'operator' }, '/api/orders/x', 'PATCH', { status: 'pending' }, { status: 'quote' }).ok, false);
+  assert.equal(D.allowsDeviceRequest({}, '/api/orders/x', 'PATCH', { status: 'pending' }, { status: 'quote' }).ok, true, 'the legacy owner');
+});
