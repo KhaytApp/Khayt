@@ -183,10 +183,13 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     // content blocker for every load, and the page's own CSP.
 
     /// The content blocker: block everything, then let `data:`, `blob:` and
-    /// `about:` through.
+    /// `about:` through. One rule each: WebKit's content-blocker regex has
+    /// no `|`, and a list using it does not compile at all.
     nonisolated static let localOnlyRules = """
     [{"trigger":{"url-filter":".*"},"action":{"type":"block"}},
-     {"trigger":{"url-filter":"^(data|blob|about):"},"action":{"type":"ignore-previous-rules"}}]
+     {"trigger":{"url-filter":"^data:"},"action":{"type":"ignore-previous-rules"}},
+     {"trigger":{"url-filter":"^blob:"},"action":{"type":"ignore-previous-rules"}},
+     {"trigger":{"url-filter":"^about:"},"action":{"type":"ignore-previous-rules"}}]
     """
     /// Compiled lists outlive app updates in WebKit's store, so the rules are
     /// compiled again for each paper (which replaces the stored list under
