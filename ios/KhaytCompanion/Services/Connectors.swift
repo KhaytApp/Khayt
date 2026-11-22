@@ -790,6 +790,14 @@ extension KhaytAPIClient {
         request.httpShouldHandleCookies = false
         for h in post.headers { request.setValue(h.value, forHTTPHeaderField: h.name) }
 
+        // A connector posts to a service the shop chose (P8, `webhooks`); one
+        // on the shop's own network is `lan` and still works while offline.
+        // Refused, it says what any refused button says ("can't be used right
+        // now, nothing was sent"); words naming the switch wait for the
+        // signed-off frame.
+        guard (try? OutboundGate.shared.require(.webhooks, orLan: post.url)) != nil else {
+            return .failed(L10n.tr("connectors.error.build"))
+        }
         let session = URLSession(configuration: .ephemeral)
         defer { session.finishTasksAndInvalidate() }
         let data: Data, response: URLResponse

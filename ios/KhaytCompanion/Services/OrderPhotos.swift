@@ -105,6 +105,9 @@ extension KhaytAPIClient {
     /// the only route that lists them (the owner side has add and delete).
     func orderPhotos(token: String) async throws -> [OrderPhoto] {
         guard let cloud, let url = Self.cloudURL(cloud.url, path: "/v1/p/" + Self.segment(token)) else { return [] }
+        // The public route is built here, not by CloudReader.request, so it
+        // asks the shop's internet switch itself (P8).
+        try OutboundGate.shared.require(.cloud)
         let (data, response) = try await CloudReader.session.data(for: URLRequest(url: url))
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         if code == 404 { throw PhotoFailure.notPublished }
