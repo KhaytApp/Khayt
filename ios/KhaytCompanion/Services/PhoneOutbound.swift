@@ -100,17 +100,23 @@ enum PhoneOutbound {
     ///   cleared only by `forgotten()`, so losing the device credential (a
     ///   sign-out, or a forged `device-revoked` on the Wi-Fi) never turns it
     ///   into "online";
-    /// - paired and never told: `.unread` (everything but `lan` held);
+    /// - a FLOOR phone (operator or viewer), paired and never told: `.unread`
+    ///   (everything but `lan` held) until its Mac says. Floor roles exist
+    ///   only with a Mac that has #2631, which ships with #2640, so its Mac
+    ///   always has the signed field to say it with (Dev Hub, Nov 22);
+    /// - an owner or manager phone with no book (against an older Mac, or a
+    ///   Windows/Linux desktop, which has no switch to tell it): `.none`, as
+    ///   before, never held for good waiting for an answer that cannot come;
     /// - the phone's own records unreadable (launched before the first
     ///   unlock): `.unread`, read again when the data becomes available;
     /// - not paired: `.none`, nobody to ask, as every app without a book.
-    static func bookless(paired: Bool, dataAvailable: Bool = true) -> OutboundGate.Book {
+    static func bookless(paired: Bool, floor: Bool = false, dataAvailable: Bool = true) -> OutboundGate.Book {
         if let data = defaults.data(forKey: statusKey),
            let network = try? JSONDecoder().decode(JSONValue.self, from: data) {
             return .settings(.object(["network": network]))
         }
         guard dataAvailable else { return .unread }
-        return paired ? .unread : .none
+        return paired && floor ? .unread : .none
     }
 
     /// Whether the gate is following a book right now. While it is, a status
@@ -131,11 +137,13 @@ enum PhoneOutbound {
     /// A book that could not be read (launched before the first unlock, its
     /// file still protected) is read again when the data becomes available
     /// and each time the app comes forward, so the gate is never left held.
-    static func start(book: CompanionBook?, countInstall: Bool, paired: @escaping () -> Bool = { false }) {
+    static func start(book: CompanionBook?, countInstall: Bool, paired: @escaping () -> Bool = { false },
+                      floor: @escaping () -> Bool = { false }) {
         // A test host must not take the simulator's book as the app's switch:
         // the suites ask their own scoped gates.
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return }
         Self.paired = paired
+        Self.floor = floor
         read(book)
         local(countInstall: countInstall)
         guard observers.isEmpty else { return }
@@ -150,13 +158,18 @@ enum PhoneOutbound {
     /// Asked at each read, not captured once: a phone paired later in the
     /// same session counts as paired.
     nonisolated(unsafe) private static var paired: () -> Bool = { false }
+    /// Whether this phone's role is below manager (operator, viewer), asked
+    /// at each read like `paired`. The app passes the pairing's role once the
+    /// role lives on this phone (#2630); on a build without roles no phone is
+    /// a floor phone, which is what `false` says.
+    nonisolated(unsafe) private static var floor: () -> Bool = { false }
 
     private static func read(_ book: CompanionBook?) {
         let exists = book?.exists == true
         bookHeld = exists
         let available = MainActor.assumeIsolated { UIApplication.shared.isProtectedDataAvailable }
         tell(exists ? Self.book(exists: true, store: try? book?.read())
-                    : bookless(paired: paired(), dataAvailable: available))
+                    : bookless(paired: paired(), floor: floor(), dataAvailable: available))
     }
 
     /// Called with every book the phone writes.

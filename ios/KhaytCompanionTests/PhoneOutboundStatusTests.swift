@@ -55,7 +55,7 @@ final class PhoneOutboundStatusTests: XCTestCase {
             PhoneOutbound.changed(["settings": .object(["network": .object(["offline": .bool(false)])])])
             PhoneOutbound.statusAnswer(.network(.object(["offline": .bool(true)])))
             XCTAssertTrue(gate.verdict(.cloud).allowed, "the book's settings, not the status answer")
-            XCTAssertEqual(PhoneOutbound.bookless(paired: true), .unread, "nothing saved while a book is held")
+            XCTAssertEqual(PhoneOutbound.bookless(paired: true, floor: true), .unread, "nothing saved while a book is held")
             PhoneOutbound.forgotten()
         }
     }
@@ -98,7 +98,7 @@ final class PhoneOutboundStatusTests: XCTestCase {
     func testTheGateFollowsVerifiedAnswersOnly() {
         let gate = OutboundGate()
         OutboundGate.$scoped.withValue(gate) {
-            gate.update(book: PhoneOutbound.bookless(paired: true))
+            gate.update(book: PhoneOutbound.bookless(paired: true, floor: true))
             XCTAssertEqual(gate.currentBook, .unread, "first launch, never told: held")
             XCTAssertFalse(gate.verdict(.cloud).allowed)
             XCTAssertTrue(gate.verdict(.lan, host: "192.168.1.40").allowed, "the shop's own network still works")
@@ -126,14 +126,46 @@ final class PhoneOutboundStatusTests: XCTestCase {
     func testTheNextLaunchStartsFromTheLastVerifiedBlock() {
         OutboundGate.$scoped.withValue(OutboundGate()) {
             XCTAssertEqual(PhoneOutbound.bookless(paired: false), .none)
-            XCTAssertEqual(PhoneOutbound.bookless(paired: true), .unread)
+            XCTAssertEqual(PhoneOutbound.bookless(paired: true, floor: true), .unread)
             let on: JSONValue = .object(["offline": .bool(true), "keep": .array([])])
             PhoneOutbound.statusAnswer(.network(on))
-            XCTAssertEqual(PhoneOutbound.bookless(paired: true), .settings(.object(["network": on])))
+            XCTAssertEqual(PhoneOutbound.bookless(paired: true, floor: true), .settings(.object(["network": on])))
             PhoneOutbound.statusAnswer(.noAnswer)
-            XCTAssertEqual(PhoneOutbound.bookless(paired: true), .settings(.object(["network": on])), "kept")
+            XCTAssertEqual(PhoneOutbound.bookless(paired: true, floor: true), .settings(.object(["network": on])), "kept")
             PhoneOutbound.forgotten()
-            XCTAssertEqual(PhoneOutbound.bookless(paired: true), .unread)
+            XCTAssertEqual(PhoneOutbound.bookless(paired: true, floor: true), .unread)
+        }
+    }
+
+    /// Held for good only on a FLOOR phone (Dev Hub, Nov 22). Floor roles
+    /// exist only with a Mac that signs the switch on /api/status, so a floor
+    /// phone always gets an answer. An owner or manager phone with no book,
+    /// against an older Mac or a Windows/Linux desktop that has no switch to
+    /// tell it, stays `.none` as before, never held waiting for an answer that
+    /// cannot come.
+    func testOnlyAFloorPhoneIsHeldUntilItsMacSays() {
+        let gate = OutboundGate()
+        OutboundGate.$scoped.withValue(gate) {
+            // A floor phone (operator, viewer), never told: held, LAN still works.
+            gate.update(book: PhoneOutbound.bookless(paired: true, floor: true))
+            XCTAssertEqual(gate.currentBook, .unread)
+            XCTAssertFalse(gate.verdict(.cloud).allowed, "floor phone: held until the Mac says")
+            XCTAssertTrue(gate.verdict(.lan, host: "192.168.1.40").allowed)
+
+            // An owner or manager phone with no book, never told: as before.
+            gate.update(book: PhoneOutbound.bookless(paired: true, floor: false))
+            XCTAssertEqual(gate.currentBook, .none)
+            XCTAssertTrue(gate.verdict(.cloud).allowed, "owner/manager with an older server: not held for good")
+            XCTAssertEqual(PhoneOutbound.bookless(paired: true), .none, "no role on this build reads as not a floor phone")
+
+            // Either way a verified answer is followed, and before the first
+            // unlock both are held until the phone can read its records.
+            let on: JSONValue = .object(["offline": .bool(true), "keep": .array([])])
+            PhoneOutbound.statusAnswer(.network(on))
+            XCTAssertEqual(PhoneOutbound.bookless(paired: true, floor: false), .settings(.object(["network": on])))
+            XCTAssertEqual(PhoneOutbound.bookless(paired: true, floor: true), .settings(.object(["network": on])))
+            PhoneOutbound.forgotten()
+            XCTAssertEqual(PhoneOutbound.bookless(paired: true, floor: false, dataAvailable: false), .unread)
         }
     }
 }
