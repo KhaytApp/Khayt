@@ -205,3 +205,19 @@ test('the window takes the offer through the same door as a hand install', () =>
   const words = global.KhaytLocales.en;
   for (const r of P.REFUSALS) assert.ok(words['plg.pil_' + r], 'a sentence for ' + r);
 });
+
+test('packaging (review at release): khayt:// declared for Windows (NSIS + appx) and Linux only; never macOS, never Bed Ready', () => {
+  const fs = require('fs'), path = require('path');
+  const root = path.join(__dirname, '..');
+  const b = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).build;
+  const schemes = (x) => (Array.isArray(x) ? x : []).flatMap((p) => p.schemes || []);
+  assert.deepEqual(schemes(b.win && b.win.protocols), ['khayt']);
+  assert.deepEqual(schemes(b.linux && b.linux.protocols), ['khayt']);
+  assert.equal(b.protocols, undefined, 'no top-level entry: it would register macOS too');
+  assert.deepEqual(schemes(b.mac && b.mac.protocols), []);
+  const br = require(path.join(root, 'electron-builder.bedready.js'));
+  const cfg = br && br.default ? br.default : br;
+  assert.deepEqual(schemes(cfg.protocols), ['bedready']);
+  assert.deepEqual(schemes(cfg.win && cfg.win.protocols), []);
+  assert.deepEqual(schemes(cfg.linux && cfg.linux.protocols), []);
+});

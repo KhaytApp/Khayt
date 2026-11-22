@@ -262,7 +262,15 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "protocols": [
+        {
+          "name": "Khayt",
+          "schemes": [
+            "khayt"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -299,7 +307,15 @@
       ],
       "icon": "assets/icon_preview.png",
       "category": "Office",
-      "description": "3D printing production management, invoicing & analytics"
+      "description": "3D printing production management, invoicing & analytics",
+      "protocols": [
+        {
+          "name": "Khayt",
+          "schemes": [
+            "khayt"
+          ]
+        }
+      ]
     }
   }
 }
