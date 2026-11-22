@@ -15,7 +15,7 @@ import Testing
     func vectors() async throws {
         let v = Self.obj(try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: Self.root.appending(path: "test/fixtures/outbound-vectors.json"))))
         guard case .array(let cases)? = v["cases"] else { Issue.record("no cases"); return }
-        #expect(cases.count >= 92)
+        #expect(cases.count >= 96)
         let engine = try KhaytEngine()
         var answered = 0, once = 0
         for value in cases {
@@ -26,6 +26,9 @@ import Testing
             let want = Self.obj(c["want"])
             #expect(got["allowed"] == want["allowed"], why)
             #expect(got["reason"] == want["reason"], why)
+            // `once` is part of the contract: true only when a person's answer
+            // let this one call through, absent otherwise.
+            #expect(got["once"] == want["once"], why)
             // A person's answer (`ctx.answer`): `once` is said only for an
             // allowed switch-sync call, and never without an answer.
             let hasAnswer = Self.obj(c["ctx"])["answer"] != nil

@@ -627,7 +627,12 @@ extension Shop {
                   case .success(let value) = NetworkSwitch.read(published, shopId: connection.shopId, dek: dek,
                                                                 highestSeen: networkSwitchHighestSeen, purposes: outboundPurposeIds),
                   !NetworkSwitch.isAhead(value, now: now), let when = NetworkSwitch.date(value.changedAt) else { return .unreached }
-            if let floor = (networkSwitchHeldStamp ?? networkSwitchOwnStamp).flatMap(NetworkSwitch.date), when < floor { return .unreached }
+            // BOTH floors, as on the desktop: not older than the stamp the 409
+            // gave (the value it spoke of, or a newer one), AND not older than
+            // this Mac's own change. Either alone lets an older value replayed
+            // behind the 409 answer the question.
+            if let conflict = networkSwitchHeldStamp.flatMap(NetworkSwitch.date), when < conflict { return .unreached }
+            if let own = networkSwitchOwnStamp.flatMap(NetworkSwitch.date), when < own { return .unreached }
             return .read(value)
         }
     }
