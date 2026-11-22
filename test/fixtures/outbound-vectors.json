@@ -915,6 +915,140 @@
     "allowed": false,
     "reason": "settings-unknown"
    }
+  },
+  {
+   "why": "settings.network present but a string: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": "x"
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but true: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": true
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but false: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": false
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but an array: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": []
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but a number: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": 1
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but null: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": null
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "settings.network present but an array holding an object: read as offline (Mac review of #2626)",
+   "settings": {
+    "network": [
+     {
+      "offline": false
+     }
+    ]
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "a malformed network block keeps nothing, even a purpose named elsewhere",
+   "settings": {
+    "network": "x",
+    "keep": [
+     "updates"
+    ]
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "a malformed network block still lets a printer on the LAN be polled",
+   "settings": {
+    "network": true
+   },
+   "purpose": "lan",
+   "ctx": {
+    "host": "192.168.1.40"
+   },
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   }
+  },
+  {
+   "why": "a malformed network block refuses a public host for the LAN purpose",
+   "settings": {
+    "network": []
+   },
+   "purpose": "lan",
+   "ctx": {
+    "host": "example.com"
+   },
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   }
+  },
+  {
+   "why": "network absent (the key not there at all) is still today's behaviour",
+   "settings": {
+    "telemetry": {}
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
   }
  ]
 }
