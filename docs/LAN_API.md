@@ -219,6 +219,14 @@ Shared test values for all three implementations are in
 and Ed25519 keys, the derived key, an enrolment signature and two signed
 requests. Each side's tests should reproduce every value in it.
 
+### Signed answers a phone can trust (Windows and Linux, Nov 2026, draft; the Mac's are #2640 and #2643)
+
+Two answers carry `x-khayt-reply-mac` = base64 `HMAC-SHA256(key, "khayt-reply-v1\n" + the request's x-khayt-nonce + "\n" + status + "\n" + hex(sha256(body)))`, the connector's reply MAC (vectors: [`connector-routes.vectors.json`](connector-routes.vectors.json) `reply`). `key` is the device's key. A phone acts on these answers only when the MAC verifies over the nonce it just sent.
+
+- **`GET /api/status?format=json` from a paired phone** also answers `"network": {"offline": true|false, "keep": [...]}`, the shop's "make no internet calls" switch as `lib/outbound.js` reads the book (`isOffline(settings, {})`, `keptOf`), with `Cache-Control: no-store`. This happens only when the request's device signature verifies, a LAN PIN of full length is set and the `Host` is local. Anyone else, an unsigned request, or a signature that does not verify gets the public counts only, with no `network` and no MAC.
+- **`401 {"reason":"device-revoked"}` is signed** with the key the phone had, when the request's own signature verifies under that key inside the clock skew. A forged request naming the phone's id gets the same 401 unsigned. The old keys are kept for this only (they open nothing), for the 256 most recent sign-outs, with the ids. `device-unknown` (a PIN change, an id never seen) is never signed. A body over the size limit is refused before it is read (413 `too-large`), unsigned.
+- **Every phone paired with this computer is the owner** (enrolled with the owner PIN). The desktop has no pairing by code and no roles yet (`lib/device-roles.js` is not used here), so a phone in a floor role cannot be paired to Windows or Linux today. The `network` block is there so the phone has one way to read the switch on both computers.
+
 ### `POST /api/connectors/pair` — a slicer plugin pairs without the PIN (native Mac only)
 
 A **connector** (Khayt for OrcaSlicer) signs its requests exactly as a phone

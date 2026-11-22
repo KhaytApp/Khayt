@@ -351,3 +351,94 @@ test('changing the PIN removes every device', async () => {
     assert.ok((await start(PIN)).ok);
   }
 });
+
+// ── Signed answers (the Mac's #2640 and #2643, for the desktop) ───────────
+
+test('replyMac matches the shared reply vectors', () => {
+  const RV = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/connector-routes.vectors.json'), 'utf8')).reply;
+  assert.ok(RV.length >= 3);
+  for (const v of RV) assert.equal(Devices.replyMac(Buffer.from(v.keyHex, 'hex'), v.nonce, v.status, Buffer.from(v.bodyB64, 'base64')), v.mac, v.name);
+});
+
+test('a verified request carries its reply key, never where it could be logged', () => {
+  const { devs } = enrolled();
+  const r = devs.verify(patchReq());
+  assert.deepEqual(r, { ok: true, deviceId: V.deviceId });
+  assert.equal(r.replyKey.toString('base64'), V.key);
+  assert.equal(r.replyNonce, patchHeaders['x-khayt-nonce']);
+  assert.doesNotMatch(JSON.stringify(r), /replyKey|replyNonce/);
+});
+
+test('a signed-out phone\'s own request gets a signed device-revoked; a forged or late one does not', () => {
+  const { devs, clock } = enrolled();
+  assert.equal(devs.remove(V.deviceId), true);
+  const r = devs.verify(patchReq());
+  assert.deepEqual(r, { ok: false, reason: 'device-revoked' });
+  assert.equal(r.replyKey.toString('base64'), V.key, 'signed with the key the phone had');
+  const forged = devs.verify(patchReq({ headers: { 'x-khayt-mac': Buffer.alloc(32, 7).toString('base64') } }));
+  assert.deepEqual([forged.reason, forged.replyKey], ['device-revoked', undefined]);
+  clock.set(VEC_MS + 121_000);
+  assert.equal(devs.verify(patchReq()).replyKey, undefined, 'outside the clock skew: unsigned');
+});
+
+test('the old keys are kept with the signed-out ids, the newest 256, and survive a restart', () => {
+  const keyPath = path.join(tmp, `rk-${crypto.randomBytes(4).toString('hex')}.key`);
+  const mk = () => Devices.createLanDevices({ fs, keyPath, seal, unseal, now: () => VEC_MS, newKeyPair: fixedPair, newDeviceId: () => V.deviceId });
+  const devs = mk();
+  devs.enrol({ publicKey: V.phonePublic, name: 'Phone', pin: PIN, sign: () => 's' });
+  devs.remove(V.deviceId);
+  assert.ok(mk().verify(patchReq()).replyKey, 'after a restart');
+  // Prune: the revoked list and its keys go together.
+  let n = 0;
+  const devs2 = Devices.createLanDevices({ fs, keyPath: path.join(tmp, `rk2-${crypto.randomBytes(4).toString('hex')}.key`), seal, unseal,
+    now: () => VEC_MS + (n++) * 1000, newKeyPair: fixedPair });
+  const ids = [];
+  for (let i = 0; i < Devices.MAX_REVOKED + 3; i++) {
+    const id = devs2.enrol({ publicKey: V.phonePublic, name: 'P', pin: PIN, sign: () => 's' }).deviceId;
+    devs2.remove(id); ids.push(id);
+  }
+  const saved = JSON.parse(unseal(Buffer.from(fs.readFileSync(path.join(tmp, fs.readdirSync(tmp).filter((f) => f.startsWith('rk2-'))[0]), 'utf8').slice('khayt-sealed:'.length), 'base64')));
+  assert.equal(Object.keys(saved.revoked).length, Devices.MAX_REVOKED);
+  assert.deepEqual(Object.keys(saved.revokedKeys).sort(), Object.keys(saved.revoked).sort());
+});
+
+test('over HTTP: a signed-out phone gets a device-revoked whose reply MAC verifies over its nonce', async () => {
+  const dev = await enrolPhone();
+  await handlers.get('hub:lan-device-remove')(null, dev.out.deviceId);
+  const h = sign(dev, 'GET', '/api/orders');
+  const res = await fetch(`${BASE}/api/orders`, { headers: h });
+  const body = Buffer.from(await res.arrayBuffer());
+  assert.equal(res.status, 401);
+  assert.deepEqual(JSON.parse(body), { reason: 'device-revoked' });
+  assert.equal(res.headers.get('x-khayt-reply-mac'), Devices.replyMac(dev.key, h['x-khayt-nonce'], 401, body));
+  // Someone else naming its id, without its key: the same refusal, unsigned.
+  const forged = await fetch(`${BASE}/api/orders`, { headers: { ...h, 'x-khayt-nonce': crypto.randomBytes(16).toString('hex') } });
+  assert.equal(forged.status, 401);
+  assert.equal(forged.headers.get('x-khayt-reply-mac'), null);
+});
+
+test('over HTTP: /api/status tells a verified phone the shop\'s switch, signed; anyone else gets the counts', async () => {
+  const dev = await enrolPhone();
+  const target = '/api/status?format=json';
+  const plain = await (await fetch(`${BASE}${target}`)).json();
+  assert.equal(plain.network, undefined, 'unsigned: no network block');
+  for (const [settings, want] of [
+    [{ lanApi: { intakeToken: 'tok' } }, { offline: false, keep: [] }],
+    [{ lanApi: { intakeToken: 'tok' }, network: { offline: true, keep: ['storage'] } }, { offline: true, keep: ['storage'] }],
+  ]) {
+    store = { ...store, settings };
+    const h = sign(dev, 'GET', target);
+    const res = await fetch(`${BASE}${target}`, { headers: h });
+    const body = Buffer.from(await res.arrayBuffer());
+    const json = JSON.parse(body);
+    assert.deepEqual(json.network, want);
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+    assert.equal(res.headers.get('x-khayt-reply-mac'), Devices.replyMac(dev.key, h['x-khayt-nonce'], 200, body));
+    for (const k of Object.keys(plain)) assert.ok(k in json, `the public counts are all still there: ${k}`);
+  }
+  // A signature that does not verify: the public counts, no block, no MAC.
+  const bad = await fetch(`${BASE}${target}`, { headers: { ...sign(dev, 'GET', '/api/other') } });
+  assert.equal((await bad.json()).network, undefined);
+  assert.equal(bad.headers.get('x-khayt-reply-mac'), null);
+  store = { ...store, settings: { lanApi: { intakeToken: 'tok' } } };
+});
