@@ -2911,7 +2911,26 @@ final class LanServer {
                                               target: request.target.isEmpty ? request.path : request.target,
                                               body: request.body, pin: host.pin,
                                               now: host.now(), headOnly: headOnly)
-            guard verdict == .pass else { return .json(401, LanDevices.body(verdict)) }
+            guard verdict == .pass else {
+                var refusal = Response.json(401, LanDevices.body(verdict))
+                // ── "YOU ARE SIGNED OUT" IS SIGNED ───────────────────────
+                //
+                // A phone that hears `device-revoked` drops its key and its
+                // copy of the book. Unsigned, anything on the Wi-Fi could say
+                // it. So the refusal carries `x-khayt-reply-mac` under the
+                // key the phone had, over this request's nonce, the status
+                // and the body (`replyMac`, as `/api/devices/self`), and only
+                // when the request itself verified under that key.
+                if verdict == .refused("device-revoked", now: nil), !headOnly,
+                   let nonce = request.headers["x-khayt-nonce"],
+                   let key = host.devices.revokedReplyKey(headers: request.headers, method: request.method,
+                                                          target: request.target.isEmpty ? request.path : request.target,
+                                                          body: request.body, now: host.now()) {
+                    refusal.headers["x-khayt-reply-mac"] = Self.replyMac(key: key, nonce: nonce, status: refusal.status, body: refusal.body)
+                    refusal.headers["Cache-Control"] = "no-store"
+                }
+                return refusal
+            }
             // The key is good: now what this PHONE's role opens (C9).
             return await roleRefusal(request)
         }

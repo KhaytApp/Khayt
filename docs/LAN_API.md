@@ -1148,6 +1148,15 @@ A phone paired with this Mac carries a **role**: owner, manager, operator or vie
 
 Signed by a paired device. Answers what that device is: `{"deviceId":"dev_…","role":"operator","scopes":["queue:read", …]}`. A request with the owner PIN and no device signature is 403 `device-auth`. A role change takes effect on the next request; nothing is re-keyed.
 
+#### A signed `device-revoked` (Mac only)
+
+When the shop signs a phone out, that phone's next signed request is answered `401 {"reason":"device-revoked"}`. **This refusal is signed**: `x-khayt-reply-mac` = `replyMac(key, nonce, status, body)` exactly as `/api/devices/self` answers are, where `key` is the key the phone had, `nonce` is this request's `x-khayt-nonce`, `status` is `401` and `body` is the bytes of the answer. The key is per device, so the MAC is bound to the device id through it.
+
+- The Mac signs it only when the request's own `x-khayt-mac` verifies under the phone's old key and its `x-khayt-time` is within the usual skew. A forged request naming the phone's id gets the same 401 with **no** reply MAC.
+- **The phone must drop its key and its book only on a `device-revoked` whose reply MAC verifies over the nonce it just sent.** An unsigned one is not proof of anything.
+- The Mac keeps a signed-out phone's old key for this only (it opens nothing), for the 256 most recent sign-outs. A phone signed out longer ago than that, or by an older Mac, gets an unsigned `device-revoked`, as does any connector.
+- `device-unknown` (a PIN change, or an id never seen) is not signed: the Mac holds no key for it.
+
 #### `POST /api/devices/pair` (pairing by code; **off** until the phone ships it)
 
 The slicer plugin's commit-then-reveal flow (`POST /api/connectors/pair`) with the phone's own prefixes: `khayt-phone-commit-v1` (the commitment), `khayt-enrol-phone-v1` (what the Mac's identity signs in its offer) and `khayt-phone-check-v1` (the 6-digit check number). A commitment, an offer or a number made for one kind can never stand for the other. No PIN is sent.
