@@ -34,7 +34,7 @@
  *              sliced plate is a new part with no price tiers of its own.
  *
  * Returns { currency, qty, cost: {unit, total} (overhead included), unit,
- * total, rounded, basis, margin: {pct} of the price } or { unpriced: 'bad-facts' | 'no-material' | 'no-currency' }. The route
+ * total, rounded, basis, margin: {pct of the price, pctOnCost (absent when the cost shows as 0.00), amount}, round: {step} only when rounded } or { unpriced: 'bad-facts' | 'no-material' | 'no-currency' }. The route
  * decides which keys a device may see (price only, or price and cost).
  * `basis` is 'measured' when the rates came from a shop preset matched by the
  * slicer's printer preset, 'assumed' when they are the shop's defaults.
@@ -203,19 +203,34 @@ function priceSlice(facts, ctx) {
     ...(round ? { priceRound: round } : {}),
   });
   const total = r2(+(q && q.total) || 0);
+  const rounded = !!(q && q.priceSource === 'rounded');
   // What it costs the shop: the part, and its overhead by the print hour
   // (a cost, as quoteTotal counts it), so the margin shown is the real one.
   const unitAll = unitCost + overheadPerHour * f.hours;
   const costTotal = unitAll * f.qty;
+  const costShown = r2(costTotal);
   return {
     currency,
     qty: f.qty,
     unit: r2(total / f.qty),
     total,
-    rounded: !!(q && q.priceSource === 'rounded'),
+    rounded,
     basis: preset ? 'measured' : 'assumed',
-    cost: { unit: r4(unitAll), total: r2(costTotal) },
-    margin: { pct: total > 0 ? r2((total - costTotal) / total * 100) : 0 },
+    cost: { unit: r4(unitAll), total: costShown },
+    // The margin three ways, for a device the shop lets see the cost: of the
+    // price (pct), on the cost (pctOnCost, a markup) and in money (amount).
+    // amount and pctOnCost are worked from the cost AS SHOWN (2 places), so
+    // total − cost.total is amount to the cent, and a cost that shows as 0.00
+    // states no markup: pctOnCost is absent, never 0% or a number in the
+    // hundreds of thousands.
+    margin: {
+      pct: total > 0 ? r2((total - costTotal) / total * 100) : 0,
+      ...(costShown > 0 ? { pctOnCost: r2((total - costShown) / costShown * 100) } : {}),
+      amount: r2(total - costShown),
+    },
+    // The step the price was rounded to, only when it was: a tab can say
+    // "rounded to the nearest 5". Never the mode, and nothing when unrounded.
+    ...(rounded && round ? { round: { step: round.step } } : {}),
   };
 }
 

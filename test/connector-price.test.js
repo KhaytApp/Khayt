@@ -49,3 +49,22 @@ test('bad facts are refused, not priced', () => {
     assert.deepEqual(CP.priceSlice(bad, ctxOf(V.cases[0])), { unpriced: 'bad-facts' });
   }
 });
+
+test('a plate with no cost is never priced, so a 0% markup is never stated', () => {
+  // Free material and nothing in the plate are refused before a price exists;
+  // priceSlice also leaves margin.pctOnCost out when the cost shows as 0.00 (the last vector).
+  const c = V.cases[0];
+  const freeSpools = { ...ctxOf(c), printers: [], inventory: V.shop.inventory.map((s) => ({ ...s, cost: 0 })), overheadPerHour: 0 };
+  assert.deepEqual(CP.priceSlice(c.facts, freeSpools), { unpriced: 'no-material' });
+  assert.deepEqual(CP.priceSlice({ ...c.facts, filaments: [{ type: 'PLA', colour: '#1E1E1E', grams: 0 }] }, ctxOf(c)), { unpriced: 'bad-facts' });
+});
+
+test('every priced vector with a cost states the markup; round only with rounded', () => {
+  for (const c of V.cases) {
+    const got = CP.priceSlice(c.facts, ctxOf(c));
+    if (got.unpriced) continue;
+    assert.equal('pctOnCost' in got.margin, got.cost.total > 0, c.why);
+    assert.equal(got.margin.amount, Math.round((got.total - got.cost.total) * 100) / 100, c.why + ': amount is total - cost.total to the cent');
+    assert.equal('round' in got, got.rounded === true, c.why);
+  }
+});
