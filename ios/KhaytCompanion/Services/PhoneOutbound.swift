@@ -95,20 +95,32 @@ enum PhoneOutbound {
     /// The last verified status block, for the next launch.
     static let statusKey = "khayt.outbound.statusNetwork"
 
-    /// The gate's view for a phone with no book: the last verified block when
-    /// paired, `.unread` when paired but never told, `.none` when not paired
-    /// (nobody to ask, the behaviour of every app without a book).
-    static func bookless(paired: Bool) -> OutboundGate.Book {
-        guard paired else { return .none }
-        guard let data = defaults.data(forKey: statusKey),
-              let network = try? JSONDecoder().decode(JSONValue.self, from: data) else { return .unread }
-        return .settings(.object(["network": network]))
+    /// The gate's view for a phone with no book (review of #2638):
+    /// - a verified block on record is followed whatever else is known: it is
+    ///   cleared only by `forgotten()`, so losing the device credential (a
+    ///   sign-out, or a forged `device-revoked` on the Wi-Fi) never turns it
+    ///   into "online";
+    /// - paired and never told: `.unread` (everything but `lan` held);
+    /// - the phone's own records unreadable (launched before the first
+    ///   unlock): `.unread`, read again when the data becomes available;
+    /// - not paired: `.none`, nobody to ask, as every app without a book.
+    static func bookless(paired: Bool, dataAvailable: Bool = true) -> OutboundGate.Book {
+        if let data = defaults.data(forKey: statusKey),
+           let network = try? JSONDecoder().decode(JSONValue.self, from: data) {
+            return .settings(.object(["network": network]))
+        }
+        guard dataAvailable else { return .unread }
+        return paired ? .unread : .none
     }
 
-    /// One signed status answer, for a phone that keeps no book. Book
-    /// settings, when the phone has a book, always win (`changed`).
+    /// Whether the gate is following a book right now. While it is, a status
+    /// answer is ignored: the book's settings (telemetry included) win, even
+    /// when a book arrived during the status request (review of #2638).
+    nonisolated(unsafe) private(set) static var bookHeld = false
+
+    /// One signed status answer, for a phone that keeps no book.
     static func statusAnswer(_ answer: StatusNetwork) {
-        guard case .network(let network) = answer else { return }
+        guard !bookHeld, case .network(let network) = answer else { return }
         if let data = try? JSONEncoder().encode(network) { defaults.set(data, forKey: statusKey) }
         tell(.settings(.object(["network": network])))
     }
@@ -119,7 +131,7 @@ enum PhoneOutbound {
     /// A book that could not be read (launched before the first unlock, its
     /// file still protected) is read again when the data becomes available
     /// and each time the app comes forward, so the gate is never left held.
-    static func start(book: CompanionBook?, countInstall: Bool, paired: Bool = false) {
+    static func start(book: CompanionBook?, countInstall: Bool, paired: @escaping () -> Bool = { false }) {
         // A test host must not take the simulator's book as the app's switch:
         // the suites ask their own scoped gates.
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return }
@@ -135,15 +147,21 @@ enum PhoneOutbound {
         }
     }
 
-    nonisolated(unsafe) private static var paired = false
+    /// Asked at each read, not captured once: a phone paired later in the
+    /// same session counts as paired.
+    nonisolated(unsafe) private static var paired: () -> Bool = { false }
 
     private static func read(_ book: CompanionBook?) {
         let exists = book?.exists == true
-        tell(exists ? Self.book(exists: true, store: try? book?.read()) : bookless(paired: paired))
+        bookHeld = exists
+        let available = MainActor.assumeIsolated { UIApplication.shared.isProtectedDataAvailable }
+        tell(exists ? Self.book(exists: true, store: try? book?.read())
+                    : bookless(paired: paired(), dataAvailable: available))
     }
 
     /// Called with every book the phone writes.
     static func changed(_ store: [String: JSONValue]) {
+        bookHeld = true
         tell(.settings(effective(store["settings"] ?? .object([:]))))
     }
 
@@ -151,7 +169,7 @@ enum PhoneOutbound {
     static func forgotten() {
         defaults.removeObject(forKey: rememberedKey)
         defaults.removeObject(forKey: statusKey)
-        paired = false
+        bookHeld = false
         tell(.none)
     }
 

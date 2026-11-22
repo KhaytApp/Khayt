@@ -32,7 +32,46 @@ final class PhoneOutboundStatusTests: XCTestCase {
         PhoneOutbound.StatusNetwork.read(credential, nonce: nonce, status: status, body: b, replyMac: mac)
     }
 
-    override func setUp() { PhoneOutbound.defaults = UserDefaults(suiteName: "status-\(UUID().uuidString)")! }
+    override func setUp() {
+        PhoneOutbound.defaults = UserDefaults(suiteName: "status-\(UUID().uuidString)")!
+        // Other suites leave a book "held"; start each test bookless.
+        OutboundGate.$scoped.withValue(OutboundGate()) { PhoneOutbound.forgotten() }
+    }
+
+    /// A fixed vector computed outside Swift (Node's crypto, the formula in
+    /// `LanServer.replyMac`), so the phone is held to the Mac's bytes and not
+    /// only to this file's restatement of them.
+    func testAFixedReplyVector() {
+        let b = Data(#"{"queued":2,"pending":1,"network":{"offline":true,"keep":["updates"]}}"#.utf8)
+        XCTAssertTrue(DeviceKey.verifiesReply(credential, nonce: nonce, status: 200, body: b,
+                                              replyMac: "O5DNu7znRwbgnoq0rdzFnBdFO9mGr0IKpsCbtD5d8gU="))
+        XCTAssertEqual(macSigns(b), "O5DNu7znRwbgnoq0rdzFnBdFO9mGr0IKpsCbtD5d8gU=")
+    }
+
+    /// A book held, or arriving during the status request, always wins.
+    func testABookHeldWinsOverAStatusAnswer() {
+        let gate = OutboundGate()
+        OutboundGate.$scoped.withValue(gate) {
+            PhoneOutbound.changed(["settings": .object(["network": .object(["offline": .bool(false)])])])
+            PhoneOutbound.statusAnswer(.network(.object(["offline": .bool(true)])))
+            XCTAssertTrue(gate.verdict(.cloud).allowed, "the book's settings, not the status answer")
+            XCTAssertEqual(PhoneOutbound.bookless(paired: true), .unread, "nothing saved while a book is held")
+            PhoneOutbound.forgotten()
+        }
+    }
+
+    /// Losing the credential (a sign-out, or a forged `device-revoked` on the
+    /// Wi-Fi) never turns a verified offline into online; nor does a launch
+    /// before the first unlock.
+    func testAVerifiedBlockOutlivesTheCredential() {
+        OutboundGate.$scoped.withValue(OutboundGate()) {
+            XCTAssertEqual(PhoneOutbound.bookless(paired: false, dataAvailable: false), .unread, "before first unlock")
+            let on: JSONValue = .object(["offline": .bool(true), "keep": .array([])])
+            PhoneOutbound.statusAnswer(.network(on))
+            XCTAssertEqual(PhoneOutbound.bookless(paired: false), .settings(.object(["network": on])),
+                           "no credential any more: the verified block still stands")
+        }
+    }
     override func tearDown() { PhoneOutbound.defaults = .standard }
 
     func testOnlyAVerifiedAnswerIsBelieved() {

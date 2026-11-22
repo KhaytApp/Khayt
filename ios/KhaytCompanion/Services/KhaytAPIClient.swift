@@ -274,14 +274,25 @@ final class KhaytAPIClient: ObservableObject {
         // A paired phone that keeps no book (a floor phone) learns the shop's
         // "make no internet calls" switch here (#2640), from a SIGNED status
         // request whose answer the Mac signs back.
-        if reader?.holdsAnyBook != true, let device = usableDevice,
-           let signed = try? await signedStatus(device) {
-            PhoneOutbound.statusAnswer(signed.network)
-            await CompanionCache.shared.store(signed.status, for: "/api/status?format=json")
-            servingCachedSince = nil
-            return signed.status
+        let path = "/api/status?format=json"
+        if reader?.holdsAnyBook != true, let device = usableDevice {
+            do {
+                if let signed = try await signedStatus(device) {
+                    PhoneOutbound.statusAnswer(signed.network)   // ignored if a book arrived meanwhile
+                    await CompanionCache.shared.store(signed.status, for: path)
+                    servingCachedSince = nil
+                    return signed.status
+                }
+            } catch where Self.isUnreachable(error) {
+                // The Mac is not there: one timeout, not two (review of #2638).
+                if let cached = await CompanionCache.shared.load(ShopStatus.self, for: path) {
+                    servingCachedSince = cached.storedAt
+                    return cached.value
+                }
+                throw error
+            } catch {}
         }
-        return try await get("/api/status?format=json", requiresPin: false, as: ShopStatus.self)
+        return try await get(path, requiresPin: false, as: ShopStatus.self)
     }
 
     /// `/api/status?format=json`, signed with this phone's key. The counts
