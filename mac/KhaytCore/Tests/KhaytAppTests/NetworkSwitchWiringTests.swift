@@ -673,7 +673,11 @@ struct NetworkSwitchWiringTests {
         await server.answerGet(200, there)
         await server.answerPut(503, Data())
         #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
-        await server.answerPut(409, Data(#"{"changedAt":"\#(StoreWriter.iso(Date().addingTimeInterval(5)))"}"#.utf8))
+        // (between this retry's GET and its PUT, another computer published a newer value)
+        let newer = StoreWriter.iso(Date().addingTimeInterval(5))
+        await server.answerNextGet(200, there)
+        await server.answerGet(200, try Self.published(.init(offline: true, keep: [], changedAt: newer, changedBy: nil)))
+        await server.answerPut(409, Data(#"{"changedAt":"\#(newer)"}"#.utf8))
         #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .superseded)
         #expect(shop.networkSwitchUnsentOff == nil)
         #expect(shop.networkSwitchAsk == nil && shop.networkSwitchHeld == nil, "a retry never asks")
@@ -866,11 +870,27 @@ struct NetworkSwitchWiringTests {
         // A later value that cannot be opened with the shop's key supersedes nothing: the off is still sent.
         (shop, server, mine) = await unsent()
         let later = StoreWriter.iso(try #require(NetworkSwitch.date(mine)).addingTimeInterval(1))
+        // As a real server answers: the PUT is older than what it holds, so 409 with the later stamp.
+        // The value is read again, still cannot be opened, and the off is KEPT: not dropped, not asked.
         await server.answerGet(200, try Self.published(.init(offline: true, keep: [], changedAt: later, changedBy: nil), shopId: "another_shop"))
-        await server.answerPut(200, Data(#"{"ok":true}"#.utf8))
+        await server.answerPut(409, Data(#"{"changedAt":"\#(later)"}"#.utf8))
         await server.forget()
-        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .sent)
-        #expect(await server.asked.map(\.method) == ["GET", "PUT"])
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .unsent)
+        #expect(await server.asked.map(\.method) == ["GET", "PUT", "GET"], "the 409's stamp alone drops nothing: the value is read")
+        #expect(shop.networkSwitchUnsentOff == mine && shop.networkSwitchAsk == nil)
+        // The same 409, and now the value there opens and IS later: superseded.
+        await server.answerGet(200, try Self.published(.init(offline: true, keep: [], changedAt: later, changedBy: nil)))
+        // (the first GET would already supersede; make it fail to open once, so the 409 path is the one that decides)
+        await server.answerNextGet(200, try Self.published(.init(offline: true, keep: [], changedAt: later, changedBy: nil), shopId: "another_shop"))
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .superseded)
+        #expect(shop.networkSwitchUnsentOff == nil && shop.networkSwitchAsk == nil)
+        // A later value stamped ahead of this Mac's clock cannot be followed here: kept as well.
+        (shop, server, mine) = await unsent()
+        let ahead = StoreWriter.iso(Date().addingTimeInterval(3600))
+        await server.answerGet(200, try Self.published(.init(offline: true, keep: [], changedAt: ahead, changedBy: nil)))
+        await server.answerPut(409, Data(#"{"changedAt":"\#(ahead)"}"#.utf8))
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .unsent)
+        #expect(shop.networkSwitchUnsentOff == mine && shop.networkSwitchAsk == nil)
         // A 409 that names nothing newer is not understood: kept for the next retry, nothing asked.
         for body in [#"{"reason":"stale"}"#, #"{"changedAt":"\#(Self.stamp(7200))"}"#] {
             (shop, server, mine) = await unsent()

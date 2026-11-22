@@ -332,7 +332,7 @@ extension Shop {
         // meanwhile, this "off" is no longer the shop's word. Only ITS OWN
         // slot is touched from here on: a newer unsent "off" the owner made
         // while this was in flight is neither forgotten nor written over.
-        if retry, !unsentOffStillStands(stamp) { forgetUnsentOff(ifStamp: stamp); return .superseded }
+        if retry, !unsentOffStillStands(stamp) { supersededUnsentOff(stamp); return .superseded }
         switch heard {
         case .failed:
             // Not known whether a value is published there: neither sent nor
@@ -385,25 +385,33 @@ extension Shop {
                 //                            (or this change, arrived late):
                 //                            read once, below
                 let atDate = at.flatMap(NetworkSwitch.date)
-                if let atDate, atDate > mine { supersededUnsentOff(stamp); return .superseded }
-                guard let atDate, atDate == mine else {
+                // In every case the VALUE decides, read again and checked: the
+                // stamp a 409 carries is the server's outer one, and a value
+                // this Mac cannot open or that is ahead of its clock is one
+                // it cannot follow. Dropping the "off" for such a value left
+                // this Mac online and the others offline, with nothing said.
+                guard let saidAt = at.flatMap(NetworkSwitch.date), saidAt >= mine else {
                     rememberUnsentOff(stamp, seenBefore: seenBefore)
                     return .unsent
                 }
                 let (_, again) = await Self.networkSwitchGet(connection, token: token, fetch: networkSwitchFetcher)
-                if let again,
-                   case .success(let there) = NetworkSwitch.read(again, shopId: connection.shopId, dek: dek,
-                                                                 highestSeen: nil, purposes: outboundPurposeIds),
-                   NetworkSwitch.date(there.changedAt) == mine {
-                    if !there.offline {
-                        forgetUnsentOff(ifStamp: stamp)
-                        noteTold(.told(Date()))
-                        outboundRevision &+= 1
-                        return .sent
-                    }
-                } else {
+                guard let again,
+                      case .success(let there) = NetworkSwitch.read(again, shopId: connection.shopId, dek: dek,
+                                                                    highestSeen: nil, purposes: outboundPurposeIds),
+                      let thereAt = NetworkSwitch.date(there.changedAt), !NetworkSwitch.isAhead(there, now: Date()),
+                      thereAt >= mine else {
                     rememberUnsentOff(stamp, seenBefore: seenBefore)
                     return .unsent
+                }
+                // The owner changed the switch here while this was in flight:
+                // nothing of this old "off" is asked or recorded.
+                guard unsentOffStillStands(stamp) || networkSwitchUnsentOff == stamp else { return .superseded }
+                if thereAt > mine { supersededUnsentOff(stamp); return .superseded }
+                if !there.offline {
+                    forgetUnsentOff(ifStamp: stamp)
+                    noteTold(.told(Date()))
+                    outboundRevision &+= 1
+                    return .sent
                 }
             }
             forgetUnsentOff(ifStamp: stamp)
@@ -478,7 +486,7 @@ extension Shop {
         // One at a time: the check runs on a timer and beside each sync, and
         // two retries sending the same stamp read each other as a conflict.
         guard !networkSwitchRetrying, let stamp = networkSwitchUnsentOff else { return nil }
-        guard unsentOffStillStands(stamp) else { forgetUnsentOff(); return nil }
+        guard unsentOffStillStands(stamp) else { supersededUnsentOff(stamp); return nil }
         // Only the owner's own change is ever sent, and only where this Mac
         // may make the call at all.
         guard !outboundOfflineHere, lockAllows("security", "edit") else { return .unsent }
