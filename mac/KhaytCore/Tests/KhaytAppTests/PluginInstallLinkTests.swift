@@ -124,6 +124,13 @@ struct PluginInstallLinkTests {
         // Another platform's minimum is not this Mac's.
         (refusal, _, sheet) = await offer(.object(["desktop": .string("9.0.0"), "ios": .string("9.0.0")]))
         #expect(refusal == nil && sheet)
+        // The rule is asked with plain numbers, never a made-up version compared as text
+        // (under some languages' sort order "-1" did not come before "0.9").
+        let engineSource = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/KhaytCore/KhaytEngine.swift"), encoding: .utf8)
+        #expect(engineSource.contains("U.planUpdate({ version: '0' }, {}, Object.assign({}, row, { version: '1', revoked: [] }), ctx)"))
+        #expect(!engineSource.contains("planUpdate({ version: '-1' }"))
         // No requirement at all.
         (refusal, _, sheet) = await offer(nil)
         #expect(refusal == nil && sheet)

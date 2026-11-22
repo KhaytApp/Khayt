@@ -386,8 +386,8 @@ enum Multipart {
             // A few bytes of it at most (`maxPadding`): megabytes of spaces
             // after a delimiter are not padding. This reader walks a spooled
             // body once and copies nothing, so they would cost time, not
-            // memory; the limit is the same one the other app's reader has,
-            // so the two refuse the same request.
+            // memory; the limit is the one agreed for the other app's reader
+            // (64 bytes), so the two refuse the same request.
             let padStart = cursor
             while cursor < end, cursor - padStart <= maxPadding,
                   data[cursor] == UInt8(ascii: " ") || data[cursor] == UInt8(ascii: "\t") { cursor += 1 }

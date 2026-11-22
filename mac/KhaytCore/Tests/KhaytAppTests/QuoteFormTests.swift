@@ -849,6 +849,18 @@ struct QuoteFormImportTests {
         #expect(name("???") == "model" && name(" . ") == "model")
         let long = name(String(repeating: "x", count: 180) + String(repeating: ".", count: 40) + "stl")
         #expect(long.utf8.count <= 200 && !long.hasSuffix(".") && !long.hasSuffix(" "))
+        // A cut that lands on a space leaves no space at the end.
+        #expect(name(String(repeating: "x", count: 179) + " " + String(repeating: "y", count: 30)) == String(repeating: "x", count: 179))
+        // A cut must not UNCOVER a device name: these are not one before the cut.
+        let spaces = String(repeating: " ", count: 250)
+        #expect(name("CON" + spaces + "x") == "_CON")
+        let cut = name("CON" + spaces + "x.gcode")
+        #expect(cut.hasPrefix("_CON") && cut.hasSuffix(".gcode") && cut.utf8.count <= 200)
+        #expect(name("CONa" + String(repeating: "\u{301}", count: 100) + ".stl") == "_CON.stl")
+        // An "extension" of thousands of bytes is not one: the bound holds.
+        #expect(name("a.x" + String(repeating: "\u{301}", count: 1000)).utf8.count <= 200)
+        // The rest of Microsoft's list.
+        #expect(name("COM0.stl") == "_COM0.stl" && name("lpt\u{B2}") == "_lpt\u{B2}" && name("COM\u{B9}.3mf") == "_COM\u{B9}.3mf")
     }
 
     @Test("the payload's file is read; an intake row shows its name, size and expiry")

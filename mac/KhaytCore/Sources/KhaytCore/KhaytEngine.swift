@@ -8810,8 +8810,10 @@ public actor KhaytEngine {
               var row = U.rowFor(index, id, 'connector');
               if (!row) return { ok: true, reason: null, row: null, revoked: [], needsNewer: false };
               // Asked as an update from nothing: `blocked` is the rule's word for "needs a newer app or schema".
-              // '-1' sorts below every version, 0.0.0 included, so the rule never answers "current" instead.
-              var plan = U.planUpdate({ version: '-1' }, {}, row, ctx);
+              // Asked with plain numbers, 0 installed and 1 offered, so the rule reaches its `requires`
+              // check whatever the row's own version is (0.0.0 included) and whatever the Mac's language:
+              // a made-up version that is not a number is compared as text, by the user's locale.
+              var plan = U.planUpdate({ version: '0' }, {}, Object.assign({}, row, { version: '1', revoked: [] }), ctx);
               var needsNewer = !!plan && plan.plan === 'blocked';
               var revoked = (Array.isArray(row.revoked) ? row.revoked : []).map(function (x) { return String(x.version); });
               return { ok: true, reason: null, row: { version: String(row.version), url: String(row.url), sha256: String(row.sha256) }, revoked: revoked, needsNewer: needsNewer };
