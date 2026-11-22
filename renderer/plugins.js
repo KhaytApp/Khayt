@@ -292,7 +292,7 @@ async function takePluginInstallLink() {
   if (!r || r.none) return;
   const vars = { id: String(r.id || ''), v: String(r.version || '') };
   // Main decided who may; the window's own lock is asked as well.
-  const refusal = r.ok && typeof settingsReadOnly === 'function' && settingsReadOnly() ? 'notAllowed' : (r.ok ? null : r.refusal);
+  const refusal = r.ok && typeof operatorCan === 'function' && !operatorCan('settings', 'edit') ? 'notAllowed' : (r.ok ? null : r.refusal);
   if (refusal) {
     const key = 'plg.pil_' + (['off', 'notAllowed', 'index', 'unlisted', 'otherVersion', 'withdrawn', 'manifest'].includes(refusal) ? refusal : 'index');
     toast(t(key, vars), 'error', 8000);
