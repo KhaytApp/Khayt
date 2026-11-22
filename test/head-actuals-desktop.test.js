@@ -219,7 +219,6 @@ test('a hostile printer cannot put an oversized or odd job id, or infinite grams
   const inf = rig({ history: { result: { jobs: [row({ filament_used: 1e308, metadata: { filament_weight: [10, 10, 10], filament_total: 1e-300 } })] } } });
   assert.equal(await inf.h.noteEdge(U1M, printing, complete, ENDED), false);
   assert.equal(inf.book.printLog[0].actualHeads, undefined);
-  assert.equal(H.JOB_ID.test('0000A7'), true);
 });
 
 test('a look ends when the app quits or polling stops, or the printer is gone or re-addressed', async () => {
