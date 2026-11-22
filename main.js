@@ -1089,6 +1089,7 @@ function restoreAllowed() {
 }
 
 async function restoreSnapshotForWindow(parsed, event, label) {
+  let refused = [];
   if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
     console.error(`${label}: the store on disk is from a newer ${FLAVOR_NAME}; not restoring over it`);
     return null;
@@ -1111,6 +1112,14 @@ async function restoreSnapshotForWindow(parsed, event, label) {
     const g = PrinterPermission.guardSave(parsed, disk, { verified: operatorVerified, consume: consumeVerified });
     if (!g.store) { console.error(`${label}: refused, the backup has no settings`); return null; }
     parsed = g.store;
+    // What the guard put back as it is on disk is said in the window, as a
+    // refused save is; it used to be dropped here, and the restore reported
+    // success over parts it never restored (pre-cut review LOW).
+    if (g.refused && g.refused.length) {
+      console.warn(`${label}: refused for this role:`, g.refused.join(', '));
+      refused = g.refused.slice();
+      try { event.sender.send('hub:restore-refused', g.refused.slice()); } catch (_) { /* window gone */ }
+    }
   } catch (e) { console.error(`${label}: role guard failed:`, e && e.message); return null; }
   // Decrypting the backup and sealing it again are both keychain work. Explain once first.
   await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
@@ -1118,7 +1127,10 @@ async function restoreSnapshotForWindow(parsed, event, label) {
   if (!r.ok) { console.error(`${label}:`, r.error); return null; }
   machineSecrets.forget();          // a printer's key may have changed with it
   _diskStoreVersion = typeof r.masked.version === 'number' ? r.masked.version : _diskStoreVersion;
-  return JSON.stringify(r.masked);
+  // `__refused` travels with the book (normalizeStoreSnapshot drops keys it
+  // does not know), so the window can skip "Restore successful" over a
+  // restore that put parts back as they were (correctness review of #2609).
+  return JSON.stringify(refused.length ? Object.assign({}, r.masked, { __refused: refused }) : r.masked);
 }
 
 ipcMain.handle('hub:restore-backup', async (event, backupPath) => {
@@ -1599,6 +1611,7 @@ ipcMain.handle('hub:detect-slicers', async () => {
 // too; this function is the wire.
 async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
@@ -1801,6 +1814,24 @@ async function maybeShowKeychainExplanation(win) {
  * admin the lock made gets roleKey 'owner'. Never runs on a book that has an
  * owner, so it changes nothing twice.
  */
+/** btoa operator PINs become real hashes, on disk, once (#2609 security
+ * review). Returns id → new hash, so what the window gets matches the disk:
+ * a window holding the old value would save it straight back. */
+async function upgradeLegacyPinsOnDisk() {
+  // Inside the write chain (re-review of #2608/#2609): a write queued ahead
+  // of this is kept.
+  let out = null;
+  await updateStoreOnDiskAllowingLock((cur) => {
+    const r = PrinterPermission.upgradeLegacyPins(cur, hashPinSalted);
+    if (!r.changed) return cur;
+    console.warn('PIN upgrade:', r.count, 'operator PIN(s) from the first releases now hashed');
+    out = new Map();
+    for (const o of r.store.operators) if (o && o.id) out.set(o.id, o.pinHash);
+    return r.store;
+  }, ['operators']);
+  return out;
+}
+
 async function migrateLegacyOwnerOnDisk() {
   // Inside the write chain (lib/store-io.js updateStoreOnDiskAllowingLock).
   let operatorId = null;
@@ -1873,10 +1904,18 @@ ipcMain.handle('hub:load-store', async (event) => {
     // A lock older than roleKey: its translated admin becomes the owner, once,
     // on disk and in what the window gets (#2592 data review, MED-3).
     try { await migrateLegacyOwnerOnDisk(); } catch (e) { console.error('hub:load-store: owner migration failed:', e && e.message); }
+    // The PIN upgrade runs BEFORE the sign-out: hashed first, so the pad can
+    // check the person signed out next (#2608 + #2609).
+    let upgradedPins = null;
+    try { upgradedPins = await upgradeLegacyPinsOnDisk(); } catch (e) { console.error('hub:load-store: PIN upgrade failed:', e && e.message); }
     let signedOut = false;
     try { signedOut = await signOutAtStartOnDisk(); } catch (e) { console.error('hub:load-store: sign-out at start failed:', e && e.message); }
     let { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
     if (normalized) normalized = PrinterPermission.migrateLegacyOwner(normalized).store;
+    if (normalized && upgradedPins && Array.isArray(normalized.operators)) {
+      normalized.operators = normalized.operators.map((o) => (o && upgradedPins.has(o.id) && o.pinHash !== upgradedPins.get(o.id)
+        && require('./lib/pin-hash').decodeLegacyBtoaPin(o.pinHash) !== null ? { ...o, pinHash: upgradedPins.get(o.id) } : o));
+    }
     if (normalized && signedOut) normalized = PrinterPermission.signedOutAtStart(normalized).store;
     if (!normalized) {
       console.error('hub:load-store: unrecoverable store shape:', errors.join('; '));
@@ -5651,6 +5690,7 @@ ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
  */
 async function fetchPrinterHistory(machine, limit) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
     return { ok: false, error: `Only Klipper/Moonraker printers keep a job history ${FLAVOR_NAME} can read` };
@@ -5691,6 +5731,7 @@ function nextBambuSequence() { _bambuSeq = (_bambuSeq + 1) % 1e9; return String(
 
 async function sendPrinterCommand(machine, command) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey, printerSlug, accessCode, serial } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
@@ -5852,6 +5893,7 @@ async function sendPrinterCommand(machine, command) {
  */
 async function plateObjects(machine) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
     return { ok: false, error: 'Only Klipper/Moonraker printers can drop one object' };
@@ -5917,6 +5959,7 @@ ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) => {
  */
 async function sendPrinterControl(machine, control, value) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
   if (type !== 'bambu') return { ok: false, error: `${control} is not available for this printer type` };
   const target = await resolvePrinterTarget(host);
@@ -5985,6 +6028,7 @@ function stockOptsFor(machine) {
 
 async function fetchPrinterStatus(machine) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey, accessCode, printerSlug, serial } = machine.printerApi || {};
   // sanitizePrinterHost runs inside resolvePrinterTarget (no @, / or : injection).
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN

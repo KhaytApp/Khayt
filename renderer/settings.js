@@ -6364,7 +6364,8 @@ async function openOffsiteRestoreModal() {
       applyTheme(settings.theme);
       i18n.set(settings.lang);
       refreshCurrencyLabels();
-      toast(t('offsite.restored', { name: chosen.value }), 'success');
+      // Parts the staff lock put back were already said (re-review of #2609).
+      if (!(Array.isArray(data && data.__refused) && data.__refused.length)) toast(t('offsite.restored', { name: chosen.value }), 'success');
       return true;
     },
   });
@@ -6443,7 +6444,9 @@ async function openRestoreBackupModal() {
         applyTheme(settings.theme);
         i18n.set(settings.lang);
         refreshCurrencyLabels();
-        toast(t('set.restore_success'), 'success');
+        // Parts put back as they were for this role were already said (the
+        // refused toast); "Restore successful" over them would contradict it.
+        if (!(Array.isArray(data && data.__refused) && data.__refused.length)) toast(t('set.restore_success'), 'success');
         return true;
       } catch (e) {
         console.error('restore backup failed', e);
@@ -6491,9 +6494,10 @@ async function openRestorePointsModal() {
         await forgetCloudServerView();
       // Refuse a snapshot that failed validation — replaceStoreFromSnapshot leaves the
       // existing data untouched when it returns false, so do NOT save or report success.
-        if (!replaceStoreFromSnapshot(safeJsonParse(json))) { toast(t('set.restore_error') || 'Restore failed', 'error'); return; }
+        const point = safeJsonParse(json);
+        if (!replaceStoreFromSnapshot(point)) { toast(t('set.restore_error') || 'Restore failed', 'error'); return; }
         saveAll(); initialRender(); loadSettingsIntoForm(); applyTheme(settings.theme); i18n.set(settings.lang); refreshCurrencyLabels();
-        toast(t('set.restore_success') || 'Restored', 'success');
+        if (!(Array.isArray(point && point.__refused) && point.__refused.length)) toast(t('set.restore_success') || 'Restored', 'success');
         modal.querySelector('.modal-close')?.click();
       } catch (e) { console.error('restore point failed', e); toast(t('set.restore_error') || 'Restore failed', 'error'); }
     }));

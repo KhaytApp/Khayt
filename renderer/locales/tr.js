@@ -2341,6 +2341,7 @@
   "err.not_permitted": "Rolün bunu yapmaya izin vermiyor. Yetkisi olan birinden iste ya da oturum aç.",
   "err.settings_missing": "Bu değişiklik kaydedilmedi: mağaza ayarları olmadan geldi, bu yüzden hiçbir şey yazılmadı. Khayt'ı yeniden başlatıp tekrar dene.",
   "err.store_unreadable": "Khayt veri dosyanı okuyamadı, bu yüzden hiçbir şey yazılmadı. Khayt'ı yeniden başlat; tekrar ederse bir yedeği geri yükle.",
+  "err.connection_unsaved": "Bu yazıcının adresi değişti ve henüz kaydedilmedi. Önce yeni adresi kaydedin, sonra tekrar deneyin. Erişim kodu yalnızca kaydedildiği adrese gönderilir.",
   "err.guard_failed": "Khayt bu değişikliği denetleyemedi, bu yüzden hiçbir şey kaydedilmedi. Tekrar dene; tekrar ederse Khayt'ı yeniden başlat.",
   "err.refused": "Sahip gerektirdiği için kaydedilmedi: {what}. Değiştirmek için sahip olarak oturum aç.",
   "err.refused_signin": "başka biri olarak oturum açmak",

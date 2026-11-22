@@ -2341,6 +2341,7 @@
   "err.not_permitted": "你的角色无法执行此操作。请让有权限的人来做，或者登录。",
   "err.settings_missing": "此更改未保存：它没有附带商店设置，因此没有写入任何内容。请重启 Khayt 后重试。",
   "err.store_unreadable": "Khayt 无法读取你的数据文件，因此没有写入任何内容。请重启 Khayt；如果反复出现，请恢复一个备份。",
+  "err.connection_unsaved": "此打印机的地址已更改但尚未保存。请先保存新地址，然后重试。访问码只会发送到保存时的地址。",
   "err.guard_failed": "Khayt 无法检查此更改，因此没有保存任何内容。请重试；如果反复出现，请重启 Khayt。",
   "err.refused": "因需要店主而未保存：{what}。请以店主身份登录后再更改。",
   "err.refused_signin": "以他人身份登录",

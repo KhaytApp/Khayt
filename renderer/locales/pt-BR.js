@@ -2342,6 +2342,7 @@
   "err.not_permitted": "Sua função não pode fazer isso. Peça a alguém que possa, ou entre.",
   "err.settings_missing": "Esta alteração não foi salva: chegou sem as configurações da loja, então nada foi gravado. Reinicie o Khayt e tente de novo.",
   "err.store_unreadable": "O Khayt não conseguiu ler seu arquivo de dados, então nada foi gravado. Reinicie o Khayt; se continuar acontecendo, restaure um backup.",
+  "err.connection_unsaved": "O endereço desta impressora mudou e ainda não foi salvo. Salve primeiro o novo endereço e tente novamente. O código de acesso só é enviado para o endereço com o qual foi salvo.",
   "err.guard_failed": "O Khayt não conseguiu verificar esta alteração, então nada foi salvo. Tente de novo; se continuar acontecendo, reinicie o Khayt.",
   "err.refused": "Não salvo, porque precisa do proprietário: {what}. Entre como proprietário para alterar.",
   "err.refused_signin": "entrar como outra pessoa",

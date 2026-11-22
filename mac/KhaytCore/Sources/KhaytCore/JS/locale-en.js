@@ -2342,6 +2342,7 @@
   "err.not_permitted": "Your role can’t do this. Ask someone who can, or sign in.",
   "err.settings_missing": "This change was not saved: it arrived without the shop’s settings, so nothing was written. Restart Khayt and try again.",
   "err.store_unreadable": "Khayt could not read your data file, so nothing was written. Restart Khayt; if this keeps happening, restore a backup.",
+  "err.connection_unsaved": "This printer's address has changed and is not saved yet. Save the new address first, then try again. Its access code is only ever sent to the address it was saved with.",
   "err.guard_failed": "Khayt could not check this change, so nothing was saved. Try again; if it keeps happening, restart Khayt.",
   "err.refused": "Not saved, because it needs the owner: {what}. Sign in as the owner to change it.",
   "err.refused_signin": "signing in as someone else",

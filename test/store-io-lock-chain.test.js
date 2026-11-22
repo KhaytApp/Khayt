@@ -1,7 +1,7 @@
 'use strict';
 /**
- * Re-review of #2608: main's own load-time lock-field changes (sign nobody in
- * at start, the owner migration, hashing old PINs) run INSIDE the write
+ * Re-review of #2608/#2609: main's own load-time lock-field changes (the
+ * owner migration, hashing old PINs, and with #2608 the sign-out at start) run INSIDE the write
  * chain, so a write queued ahead of them is kept, not overwritten with a
  * stale copy (lib/store-io.js updateStoreOnDiskAllowingLock).
  */
@@ -39,6 +39,20 @@ test('a write queued first is kept when the sign-out at start runs after it', as
   const d = disk();
   assert.equal(d.printLog.length, 1, 'the queued order survived');
   assert.equal(d.settings.activeOperatorId, null, 'and nobody is signed in');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('a write queued first is kept when the PIN upgrade at load runs after it', async () => {
+  const b = book();
+  b.operators[0].pinHash = Buffer.from('1234').toString('base64');
+  const { io, dir, disk } = await fresh(b);
+  const PinHash = require('../lib/pin-hash.js');
+  const order = io.updateStoreOnDisk((cur) => ({ ...cur, printLog: [...cur.printLog, { id: 'a1', project: 'LAN order' }] }));
+  const up = io.updateStoreOnDiskAllowingLock((cur) => { const r = PP.upgradeLegacyPins(cur, PinHash.hashPin); return r.changed ? r.store : cur; }, ['operators']);
+  await Promise.all([order, up]);
+  const d = disk();
+  assert.equal(d.printLog.length, 1, 'the queued order survived');
+  assert.ok(PinHash.isPbkdf2Hash(d.operators[0].pinHash), 'and the PIN is hashed');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
