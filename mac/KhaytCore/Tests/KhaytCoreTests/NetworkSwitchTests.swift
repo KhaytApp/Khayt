@@ -214,7 +214,11 @@ import Testing
         }
         // The rule itself ignores a seen stamp further ahead than the route accepts (ten minutes):
         // exactly ten minutes still counts, a millisecond more does not.
-        #expect(try await engine.networkSwitchStampAfter(now: now, seen: ["2026-11-22T10:10:00.000Z"]) == "2026-11-22T10:10:00.001Z")
+        // The newest stamp the rule may give is now + 10:00.000 exactly, the
+        // last one another computer and the server still accept: a seen stamp
+        // AT the limit would need one past it, so it is ignored like a later one.
+        #expect(try await engine.networkSwitchStampAfter(now: now, seen: ["2026-11-22T10:09:59.999Z"]) == "2026-11-22T10:10:00.000Z")
+        #expect(try await engine.networkSwitchStampAfter(now: now, seen: ["2026-11-22T10:10:00.000Z"]) == "2026-11-22T10:00:00.000Z")
         #expect(try await engine.networkSwitchStampAfter(now: now, seen: ["2026-11-22T10:10:00.001Z"]) == "2026-11-22T10:00:00.000Z")
         #expect(try await engine.networkSwitchStampAfter(now: now, seen: ["2027-06-01T00:00:00.000Z", "2026-11-22T10:03:00.000Z"]) == "2026-11-22T10:03:00.001Z")
         #expect(try await engine.networkSwitchJustBefore("2026-11-22T10:05:00.000Z") == "2026-11-22T10:04:59.999Z")

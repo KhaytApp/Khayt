@@ -103,7 +103,9 @@ function stampAfter(now, seen) {
   const limit = Number.isFinite(t) ? t + FUTURE_MS : Infinity;
   for (const s of Array.isArray(seen) ? seen : []) {
     const v = ms(s);
-    if (!Number.isFinite(v) || v > limit) continue;
+    // >=: a stamp at exactly the limit would be stamped 1 ms past it, which
+    // judge and the server refuse (the Mac's review, Nov 22).
+    if (!Number.isFinite(v) || v >= limit) continue;
     if (!Number.isFinite(t) || v + 1 > t) t = v + 1;
   }
   return Number.isFinite(t) ? new Date(t).toISOString() : null;
