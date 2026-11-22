@@ -417,6 +417,7 @@ const hubAPI = {
   onLanSpoolUpdated:    (() => { let _cb=null; ipcRenderer.on('lan-spool-updated',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanSpoolDeleted:    (() => { let _cb=null; ipcRenderer.on('lan-spool-deleted',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanWasteLogged:     (() => { let _cb=null; ipcRenderer.on('lan-waste-logged',     (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
+  onLanMachineBedCleared: (() => { let _cb=null; ipcRenderer.on('lan-machine-bed-cleared', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanExpenseAdded:    (() => { let _cb=null; ipcRenderer.on('lan-expense-added',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanOrderPhotoAdded: (() => { let _cb=null; ipcRenderer.on('lan-order-photo-added', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanOrderUpdated:    (() => { let _cb=null; ipcRenderer.on('lan-order-updated',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),

@@ -555,6 +555,50 @@
     "required": "queue:read",
     "role": "viewer"
    }
+  },
+  {
+   "why": "a viewer cannot say the bed is clear",
+   "role": "viewer",
+   "path": "/api/printer/m1/bed-clear",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "machines:control",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "an operator may say the bed is clear, or that a print was taken off",
+   "role": "operator",
+   "path": "/api/printer/m1/bed-clear",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "machines:control",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "a manager may say the bed is clear",
+   "role": "manager",
+   "path": "/api/printer/m1/bed-clear",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "machines:control",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "the owner may say the bed is clear",
+   "role": "owner",
+   "path": "/api/printer/m1/bed-clear",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "machines:control",
+    "role": "owner"
+   }
   }
  ],
  "phonePaths": [
@@ -702,6 +746,16 @@
    "POST",
    "/api/waste",
    "waste:write"
+  ],
+  [
+   "POST",
+   "/api/printer/m1/bed-clear",
+   "machines:control"
+  ],
+  [
+   "GET",
+   "/api/printer/m1/bed-clear",
+   "owner"
   ]
  ],
  "requests": [

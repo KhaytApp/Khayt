@@ -57,6 +57,36 @@ extension Shop {
         return (200, Self.json(["ok": .bool(true), "state": state.map(JSONValue.string) ?? .null]))
     }
 
+    /// A paired phone saying a machine's plate is empty: its "Bed is clear"
+    /// (leftovers from a print that ended badly) and "Taken off" (a finished
+    /// print). Both are the same sentence to the book: `bedClearedAt` on the
+    /// machine, the stamp the Mac's own "Bed is clear" writes
+    /// (`stampBedClear`), which the shared rules read
+    /// (`lib/auto-dispatch.js`, `lib/waiting-at-machine.js`). The printer is
+    /// told nothing.
+    ///
+    /// The answer: `{"ok":true,"bedClearedAt":…}` or
+    /// `{"ok":false,"reason":…,"message":…}`.
+    func phoneBedClear(_ machineId: String, now: Date = Date()) async -> (Int, String) {
+        // lock: system — a paired phone's "bed is clear"; the LAN route takes a signed enrolled device whose role allows machines:control
+        func refuse(_ status: Int, _ reason: String, _ message: String? = nil) -> (Int, String) {
+            var body: [String: JSONValue] = ["ok": .bool(false), "reason": .string(reason)]
+            if let message { body["message"] = .string(message) }
+            return (status, Self.json(body))
+        }
+        guard let machine = machinesInUse.first(where: { $0.id == machineId }) else {
+            return refuse(404, "not-found")
+        }
+        // The sample book has nowhere to write: said, not a 200 for nothing.
+        guard source.build != nil else { return refuse(409, "read-only") }
+        do {
+            let at = try await stampBedClear(machine.id, at: now)
+            return (200, Self.json(["ok": .bool(true), "bedClearedAt": .string(at)]))
+        } catch {
+            return refuse(500, "not-saved", said(error))
+        }
+    }
+
     private static func json(_ object: [String: JSONValue]) -> String {
         (try? String(decoding: JSONEncoder().encode(JSONValue.object(object)), as: UTF8.self))
             ?? #"{"ok":false,"reason":"encode"}"#
@@ -64,6 +94,15 @@ extension Shop {
 }
 
 extension LanServer {
+    /// `/api/printer/{machineId}/bed-clear` → the machine. Nil for any other
+    /// shape.
+    nonisolated static func bedClearPath(_ path: String) -> String? {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 5, parts[0].isEmpty, parts[1] == "api", parts[2] == "printer", parts[4] == "bed-clear",
+              let id = String(parts[3]).removingPercentEncoding, !id.isEmpty else { return nil }
+        return id
+    }
+
     /// `/api/printer/{machineId}/{verb}` → the machine and the verb. `stop` is
     /// the phone's word for `cancel`, which is also accepted. Nil for any other
     /// shape, so the route falls through to 404.

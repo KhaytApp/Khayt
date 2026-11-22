@@ -1095,6 +1095,45 @@ Machine list glance. **Requires owner PIN.**
 ]
 ```
 
+### A paired phone's role (native Mac, Nov 2026, draft)
+
+> **Native Mac only for now.** `lib/lan-server.js` follows in the desktop lane. The rule is shared: `lib/device-roles.js`.
+
+A phone paired with this Mac carries a **role**: owner, manager, operator or viewer. The role is a set of scopes, and the Mac checks it on **every request the phone signs**. The phone's screens follow its role as a convenience; the server's answer is the check.
+
+- A request the role does not cover is answered **403** `{"reason":"role-scope","required":"<scope>"}`, the shape an API token gets for a scope it lacks. `required` is `owner` for a route the table does not name.
+- The check uses the path the server routes on. A segment that decodes to a slash, a dot segment or a control character is owner-only.
+- A phone paired with the owner PIN before roles existed has no role and is the **owner**, as it was.
+- A role holds whether the staff lock is on or off.
+- The owner PIN and API tokens are unchanged.
+- **Pricing through a job update is `quote:write`.** A write to `/api/orders` or `/api/orders/<id>` that carries a `price`, creates a job as a quote, or sends a `status` for a job that is a quote now (which accepts it) needs `quote:write`, whatever the route's own scope. An operator moves jobs; it does not price them.
+- **The role answers are signed back.** `GET /api/devices/self` and every `role-scope` 403 carry `x-khayt-reply-mac` (the connector's: `HMAC(key, "khayt-reply-v1\n" + request nonce + "\n" + status + "\n" + sha256hex(body))`, base64), and only when the request's own signature passed. A phone should act on a role answer only when the MAC checks out. Other routes' answers are not signed yet.
+- **A phone paired with the owner PIN is always the owner.** It holds the PIN, so it could send the PIN instead of its key; it cannot be given a lesser role. Remove it and pair it again by code.
+
+| Role | Scopes |
+|---|---|
+| viewer | `queue:read`, `machines:read`, `orders:read`, `inventory:read` |
+| operator | viewer + `orders:write`, `inventory:write`, `waste:write`, `machines:control` |
+| manager | operator + `clients:read`, `clients:write`, `expense:write`, `quote:write`, `book:read` |
+| owner | everything, including `book:write` and every route not listed |
+
+#### `GET /api/devices/self`
+
+Signed by a paired device. Answers what that device is: `{"deviceId":"dev_…","role":"operator","scopes":["queue:read", …]}`. A request with the owner PIN and no device signature is 403 `device-auth`. A role change takes effect on the next request; nothing is re-keyed.
+
+#### `POST /api/devices/pair` (pairing by code; **off** until the phone ships it)
+
+The slicer plugin's commit-then-reveal flow (`POST /api/connectors/pair`) with the phone's own prefixes: `khayt-phone-commit-v1` (the commitment), `khayt-enrol-phone-v1` (what the Mac's identity signs in its offer) and `khayt-phone-check-v1` (the 6-digit check number). A commitment, an offer or a number made for one kind can never stand for the other. No PIN is sent.
+
+- `POST /api/devices/pair` with `{v:2, commit, name, app, version}` → `{pairId, pollSecret, deviceId, publicKey, sig, identity}`. Only while a person has opened **Pair a phone** (120 s, 3 offers). 404 while the Mac has pairing by code off.
+- `POST /api/devices/pair/<pairId>/reveal` with `{publicKey, nonce}` and `x-khayt-poll` → `{"state":"waiting"}`. A mismatch expires the offer; no number is ever shown for it.
+- `GET /api/devices/pair/<pairId>` with `x-khayt-poll` → `{"state":"waiting"|"approved"|"denied"|"expired"}`.
+- `DELETE /api/devices/pair/<pairId>` with `x-khayt-poll` → `{"state":"cancelled"}`: the phone gives its own request up, and the Mac goes back to waiting. A later `GET` answers `expired`. `409 {"state":"approved"|"denied"|"expired"}` when it was already answered (an approval is not undone here), `404 {"state":"unknown"}` for a wrong id or secret. The offer stays counted.
+- Shared vectors: `docs/phone-pair.vectors.json` (the commitment, the signed offer, the check number, the derived key, and the reveals each side must refuse).
+- A person at the Mac compares the number, picks a role (Operator by default; only the owner may give Owner, a manager up to Manager) and approves. The device is enrolled with that role.
+
+**Signing out.** A phone paired by code holds no tag of the PIN: a PIN change does not sign it out. The server still needs a LAN PIN of at least 8 characters to answer anyone: with the PIN cleared or too short, a phone paired by code is refused like everyone else until one is set. **Remove** does (`device-revoked`). A phone paired with the owner PIN is still signed out by a PIN change.
+
 ### `GET /api/machines/live`
 
 > **Served by both apps.** `lib/lan-server.js` and the native Mac's
@@ -1189,6 +1228,32 @@ unset or short PIN is `401`.
 | 409 | `not-connected`, `not-watched` (under service / retired / another app's protocol), `unsupported` (this protocol has no such verb), `no-job` |
 | 502 | `refused`: the printer said no, and `message` is what it said |
 | 503 | `busy`: the app is starting |
+
+### `POST /api/printer/{machineId}/bed-clear`
+
+> **Served by both apps** (Nov 2026, drafts): the native Mac app and
+> `lib/lan-server.js` (Windows/Linux), through the shared rule
+> `lib/lan-rest.js` `machineBedClear`. The desktop has no sample book, so it
+> never answers `409 read-only`.
+
+A paired phone saying a machine's plate is empty: the phone's **"Bed is clear"** (leftovers from a print that ended badly) and **"Taken off"** (a finished print). Both write the same thing, and the same thing as the Mac's own "Bed is clear" button: `bedClearedAt` on the machine, stamped now. The shared rules read it (`lib/auto-dispatch.js`: the printer may be offered again; `lib/waiting-at-machine.js`: `print-to-take-off` and `bed-to-clear` end). The body is empty. The printer itself is told nothing.
+
+**Requires a signed, enrolled phone**, as the commands above do: the owner PIN sent bare is `403 {"ok":false,"reason":"device-key-required"}`.
+
+**Role:** `machines:control` in `lib/device-roles.js` (`allowsRequest`): an operator's, a manager's or the owner's phone. A viewer's phone is refused with the usual `403 {"reason":"role-scope","required":"machines:control"}`, signed back.
+
+**Response 200:** `{"ok":true,"bedClearedAt":"2026-11-22T14:07:05.120Z"}`.
+
+**Refusals:** `{"ok":false,"reason":…,"message"?:…}`
+
+| Status | `reason` |
+|---|---|
+| 404 | `not-found`: no machine in use with that id (a retired printer is not one) |
+| 409 | `read-only`: this Mac is showing the sample book |
+| 500 | `not-saved`: the write failed (another computer holds the book, for one), and `message` says why |
+| 503 | `busy`: the app is starting |
+
+It is not refused while the printer is printing: a stamp made before a print ends is simply older than that print's end, and the rules ignore it. Sending it twice writes a newer stamp and changes nothing else.
 
 ### `POST /api/orders/{id}/photos`
 
