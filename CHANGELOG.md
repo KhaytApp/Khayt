@@ -7,6 +7,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **Mac: the install count and the crash and usage opt-ins are the owner's to change under the staff lock** (decided Nov 22; the desktop did the same in #2636). With the lock off, anyone can, as before.
   - **The anonymous install count** had no check at all. It now asks for the owner and says "Not saved, because it needs the owner: the anonymous install count."
   - **Crash reports and usage statistics** asked for the wrong permission and refused in silence. They now ask what the outbound switch asks, and say why beside the switch and on the shop window. The one-time card stays when somebody other than the owner presses Share, so the owner is still asked.
+  - **Not through the sample book.** The sample has no lock and anyone can open it. While it is open, this Mac's own switches (the install count, "Also on this Mac only") go by whether the shop's book had the lock on, and are not changed from there.
   - **Backups.** The Mac's restore points and backups are copies of the book on disk, which a non-owner can no longer change, so they cannot carry these switches into a later restore.
 
 - **Mac: Settings ▸ General ▸ Internet use.** The page for the switch that stops Khayt calling the internet (Figma page 27).

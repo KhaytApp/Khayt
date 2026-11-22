@@ -832,6 +832,7 @@ extension Shop {
         guard source.isReal else {
             writeProblem = words.callIt("mac.move_sample")
             privacyProblem = writeProblem
+            privacyProblemKey = "mac.priv_owner_telemetry"
             return false
         }
         guard let build = source.build else { return false }

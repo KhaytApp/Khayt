@@ -74,6 +74,11 @@ extension Shop {
         outboundGate.update(local: outboundLocal)
         outboundGate.update(book: .settings(Self.outboundBook(real: source.isReal, settings: settingsDict,
                                                               defaults: outboundDefaults)))
+        // Whether the shop's own book has the staff lock on, remembered for
+        // this Mac's own switches (`thisMacsSwitchesAreOpen`).
+        if source.isReal, outboundDefaults.bool(forKey: Self.lockLastKnownKey) != lockSwitchedOn {
+            outboundDefaults.set(lockSwitchedOn, forKey: Self.lockLastKnownKey)
+        }
         outboundRevision &+= 1
     }
 
@@ -208,6 +213,9 @@ extension Shop {
     func setOutboundOfflineHere(_ on: Bool) -> Bool {
         moveProblem = nil
         guard permitted("security", "edit") else { return false }
+        // Stricter is always allowed; looser is not, from a book that is not
+        // the shop's while the shop's has the lock on.
+        guard on || thisMacsSwitchesAreOpen else { moveProblem = words.callIt("mac.lock_not_allowed"); return false }
         outboundDefaults.set(on, forKey: Self.offlineHereKey)
         // When it was turned on, for the count of days without updates.
         if on { outboundDefaults.set(Date(), forKey: Self.offlineHereAtKey) }
@@ -219,17 +227,39 @@ extension Shop {
 
     // MARK: - The privacy switches are the owner's (Turki, Nov 22)
 
+    /// THE SAMPLE BOOK HAS NO LOCK, and anyone can open it from the book
+    /// menu. The book's switches are safe from that (the sample is not the
+    /// shop's book), but this Mac's own are not the book's: a signed-in
+    /// operator could open the sample, where nobody is locked out of
+    /// anything, flip the install count or turn "Also on this Mac only" off,
+    /// and go back. So while a book that is not the shop's is open, this
+    /// Mac's own switches go by whether the SHOP's book had the lock on when
+    /// it was last read, and with it on they are not changed from there.
+    nonisolated static let lockLastKnownKey = "lock.lastKnownOn"
+
+    var thisMacsSwitchesAreOpen: Bool { source.isReal || !outboundDefaults.bool(forKey: Self.lockLastKnownKey) }
+
     /// May whoever is here change the install count or the crash and usage
     /// opt-ins? Under the staff lock only the owner (`security`/`edit`, as
     /// the outbound switch asks); with the lock off, anyone, as before.
     /// Refused with its own words, beside the switch and on the shop window.
     func ownerAllowsPrivacy(saying key: String) -> Bool {
-        // An earlier refusal of this kind is not left on the shop window.
-        if let old = privacyProblem, moveProblem == old { moveProblem = nil }
-        privacyProblem = nil
+        clearPrivacyProblem()
         if lockAllows("security", "edit") { return true }
-        let said = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : key)
+        return refusePrivacy(needsSignIn ? "mac.lock_sign_in_first" : key, beside: key)
+    }
+
+    /// Forget the last privacy refusal, beside its switch and on the shop
+    /// window (only if the shop window still shows that same sentence).
+    func clearPrivacyProblem() {
+        if let old = privacyProblem, moveProblem == old { moveProblem = nil }
+        privacyProblem = nil; privacyProblemKey = nil
+    }
+
+    private func refusePrivacy(_ sentence: String, beside key: String) -> Bool {
+        let said = words.callIt(sentence)
         privacyProblem = said
+        privacyProblemKey = key
         moveProblem = said
         return false
     }
@@ -240,6 +270,7 @@ extension Shop {
     @discardableResult
     func setInstallCount(_ on: Bool, sender: ActiveCountSender = .shared) -> Bool {
         guard ownerAllowsPrivacy(saying: "mac.priv_owner_count") else { return false }
+        guard thisMacsSwitchesAreOpen else { return refusePrivacy("mac.priv_owner_count", beside: "mac.priv_owner_count") }
         sender.enabled = on
         tellOutboundGate()
         return true
@@ -280,6 +311,7 @@ extension Shop {
     func setOutboundTellsOthers(_ on: Bool) -> Bool {
         moveProblem = nil
         guard permitted("security", "edit") else { return false }
+        guard thisMacsSwitchesAreOpen else { moveProblem = words.callIt("mac.lock_not_allowed"); return false }
         outboundDefaults.set(on, forKey: Self.tellOthersKey)
         return true
     }

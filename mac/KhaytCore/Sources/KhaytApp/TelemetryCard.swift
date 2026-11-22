@@ -103,7 +103,7 @@ struct TelemetrySettings: View {
             })) {
                 labelled("tel.usage", "tel.usage_hint")
             }
-            PrivacyProblem(shop: shop, key: "mac.priv_owner_telemetry", orAny: shop.privacyProblem != shop.words.callIt("mac.priv_owner_count"))
+            PrivacyProblem(shop: shop, key: "mac.priv_owner_telemetry")
             DisclosureGroup(shop.words.callIt("tel.view")) {
                 collected(consent)
             }

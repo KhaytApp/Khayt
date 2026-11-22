@@ -162,17 +162,14 @@ struct ActiveCountSettings: View {
     }
 }
 
-/// Why a privacy switch was not changed, beside it. Only the sentence for
-/// this switch (`key`), or the sign-in one.
+/// Why a privacy switch was not changed, beside THAT switch only (`key` is
+/// the one the refused change belongs to, whatever the sentence).
 struct PrivacyProblem: View {
     let shop: Shop
     let key: String
-    /// Also shown for any other reason this switch's write gave.
-    var orAny = false
 
     var body: some View {
-        if let said = shop.privacyProblem,
-           orAny || said == shop.words.callIt(key) || said == shop.words.callIt("mac.lock_sign_in_first") {
+        if let said = shop.privacyProblem, shop.privacyProblemKey == key {
             Text(said).font(.caption).foregroundStyle(Khayt.late)
                 .fixedSize(horizontal: false, vertical: true)
         }
