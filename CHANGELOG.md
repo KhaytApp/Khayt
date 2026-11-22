@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the screens for pairing a phone by code, with a role (draft; drawn only while pairing by code is switched on).** Figma: Mac file, page 26, signed off Nov 22. Settings ▸ Online.
+  - **Pair a phone.** While the window is open the Mac shows its address, with Copy, and how long is left. When a phone asks, the Mac shows the phone's name, the same 6-digit number the phone shows, and "This phone may": Viewer, Operator (the default), Manager or Owner, each with what it opens. A manager is not offered Owner. Approve is never the default button, so Return cannot approve a request that has just appeared.
+  - **Every ending is said in words:** paired as which role, denied (the window stays open for another try), nobody approved in time, three requests with none approved, and the PIN could not be read.
+  - **Paired phones** lists each phone with how it was paired, when it was last seen, and its role. The owner changes a phone's role from a list that says what each role opens. A phone paired with the PIN is always the owner. A manager sees the roles and cannot change them.
+  - **Removing a phone:** while pairing by code is on, a manager may remove a phone as well as the owner (frame 6). Before, only someone who may change settings could.
+  - With the switch off, Settings ▸ Online is the screen it was.
+  - 38 new strings in 9 languages. Tests: what the panel shows for each state of the two windows, each ending's sentence, who may set which role, who may remove, and that the old screen is drawn while the switch is off.
 - **Mac: a paired phone carries a role, and the Mac enforces it on every request (draft, stacked on #2625; no new screens).** Phone pairing design, decided Nov 22.
   - **The check.** A request a phone signs is asked of the shared rule (`lib/device-roles.js`) with the path the server routes on. A request the phone's role does not cover is answered 403 `role-scope` with the scope it lacked. A route the rule does not name is the owner's. The check sits in the one place a device's signature is accepted, so no route can take a phone's key without it.
   - **Phones already paired are unchanged.** A phone paired with the owner PIN has no role and is the owner, as it was.

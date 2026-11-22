@@ -59,8 +59,22 @@ extension Shop {
         lanPhonePairing.close()
     }
 
+    /// May whoever is at this Mac remove a paired phone? Whoever may change
+    /// settings, as before; and, while pairing by code is on, a manager too
+    /// (page 26, frame 6: "You can remove a phone"). Removing only cuts a
+    /// phone off: it gives nobody anything, and the phone can be paired again.
+    /// Asks, says nothing.
+    var mayRemovePhone: Bool {
+        if lockAllows("settings", "edit") { return true }
+        return PhonePairingUI.on && mayOpenPairing
+    }
+
     func signOutPhone(_ id: String) {
-        guard permitted("settings", "edit") else { return }
+        // lock: whoever may change settings, or (pairing by code on) a manager: `mayRemovePhone`
+        guard mayRemovePhone else {
+            moveProblem = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
+            return
+        }
         lanDeviceStore.remove(id)
         refreshPairedPhones()
     }
@@ -72,6 +86,16 @@ struct PairedPhones: View {
     @State private var signingOut: LanDevices.Listed?
 
     var body: some View {
+        // Pairing by code on: the page-26 screens, with each phone's role.
+        if PhonePairingUI.on {
+            PairedPhonesByCode(shop: shop)
+        } else {
+            classic
+        }
+    }
+
+    /// Settings ▸ Online as it has been: the PIN, one line per phone.
+    @ViewBuilder private var classic: some View {
         LabeledContent(shop.words.callIt("mac.phones_title")) {
             if shop.pairedPhones.isEmpty {
                 Text(shop.words.callIt("mac.phones_none")).foregroundStyle(.secondary)

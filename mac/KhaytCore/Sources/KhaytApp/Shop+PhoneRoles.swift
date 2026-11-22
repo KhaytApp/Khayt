@@ -57,6 +57,17 @@ extension Shop {
         return (try? await engine.deviceRole(record)) ?? "viewer"
     }
 
+    /// The roles whoever is here may set on THIS paired phone, from the shared
+    /// rule (`settableRoles`): none for anyone but the owner, and only Owner
+    /// on a phone paired with the PIN. The picker lists these and no others.
+    func phoneRolesSettable(on phone: LanDevices.Listed) async -> [String] {
+        guard lockAllows("security", "edit"), let engine, let approver = phoneApproverRole else { return [] }
+        let record = KhaytEngine.deviceRecord(kind: phone.kind, role: phone.role, rolesVersion: phone.rolesVersion)
+        let settable = (try? await engine.deviceRolesSettable(on: record, by: approver)) ?? []
+        let grantable = await phoneRolesGrantable()
+        return settable.filter(grantable.contains)
+    }
+
     /// Why an approval or a role change did not happen.
     enum PhoneRoleRefusal: Equatable {
         /// The lock, or nobody signed in.
