@@ -102,16 +102,26 @@ try {
   ok(JSON.stringify(await buttons(w, 'ask')) === JSON.stringify(['Apply it here', 'Not now']), 'buttons: Apply it here, Not now');
   await shot(w, 'G-ask');
 
-  // ── G: the 409, turning ON here: both answers ─────────────────────────────
-  await drawWith(w, { unlocked: true, share: true, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: true, held: true } });
+  // ── G: the 409, turning ON here, the other computer read as OFF: both answers ─
+  await drawWith(w, { unlocked: true, share: true, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: true, held: true, theirs: false } });
   ok(await w.evaluate(() => /The switch was changed at another computer at .*, after your change here at .*\. Khayt Cloud keeps the newer one\./.test(document.querySelector('[data-iu-g-card="conflict-on"]').textContent)), 'G 409: "The switch was changed at another computer at …, after your change here at …"');
   ok(JSON.stringify(await buttons(w, 'conflict-on')) === JSON.stringify(['Use the newer setting', 'Keep it on this computer only']), 'turning it ON here: "Use the newer setting" and "Keep it on this computer only"');
+  ok(/turned it off/.test(await text(w)), 'and names the direction, which was read');
   await shot(w, 'G-409-on');
 
+  // ── G: a 409 with the other value NOT read: no direction, no "keep" (Dev Hub, Nov 22) ─
+  await drawWith(w, { unlocked: true, share: true, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: true, held: false, theirs: null } });
+  ok(JSON.stringify(await buttons(w, 'conflict')) === JSON.stringify(['Use the newer setting']), 'not read: only "Use the newer setting", no keep on a guess');
+  ok(/so yours was not sent\. If this keeps happening .* clock may be behind/.test(await text(w)) && !/turned it (on|off)/.test(await text(w)), 'the general sentence with the clock hint, no direction');
+  // Both turned it ON (a clock behind): read, but not opposite: still the general sentence.
+  await drawWith(w, { unlocked: true, share: true, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: true, held: true, theirs: true } });
+  ok(JSON.stringify(await buttons(w, 'conflict')) === JSON.stringify(['Use the newer setting']), 'both ON: keeping it on here would keep nothing, so no keep');
+  await shot(w, 'G-409-general');
+
   // ── G: the 409, turning OFF here: only the newer setting ──────────────────
-  await drawWith(w, { unlocked: true, share: true, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: false, held: false } });
+  await drawWith(w, { unlocked: true, share: true, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: false, held: true, theirs: true } });
   ok(JSON.stringify(await buttons(w, 'conflict-off')) === JSON.stringify(['Use the newer setting']), 'turning it OFF here: only "Use the newer setting" (stricter-only, Turki Nov 22)');
-  ok(/never looser/.test(await text(w)), 'and says why there is nothing to keep');
+  ok(/never looser/.test(await text(w)) && /turned it on/.test(await text(w)), 'and says why there is nothing to keep, naming the direction read');
   await shot(w, 'G-409-off');
   // A forged "keep" from the window: with Khayt Cloud locked here main answers
   // 'locked' before anything else. The stricter-only refusal ('looser') needs
@@ -125,7 +135,7 @@ try {
   await shot(w, 'G-clock');
 
   // A button goes to main; main says why it did not (Khayt Cloud locked here).
-  await drawWith(w, { unlocked: true, share: true, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: true, held: true } });
+  await drawWith(w, { unlocked: true, share: true, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: true, held: true, theirs: false } });
   await w.click('[data-iu-g="keep"]');
   await w.waitForFunction(() => [...document.querySelectorAll('#toastContainer .toast')].some((t) => /Unlock Khayt Cloud on this computer/.test(t.textContent)), null, { timeout: 8000 });
   ok(true, 'the answer went to main, which said "locked": "Unlock Khayt Cloud on this computer to change this."');
@@ -184,7 +194,7 @@ try {
 
   // ── Arabic: the same states in the shop's language ───────────────────────
   await w.evaluate(() => { settings.lang = 'ar'; i18n.set('ar'); });
-  await drawWith(w, { unlocked: true, share: false, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: true, held: true } });
+  await drawWith(w, { unlocked: true, share: false, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: true, held: true, theirs: false } });
   ok(JSON.stringify(await buttons(w, 'conflict-on')) === JSON.stringify(['استخدام الإعداد الأحدث', 'إبقاؤه على هذا الحاسوب فقط']), 'Arabic: both answers');
   ok(/إبلاغ حواسيبي الأخرى أيضًا عبر سحابة خيط/.test(await text(w)), 'Arabic: the option row');
   b = await bannerWith(w, Object.assign({}, NONE, { conflict: { at: AT, mine: MINE, offline: true, held: true } }));

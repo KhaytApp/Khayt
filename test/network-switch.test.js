@@ -118,7 +118,9 @@ function harness(over = {}) {
   const client = {
     async getNetworkSwitch(url, shopId, token, opts) {
       server.gets += 1; server.lastGetPurpose = opts && opts.purpose;
-      if (server.blocked) { const e = new Error('outbound blocked: switch-sync (offline)'); e.code = 'outbound.blocked'; throw e; }
+      const once = server.allowOnce && opts && opts.purpose === 'switch-sync';
+      if (once) server.allowOnce = false;
+      if (server.blocked && !once) { const e = new Error('outbound blocked: switch-sync (offline)'); e.code = 'outbound.blocked'; throw e; }
       if (server.getFail) throw new Error('ECONNREFUSED');
       if (server.status) return { status: server.status, body: null };
       if (!server.value) return { status: 404, body: { reason: 'none' } };
@@ -145,6 +147,8 @@ function harness(over = {}) {
     log: (m) => logs.push(m),
     setLocalOffline: () => { local.offline = true; local.sets += 1; },
     changed: () => { changes += 1; },
+    // Main's gate lets ONE switch-sync GET through the shop's switch (lib/main/outbound-fetch.js).
+    allowSwitchSyncOnce: over.noOnce ? undefined : () => { server.allowOnce = true; server.onceAsked = (server.onceAsked || 0) + 1; },
   });
   const publishRemote = (p) => { server.value = { changedAt: p.changedAt, receivedAt: 'x', ciphertext: sc.encryptStore(p, dek) }; };
   return { sync, server, dek, book: () => book, setBook: (n) => { book = { network: n }; }, mine: () => file.scopes[SCOPE] || {}, file: () => file,
@@ -286,7 +290,7 @@ test('rule 3: a 409 is held for the person, never applied by the timer, never re
   h.publishRemote(plain({ changedAt: '2026-11-22T10:05:00.000Z' }));
   assert.equal((await h.sync.pull()).act, 'held');
   assert.equal(h.book().network.offline, false, 'the person\'s change stands until they choose');
-  assert.deepEqual(h.sync.state().conflict, { at: '2026-11-22T10:05:00.000Z', mine: '2026-11-22T10:00:00.000Z', offline: false, held: true });
+  assert.deepEqual(h.sync.state().conflict, { at: '2026-11-22T10:05:00.000Z', mine: '2026-11-22T10:00:00.000Z', offline: false, held: true, theirs: true });
   assert.equal((await h.sync.answerConflict('adopt')).applied, true);
   assert.equal(h.book().network.offline, true);
   const k = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
@@ -374,7 +378,8 @@ test('review H1/M1: the newer value is fetched at the 409, so both answers work 
   await n.sync.publish({ offline: true, network: on });
   n.setBook(on);
   n.server.blocked = true;
-  assert.deepEqual(await n.sync.answerConflict('keep'), { ok: false, why: 'not-held' });
+  n.server.getFail = true;   // the one GET the answer makes fails too
+  assert.deepEqual(await n.sync.answerConflict('keep'), { ok: false, why: 'unreachable' });
   assert.equal(n.local.sets, 0, 'this computer\'s switch untouched');
   assert.ok(n.sync.state().conflict, 'the card stays');
   assert.equal(n.book().network.offline, true);
@@ -445,4 +450,99 @@ test('review of the banner: locking Khayt Cloud tells the window, and the questi
   assert.equal(h.sync.state().pending, null, 'and state() shows nothing to point to');
   const main = require('fs').readFileSync(require('path').join(__dirname, '..', 'main.js'), 'utf8');
   assert.match(main, /ipcMain\.handle\('hub:cloud-lock', \(\) => \{ networkSwitchSync\.stop\(\);/);
+});
+
+/* Dev Hub, Nov 22 (the Mac's review of the same flow). */
+const conflictNotHeld = async (mineOn) => {
+  const h = harness({ mine: { share: true } });
+  const net = mineOn ? Object.assign({}, ON_NOW, { changedAt: new Date(NOW).toISOString() })
+    : { offline: false, changedAt: new Date(NOW).toISOString() };
+  h.server.putStatus = 409;
+  h.server.getFail = true;            // the GET at the 409 fails: nothing held
+  await h.sync.publish({ offline: mineOn, network: net });
+  h.setBook(net);
+  h.server.putStatus = null;
+  h.server.getFail = false;
+  return h;
+};
+
+test('a 409 alone names no direction: theirs is null until the other value is read, then which way it went', async () => {
+  const h = await conflictNotHeld(true);
+  assert.equal(h.sync.state().conflict.held, false);
+  assert.equal(h.sync.state().conflict.theirs, null, 'not read: the window uses the general sentence');
+  const k = harness({ mine: { share: true } });
+  k.publishRemote(plain({ offline: true, changedAt: new Date(NOW + 60000).toISOString() }));
+  k.server.putStatus = 409;
+  await k.sync.publish({ offline: true, network: Object.assign({}, ON_NOW, { changedAt: new Date(NOW).toISOString() }) });
+  assert.equal(k.sync.state().conflict.theirs, true, 'read: the other computer also turned it ON (a clock behind)');
+});
+
+test('"Use the newer setting" with nothing held makes ONE switch-sync GET, even with the shop offline, and applies what it reads', async () => {
+  const h = await conflictNotHeld(true);
+  h.publishRemote(plain({ offline: false, changedAt: new Date(NOW + 60000).toISOString() }));
+  h.server.blocked = true;            // offline by the shop's switch: only the one-shot gets through
+  const gets = h.server.gets;
+  const r = await h.sync.answerConflict('adopt');
+  assert.equal(r.ok, true);
+  assert.equal(r.applied, true);
+  assert.equal(h.server.gets - gets, 1, 'exactly one GET');
+  assert.equal(h.server.lastGetPurpose, 'switch-sync', 'as switch-sync, person-started');
+  assert.equal(h.server.onceAsked, 1, 'main\'s gate was asked to let it through once');
+  assert.equal(h.book().network.offline, false);
+  assert.equal(h.sync.state().conflict, null);
+});
+
+test('"Use the newer setting": the one GET fails, so the question STAYS and the window says Khayt Cloud could not be reached', async () => {
+  for (const fail of ['getFail', 'status']) {
+    const h = await conflictNotHeld(true);
+    h.publishRemote(plain({ offline: false, changedAt: new Date(NOW + 60000).toISOString() }));
+    if (fail === 'getFail') h.server.getFail = true;
+    if (fail === 'status') h.server.status = 503;
+    const before = h.changes();
+    const r = await h.sync.answerConflict('adopt');
+    assert.deepEqual(r, { ok: false, why: 'unreachable' }, fail);
+    assert.ok(h.sync.state().conflict, `${fail}: the question stays, never cleared with nothing applied`);
+    assert.equal(h.book().network.offline, true, `${fail}: nothing changed`);
+    assert.ok(h.changes() > before, `${fail}: the window is told to draw it again`);
+  }
+  // Without main's one-shot (a gate that refuses switch-sync offline), it is unreachable too.
+  const n = harness({ mine: { share: true }, noOnce: true });
+  n.server.putStatus = 409; n.server.getFail = true;
+  const on = Object.assign({}, ON_NOW, { changedAt: new Date(NOW).toISOString() });
+  await n.sync.publish({ offline: true, network: on });
+  n.setBook(on); n.server.putStatus = null; n.server.getFail = false;
+  n.publishRemote(plain({ offline: false, changedAt: new Date(NOW + 60000).toISOString() }));
+  n.server.blocked = true;
+  assert.equal((await n.sync.answerConflict('adopt')).why, 'unreachable');
+  assert.ok(n.sync.state().conflict);
+});
+
+test('"Keep it on this computer only" only when it really keeps this computer stricter than the newer value', async () => {
+  // Both turned it ON (a clock behind): keeping it on here keeps nothing.
+  const h = harness({ mine: { share: true } });
+  h.publishRemote(plain({ offline: true, changedAt: new Date(NOW + 60000).toISOString() }));
+  h.server.putStatus = 409;
+  await h.sync.publish({ offline: true, network: Object.assign({}, ON_NOW, { changedAt: new Date(NOW).toISOString() }) });
+  assert.deepEqual(await h.sync.answerConflict('keep'), { ok: false, why: 'not-stricter' });
+  assert.equal(h.local.sets, 0, 'this computer\'s own switch untouched');
+  assert.ok(h.sync.state().conflict, 'the question stays for "Use the newer setting"');
+  assert.equal((await h.sync.answerConflict('adopt')).applied, true);
+  // Not held at the 409, read on the answer, and it is ON too: still refused.
+  const k = await conflictNotHeld(true);
+  k.publishRemote(plain({ offline: true, changedAt: new Date(NOW + 60000).toISOString() }));
+  assert.deepEqual(await k.sync.answerConflict('keep'), { ok: false, why: 'not-stricter' });
+  assert.equal(k.local.sets, 0);
+});
+
+test('frame G words: a direction only when read and opposite; Keep only when stricter; "could not reach Khayt Cloud" said', () => {
+  const ui = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'internet-use.js'), 'utf8');
+  const g = ui.slice(ui.indexOf('function gCards('), ui.indexOf('function answerSay('));
+  assert.match(g, /const known = typeof c\.theirs === 'boolean' && c\.theirs !== turningOn;/);
+  assert.match(g, /const keep = known && turningOn;/);
+  assert.match(g, /'iu\.g\.conflict_general_body'/);
+  assert.match(ui, /if \(r\.why === 'unreachable'\) return toast\('⚠ ' \+ tr\('iu\.g\.unreachable'\)/);
+  for (const l of ['en', 'ar', 'de', 'es', 'fr', 'ja', 'pt-BR', 'tr', 'zh']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'locales', l + '.js'), 'utf8');
+    for (const k of ['iu.g.conflict_general_body', 'iu.g.unreachable', 'iu.g.conflict_on_body', 'iu.g.conflict_off_body']) assert.match(src, new RegExp(`"${k.replace(/\./g, '\\.')}":`), `${l} ${k}`);
+  }
 });

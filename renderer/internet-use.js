@@ -206,12 +206,21 @@ function gCards(ns, can) {
     const title = ms(c.at) !== null && ms(c.mine) !== null
       ? tr('iu.g.conflict_title', { theirs: fmtTime(c.at), mine: fmtTime(c.mine) })
       : tr('iu.g.conflict_title_plain');
-    // Two variants (Turki, Nov 22): "Keep it on this computer only" only when
-    // the person was turning the switch ON here; main refuses it otherwise.
+    // A 409 alone does not say which way the other computer turned the
+    // switch: with a clock behind, both may have turned it ON (Dev Hub, Nov
+    // 22). A direction is named only when main READ the other value
+    // (`theirs`) and it is the opposite of the person's; otherwise the general
+    // sentence, with the clock hint. "Keep it on this computer only" only when
+    // it really keeps this computer stricter: the person turned it ON here and
+    // the other computer turned it OFF (Turki, Nov 22). Main refuses it otherwise.
     const turningOn = c.offline === true;
-    out.push(`<div class="card iu-g" data-iu-g-card="${turningOn ? 'conflict-on' : 'conflict-off'}"><div class="iu-g-title">${esc(title)}</div>
-      <div class="iu-sub">${esc(tr(turningOn ? 'iu.g.conflict_on_body' : 'iu.g.conflict_off_body'))}</div>
-      <div class="iu-g-btns">${btn('adopt', tr('iu.g.use_newer'), true)}${turningOn ? btn('keep', tr('iu.g.keep_here')) : ''}</div></div>`);
+    const known = typeof c.theirs === 'boolean' && c.theirs !== turningOn;
+    const kind = !known ? 'conflict' : (turningOn ? 'conflict-on' : 'conflict-off');
+    const body = !known ? 'iu.g.conflict_general_body' : (turningOn ? 'iu.g.conflict_on_body' : 'iu.g.conflict_off_body');
+    const keep = known && turningOn;
+    out.push(`<div class="card iu-g" data-iu-g-card="${kind}"><div class="iu-g-title">${esc(title)}</div>
+      <div class="iu-sub">${esc(tr(body))}</div>
+      <div class="iu-g-btns">${btn('adopt', tr('iu.g.use_newer'), true)}${keep ? btn('keep', tr('iu.g.keep_here')) : ''}</div></div>`);
   }
   if (ns.clockBehind) {
     out.push(`<div class="card iu-g" data-iu-g-card="clock"><div class="iu-g-title">${esc(tr('iu.g.clock'))}</div></div>`);
@@ -225,6 +234,9 @@ function answerSay(r) {
   if (r.why === 'not_permitted') return refuseSay('not_permitted');
   if (r.why === 'locked') return toast('⚠ ' + tr('iu.share_locked'), 'error', 6000);
   if (r.why === 'role') return toast('⚠ ' + tr('iu.share_role'), 'error', 6000);
+  // "Use the newer setting" with nothing held made its one GET and could not
+  // read it: the question stays, and says why (Dev Hub, Nov 22).
+  if (r.why === 'unreachable') return toast('⚠ ' + tr('iu.g.unreachable'), 'error', 8000);
   toast('⚠ ' + tr('iu.g.failed'), 'error', 6000);
 }
 

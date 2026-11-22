@@ -325,3 +325,29 @@ test('review: main\'s own writers may not change the outbound switch either (sto
   await io.updateStoreOnDisk((cur) => ({ ...cur, printLog: [{ id: 'a' }] }));
   fs2.rmSync(dir, { recursive: true, force: true });
 });
+
+test('switch-sync: ONE person-started GET through the shop\'s switch, set by main only, never through this computer\'s own', () => {
+  let t = 1000;
+  const settings = { network: { offline: true, changedAt: '2026-11-22T10:00:00.000Z' } };   // set here: not via cloud
+  let local = {};
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => local, writeLocal: (v) => { local = v; }, now: () => t });
+  assert.equal(g.check('switch-sync').allowed, false, 'the shop is offline and the switch did not come through Khayt Cloud');
+  g.allowSwitchSyncOnce();
+  const r = g.check('switch-sync');
+  assert.equal(r.allowed, true);
+  assert.equal(r.person, true);
+  assert.equal(g.check('switch-sync').allowed, false, 'once');
+  g.allowSwitchSyncOnce();
+  assert.equal(g.check('cloud').allowed, false, 'only switch-sync, never the rest of Khayt Cloud');
+  t += 21000;
+  assert.equal(g.check('switch-sync').allowed, false, 'it lapses within seconds of the answer');
+  // This computer's own switch: a computer offline by its own switch makes no call.
+  g.setLocal({ offline: true });
+  g.allowSwitchSyncOnce();
+  assert.equal(g.check('switch-sync').allowed, false);
+  // Not reachable from the window: no IPC names it.
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const pre = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
+  assert.doesNotMatch(pre, /allowSwitchSyncOnce/);
+  assert.equal((main.match(/allowSwitchSyncOnce/g) || []).length, 2, 'only handed to network-switch-sync');
+});
