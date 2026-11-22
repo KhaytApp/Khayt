@@ -6202,6 +6202,8 @@
   "outbound.blocked.lan-host-missing": "خيط مضبوط على عدم الاتصال بالإنترنت، والعنوان الذي يحتاجه هذا الإجراء ليس على شبكة متجرك.",
   "outbound.blocked.settings-unknown": "خيط قيد التشغيل. حاول مرة أخرى بعد لحظة.",
   "err.refused_network": "استخدام الإنترنت («عدم الاتصال بالإنترنت»)",
+  "err.refused_telemetry": "تقارير الأعطال وإحصاءات الاستخدام",
+  "err.refused_active_count": "احتساب التثبيت دون هوية",
   "iu.in.unrouted": "عنوان خارج شبكة متجرك",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

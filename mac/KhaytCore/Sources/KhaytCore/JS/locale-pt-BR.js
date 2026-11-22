@@ -6203,6 +6203,8 @@
   "outbound.blocked.lan-host-missing": "O Khayt está configurado para não fazer conexões com a internet, e o endereço necessário não está na rede da sua loja.",
   "outbound.blocked.settings-unknown": "O Khayt está iniciando. Tente de novo em instantes.",
   "err.refused_network": "Uso da internet (“Não fazer conexões com a internet”)",
+  "err.refused_telemetry": "relatórios de falhas e estatísticas de uso",
+  "err.refused_active_count": "a contagem anônima desta instalação",
   "iu.in.unrouted": "um endereço fora da rede da sua loja",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

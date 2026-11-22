@@ -5191,8 +5191,25 @@ const API_TOKEN_SCOPES = ['orders:read', 'orders:write', 'clients:read', 'client
 // SEPARATELY, revocable without restart — opting out purges the local queue and clears
 // the install id so nothing identifying survives.
 /** The two consents — the Settings switches and the one-time card both land here. */
+/** Under the staff lock only the owner changes what Khayt shares (Turki, Nov 22).
+ *  Main decides (the save guard, hub:active-count-set); this only says so first. */
+function _privacyOwnerOnly() {
+  if (!settings.operatorLockEnabled) return false;
+  return !(typeof currentOperatorRoleKey === 'function' && currentOperatorRoleKey() === 'owner');
+}
+
 async function setTelemetryConsent(crash, usage) {
   const prev = settings.telemetry || {};
+  // A change the owner has to make is not made, and said in its own words.
+  // Pressing "No thanks" on the card over opt-ins already off changes nothing,
+  // so it is never refused.
+  if ((prev.crashOptIn === true) !== !!crash || (prev.usageOptIn === true) !== !!usage) {
+    if (_privacyOwnerOnly()) {
+      toast('⚠ ' + t('err.refused', { what: t('err.refused_telemetry') }), 'error', 9000);
+      renderTelemetrySettings();
+      return false;
+    }
+  }
   const anyOn = crash || usage;
   let installId = prev.installId || '';
   if (anyOn && !installId) {
@@ -5210,6 +5227,7 @@ async function setTelemetryConsent(crash, usage) {
   if (!anyOn) { try { await window.hubAPI?.telemetryPurge?.(); } catch (_) {} }
   renderTelemetrySettings();
   renderTelemetryAsk();
+  return true;
 }
 
 // The one-time ask, as the Mac's TelemetryCard: a card across the top of the
@@ -5282,8 +5300,11 @@ function renderTelemetryAsk() {
   });
   card.querySelector('[data-tel-ask="share"]').addEventListener('click', async () => {
     const usage = !!card.querySelector('#telemetryAskUsage')?.checked;
+    // Refused for a staff member under the lock: the card stays, so the owner
+    // is still asked on this computer (Nov 22).
+    if (await setTelemetryConsent(true, usage) === false) return;
     markTelemetryAsked();
-    await setTelemetryConsent(true, usage);
+    renderTelemetryAsk();
     toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
   });
 }
@@ -5307,8 +5328,15 @@ async function renderActiveCountRow(el) {
       <span style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('tel.active_hint'))}</span></span>
     </label>`;
   row.querySelector('#tel_active')?.addEventListener('change', async (e) => {
-    const r = await window.hubAPI?.activeCountSet?.(e.target.checked).catch(() => null);
+    const box = e.target;
+    const refuse = () => {
+      box.checked = !box.checked;   // what is really set
+      toast('⚠ ' + t('err.refused', { what: t('err.refused_active_count') }), 'error', 9000);
+    };
+    if (_privacyOwnerOnly()) return refuse();
+    const r = await window.hubAPI?.activeCountSet?.(box.checked).catch(() => null);
     if (r?.ok) toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
+    else if (r && r.error === 'not_permitted') refuse();
   });
 }
 
@@ -5335,7 +5363,8 @@ function renderTelemetrySettings() {
     </div>`;
 
   const persist = async () => {
-    await setTelemetryConsent(!!el.querySelector('#tel_crash')?.checked, !!el.querySelector('#tel_usage')?.checked);
+    // Refused (the owner's, under the lock): said already, and not "saved" too (review LOW-3).
+    if (await setTelemetryConsent(!!el.querySelector('#tel_crash')?.checked, !!el.querySelector('#tel_usage')?.checked) === false) return;
     toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
   };
   renderActiveCountRow(el);
