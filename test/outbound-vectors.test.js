@@ -15,7 +15,11 @@ const V = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'outbound-
 for (const c of V.cases) {
   test(c.why, () => {
     const r = O.allowed(c.settings, c.purpose, c.ctx);
-    assert.deepEqual({ allowed: r.allowed, reason: r.reason }, c.want);
+    // `once` is part of the contract: present (true) only when a person's
+    // answer let the call through, and the host must spend the token then.
+    const got = { allowed: r.allowed, reason: r.reason };
+    if (r.once !== undefined) got.once = r.once;
+    assert.deepEqual(got, c.want);
     assert.equal(r.purpose, c.purpose);
   });
 }
