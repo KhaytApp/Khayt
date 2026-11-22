@@ -85,6 +85,23 @@ extension KhaytEngine {
         try runtime.call2("KhaytWaitingAtMachine.waiting(ARG0, ARG1 || {})", [machine, opts], as: JSONValue.self)
     }
 
+    /// The job a finished print's per-head figures may go on, or nil
+    /// (`actualsJob`: printing, on this machine, naming the file; stricter
+    /// than the finish photo's rule, with no fallbacks).
+    public func headActualsJob(printLog: [JSONValue], machineId: String, filename: String) throws -> String? {
+        try runtime.call2("globalThis.KhaytPrinterActuals.actualsJob(ARG0, ARG1, ARG2)",
+                          [.array(printLog), .string(machineId), .string(filename)], as: String?.self)
+    }
+
+    /// This print's row in the printer's history, or `.null` (`historyRun`:
+    /// the closest completed run of the file within twenty minutes that no
+    /// job already holds). `taken`: every job's `actualHeadsJobId`.
+    public func headActualsRun(jobs: JSONValue, filename: String, endedAt: Date, taken: [String]) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPrinterActuals.historyRun(ARG0, ARG1, ARG2, { taken: ARG3 })",
+                          [jobs, .string(filename), .number(endedAt.timeIntervalSince1970), .array(taken.map(JSONValue.string))],
+                          as: JSONValue.self)
+    }
+
     /// What to write on a job for a finished print's filament per head
     /// (`perHeadActuals` then `perHeadPatch`), or `.null` when the printer's
     /// history row says nothing per head or the job already holds a split.
