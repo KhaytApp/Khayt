@@ -128,7 +128,7 @@ test('the book is read once per window of time, and a save makes the next call r
 
 test('every printer call in main.js starts by putting the credentials back', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
-  for (const fn of ['uploadGcodeToPrinter', 'fetchPrinterHistory', 'sendPrinterCommand', 'sendPrinterControl', 'plateObjects', 'fetchPrinterStatus']) {
+  for (const fn of ['uploadGcodeToPrinter', 'fetchPrinterHistory', 'sendPrinterCommand', 'sendPrinterControl', 'plateObjects', 'fetchPrinterStatus', 'moonrakerRead']) {
     const at = src.indexOf(`async function ${fn}(machine`);
     assert.ok(at > 0, fn);
     const head = src.slice(at, src.indexOf('\n', src.indexOf('\n', at) + 1));

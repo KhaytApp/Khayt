@@ -1634,6 +1634,7 @@ function pollPrinterSoon(machine, tries = 0) {
       const before = printerStatusCache[id];
       printerStatusCache[id] = mergePollSuccess(before, status, Date.now());
       if (completionIsNew(before, printerStatusCache[id])) persistCompletions().catch(() => {});
+      noteHeadActuals(machine, before, printerStatusCache[id]);
       BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('printer-status-update', printerStatusCache));
     } catch (_) { /* the next full poll says it */ } finally { printerSoonPolling.delete(id); }
   }, SETTLE_POLL_MS);
@@ -5611,6 +5612,7 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
         // A job just ended. This is the only moment its figures are true, and
         // now the only moment they are written down.
         if (completionIsNew(before, printerStatusCache[machine.id])) captured = true;
+        noteHeadActuals(machine, before, printerStatusCache[machine.id]);
       } catch(e) {
         printerStatusCache[machine.id] = mergePollFailure(
           printerStatusCache[machine.id], e.message, Date.now(), e && e.status,
@@ -5678,28 +5680,13 @@ ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
  */
 async function fetchPrinterHistory(machine, limit) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
-  const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
+  const type = machine && machine.printerApi && machine.printerApi.type;
   if (type !== 'moonraker') {
     return { ok: false, error: `Only Klipper/Moonraker printers keep a job history ${FLAVOR_NAME} can read` };
   }
-  // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
-  // address the name resolved to, never to the name looked up again.
-  const target = await resolvePrinterTarget(host);
-  if (!target.ok) return { ok: false, error: target.error };
-  const printerHost = target.urlHost;
-  const portNum = parseInt(port || defaultPrinterPort(type), 10);
-  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
-    return { ok: false, error: 'Invalid port number' };
-  }
   const n = Number.isInteger(limit) && limit > 0 && limit <= 1000 ? limit : 500;
-  const headers = {};
-  if (apiKey) headers['X-Api-Key'] = apiKey;
   try {
-    const res = await fetch(`http://${printerHost}:${portNum}/server/history/list?limit=${n}`, {
-      headers, redirect: 'manual', signal: AbortSignal.timeout(30000),
-    });
-    if (!res.ok) return { ok: false, error: `Printer answered HTTP ${res.status}` };
-    const body = await res.json();
+    const body = await moonrakerRead(machine, `/server/history/list?limit=${n}`, 30000);
     const raw = (body && body.result) || {};
     // Mapped in the main process so the renderer never sees the slicer's
     // thumbnails: a hundred base64 previews would land in the store file, which
@@ -5708,6 +5695,55 @@ async function fetchPrinterHistory(machine, limit) {
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
+}
+
+/**
+ * One read-only GET on a Moonraker printer, JSON back; throws on any failure.
+ * The secrets come from main (machineSecrets.fill), the address is resolved
+ * and pinned (resolvePrinterTarget), the key goes as X-Api-Key only when set,
+ * and a redirect is a failure: the same guards as the poll.
+ */
+async function moonrakerRead(machine, pathAndQuery, timeoutMs) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
+  if (type !== 'moonraker') throw new Error('not a Moonraker printer');
+  // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
+  // address the name resolved to, never to the name looked up again.
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) throw new Error(target.error);
+  const portNum = parseInt(port || defaultPrinterPort(type), 10);
+  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) throw new Error('Invalid port number');
+  const headers = {};
+  if (apiKey) headers['X-Api-Key'] = apiKey;
+  const res = await fetch(`http://${target.urlHost}:${portNum}${pathAndQuery}`, {
+    headers, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs || 10000),
+  });
+  if (!res.ok) throw new Error(`Printer answered HTTP ${res.status}`);
+  return res.json();
+}
+
+/* Filament used per head after a finished U1 (Moonraker) print, with each
+ * head's colour and material, on the job (lib/main/head-actuals.js; the Mac's
+ * HeadActuals.swift). Two read-only GETs on the printer, a write through
+ * updateStoreOnDisk, and the window told so its next save keeps the fields. */
+const headActuals = require('./lib/main/head-actuals.js').createHeadActuals({
+  read: (machine, p) => moonrakerRead(machine, p, 10000),
+  readBook: () => {
+    if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+    return lanServerStore;
+  },
+  updateStoreOnDisk: (mutate) => updateStoreOnDisk(mutate),
+  notify: (id, fields) => {
+    BrowserWindow.getAllWindows().forEach((w) => {
+      if (!w.isDestroyed()) w.webContents.send('printer-head-actuals', { id, fields });
+    });
+  },
+});
+function noteHeadActuals(machine, before, after) {
+  try {
+    const p = headActuals.noteEdge(machine, before, after, Date.now());
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_) { /* never break polling */ }
 }
 
 // Bambu's `sequence_id`: "incremented by 1 on each request" (OpenBambuAPI).

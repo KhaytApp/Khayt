@@ -668,6 +668,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       toast('📱 ' + t('phonephoto.added', { job: order.project || order.jobNumber || order.id }), 'success', 4000);
     });
   }
+  // Main noted how much filament each head used on a job after a U1 print,
+  // with each head's colour and material (lib/main/head-actuals.js). The
+  // record is already on disk; this copy of the book takes the three fields
+  // too, or the next save would write the job back without them. Once per
+  // print: a job that already holds a split keeps it. Nothing on screen.
+  if (window.hubAPI?.onPrinterHeadActuals) {
+    window.hubAPI.onPrinterHeadActuals((payload) => {
+      const f = payload && payload.fields;
+      if (!f || typeof f !== 'object' || !Array.isArray(f.actualHeads) || !f.actualHeadsJobId) return;
+      const order = printLog.find((o) => o && o.id === payload.id);
+      if (!order || order.actualHeadsJobId != null) return;
+      order.actualHeads = f.actualHeads;
+      order.actualHeadsJobId = f.actualHeadsJobId;
+      order.actualHeadsBasis = f.actualHeadsBasis;
+      saveAll();
+    });
+  }
   if (window.hubAPI?.onLanOrderUpdated) {
     window.hubAPI.onLanOrderUpdated((payload) => {
       const { id, status } = payload;
