@@ -6204,6 +6204,8 @@
   "iu.banner": "Khayt {n} gündür güncellemeleri kontrol etmedi, bu yüzden bu bilgisayara hiçbir güvenlik düzeltmesi ulaşmadı.",
   "iu.banner_shop": "Mağazanız internet bağlantılarını kapattı.",
   "iu.banner_here": "Bu bilgisayar internet bağlantılarını kapattı.",
+  "iu.banner_g_ask": "Mağazanız başka bir bilgisayarda internet kullanımını kapattı. Khayt, bunu burada da uygulayıp uygulamayacağınızı bekliyor.",
+  "iu.banner_g_conflict": "İnternet anahtarı, buradaki değişikliğinizden sonra başka bir bilgisayarda değiştirildi. Hangisinin kalacağını seçin.",
   "iu.keep_updates": "Güncellemeleri koru",
   "outbound.blocked.offline": "Khayt internet bağlantısı yapmayacak şekilde ayarlı. Bunun için {purpose} gerekiyor.",
   "outbound.blocked.offline-here": "Bu bilgisayar internet bağlantısı yapmayacak şekilde ayarlı. Bunun için {purpose} gerekiyor.",

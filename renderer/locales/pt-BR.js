@@ -6205,6 +6205,8 @@
   "iu.banner": "O Khayt não verifica atualizações há {n} dias, então nenhuma correção de segurança chegou a este computador.",
   "iu.banner_shop": "Sua loja desativou as conexões com a internet.",
   "iu.banner_here": "Este computador desativou as conexões com a internet.",
+  "iu.banner_g_ask": "Sua loja desligou o uso da internet em outro computador. O Khayt está esperando você decidir se aplica aqui.",
+  "iu.banner_g_conflict": "O interruptor de internet foi alterado em outro computador depois da sua alteração aqui. Escolha qual manter.",
   "iu.keep_updates": "Manter atualizações",
   "outbound.blocked.offline": "O Khayt está configurado para não fazer conexões com a internet. Isto requer {purpose}.",
   "outbound.blocked.offline-here": "Este computador está configurado para não fazer conexões com a internet. Isto requer {purpose}.",

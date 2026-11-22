@@ -11,6 +11,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     - the 7-day question ("Apply it here?");
     - a newer change at another computer;
     - a clock that may be behind.
+  - **Pointed to from every screen.** While the 7-day question or a newer change elsewhere is waiting, the notice above every screen (the one that says updates are off) says so, with a link to Settings ▸ General ▸ Internet use, so a question that arrives on another screen is not left unseen. The answer is given on the page itself. A question alone shows in the warning colours, not the red of a fault.
   - **A newer change elsewhere.** "Keep it on this computer only" is offered only when the person was turning the switch on here. It turns this computer's own switch on, and the shop takes the newer setting. After turning it off there is only "Use the newer setting": a computer may be stricter than the shop, never looser, and main refuses a "keep" in that case too.
   - In 9 languages. Tests: `npm run test:e2e:netswitchcloud`, `test/network-switch.test.js`.
 

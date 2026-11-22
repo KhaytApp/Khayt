@@ -6204,6 +6204,8 @@
   "iu.banner": "Khayt n'a pas vérifié les mises à jour depuis {n} jours : aucun correctif de sécurité n'a atteint cet ordinateur.",
   "iu.banner_shop": "Votre boutique a désactivé les connexions Internet.",
   "iu.banner_here": "Cet ordinateur a désactivé les connexions Internet.",
+  "iu.banner_g_ask": "Votre boutique a désactivé l'utilisation d'Internet sur un autre ordinateur. Khayt attend que vous choisissiez de l'appliquer ici ou non.",
+  "iu.banner_g_conflict": "L'interrupteur Internet a été modifié sur un autre ordinateur après votre modification ici. Choisissez celle à garder.",
   "iu.keep_updates": "Conserver les mises à jour",
   "outbound.blocked.offline": "Khayt est configuré pour n'effectuer aucune connexion Internet. Cette action nécessite {purpose}.",
   "outbound.blocked.offline-here": "Cet ordinateur est configuré pour n'effectuer aucune connexion Internet. Cette action nécessite {purpose}.",

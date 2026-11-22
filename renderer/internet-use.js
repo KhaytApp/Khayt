@@ -394,19 +394,47 @@ function wire(host) {
   }));
 }
 
-/** The banner on every screen (frame C): updates blocked and not checked for 30+ days. */
+/** What Khayt Cloud is waiting on, for the banner: 'ask' (the 7-day question), 'conflict' (a 409), or ''. */
+function gWaiting(ctx) {
+  const ns = ctx && ctx.ns;
+  if (!ns || typeof ns !== 'object') return '';
+  if (ns.conflict) return 'conflict';
+  if (ns.pending && ns.pending.offline === true) return 'ask';
+  return '';
+}
+
+/**
+ * The banner on every screen. Frame C: updates blocked and not checked for
+ * 30+ days. And (Turki, Nov 22) a question from Khayt Cloud or a clash that
+ * is waiting on the Internet use page (frame G), pointed to from here with a
+ * link to Settings › General › Internet use, no new screen: a question that
+ * arrived while the person was elsewhere used to wait unseen. The answer is
+ * only ever given on the page itself.
+ */
 function renderBanner(ctx) {
   const el = document.getElementById('updatesOffBanner');
   if (!el) return;
   const row = ctx && Array.isArray(ctx.rows) ? ctx.rows.find((r) => r.purpose === 'updates') : null;
   const days = updatesStale(row, ctx);
-  if (!days) { el.style.display = 'none'; el.innerHTML = ''; return; }
-  const why = row.reason === 'offline-here' ? tr('iu.banner_here') : tr('iu.banner_shop');
-  el.innerHTML = `<div class="iu-banner-text">${esc(tr('iu.banner', { n: days }) + ' ' + why)}</div>
+  const g = gWaiting(ctx);
+  if (!days && !g) { el.style.display = 'none'; el.innerHTML = ''; el.classList.remove('iu-banner-ask'); return; }
+  const where = [tr('nav.settings'), tr('set.pane_general'), tr('iu.title')].join(' › ');
+  const lines = [];
+  if (g) {
+    lines.push(`<div class="iu-banner-text" data-iu-banner-g="${g}">${esc(tr(g === 'ask' ? 'iu.banner_g_ask' : 'iu.banner_g_conflict'))}
+      <a href="#" class="iu-banner-link" data-iu-banner="where">${esc(where)}</a></div>`);
+  }
+  if (days) {
+    const why = row.reason === 'offline-here' ? tr('iu.banner_here') : tr('iu.banner_shop');
+    lines.push(`<div class="iu-banner-text">${esc(tr('iu.banner', { n: days }) + ' ' + why)}</div>
     <div class="iu-banner-btns">
       ${row.reason === 'offline' && mayChange() ? `<button type="button" class="btn primary small" data-iu-banner="keep">${esc(tr('iu.keep_updates'))}</button>` : ''}
       <button type="button" class="btn small" data-iu-banner="open">${esc(tr('iu.open'))}</button>
-    </div>`;
+    </div>`);
+  }
+  el.innerHTML = lines.join('');
+  // A question alone is not a fault: the warning colours, not the red.
+  el.classList.toggle('iu-banner-ask', !days);
   el.style.display = '';
   const k = el.querySelector('[data-iu-banner="keep"]');
   if (k) k.addEventListener('click', async () => {
@@ -416,7 +444,10 @@ function renderBanner(ctx) {
     await saveNetwork({ keep });
     await refresh();
   });
-  el.querySelector('[data-iu-banner="open"]').addEventListener('click', open);
+  const o = el.querySelector('[data-iu-banner="open"]');
+  if (o) o.addEventListener('click', open);
+  const w = el.querySelector('[data-iu-banner="where"]');
+  if (w) w.addEventListener('click', (e) => { e.preventDefault(); open(); });
 }
 
 /** The one line on the General pane that leads here. */
@@ -554,7 +585,7 @@ try {
   else boot();
 } catch (_) { /* no document */ }
 
-const api = { ORDER, STALE_DAYS, ownSwitchOff, refresh, render, renderBanner, open, refusalText, sayBlocked, stateOf, updatesStale, setUp, load, gCards };
+const api = { ORDER, STALE_DAYS, ownSwitchOff, refresh, render, renderBanner, gWaiting, open, refusalText, sayBlocked, stateOf, updatesStale, setUp, load, gCards };
 global.KhaytInternetUse = api;
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 

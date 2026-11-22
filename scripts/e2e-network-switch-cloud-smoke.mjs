@@ -132,11 +132,45 @@ try {
   await w.waitForFunction(() => !document.querySelector('[data-iu-g-card]'), null, { timeout: 8000 });
   ok(true, 'and the page is drawn again from main\'s own state');
 
+  // ── The every-screen banner points to a waiting question (Turki, Nov 22) ─
+  const bannerWith = (w, ns) => w.evaluate(async (ns) => {
+    const ctx = await window.KhaytInternetUse.load();
+    window.KhaytInternetUse.renderBanner(Object.assign({}, ctx, { ns }));
+    const el = document.getElementById('updatesOffBanner');
+    return { shown: el.style.display !== 'none', text: el.textContent.replace(/\s+/g, ' ').trim(), ask: el.classList.contains('iu-banner-ask'),
+      link: (el.querySelector('[data-iu-banner="where"]') || {}).textContent || '' };
+  }, ns);
+  const NONE = { unlocked: true, share: true, owner: true, pending: null, conflict: null, clockBehind: false };
+  let b = await bannerWith(w, NONE);
+  ok(!b.shown, 'banner: hidden while nothing waits');
+  b = await bannerWith(w, Object.assign({}, NONE, { pending: { offline: true, changedAt: '2026-11-10T09:00:00.000Z' } }));
+  ok(b.shown && /Your shop turned off internet use at another computer\. Khayt is waiting for you to say whether to apply it here\./.test(b.text), 'banner: the 7-day question is pointed to');
+  ok(b.link === 'Settings › General › Internet use', 'with a link to Settings › General › Internet use');
+  ok(b.ask, 'in the warning colours, not the red of a fault');
+  ok(!/Apply it here|Not now/.test(b.text), 'and no answer buttons: the answer is given on the page');
+  b = await bannerWith(w, Object.assign({}, NONE, { conflict: { at: AT, mine: MINE, offline: true, held: true } }));
+  ok(b.shown && /The internet switch was changed at another computer after your change here\. Choose which one to keep\./.test(b.text), 'banner: a 409 waiting is pointed to');
+  b = await bannerWith(w, Object.assign({}, NONE, { pending: { offline: false } }));
+  ok(!b.shown, 'banner: a pending value that is not "off" asks nothing');
+  b = await bannerWith(w, Object.assign({}, NONE, { clockBehind: true }));
+  ok(!b.shown, 'banner: the clock line alone stays on the page');
+  // The link opens the page, from anywhere.
+  await bannerWith(w, Object.assign({}, NONE, { pending: { offline: true, changedAt: '2026-11-10T09:00:00.000Z' } }));
+  await w.evaluate(() => openSettingsSection('general'));
+  await w.evaluate(() => document.querySelector('#updatesOffBanner [data-iu-banner="where"]').click());
+  await w.waitForFunction(() => { const p = document.getElementById('settings-panel-internet'); return p && p.classList.contains('active'); }, null, { timeout: 5000 });
+  ok(true, 'the link opens Settings › General › Internet use');
+  if (shots) { fs.mkdirSync(shots, { recursive: true }); await w.locator('#updatesOffBanner').screenshot({ path: path.join(shots, 'banner-ask.png') }); }
+  await w.evaluate(() => openSettingsSection('internet'));
+
   // ── Arabic: the same states in the shop's language ───────────────────────
   await w.evaluate(() => { settings.lang = 'ar'; i18n.set('ar'); });
   await drawWith(w, { unlocked: true, share: false, owner: true, pending: null, clockBehind: false, conflict: { at: AT, mine: MINE, offline: true, held: true } });
   ok(JSON.stringify(await buttons(w, 'conflict-on')) === JSON.stringify(['استخدام الإعداد الأحدث', 'إبقاؤه على هذا الحاسوب فقط']), 'Arabic: both answers');
   ok(/إبلاغ حواسيبي الأخرى أيضًا عبر سحابة خيط/.test(await text(w)), 'Arabic: the option row');
+  b = await bannerWith(w, Object.assign({}, NONE, { conflict: { at: AT, mine: MINE, offline: true, held: true } }));
+  ok(/تغيّر مفتاح الإنترنت على حاسوب آخر بعد تغييرك هنا/.test(b.text) && b.link === 'الإعدادات › عام › استخدام الإنترنت', 'Arabic: the banner and its link');
+  await bannerWith(w, NONE);
   await shot(w, 'G-409-on-ar');
   await w.evaluate(() => { settings.lang = 'en'; i18n.set('en'); });
   await a.electronApp.close(); a = null;
