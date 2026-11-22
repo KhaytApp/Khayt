@@ -67,12 +67,22 @@ extension Shop {
         case nothingToApprove
         /// The PIN could not be read, so nothing could be enrolled.
         case pinUnreadable
+        /// The request waiting is not the one the person was shown: another
+        /// phone asked meanwhile, or the number changed.
+        case notTheOneShown
+        /// The phone was paired with the owner PIN, so it holds the PIN and
+        /// cannot be held to a lesser role. Remove it and pair it by code.
+        case pairedWithPin
     }
 
     /// Approve the phone that asked, with `role`. The numbers were compared
     /// by the person; this enrols the device with the role and no PIN tag.
     /// Returns nil when the phone was paired.
-    func approvePhone(role: String) async -> PhoneRoleRefusal? {
+    ///
+    /// `pairId` and `check` are the request the person was SHOWN and compared.
+    /// The approval is for that request and no other: if something else is
+    /// waiting when the button is pressed, nothing is enrolled.
+    func approvePhone(role: String, pairId: String, check: String) async -> PhoneRoleRefusal? {
         // Who may approve is the shared rule's answer (`grantable`, D-P3): the
         // owner, or a manager up to manager. Under the staff lock a manager
         // cannot change settings, so asking `settings`/`edit` here would
@@ -84,6 +94,9 @@ extension Shop {
             return .notAllowed
         }
         guard may.contains(role) else { return .roleNotGrantable }
+        // Only inside the window the person opened: a Pair a phone window that
+        // has shut takes the code path with it.
+        guard lanPairing.isOpen() else { lanPhonePairing.close(); return .nothingToApprove }
         guard lanPhonePairing.pending?.check != nil else { return .nothingToApprove }
         // The PIN in force now: enrolment makes room among devices tagged
         // with another PIN, so it must be the real one, never "".
@@ -92,9 +105,14 @@ extension Shop {
         catch { lanPhonePairing.refuse(.pinUnreadable); return .pinUnreadable }
         let store = lanDeviceStore
         let now = Date()
+        // Asked again after the awaits above, on the request as it is now.
+        guard let pending = lanPhonePairing.pending, pending.pairId == pairId, pending.check == check else {
+            return .notTheOneShown
+        }
         var enrolled = false
         try? lanPhonePairing.approve { asked in
-            guard let phonePublic = asked.pluginPublic else { throw CancellationError() }
+            guard asked.pairId == pairId, asked.check == check,
+                  let phonePublic = asked.pluginPublic else { throw CancellationError() }
             try store.admitPhone(phonePublic: phonePublic, serverKey: asked.serverKey, deviceId: asked.deviceId,
                                  name: asked.name, role: role, pin: pin, now: now)
             enrolled = true
@@ -114,6 +132,8 @@ extension Shop {
     func setPhoneRole(_ id: String, _ role: String) async -> PhoneRoleRefusal? {
         guard permitted("security", "edit") else { return .notAllowed }
         guard await phoneRolesGrantable().contains(role) else { return .roleNotGrantable }
+        if let phone = lanDeviceStore.list().first(where: { $0.id == id && $0.kind == nil }),
+           !phone.codePaired, role != "owner" { return .pairedWithPin }
         guard lanDeviceStore.setRole(id, role) else { return .nothingToApprove }
         refreshPairedPhones()
         return nil

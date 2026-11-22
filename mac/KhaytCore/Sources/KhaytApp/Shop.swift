@@ -1985,7 +1985,8 @@ final class Shop {
     /// The window a phone may ask to pair BY CODE in (`Shop+PhoneRoles`):
     /// the slicer's state machine with the phone's prefixes. Opened and shut
     /// with Pair a phone; does nothing until the Mac has code pairing on.
-    let lanPhonePairing = LanConnectorPairing(flavor: .phone)
+    /// `var` only so a test can stand an enabled one here.
+    var lanPhonePairing = LanConnectorPairing(flavor: .phone)
     /// Slicer plugins paired with this Mac (`Shop+ConnectedApps`), as last read.
     var connectedApps: [LanDevices.Listed] = []
     /// A test's own device store; the app uses the Keychain's (`.shared`).

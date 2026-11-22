@@ -303,10 +303,24 @@ final class LanDevices: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         guard let i = saved.devices.firstIndex(where: { $0.id == id }), saved.devices[i].kind == nil,
               !role.isEmpty, role.count <= 32 else { return false }
+        // A phone paired with the owner PIN holds the PIN: given a lesser
+        // role it could drop its key and send the PIN instead, and be the
+        // owner again. So it is the owner or it is removed; a lesser role
+        // needs pairing again by code (security review of the first draft).
+        guard saved.devices[i].codePaired || role == "owner" else { return false }
         saved.devices[i].role = role
         saved.devices[i].rolesVersion = Self.rolesVersion
         save()
         return true
+    }
+
+    /// A PHONE's derived key, by id, for signing an answer back to it
+    /// (`LanServer.signedForPhone`). Asked only after its request's own
+    /// signature passed. Nil for a connector or an id nobody enrolled.
+    func phoneKey(_ id: String) -> Data? {
+        lock.lock(); defer { lock.unlock() }
+        guard let d = saved.devices.first(where: { $0.id == id }), d.kind == nil else { return nil }
+        return d.key
     }
 
     /// A connector's price grant: nil (none), `price` or `cost`.

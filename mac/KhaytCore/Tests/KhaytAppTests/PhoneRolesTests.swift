@@ -91,10 +91,14 @@ struct PhoneRolesTests {
         #expect(devices.setRole(floor.id, "superuser"))
         #expect(devices.rulesRecord(floor.id)?["role"] == "superuser")
         #expect(try await role(floor.id) == "viewer")
-        // The owner's own phone given a role keeps it, with the mark that it was set.
-        #expect(devices.setRole(legacy.id, "manager"))
-        #expect(try await role(legacy.id) == "manager")
-        #expect(devices.rulesRecord(legacy.id)?["rolesVersion"] == "1")
+        // A phone paired with the PIN holds the PIN, so it cannot be held to a lesser role:
+        // it stays the owner (or is removed). Naming it the owner is allowed.
+        #expect(!devices.setRole(legacy.id, "manager"))
+        #expect(!devices.setRole(legacy.id, "viewer"))
+        #expect(try await role(legacy.id) == "owner")
+        #expect(devices.rulesRecord(legacy.id) == [:], "left exactly as it was stored")
+        #expect(devices.setRole(legacy.id, "owner"))
+        #expect(try await role(legacy.id) == "owner")
         // A connector is never given a phone's role.
         let slicer = try LanConnectorScopeTests.enrol(devices, kind: LanDevices.kindConnector, name: "Orca")
         #expect(!devices.setRole(slicer.id, "owner"))
@@ -166,10 +170,78 @@ struct PhoneRolesTests {
         // Clients: a manager reads them; an operator does not.
         #expect(try await Self.status(bench, op, "GET", "/api/clients").0 == 403)
         #expect(try await Self.status(bench, manager, "GET", "/api/clients").0 == 200)
-        // A route the table does not name is the owner's.
-        let (unlisted, why) = try await Self.status(bench, manager, "GET", "/api/identity/extra")
-        #expect(unlisted == 403 || unlisted == 404)
-        if unlisted == 403 { #expect(why["required"] as? String == "owner") }
+        // A real route the table does not name is the owner's: the identity
+        // key, which only somebody holding the PIN or an owner's phone reads.
+        let engine = OperatorLockTests.sharedEngine
+        let unlisted = try await engine.deviceAllows(.object(["role": .string("manager"), "rolesVersion": .number(1)]),
+                                                     path: "/api/files/local", method: "POST")
+        #expect(!unlisted.ok && unlisted.required == "owner")
+        // This bench's shop has the staff lock OFF: the roles above held anyway (D-P5).
+        #expect(!bench.shop.lockInForce)
+    }
+
+    @Test("an operator cannot approve a quote by spelling the path another way: the write that matters, refused")
+    func encodedWrite() async throws {
+        let bench = try await Self.bench()
+        let op = try Self.codePaired(bench.devices, role: "operator")
+        let manager = try Self.codePaired(bench.devices, role: "manager", name: "M")
+        let job = bench.shop.orders.first?.id ?? "J1"
+        for path in ["/api/orders/\(job)/approve", "/api/orders/\(job)%2Fapprove"] {
+            let (status, json) = try await Self.status(bench, op, "POST", path, body: Data("{}".utf8))
+            #expect(status == 403, Comment(rawValue: "\(path) → \(status)"))
+            #expect(json["reason"] as? String == "role-scope", Comment(rawValue: path))
+        }
+        // A manager holds quote:write, so the same request is not refused for its role.
+        let (status, json) = try await Self.status(bench, manager, "POST", "/api/orders/\(job)/approve", body: Data("{}".utf8))
+        #expect(!(status == 403 && json["reason"] as? String == "role-scope"), "\(status)")
+    }
+
+    @Test("pricing through a job update is the manager's: an operator may move a job, not set a price or accept a quote")
+    func pricingThroughJobRoutes() async throws {
+        let bench = try await Self.bench()
+        let op = try Self.codePaired(bench.devices, role: "operator")
+        let manager = try Self.codePaired(bench.devices, role: "manager", name: "M")
+        guard case .array(let orders)? = bench.book.value["printLog"] else { Issue.record("no jobs"); return }
+        func id(where test: ([String: JSONValue]) -> Bool) -> String? {
+            for o in orders { if case .object(let f) = o, test(f), case .string(let id)? = f["id"] { return id } }
+            return nil
+        }
+        let quote = id { $0["status"] == .string("quote") }
+        let job = try #require(id { $0["status"] != .string("quote") })
+        func refusedForRole(_ peer: Peer, _ method: String, _ path: String, _ body: String) async throws -> Bool {
+            let (status, json) = try await Self.status(bench, peer, method, path, body: Data(body.utf8))
+            return status == 403 && json["reason"] as? String == "role-scope" && json["required"] as? String == "quote:write"
+        }
+        // A price, on a new job or an existing one.
+        #expect(try await refusedForRole(op, "POST", "/api/orders", #"{"project":"x","price":1}"#))
+        #expect(try await refusedForRole(op, "PATCH", "/api/orders/\(job)", #"{"price":1}"#))
+        #expect(try await refusedForRole(op, "POST", "/api/orders", #"{"project":"x","status":"quote"}"#))
+        // Accepting a quote by moving it on.
+        if let quote {
+            #expect(try await refusedForRole(op, "PATCH", "/api/orders/\(quote)", #"{"status":"pending"}"#))
+            #expect(try await !refusedForRole(manager, "PATCH", "/api/orders/\(quote)", #"{"notes":"seen"}"#))
+        }
+        // A body that cannot be read is not waved through.
+        #expect(try await refusedForRole(op, "PATCH", "/api/orders/\(job)", "not json"))
+        // What an operator is for: notes and moving a job that is not a quote.
+        #expect(try await !refusedForRole(op, "PATCH", "/api/orders/\(job)", #"{"notes":"on the bench"}"#))
+        #expect(try await !refusedForRole(op, "PATCH", "/api/orders/\(job)", #"{"status":"printing"}"#))
+        // A manager holds quote:write.
+        #expect(try await !refusedForRole(manager, "PATCH", "/api/orders/\(job)", #"{"price":1}"#))
+    }
+
+    @Test("the code path shuts with Pair a phone: a PIN pairing, or the window closing, ends it")
+    func codeWindowFollowsThePairWindow() async throws {
+        let bench = try await Self.bench(code: true)
+        bench.pairing.open()
+        bench.phonePairing.open()
+        let commit = Data(repeating: 9, count: 32).base64EncodedString()
+        let ask = try JSONEncoder().encode(JSONValue.object(["v": .number(2), "commit": .string(commit), "name": .string("x")]))
+        #expect(try await bench.send("POST", "/api/devices/pair", body: ask).status == 200)
+        // The Pair a phone window shuts (as when a phone pairs with the PIN).
+        bench.pairing.close()
+        #expect(try await bench.send("POST", "/api/devices/pair", body: ask).status == 403)
+        #expect(!bench.phonePairing.isOpenNow && bench.phonePairing.pending == nil, "the waiting offer went with it")
     }
 
     @Test("a path that decodes to another route is the owner's, however it is spelled")
@@ -207,6 +279,39 @@ struct PhoneRolesTests {
         #expect(gone.0 == 401 && gone.1["reason"] as? String == "device-revoked")
     }
 
+    @Test("the role answers are signed back to the phone, and only to a request that verified")
+    func replyMacs() async throws {
+        let bench = try await Self.bench()
+        let op = try Self.codePaired(bench.devices, role: "operator")
+        func ask(_ path: String, headers: [String: String]) async throws -> LanServerTests.Bench.Reply {
+            try await bench.send("GET", path, headers: headers, timeout: 30)
+        }
+        func expected(_ reply: LanServerTests.Bench.Reply, nonce: String) -> String {
+            LanServer.replyMac(key: op.key, nonce: nonce, status: reply.status, body: reply.body)
+        }
+        // What the phone is.
+        var headers = op.headers("GET", "/api/devices/self")
+        var reply = try await ask("/api/devices/self", headers: headers)
+        #expect(reply.status == 200)
+        #expect(reply.headers["x-khayt-reply-mac"] == expected(reply, nonce: headers["x-khayt-nonce"] ?? ""))
+        // A refusal for its role.
+        headers = op.headers("GET", "/api/store")
+        reply = try await ask("/api/store", headers: headers)
+        #expect(reply.status == 403)
+        #expect(reply.headers["x-khayt-reply-mac"] == expected(reply, nonce: headers["x-khayt-nonce"] ?? ""))
+        // A request naming the phone with a signature that is not its own gets
+        // no signed answer: nothing to replay at the real phone.
+        headers = op.headers("GET", "/api/devices/self")
+        headers["x-khayt-mac"] = Data(repeating: 1, count: 32).base64EncodedString()
+        reply = try await ask("/api/devices/self", headers: headers)
+        #expect(reply.status == 401)
+        #expect(reply.headers["x-khayt-reply-mac"] == nil)
+        headers = op.headers("GET", "/api/store")
+        headers["x-khayt-mac"] = Data(repeating: 1, count: 32).base64EncodedString()
+        reply = try await ask("/api/store", headers: headers)
+        #expect(reply.status == 401 && reply.headers["x-khayt-reply-mac"] == nil)
+    }
+
     @Test("the owner PIN and a connector are unchanged by roles")
     func othersUnchanged() async throws {
         let bench = try await Self.bench()
@@ -234,6 +339,7 @@ struct PhoneRolesTests {
         // Closed until a person opens it.
         let closed = try await bench.send("POST", "/api/devices/pair", body: Data(#"{"v":2,"commit":"AAAA"}"#.utf8))
         #expect(closed.status == 403)
+        bench.pairing.open()
         window.open()
         let mine = Curve25519.KeyAgreement.PrivateKey()
         let publicKey = mine.publicKey.rawRepresentation.base64EncodedString()
@@ -274,6 +380,7 @@ struct PhoneRolesTests {
     @Test("a slicer's commitment cannot pair as a phone: the prefixes differ, so the reveal fails")
     func kindsDoNotCross() async throws {
         let bench = try await Self.bench(code: true)
+        bench.pairing.open()
         bench.phonePairing.open()
         let mine = Curve25519.KeyAgreement.PrivateKey()
         let publicKey = mine.publicKey.rawRepresentation.base64EncodedString()
@@ -292,6 +399,61 @@ struct PhoneRolesTests {
                                             headers: ["x-khayt-poll": secret])
         #expect(revealed.status == 403)
         #expect(bench.phonePairing.pending == nil, "the offer expired; no number was ever shown")
+    }
+
+    /// A phone that has asked and revealed, so its number is on the Mac's screen.
+    static func waitingPhone(_ shop: Shop) throws -> (deviceId: String, pairId: String, check: String) {
+        shop.lanPhonePairing = LanConnectorPairing(enabled: true, flavor: .phone)
+        shop.lanPairing.open()
+        shop.lanPhonePairing.open()
+        let mine = Curve25519.KeyAgreement.PrivateKey()
+        let publicKey = mine.publicKey.rawRepresentation.base64EncodedString()
+        let nonce = Data(repeating: 3, count: 16).base64EncodedString()
+        let commit = LanConnectorPairing.commitment(pluginPublic: publicKey, nonce: nonce, flavor: .phone).base64EncodedString()
+        let offer = try shop.lanPhonePairing.request(commitment: commit, name: "Reem's iPhone", app: "Khayt iPhone", version: "1",
+                                                     address: "192.168.1.47", identity: .init(), pollSecret: "s3cret")
+        #expect(shop.lanPhonePairing.reveal(pairId: offer.pairId, secret: "s3cret", publicKey: publicKey, nonce: nonce) == .accepted)
+        let check = try #require(shop.lanPhonePairing.pending?.check)
+        return (offer.deviceId, offer.pairId, check)
+    }
+
+    @Test("with a phone waiting and its number shown: an operator approves nothing, a manager not an owner, and the approval enrols the role chosen")
+    func approvingAWaitingPhone() async throws {
+        let shop = await OperatorLockTests.shop()
+        let devices = LanDevices.inMemory()
+        shop.lanDevicesForTests = devices
+        let shown = try Self.waitingPhone(shop)
+        let deviceId = shown.deviceId
+        for who in [nil, ("OP-v", "4444"), ("OP-x", "3333")] as [(String, String)?] {
+            shop.lockNow()
+            if let who { #expect(await shop.signIn(who.0, pin: who.1) == .ok) }
+            #expect(await shop.approvePhone(role: "viewer", pairId: shown.pairId, check: shown.check) == .notAllowed, Comment(rawValue: who?.0 ?? "nobody"))
+            #expect(devices.rulesRecord(deviceId) == nil)
+        }
+        shop.lockNow()
+        #expect(await shop.signIn("OP-m", pin: "2222") == .ok)
+        #expect(await shop.approvePhone(role: "owner", pairId: shown.pairId, check: shown.check) == .roleNotGrantable)
+        #expect(devices.rulesRecord(deviceId) == nil, "a manager made nobody an owner")
+        // The approval is for the request that was shown: another id, or another number, enrols nothing.
+        #expect(await shop.approvePhone(role: "operator", pairId: "zzzzzzzzzzzz", check: shown.check) == .notTheOneShown)
+        #expect(await shop.approvePhone(role: "operator", pairId: shown.pairId, check: "000000") == .notTheOneShown)
+        #expect(devices.rulesRecord(deviceId) == nil)
+        #expect(shop.lanPhonePairing.pending?.check != nil, "the request still waits for somebody who may")
+        // The manager approves it as an operator. On the sample book the PIN
+        // may not be readable; then nothing is enrolled and the window says why.
+        let result = await shop.approvePhone(role: "operator", pairId: shown.pairId, check: shown.check)
+        #expect(result == nil || result == .pinUnreadable, "\(String(describing: result))")
+        if result == nil {
+            #expect(devices.rulesRecord(deviceId) == ["role": "operator", "rolesVersion": "1"])
+            #expect(devices.list().first { $0.id == deviceId }?.codePaired == true)
+            #expect(!shop.lanPairing.isOpen(), "Pair a phone shut once the phone was paired")
+        } else {
+            #expect(devices.rulesRecord(deviceId) == nil)
+        }
+        // Once Pair a phone is shut, nothing can be approved.
+        let again = try Self.waitingPhone(shop)
+        shop.lanPairing.close()
+        #expect(await shop.approvePhone(role: "viewer", pairId: again.pairId, check: again.check) == .nothingToApprove)
     }
 
     // MARK: - Who may give which role
@@ -324,8 +486,8 @@ struct PhoneRolesTests {
             if let who { #expect(await shop.signIn(who.0, pin: who.1) == .ok) }
             #expect(await shop.setPhoneRole(phone.id, "manager") == .notAllowed)
             #expect(devices.rulesRecord(phone.id)?["role"] == "viewer")
-            #expect(await shop.approvePhone(role: "owner") != nil, "nobody below the owner approves an owner phone")
-            if who?.0 != "OP-m" { #expect(await shop.approvePhone(role: "viewer") == .notAllowed, "may give no role at all") }
+            #expect(await shop.approvePhone(role: "owner", pairId: "x", check: "0") != nil, "nobody below the owner approves an owner phone")
+            if who?.0 != "OP-m" { #expect(await shop.approvePhone(role: "viewer", pairId: "x", check: "0") == .notAllowed, "may give no role at all") }
         }
         shop.lockNow()
         #expect(await shop.signIn("OP-o", pin: "1111") == .ok)
@@ -333,10 +495,14 @@ struct PhoneRolesTests {
         #expect(devices.rulesRecord(phone.id)?["role"] == "manager")
         #expect(await shop.setPhoneRole(phone.id, "root") == .roleNotGrantable, "only a role on the ladder")
         #expect(await shop.setPhoneRole("dev_nobody0000000000", "viewer") == .nothingToApprove)
+        // A PIN-paired phone is not demoted: it would send the PIN instead.
+        let byPin = try LanConnectorScopeTests.enrol(devices, kind: nil, name: "PIN phone")
+        #expect(await shop.setPhoneRole(byPin.id, "viewer") == .pairedWithPin)
+        #expect(devices.rulesRecord(byPin.id) == [:])
         // A manager approving: nothing waits, and an owner grant is refused before that.
         shop.lockNow()
         #expect(await shop.signIn("OP-m", pin: "2222") == .ok)
-        #expect(await shop.approvePhone(role: "owner") == .roleNotGrantable)
-        #expect(await shop.approvePhone(role: "operator") == .nothingToApprove)
+        #expect(await shop.approvePhone(role: "owner", pairId: "x", check: "0") == .roleNotGrantable)
+        #expect(await shop.approvePhone(role: "operator", pairId: "x", check: "0") == .nothingToApprove)
     }
 }
