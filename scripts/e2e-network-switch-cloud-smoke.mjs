@@ -162,6 +162,25 @@ try {
   ok(true, 'the link opens Settings › General › Internet use');
   if (shots) { fs.mkdirSync(shots, { recursive: true }); await w.locator('#updatesOffBanner').screenshot({ path: path.join(shots, 'banner-ask.png') }); }
   await w.evaluate(() => openSettingsSection('internet'));
+  // The real path (review): main's state changes and main says so; the window
+  // redraws the notice through refreshSoon on its own, then hides it when
+  // main's state has nothing waiting. Main's state() is replaced for this
+  // (no Khayt Cloud in CI); the event is main's own channel.
+  await bannerWith(w, NONE);
+  const mainState = (ns) => a.electronApp.evaluate(({ ipcMain, BrowserWindow }, ns) => {
+    ipcMain.removeHandler('hub:network-switch-state');
+    ipcMain.handle('hub:network-switch-state', () => ns);
+    BrowserWindow.getAllWindows().forEach((x) => x.webContents.send('hub:network-switch-changed'));
+  }, ns);
+  await mainState(Object.assign({}, NONE, { pending: { offline: true, changedAt: '2026-11-10T09:00:00.000Z', changedBy: '' } }));
+  await w.waitForFunction(() => { const el = document.getElementById('updatesOffBanner'); return el.style.display !== 'none' && /Khayt is waiting for you/.test(el.textContent); }, null, { timeout: 5000 });
+  ok(true, 'banner: shown when main says a question arrived (onNetworkSwitchChanged → refreshSoon)');
+  const before = await w.evaluate(() => { const l = document.querySelector('#updatesOffBanner [data-iu-banner="where"]'); l.dataset.e2eMark = '1'; return true; });
+  await w.evaluate(() => window.KhaytInternetUse.refresh());
+  ok(before && await w.evaluate(() => (document.querySelector('#updatesOffBanner [data-iu-banner="where"]') || {}).dataset?.e2eMark === '1'), 'banner: the same notice is not written again (no repeated screen-reader alert)');
+  await mainState(NONE);
+  await w.waitForFunction(() => document.getElementById('updatesOffBanner').style.display === 'none', null, { timeout: 5000 });
+  ok(true, 'banner: hidden again when main says nothing waits (answered, or Khayt Cloud locked)');
 
   // ── Arabic: the same states in the shop's language ───────────────────────
   await w.evaluate(() => { settings.lang = 'ar'; i18n.set('ar'); });

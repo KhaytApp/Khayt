@@ -175,7 +175,11 @@ async function load() {
   try { offsite = api.offsiteGet ? await api.offsiteGet() : null; } catch (_) { offsite = null; }
   try { activeCount = api.activeCountGet ? await api.activeCountGet() : null; } catch (_) { activeCount = null; }
   try { ns = api.networkSwitchState ? await api.networkSwitchState() : null; } catch (_) { ns = null; }
-  _last = d && Array.isArray(d.rows) ? Object.assign({}, d, { offsite, activeCount, ns: ns && typeof ns === 'object' ? ns : null }) : null;
+  const nsOk = ns && typeof ns === 'object' ? ns : null;
+  // A question from Khayt Cloud is still pointed to when the list of calls
+  // could not be read (review of the banner): the banner reads `ns` alone.
+  _last = d && Array.isArray(d.rows) ? Object.assign({}, d, { offsite, activeCount, ns: nsOk })
+    : (nsOk ? { rows: [], ns: nsOk, partial: true } : null);
   return _last;
 }
 
@@ -227,7 +231,8 @@ function answerSay(r) {
 function render(ctx) {
   const host = document.getElementById('internetUseBody');
   if (!host) return;
-  if (!ctx) { host.innerHTML = `<p class="iu-muted">${esc(tr('iu.unavailable'))}</p>`; return; }
+  // `partial`: only Khayt Cloud's state was read; the page still says it could not load.
+  if (!ctx || ctx.partial) { host.innerHTML = `<p class="iu-muted">${esc(tr('iu.unavailable'))}</p>`; return; }
   const on = shopOffline();
   const here = !!(ctx.local && ctx.local.offline);
   const can = mayChange();
@@ -417,7 +422,7 @@ function renderBanner(ctx) {
   const row = ctx && Array.isArray(ctx.rows) ? ctx.rows.find((r) => r.purpose === 'updates') : null;
   const days = updatesStale(row, ctx);
   const g = gWaiting(ctx);
-  if (!days && !g) { el.style.display = 'none'; el.innerHTML = ''; el.classList.remove('iu-banner-ask'); return; }
+  if (!days && !g) { el.style.display = 'none'; el.innerHTML = ''; el.dataset.iuHtml = ''; el.classList.remove('iu-banner-ask'); return; }
   const where = [tr('nav.settings'), tr('set.pane_general'), tr('iu.title')].join(' › ');
   const lines = [];
   if (g) {
@@ -432,7 +437,12 @@ function renderBanner(ctx) {
       <button type="button" class="btn small" data-iu-banner="open">${esc(tr('iu.open'))}</button>
     </div>`);
   }
-  el.innerHTML = lines.join('');
+  const html = lines.join('');
+  // The same notice again is left as it is: it is role="alert", and writing
+  // it anew made a screen reader read it out after every save (review).
+  if (el.style.display !== 'none' && el.dataset.iuHtml === html) return;
+  el.dataset.iuHtml = html;
+  el.innerHTML = html;
   // A question alone is not a fault: the warning colours, not the red.
   el.classList.toggle('iu-banner-ask', !days);
   el.style.display = '';

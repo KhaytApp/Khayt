@@ -434,3 +434,15 @@ test('security review LOW-1: no cloud role recorded is not the owner; the share 
   assert.doesNotMatch(main, /role: cloud\.role \|\| 'owner'/);
   assert.match(main, /role: typeof cloud\.role === 'string' && cloud\.role \? cloud\.role : null, scope/);
 });
+
+test('review of the banner: locking Khayt Cloud tells the window, and the question is no longer shown', () => {
+  const h = harness({ mine: { pending: { offline: true, changedAt: '2026-11-22T09:00:00.000Z', changedBy: 'Sara' } } });
+  assert.ok(h.sync.state().pending, 'a question waits while unlocked');
+  const before = h.changes();
+  h.sync.stop();        // main's hub:cloud-lock calls this, then drops the session
+  h.lock();
+  assert.ok(h.changes() > before, 'the window was told');
+  assert.equal(h.sync.state().pending, null, 'and state() shows nothing to point to');
+  const main = require('fs').readFileSync(require('path').join(__dirname, '..', 'main.js'), 'utf8');
+  assert.match(main, /ipcMain\.handle\('hub:cloud-lock', \(\) => \{ networkSwitchSync\.stop\(\);/);
+});

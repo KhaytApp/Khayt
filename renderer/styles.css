@@ -6056,9 +6056,12 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .iu-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; padding: 12px 16px; border: 1px solid var(--danger); border-radius: var(--radius); background: var(--danger-soft); color: var(--danger); font-size: 13.5px; line-height: 1.5; }
 .iu-banner-text { flex: 1 1 320px; }
 .iu-banner-btns { display: flex; gap: 10px; }
-.iu-banner.iu-banner-ask { border-color: var(--warning, #b45309); background: var(--warning-soft, #fef3c7); color: var(--text); }
+/* A translucent amber over the page, so var(--text) reads in both themes
+   (--warning-soft is not defined anywhere; its pale fallback under the dark
+   theme's near-white text could not be read: review of the banner). */
+.iu-banner.iu-banner-ask { border-color: var(--warning, #b45309); background: rgba(245, 166, 35, 0.16); color: var(--text); }
 .iu-banner .iu-banner-text + .iu-banner-text { flex-basis: 100%; }
-.iu-banner-link { color: inherit; font-weight: 600; text-decoration: underline; white-space: nowrap; }
+.iu-banner-link { color: inherit; font-weight: 600; text-decoration: underline; overflow-wrap: anywhere; }
 @media (max-width: 720px) {
   .iu-cols { display: none; }
   .iu-row, .iu-row.no-keep { grid-template-columns: minmax(0, 1fr) auto; }
