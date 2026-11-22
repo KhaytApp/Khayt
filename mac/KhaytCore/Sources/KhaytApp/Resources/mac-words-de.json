@@ -1973,6 +1973,7 @@
  "mac.ppair_open_online": "Online öffnen",
  "mac.ppair_role_refused": "Sie können einem Telefon diese Rolle nicht geben.",
  "mac.ppair_not_this": "Inzwischen hat ein anderes Telefon angefragt, daher wurde nichts gekoppelt. Prüfen Sie die Zahl erneut.",
+ "mac.ppair_failed": "Das Telefon konnte auf diesem Mac nicht gespeichert werden und wurde daher nicht gekoppelt. Versuchen Sie es erneut.",
  "mac.phones_role": "Rolle",
  "mac.phones_remove": "Entfernen",
  "mac.phones_remove_q": "„{name}“ entfernen?",

@@ -59,22 +59,13 @@ extension Shop {
         lanPhonePairing.close()
     }
 
-    /// May whoever is at this Mac remove a paired phone? Whoever may change
-    /// settings, as before; and, while pairing by code is on, a manager too
-    /// (page 26, frame 6: "You can remove a phone"). Removing only cuts a
-    /// phone off: it gives nobody anything, and the phone can be paired again.
-    /// Asks, says nothing.
-    var mayRemovePhone: Bool {
-        if lockAllows("settings", "edit") { return true }
-        return PhonePairingUI.on && mayOpenPairing
-    }
-
+    /// Sign a phone out, from the screen as it was: whoever may change
+    /// settings. A phone only: a slicer is removed from its own list. The
+    /// page-26 list removes through `removePhone`, which also lets a manager
+    /// remove a phone a manager could have paired.
     func signOutPhone(_ id: String) {
-        // lock: whoever may change settings, or (pairing by code on) a manager: `mayRemovePhone`
-        guard mayRemovePhone else {
-            moveProblem = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
-            return
-        }
+        guard permitted("settings", "edit") else { return }
+        guard lanDeviceStore.list().contains(where: { $0.id == id && $0.kind == nil }) else { return }
         lanDeviceStore.remove(id)
         refreshPairedPhones()
     }

@@ -1973,6 +1973,7 @@
  "mac.ppair_open_online": "オンラインを開く",
  "mac.ppair_role_refused": "その役割を電話に与えることはできません。",
  "mac.ppair_not_this": "その間に別の電話が求めたため、何もペアリングされませんでした。数字をもう一度確認してください。",
+ "mac.ppair_failed": "電話をこのMacに保存できなかったため、ペアリングされませんでした。もう一度お試しください。",
  "mac.phones_role": "役割",
  "mac.phones_remove": "削除",
  "mac.phones_remove_q": "「{name}」を削除しますか？",

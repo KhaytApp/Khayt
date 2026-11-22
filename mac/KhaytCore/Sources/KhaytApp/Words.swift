@@ -4105,6 +4105,7 @@ final class Words {
         "mac.ppair_open_online": ["en": "Open Online", "ar": "فتح الاتصال"],
         "mac.ppair_role_refused": ["en": "You can't give a phone that role.", "ar": "لا يمكنك منح الجوال هذا الدور."],
         "mac.ppair_not_this": ["en": "Another phone asked meanwhile, so nothing was paired. Check the number again.", "ar": "طلب جوال آخر الاقتران في الأثناء، فلم يُقترن شيء. تحقق من الرقم مرة أخرى."],
+        "mac.ppair_failed": ["en": "The phone could not be saved on this Mac, so it was not paired. Try again.", "ar": "تعذّر حفظ الجوال على هذا الـMac، فلم يُقترن. حاول مرة أخرى."],
         "mac.phones_role": ["en": "Role", "ar": "الدور"],
         "mac.phones_remove": ["en": "Remove", "ar": "إزالة"],
         "mac.phones_remove_q": ["en": "Remove “{name}”?", "ar": "إزالة «{name}»؟"],

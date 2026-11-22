@@ -97,12 +97,42 @@ enum PhonePairingUI {
 
     /// The phone's name as shown: its own, or "Phone" when it sent none.
     @MainActor static func shown(_ name: String, _ words: Words) -> String {
-        name.isEmpty ? words.callIt("mac.phones_unnamed") : name
+        let clean = tidy(name)
+        return clean.isEmpty ? words.callIt("mac.phones_unnamed") : clean
     }
+
+    /// A phone's name is whatever the phone sent, and it is drawn beside the
+    /// number the person compares. So it is one line and short here whatever
+    /// arrived: no line or paragraph separators (which are not control
+    /// characters and would draw a second line, say a fake number), no braces
+    /// (the sentences it is put into use `{placeholders}`), at most 60
+    /// scalars, so a pile of combining marks cannot grow it either.
+    nonisolated static func tidy(_ name: String) -> String {
+        var out = String.UnicodeScalarView()
+        for scalar in name.unicodeScalars {
+            if CharacterSet.newlines.contains(scalar) || CharacterSet.controlCharacters.contains(scalar)
+                || CharacterSet.illegalCharacters.contains(scalar) { out.append(" "); continue }
+            if scalar == "{" || scalar == "}" { continue }
+            out.append(scalar)
+            if out.count >= 60 { break }
+        }
+        return String(out).trimmingCharacters(in: .whitespaces)
+    }
+
+    /// The check number as drawn: "418 207" inside a left-to-right isolate, so
+    /// its two halves keep their order in a right-to-left sentence or pane.
+    nonisolated static func number(_ check: String) -> String {
+        "\u{2066}" + LanConnectorPairing.spaced(check) + "\u{2069}"
+    }
+
+    /// How long the approve sheet's controls wait after a request appears. A
+    /// click already on its way to Stop must not land on a role, or on
+    /// Approve, of a request that was not on screen when it was aimed.
+    nonisolated static let settle: Duration = .milliseconds(900)
 
     /// "Khayt iPhone 1.2.0 · 192.168.1.47", leaving out what the phone did not say.
     nonisolated static func from(_ asked: Asked) -> String {
-        let app = [asked.app, asked.version].filter { !$0.isEmpty }.joined(separator: " ")
+        let app = [tidy(asked.app), tidy(asked.version)].filter { !$0.isEmpty }.joined(separator: " ")
         return [app, asked.address].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
@@ -139,6 +169,7 @@ enum PhonePairingUI {
         case .notAllowed: words.callIt("mac.lock_not_allowed")
         case .roleNotGrantable: words.callIt("mac.ppair_role_refused")
         case .nothingToApprove: words.callIt("mac.ppair_timed_out")
+        case .notEnrolled: words.callIt("mac.ppair_failed")
         case .pinUnreadable: words.callIt("mac.ppair_pin_unreadable")
         case .notTheOneShown: words.callIt("mac.ppair_not_this")
         case .pairedWithPin: words.callIt("mac.phones_role_pin")
@@ -209,11 +240,21 @@ struct PhonePairingPanel: View {
     var deny: (PhonePairingUI.Asked) -> Void = { _ in }
     var done: () -> Void = {}
     var openOnline: () -> Void = {}
+    /// False only in a capture, which photographs the sheet at once.
+    var settles = true
+    /// The request whose controls have been on screen long enough to press.
+    @State private var settled: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             switch panel {
-            case .asked(let asked): askedBody(asked)
+            case .asked(let asked):
+                askedBody(asked, ready: !settles || settled == asked.pairId)
+                    .task(id: asked.pairId) {
+                        settled = nil
+                        try? await Task.sleep(for: PhonePairingUI.settle)
+                        if !Task.isCancelled { settled = asked.pairId }
+                    }
             case .waiting(let denied): waitingBody(denied: denied)
             case .closed(let ended): closedBody(ended)
             }
@@ -237,7 +278,7 @@ struct PhonePairingPanel: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let denied {
                     Text(words.callIt("mac.ppair_denied", ["name": .string(PhonePairingUI.shown(denied, words))]))
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(2).truncationMode(.middle)
                 }
                 Text(words.callIt("mac.ppair_waiting")).fontWeight(.medium)
             }
@@ -273,18 +314,20 @@ struct PhonePairingPanel: View {
     }
 
     // Frames 2 and 3.
-    @ViewBuilder private func askedBody(_ asked: PhonePairingUI.Asked) -> some View {
+    @ViewBuilder private func askedBody(_ asked: PhonePairingUI.Asked, ready: Bool) -> some View {
+        // Held while saving, and for a moment after the request appears.
+        let held = busy || !ready
         VStack(alignment: .leading, spacing: 2) {
             Text(words.callIt("mac.ppair_asks", ["name": .string(PhonePairingUI.shown(asked.name, words))]))
                 .fontWeight(.medium)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(2).truncationMode(.middle)
             let from = PhonePairingUI.from(asked)
             if !from.isEmpty {
                 Text(verbatim: from).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
         }
         VStack(spacing: 2) {
-            Text(verbatim: LanConnectorPairing.spaced(asked.check))
+            Text(verbatim: PhonePairingUI.number(asked.check))
                 .font(.system(size: 30, weight: .semibold, design: .monospaced))
                 .environment(\.layoutDirection, .leftToRight)
                 .accessibilityIdentifier("phone-check")
@@ -301,7 +344,7 @@ struct PhonePairingPanel: View {
                 .font(.callout).foregroundStyle(Khayt.attention)
                 .fixedSize(horizontal: false, vertical: true)
         } else {
-            PhoneRoleChoices(roles: grantable, role: $role, words: words, disabled: busy)
+            PhoneRoleChoices(roles: grantable, role: $role, words: words, disabled: held)
         }
         Divider()
         // An owner is told how to refuse; anyone who may not give Owner is told why it is not listed.
@@ -312,13 +355,13 @@ struct PhonePairingPanel: View {
             left()
             Spacer(minLength: 8)
             Button(words.callIt("mac.ppair_deny")) { deny(asked) }
-                .disabled(busy)
+                .disabled(held)
                 .accessibilityIdentifier("phone-deny")
             // No default action: Return in Settings at the wrong moment must
             // not approve a request that has just appeared (as for a slicer).
             Button(words.callIt("mac.ppair_approve")) { approve(asked) }
                 .buttonStyle(.borderedProminent)
-                .disabled(busy || grantable.isEmpty || !grantable.contains(role))
+                .disabled(held || grantable.isEmpty || !grantable.contains(role))
                 .accessibilityIdentifier("phone-approve")
         }
     }
@@ -400,7 +443,10 @@ struct PairAPhoneByCode: View {
                     problem = nil
                 },
                 done: { dismissed = true },
-                openOnline: { shop.settingsPane = .online })
+                // This panel is in Settings ▸ Online already: going there also
+                // puts the Pair a phone button back, or the panel would be
+                // stuck on the sentence with no way to try again.
+                openOnline: { dismissed = true; problem = nil; shop.settingsPane = .online })
             if shop.lanURL != nil, !reachable {
                 Text(shop.words.callIt("mac.pair_loopback"))
                     .font(.caption).foregroundStyle(.secondary)
@@ -416,7 +462,12 @@ struct PairAPhoneByCode: View {
         // when the person changes, and each time a phone asks.
         .task(id: Shop.PhoneAsk(person: shop.phoneApproverRole, pairId: code.pending?.pairId)) {
             grantable = await shop.phoneRolesGrantable()
-            if !grantable.contains(role) { role = await shop.phoneDefaultRole() ?? grantable.last ?? role }
+            // Every request starts on the rule's default (Operator), never on
+            // what the last phone was given: an owner who paired one phone as
+            // Owner must not find Owner already selected for the next.
+            role = await shop.phoneDefaultRole() ?? grantable.last ?? "operator"
+            // What was said about the last request does not belong under this one.
+            if code.pending != nil { denied = nil; problem = nil }
         }
         // Shut each window on time even when no phone asks.
         .task(id: code.deadline ?? pin.deadline) {
@@ -426,15 +477,10 @@ struct PairAPhoneByCode: View {
             guard !Task.isCancelled else { return }
             _ = code.isOpen(); _ = pin.isOpen()
         }
-        // The two paths share one window: when either ends, both do.
-        .onChange(of: code.lastClosed) { _, closed in
-            if closed != nil, pin.deadline != nil { shop.lanPairing.close() }
-            if case .paired? = closed { shop.refreshPairedPhones() }
-        }
-        .onChange(of: pin.lastClosed) { _, closed in
-            if closed != nil, code.isOpenNow { shop.lanPhonePairing.close() }
-            if case .paired? = closed { shop.refreshPairedPhones() }
-        }
+        // The two paths share one window: when either ends, both do. Watched
+        // by count, since the same ending twice running is not a change.
+        .onChange(of: code.closes) { _, _ in shop.pairingWindowClosed(); problem = nil }
+        .onChange(of: pin.closes) { _, _ in shop.pairingWindowClosed(); problem = nil }
     }
 }
 
@@ -452,8 +498,9 @@ extension Shop {
 /// runner both hand it these.
 struct PairedPhoneRow: View {
     let phone: LanDevices.Listed
-    /// The role the phone HOLDS, as the rule reads its record.
-    let role: String
+    /// The role the phone HOLDS, as the rule reads its record; nil until it
+    /// has been read.
+    let role: String?
     /// The roles the person here may set on THIS phone (empty: not changeable).
     let settable: [String]
     let mayRemove: Bool
@@ -478,23 +525,23 @@ struct PairedPhoneRow: View {
                 // (frame 7), not a bare menu of four words.
                 Button { choosing = true } label: {
                     HStack(spacing: 4) {
-                        Text(words.callIt(PhonePairingUI.nameKey(role)))
+                        Text(verbatim: role.map { words.callIt(PhonePairingUI.nameKey($0)) } ?? "\u{2026}")
                         Image(systemName: "chevron.up.chevron.down").font(.caption2)
                     }
                 }
                 .controlSize(.small)
-                .disabled(settable.isEmpty)
+                .disabled(settable.isEmpty || role == nil)
                 .accessibilityIdentifier("phone-role-change")
                 .shopPopover(isPresented: $choosing, arrowEdge: .bottom) {
-                    PhoneRoleMenu(name: PhonePairingUI.shown(phone.name, words), roles: settable, role: role, words: words) {
+                    PhoneRoleMenu(name: PhonePairingUI.shown(phone.name, words), roles: settable, role: role ?? "", words: words) {
                         choosing = false
                         if $0 != role { choose($0) }
                     }
                 }
             } else {
                 // Paired with the PIN: it holds the PIN, so it is the owner.
-                Text(words.callIt(PhonePairingUI.nameKey(role)))
-                    .foregroundStyle(settable.isEmpty && !mayRemove ? .secondary : .primary)
+                Text(verbatim: role.map { words.callIt(PhonePairingUI.nameKey($0)) } ?? "\u{2026}")
+                    .foregroundStyle(settable.isEmpty ? .secondary : .primary)
             }
             Button(words.callIt("mac.phones_remove") + "\u{2026}", action: remove)
                 .controlSize(.small)
@@ -532,6 +579,8 @@ struct PairedPhonesByCode: View {
     /// Each phone's role and what may be set on it, from the rule.
     @State private var roles: [String: String] = [:]
     @State private var settable: [String: [String]] = [:]
+    /// The phones whoever is here may remove (`Shop.mayRemovePhone(_:)`).
+    @State private var removable: Set<String> = []
     @State private var problem: String?
 
     var body: some View {
@@ -542,9 +591,11 @@ struct PairedPhonesByCode: View {
                 Text(shop.words.callIt("mac.phones_none")).foregroundStyle(.secondary)
             }
             ForEach(shop.pairedPhones) { phone in
-                PairedPhoneRow(phone: phone, role: roles[phone.id] ?? (phone.codePaired ? "viewer" : "owner"),
+                // Until the rule has been asked, a phone paired by code shows no
+                // role rather than a guess; one paired with the PIN is the owner.
+                PairedPhoneRow(phone: phone, role: roles[phone.id] ?? (phone.codePaired ? nil : "owner"),
                                settable: mayChange ? (settable[phone.id] ?? []) : [],
-                               mayRemove: shop.mayRemovePhone, words: shop.words,
+                               mayRemove: removable.contains(phone.id), words: shop.words,
                                choose: { role in
                                    Task {
                                        let refusal = await shop.setPhoneRole(phone.id, role)
@@ -573,18 +624,23 @@ struct PairedPhonesByCode: View {
                   message: { _ in shop.words.callIt("mac.phones_sign_out_note") },
                   confirm: shop.words.callIt("mac.phones_remove"),
                   cancel: shop.words.callIt("common.cancel")) { phone in
-            shop.signOutPhone(phone.id)
+            Task {
+                problem = await shop.removePhone(phone.id) ? nil : shop.moveProblem
+                await readRoles()
+            }
         }
     }
 
     private func readRoles() async {
-        var held: [String: String] = [:], may: [String: [String]] = [:]
+        var held: [String: String] = [:], may: [String: [String]] = [:], gone: Set<String> = []
         for phone in shop.pairedPhones {
             held[phone.id] = await shop.phoneRole(phone)
             may[phone.id] = await shop.phoneRolesSettable(on: phone)
+            if await shop.mayRemovePhone(phone) { gone.insert(phone.id) }
         }
         roles = held
         settable = may
+        removable = gone
     }
 }
 

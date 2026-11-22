@@ -1973,6 +1973,7 @@
  "mac.ppair_open_online": "Abrir En línea",
  "mac.ppair_role_refused": "No puedes dar ese rol a un teléfono.",
  "mac.ppair_not_this": "Otro teléfono lo pidió entretanto, así que no se emparejó nada. Comprueba el número de nuevo.",
+ "mac.ppair_failed": "No se pudo guardar el teléfono en este Mac, así que no se emparejó. Inténtalo de nuevo.",
  "mac.phones_role": "Rol",
  "mac.phones_remove": "Quitar",
  "mac.phones_remove_q": "¿Quitar «{name}»?",

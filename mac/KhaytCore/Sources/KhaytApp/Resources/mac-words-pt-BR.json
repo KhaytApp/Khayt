@@ -1973,6 +1973,7 @@
  "mac.ppair_open_online": "Abrir Online",
  "mac.ppair_role_refused": "Você não pode dar essa função a um telefone.",
  "mac.ppair_not_this": "Outro telefone pediu nesse meio-tempo, então nada foi emparelhado. Confira o número de novo.",
+ "mac.ppair_failed": "Não foi possível salvar o telefone neste Mac, então ele não foi emparelhado. Tente de novo.",
  "mac.phones_role": "Função",
  "mac.phones_remove": "Remover",
  "mac.phones_remove_q": "Remover “{name}”?",

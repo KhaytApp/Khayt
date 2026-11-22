@@ -1973,6 +1973,7 @@
  "mac.ppair_open_online": "Ouvrir En ligne",
  "mac.ppair_role_refused": "Vous ne pouvez pas donner ce rôle à un téléphone.",
  "mac.ppair_not_this": "Un autre téléphone a demandé entre-temps, rien n'a donc été jumelé. Vérifiez à nouveau le nombre.",
+ "mac.ppair_failed": "Le téléphone n'a pas pu être enregistré sur ce Mac, il n'a donc pas été jumelé. Réessayez.",
  "mac.phones_role": "Rôle",
  "mac.phones_remove": "Retirer",
  "mac.phones_remove_q": "Retirer « {name} » ?",

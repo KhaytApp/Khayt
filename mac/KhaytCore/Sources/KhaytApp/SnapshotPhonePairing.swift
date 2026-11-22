@@ -35,7 +35,7 @@ extension Snapshot {
                                          address: "192.168.1.47", check: "418207")
         func panel(_ p: PhonePairingUI.Panel, left: TimeInterval, grantable: [String] = all) -> some View {
             PhonePairingPanel(panel: p, words: words, remaining: { left }, address: "192.168.1.20:3210",
-                              grantable: grantable, role: .constant("operator"))
+                              grantable: grantable, role: .constant("operator"), settles: false)
         }
 
         // Frame 1: the window is open.
@@ -71,7 +71,9 @@ extension Snapshot {
                 ForEach(phones, id: \.0.id) { phone, role in
                     PairedPhoneRow(phone: phone, role: role,
                                    settable: owner ? (phone.codePaired ? all : ["owner"]) : [],
-                                   mayRemove: true, words: words)
+                                   // As the rule has it: the owner any phone, a manager only
+                                   // one paired by code at Manager or below.
+                                   mayRemove: owner || (phone.codePaired && role != "owner"), words: words)
                     Divider()
                 }
                 Text(words.callIt(owner ? "mac.phones_roles_note" : "mac.phones_roles_manager"))

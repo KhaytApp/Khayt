@@ -1973,6 +1973,7 @@
  "mac.ppair_open_online": "Çevrimiçi'yi aç",
  "mac.ppair_role_refused": "Bir telefona bu rolü veremezsiniz.",
  "mac.ppair_not_this": "Bu arada başka bir telefon istekte bulundu, bu yüzden hiçbir şey eşleşmedi. Sayıyı yeniden denetleyin.",
+ "mac.ppair_failed": "Telefon bu Mac'e kaydedilemedi, bu yüzden eşleşmedi. Yeniden deneyin.",
  "mac.phones_role": "Rol",
  "mac.phones_remove": "Kaldır",
  "mac.phones_remove_q": "“{name}” kaldırılsın mı?",

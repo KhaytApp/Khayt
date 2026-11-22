@@ -1973,6 +1973,7 @@
  "mac.ppair_open_online": "打开“在线”",
  "mac.ppair_role_refused": "你不能给手机这个角色。",
  "mac.ppair_not_this": "期间有另一部手机请求配对，因此没有配对任何设备。请再次核对数字。",
+ "mac.ppair_failed": "无法在这台 Mac 上保存该手机，因此未配对。请重试。",
  "mac.phones_role": "角色",
  "mac.phones_remove": "移除",
  "mac.phones_remove_q": "移除“{name}”？",

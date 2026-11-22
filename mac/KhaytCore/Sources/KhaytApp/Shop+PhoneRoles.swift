@@ -15,8 +15,7 @@ import KhaytCore
 ///
 /// APPROVING a phone is open to whoever the rule lets grant a role: an owner
 /// or a manager, within what they may grant. OPENING the Pair a phone window
-/// is unchanged (`settings`/`edit`, which under the lock is the owner):
-/// whether a manager may open it too is a question for Turki. CHANGING a paired
+/// is the same people's (`mayOpenPairing`; Turki, Nov 22). CHANGING a paired
 /// phone's role is the owner's alone (`security`/`edit`): a manager must not
 /// be able to lift their own phone, or lower the owner's.
 ///
@@ -68,6 +67,47 @@ extension Shop {
         return settable.filter(grantable.contains)
     }
 
+    /// May whoever is here remove THIS paired phone? Whoever may change
+    /// settings may remove any phone, as before. While pairing by code is on,
+    /// a manager may too (page 26, frame 6), but only a phone a manager could
+    /// have paired: one paired by code, holding a role the rule lets them give
+    /// (Manager or below). Never the owner's phone and never one paired with
+    /// the PIN: a manager who could remove the owner's phone, or remove a
+    /// phone the owner demoted and pair it again as Manager, would undo what
+    /// only the owner may decide (security review).
+    func mayRemovePhone(_ phone: LanDevices.Listed) async -> Bool {
+        guard phone.kind == nil else { return false }
+        if lockAllows("settings", "edit") { return true }
+        guard PhonePairingUI.on, mayOpenPairing, phone.codePaired else { return false }
+        return await phoneRolesGrantable().contains(await phoneRole(phone))
+    }
+
+    /// Remove a paired phone, asked of the record as the store holds it now.
+    /// False, and said, when this person may not remove that phone.
+    @discardableResult
+    func removePhone(_ id: String) async -> Bool {
+        guard let phone = lanDeviceStore.list().first(where: { $0.id == id && $0.kind == nil }) else { return false }
+        // lock: `mayRemovePhone(_:)` above (lockAllows, or a manager within what they may give); refused and said otherwise.
+        guard await mayRemovePhone(phone) else {
+            moveProblem = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
+            return false
+        }
+        lanDeviceStore.remove(id)
+        refreshPairedPhones()
+        return true
+    }
+
+    /// The code path and the PIN path share one Pair a phone window: when
+    /// either ends, both do, and the list is read again. Called on every
+    /// close of either (their `closes` counters), not on a change of the
+    /// ending's value: two phones of one name pairing in a row, or two
+    /// timeouts, are the same value twice (correctness review).
+    func pairingWindowClosed() {
+        if lanPairing.deadline == nil, lanPhonePairing.isOpenNow { lanPhonePairing.close() }
+        if !lanPhonePairing.isOpenNow, lanPhonePairing.lastClosed != nil, lanPairing.deadline != nil { lanPairing.close() }
+        refreshPairedPhones()
+    }
+
     /// Why an approval or a role change did not happen.
     enum PhoneRoleRefusal: Equatable {
         /// The lock, or nobody signed in.
@@ -84,6 +124,9 @@ extension Shop {
         /// The phone was paired with the owner PIN, so it holds the PIN and
         /// cannot be held to a lesser role. Remove it and pair it by code.
         case pairedWithPin
+        /// The phone could not be written to this Mac's paired devices. The
+        /// request still waits; nothing was paired.
+        case notEnrolled
     }
 
     /// Approve the phone that asked, with `role`. The numbers were compared
@@ -116,6 +159,10 @@ extension Shop {
         catch { lanPhonePairing.refuse(.pinUnreadable); return .pinUnreadable }
         let store = lanDeviceStore
         let now = Date()
+        // Who is here is asked again after the wait for the PIN: the person
+        // who pressed Approve may have signed out, or another signed in, and
+        // the enrolment must stand on whoever is at this Mac now.
+        guard await phoneRolesGrantable().contains(role) else { return .roleNotGrantable }
         // Asked again after the awaits above, on the request as it is now.
         guard let pending = lanPhonePairing.pending, pending.pairId == pairId, pending.check == check else {
             return .notTheOneShown
@@ -130,7 +177,9 @@ extension Shop {
         }
         refreshPairedPhones()
         if enrolled { lanPairing.close() }
-        return enrolled ? nil : .nothingToApprove
+        // The request is still waiting and the window still open: the write
+        // itself failed, which is not "nobody approved in time".
+        return enrolled ? nil : .notEnrolled
     }
 
     /// The person said the numbers do not match, or does not know the phone.

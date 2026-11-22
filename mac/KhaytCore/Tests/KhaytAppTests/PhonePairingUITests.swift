@@ -85,6 +85,14 @@ struct PhonePairingUITests {
             #expect(Self.panel(shop) == .closed(.pinUnreadable))
         }
         shop.closePairing()
+        // The window's own approval, with no PIN in the way: paired, and said with the role.
+        let again = try PhoneRolesTests.waitingPhone(shop)
+        _ = again
+        shop.lanPhonePairing.approve { _ in }
+        shop.pairingWindowClosed()
+        #expect(Self.panel(shop, role: "manager") == .closed(.paired(name: "Reem's iPhone", role: "manager")))
+        #expect(shop.lanPairing.deadline == nil, "the PIN path shut with it")
+        #expect(Self.panel(shop, role: "manager", dismissed: true) == .closed(nil), "Done puts the button back")
     }
 
     @Test("each ending has its sentence and weight")
@@ -99,7 +107,9 @@ struct PhonePairingUITests {
         #expect(PhonePairingUI.sentence(.paired(name: "", role: "viewer"), words: w).text == "Phone is paired as Viewer.")
         // A phone paired with the PIN in the same window keeps the PIN path's sentence.
         #expect(PhonePairingUI.sentence(.paired(name: "Old phone", role: nil), words: w).text == w.callIt("mac.pair_done", ["name": .string("Old phone")]))
-        for refusal in [Shop.PhoneRoleRefusal.notAllowed, .roleNotGrantable, .nothingToApprove, .pinUnreadable, .notTheOneShown, .pairedWithPin] {
+        #expect(PhonePairingUI.refusal(.notEnrolled, words: w) != PhonePairingUI.refusal(.nothingToApprove, words: w),
+                "a failed write is not said as a timeout")
+        for refusal in [Shop.PhoneRoleRefusal.notAllowed, .roleNotGrantable, .nothingToApprove, .pinUnreadable, .notTheOneShown, .pairedWithPin, .notEnrolled] {
             let said = PhonePairingUI.refusal(refusal, words: w)
             #expect(!said.isEmpty && !said.hasPrefix("mac."), Comment(rawValue: "\(refusal)"))
         }
@@ -137,44 +147,137 @@ struct PhonePairingUITests {
         #expect(await shop.phoneRolesSettable(on: pinPaired) == ["owner"], "it holds the PIN: nothing less can be held to")
     }
 
-    @Test("removing a phone: whoever may change settings; a manager too, only while pairing by code is on")
+    @Test("removing a phone: the owner any phone; a manager only a code-paired phone at Manager or below, and only while pairing by code is on")
     func whoMayRemove() async throws {
         let shop = await OperatorLockTests.shop()
         defer { PhonePairingUI.forcedOn = false }
-        for on in [false, true] {
-            PhonePairingUI.forcedOn = on
-            for who in [nil, ("OP-v", "4444", false), ("OP-x", "3333", false), ("OP-m", "2222", on), ("OP-o", "1111", true)] as [(String, String, Bool)?] {
-                shop.lockNow()
-                if let who { #expect(await shop.signIn(who.0, pin: who.1) == .ok) }
-                #expect(shop.mayRemovePhone == (who?.2 ?? false), Comment(rawValue: "\(who?.0 ?? "nobody"), by code \(on)"))
-            }
-        }
-        // The write asks the same question, and says so when it refuses.
-        PhonePairingUI.forcedOn = true
         let devices = LanDevices.inMemory()
         shop.lanDevicesForTests = devices
-        let peer = try PhoneRolesTests.codePaired(devices, role: "viewer")
-        shop.lockNow()
-        #expect(await shop.signIn("OP-x", pin: "3333") == .ok)
-        shop.moveProblem = nil
-        shop.signOutPhone(peer.id)
-        #expect(devices.list().contains { $0.id == peer.id }, "an operator removed nothing")
-        #expect(LockReviewTests.refused(shop))
+        _ = try PhoneRolesTests.codePaired(devices, role: "viewer", name: "Viewer phone")
+        _ = try PhoneRolesTests.codePaired(devices, role: "manager", name: "Manager phone")
+        _ = try PhoneRolesTests.codePaired(devices, role: "owner", name: "Owner by code")
+        shop.refreshPairedPhones()
+        func phone(_ name: String) throws -> LanDevices.Listed { try #require(shop.pairedPhones.first { $0.name == name }) }
+        let pinPaired = LanDevices.Listed(id: "pin", name: "Turki's iPhone", createdAt: Date(), lastSeenAt: Date())
+        var slicer = LanDevices.Listed(id: "orca", name: "Orca", createdAt: Date(), lastSeenAt: Date())
+        slicer.kind = LanDevices.kindConnector
+
+        // The switch off: only whoever may change settings, as it was.
+        PhonePairingUI.forcedOn = false
         shop.lockNow()
         #expect(await shop.signIn("OP-m", pin: "2222") == .ok)
-        shop.signOutPhone(peer.id)
-        #expect(!devices.list().contains { $0.id == peer.id })
+        #expect(await shop.mayRemovePhone(try phone("Viewer phone")) == false)
+
+        PhonePairingUI.forcedOn = true
+        // A manager: a phone a manager could have paired, and nothing else.
+        #expect(await shop.mayRemovePhone(try phone("Viewer phone")))
+        #expect(await shop.mayRemovePhone(try phone("Manager phone")))
+        #expect(await shop.mayRemovePhone(try phone("Owner by code")) == false, "not a phone holding Owner")
+        #expect(await shop.mayRemovePhone(pinPaired) == false, "not the owner's PIN-paired phone")
+        #expect(await shop.mayRemovePhone(slicer) == false, "a slicer is not a phone")
+        // The write asks the same question on the stored record, and says so.
+        let ownerPhone = try phone("Owner by code")
+        shop.moveProblem = nil
+        #expect(await shop.removePhone(ownerPhone.id) == false)
+        #expect(devices.list().contains { $0.id == ownerPhone.id }, "a manager did not remove the owner's phone")
+        #expect(LockReviewTests.refused(shop))
+        let viewerPhone = try phone("Viewer phone")
+        #expect(await shop.removePhone(viewerPhone.id))
+        #expect(!devices.list().contains { $0.id == viewerPhone.id })
+
+        // An operator, a viewer and nobody: nothing.
+        for who in [nil, ("OP-v", "4444"), ("OP-x", "3333")] as [(String, String)?] {
+            shop.lockNow()
+            if let who { #expect(await shop.signIn(who.0, pin: who.1) == .ok) }
+            let managerPhone = try phone("Manager phone")
+            #expect(await shop.mayRemovePhone(managerPhone) == false, Comment(rawValue: who?.0 ?? "nobody"))
+            #expect(await shop.removePhone(managerPhone.id) == false)
+            #expect(devices.list().contains { $0.id == managerPhone.id })
+        }
+        // The owner: any phone.
+        shop.lockNow()
+        #expect(await shop.signIn("OP-o", pin: "1111") == .ok)
+        #expect(await shop.mayRemovePhone(pinPaired))
+        #expect(await shop.removePhone(ownerPhone.id))
+        // The classic sign-out is still settings-only, and never removes a slicer.
+        shop.lockNow()
+        #expect(await shop.signIn("OP-m", pin: "2222") == .ok)
+        let left = try phone("Manager phone")
+        shop.signOutPhone(left.id)
+        #expect(devices.list().contains { $0.id == left.id }, "the old button's write did not widen")
     }
 
-    @Test("off by default: Settings ▸ Online is the screen it was")
+    @Test("the two paths share one window: when either ends, both do, even when it ends the same way twice")
+    func windowsCloseTogether() async throws {
+        let shop = await OperatorLockTests.shop(on: false)
+        shop.lanDevicesForTests = LanDevices.inMemory()
+        for round in 1...2 {
+            shop.lanPhonePairing = round == 1 ? LanConnectorPairing(enabled: true, flavor: .phone) : shop.lanPhonePairing
+            shop.lanPairing.open(); shop.lanPhonePairing.open()
+            let before = (shop.lanPairing.closes, shop.lanPhonePairing.closes)
+            // The PIN path ends (here: the person's own Stop on that window alone).
+            shop.lanPairing.close()
+            #expect(shop.lanPairing.closes == before.0 + 1, "counted every time, round \(round)")
+            shop.pairingWindowClosed()
+            #expect(!shop.lanPhonePairing.isOpenNow, "the code path shut with it, round \(round)")
+            #expect(shop.lanPhonePairing.closes == before.1 + 1)
+        }
+        // The other way: the code path ends, the PIN path follows.
+        shop.lanPairing.open(); shop.lanPhonePairing.open()
+        shop.lanPhonePairing.refuse(.pinUnreadable)
+        shop.pairingWindowClosed()
+        #expect(shop.lanPairing.deadline == nil)
+        #expect(Self.panel(shop) == .closed(.pinUnreadable), "and the real ending is the one said")
+        // Twice running, the same ending: still counted, still said.
+        let closes = shop.lanPhonePairing.closes
+        shop.lanPairing.open(); shop.lanPhonePairing.open()
+        shop.lanPhonePairing.refuse(.pinUnreadable)
+        #expect(shop.lanPhonePairing.closes == closes + 1)
+        shop.pairingWindowClosed()
+        #expect(shop.lanPairing.deadline == nil && Self.panel(shop) == .closed(.pinUnreadable))
+        // Nothing open: asking again changes nothing.
+        shop.pairingWindowClosed()
+        #expect(shop.lanPairing.deadline == nil && !shop.lanPhonePairing.isOpenNow)
+    }
+
+    @Test("a name is one short line whatever the phone sent, and the number keeps its order")
+    func namesAreTidied() async {
+        let shop = await OperatorLockTests.shop(on: false)
+        #expect(PhonePairingUI.tidy("Reem's iPhone") == "Reem's iPhone")
+        #expect(PhonePairingUI.tidy("Reem\u{2028}418 207") == "Reem 418 207", "a line separator does not start a second line")
+        #expect(PhonePairingUI.tidy("A\nB\u{2029}C\u{0085}D") == "A B C D")
+        #expect(PhonePairingUI.tidy("{role} {name}") == "role name", "no placeholders to expand")
+        #expect(PhonePairingUI.tidy("a\u{202E}b") == "a b", "no direction override")
+        #expect(PhonePairingUI.tidy(String(repeating: "e\u{0301}", count: 500)).unicodeScalars.count <= 60)
+        #expect(PhonePairingUI.shown("\u{2028}\u{2029}", shop.words) == shop.words.callIt("mac.phones_unnamed"))
+        let said = PhonePairingUI.sentence(.paired(name: "X {role}", role: "viewer"), words: shop.words).text
+        #expect(said == "X role is paired as Viewer.")
+        let number = PhonePairingUI.number("418207")
+        #expect(number.unicodeScalars.first == "\u{2066}" && number.unicodeScalars.last == "\u{2069}")
+        #expect(number.contains("418") && number.contains("207"))
+        let asked = PhonePairingUI.Asked(pairId: "p", name: "n", app: "Khayt\u{2028}Fake", version: "1.2.0", address: "192.168.1.47", check: "1")
+        #expect(PhonePairingUI.from(asked) == "Khayt Fake 1.2.0 · 192.168.1.47")
+    }
+
+    @Test("off by default: nothing turns the screens on but the Mac's own switch, and the old screen is the other branch")
     func offByDefault() throws {
-        #expect(!PhonePairingUI.forcedOn)
-        #expect(PhonePairingUI.on == LanConnectorPairing.phoneCodeEnabled)
-        let src = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().appending(path: "Sources/KhaytApp/Shop+PairedPhones.swift"), encoding: .utf8)
-        let body = try #require(src.range(of: "if PhonePairingUI.on {"))
-        #expect(src[body.upperBound...].prefix(160).contains("PairedPhonesByCode(shop: shop)"))
-        #expect(src.contains("classic"), "the screen as it was is still there, drawn when the switch is off")
+        #expect(!PhonePairingUI.forcedOn, "no test or capture left it on")
+        let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        // Only a test sets `forcedOn`: no source file does, so no build can ship with the screens forced.
+        for file in try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) where file.pathExtension == "swift" {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            #expect(!text.contains("PhonePairingUI.forcedOn = "), Comment(rawValue: file.lastPathComponent))
+            #expect(!text.contains("forcedOn = true"), Comment(rawValue: file.lastPathComponent))
+        }
+        let src = try String(contentsOf: dir.appending(path: "Shop+PairedPhones.swift"), encoding: .utf8)
+        let branch = try #require(src.range(of: "if PhonePairingUI.on {"))
+        let after = src[branch.upperBound...].prefix(120)
+        #expect(after.contains("PairedPhonesByCode(shop: shop)") && after.contains("} else {") && after.contains("classic"))
+        // The old screen's own rows are still in the file, under `classic`.
+        let classic = try #require(src.range(of: "@ViewBuilder private var classic: some View {"))
+        #expect(src[classic.upperBound...].contains("PairAPhone(shop: shop)"))
+        #expect(src[classic.upperBound...].contains("shop.signOutPhone(phone.id)"))
     }
 
     @Test("Approve is never the default action, and the number is drawn left to right")
@@ -182,7 +285,10 @@ struct PhonePairingUITests {
         let src = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytApp/PhonePairingViews.swift"), encoding: .utf8)
         #expect(!src.contains(".keyboardShortcut(.defaultAction)"), "Return must not approve a request that has just appeared")
-        let number = try #require(src.range(of: "LanConnectorPairing.spaced(asked.check)"))
+        let number = try #require(src.range(of: "PhonePairingUI.number(asked.check)"))
         #expect(src[number.upperBound...].prefix(260).contains(".environment(\\.layoutDirection, .leftToRight)"))
+        // The controls wait a moment after a request appears, and a new request starts on the default role.
+        #expect(src.contains("askedBody(asked, ready: !settles || settled == asked.pairId)"))
+        #expect(src.contains("role = await shop.phoneDefaultRole() ?? grantable.last ?? \"operator\""))
     }
 }
