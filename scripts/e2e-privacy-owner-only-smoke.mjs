@@ -24,9 +24,14 @@ function bookAs({ lock, who }) {
     ],
     printLog: [], clients: [], inventory: [], machines: [],
   }));
+  if (lock && who) whoFor.set(dir, who);
   return dir;
 }
 const onDisk = (dir) => JSON.parse(fs.readFileSync(path.join(dir, 'khayt-store.json'), 'utf8'));
+// Whom the book was written signed in as (bookAs's `who`), kept beside it:
+// the start clears it from the book itself (#2608).
+const whoFor = new Map();
+const onDiskWho = (dir) => whoFor.get(dir) || null;
 
 async function run(dir, fn) {
   const { electronApp, window } = await launchApp(dir);
@@ -34,6 +39,19 @@ async function run(dir, fn) {
     await window.waitForFunction(() => typeof settings !== 'undefined' && settings && settings.bizName === 'Privacy Shop', { timeout: 15000 });
     // A start may open the PIN pad (#2608); it is not what this tests.
     await window.evaluate(() => document.getElementById('pinPadOverlay')?.remove());
+    // Under the lock nobody stays signed in across a restart (#2608), so the
+    // person the book names signs in again here, as the pad does: main checks
+    // (no PIN set: noteVerified) and the window saves the sign-in.
+    const who = onDiskWho(dir);
+    if (who) {
+      await window.evaluate(async (id) => {
+        const v = await window.hubAPI.verifyOperatorPin({ operatorId: id, pin: '' });
+        if (!v || !v.ok) throw new Error('sign-in refused: ' + JSON.stringify(v));
+        settings.activeOperatorId = id;
+        saveAll();
+        if (typeof flushSave === 'function') await flushSave();
+      }, who);
+    }
     return await fn(window);
   } finally { await electronApp.close(); }
 }
