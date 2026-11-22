@@ -113,3 +113,70 @@ test('desktop: every scan is remembered, and the IPC returns this scan plus earl
   const pre = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
   assert.match(pre, /foundPrinters: \(\)\s+=> ipcRenderer\.invoke\('hub:found-printers'\)/);
 });
+
+// ── The Mac's review (Nov 22) ────────────────────────────────────────────
+const roundTrip = (list) => JSON.parse(JSON.stringify({ version: 1, printers: list })).printers;
+
+test('previousHost survives a write and a read back (clean keeps it, bounded)', () => {
+  const F = require('../lib/found-printers.js');
+  let list = F.remember([], [{ serial: 'SN1', host: '192.168.1.20', port: 80, name: 'U1' }], 1000);
+  list = roundTrip(list);
+  list = F.remember(list, [{ serial: 'SN1', host: '192.168.1.31', port: 80, name: 'U1' }], 2000);
+  list = roundTrip(list);
+  assert.equal(F.recent(list, 2000)[0].previousHost, '192.168.1.20', 'read back, the picker can still say where it was');
+  list = roundTrip(F.remember(list, [{ serial: 'SN1', host: '192.168.1.31', port: 80 }], 3000));
+  assert.equal(F.recent(list, 3000)[0].previousHost, '192.168.1.20', 'a later find at the same address keeps it');
+  assert.equal(F.clean({ serial: 'x', host: 'h', lastSeen: 1, previousHost: 'p'.repeat(500) }).previousHost.length, 200);
+  assert.equal('previousHost' in F.clean({ serial: 'x', host: 'h', lastSeen: 1 }), false, 'absent stays absent');
+});
+
+test('one app re-seeing the other app\'s printer never blanks what the other said, both directions', () => {
+  const F = require('../lib/found-printers.js');
+  const full = { serial: 'SN9', host: '10.0.0.9', port: 7125, id: 'mdns|u1', name: 'U1', label: 'Snapmaker U1', linkMode: 'moonraker', advertisedPort: 7125, vendor: 'Snapmaker', model: 'U1', connection: 'lan', catalogId: 'snapmaker-u1' };
+  const sparse = { serial: 'SN9', host: '10.0.0.9', port: 7125, source: 'sweep' };
+  // Full first (this app), then the sparse find (the other app's scanner):
+  let a = roundTrip(F.remember([], [full], 1000));
+  a = roundTrip(F.remember(a, [sparse], 2000));
+  const e = F.recent(a, 2000)[0];
+  for (const k of ['id', 'label', 'linkMode', 'vendor', 'model', 'name', 'connection', 'catalogId']) assert.equal(e[k], full[k], k);
+  assert.equal(e.advertisedPort, 7125);
+  assert.equal(e.lastSeen, 2000);
+  // Sparse first, then full: the full find fills everything in.
+  let b = roundTrip(F.remember([], [sparse], 1000));
+  b = roundTrip(F.remember(b, [full], 2000));
+  const g = F.recent(b, 2000)[0];
+  for (const k of ['id', 'label', 'linkMode', 'vendor', 'model']) assert.equal(g[k], full[k], k);
+  // A find that SAYS something different still wins.
+  const c = F.recent(F.remember(a, [{ ...sparse, label: 'Renamed' }], 3000), 3000)[0];
+  assert.equal(c.label, 'Renamed');
+  assert.equal(c.vendor, 'Snapmaker');
+});
+
+test('rememberInFile: the other app\'s write lands between the read and the write; both apps\' printers survive', () => {
+  const F = require('../lib/found-printers.js');
+  const mine = { serial: 'MINE', host: '10.0.0.1', port: 80, name: 'Mine' };
+  const theirs = { serial: 'THEIRS', host: '10.0.0.2', port: 80, name: 'Theirs' };
+  let disk = JSON.stringify({ version: 1, printers: [] });
+  let reads = 0;
+  const io = {
+    read: () => {
+      reads++;
+      // The Mac writes right after this app's first read.
+      if (reads === 1) { const was = disk; disk = JSON.stringify({ version: 1, printers: F.remember([], [theirs], 500) }); return was; }
+      return disk;
+    },
+    write: (t) => { disk = t; },
+  };
+  assert.equal(F.rememberInFile(io, [mine], 1000), true);
+  const serials = JSON.parse(disk).printers.map((p) => p.serial).sort();
+  assert.deepEqual(serials, ['MINE', 'THEIRS']);
+  // A file that keeps changing under it: give up after the rounds, write nothing.
+  let n = 0, wrote = false;
+  const busy = { read: () => String(n++), write: () => { wrote = true; } };
+  assert.equal(F.rememberInFile(busy, [mine], 1000, { rounds: 3 }), false);
+  assert.equal(wrote, false);
+  // Nothing on disk yet, or garbage: still writes this scan.
+  let d2 = '';
+  assert.equal(F.rememberInFile({ read: () => d2, write: (t) => { d2 = t; } }, [mine], 1000), true);
+  assert.equal(JSON.parse(d2).printers[0].serial, 'MINE');
+});
