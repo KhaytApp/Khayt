@@ -7,7 +7,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-for (const f of ['color-mix', 'loaded-colours', 'print-fit', 'printer-upload', 'gcode-parse', 'send-checks']) require('../lib/' + f + '.js');
+for (const f of ['color-mix', 'loaded-colours', 'print-fit', 'printer-upload', 'gcode-parse', 'printer-activity', 'auto-dispatch', 'send-checks']) require('../lib/' + f + '.js');
 const S = globalThis.KhaytSendChecks, G = globalThis.KhaytGcodeParse, LC = globalThis.KhaytLoadedColours;
 const V = require('./fixtures/send-checks-vectors.json');
 
@@ -15,7 +15,7 @@ const run = (c) => {
   const f = Object.assign({}, c.file);
   if (f.headerText) f.header = G.parsePrinterHeader(f.headerText);
   const l = c.loaded;
-  return S.sendChecks(f, c.machine, l ? (l.ptc ? LC.fromPrintTaskConfig(l.ptc) : l.loaded) : undefined);
+  return S.sendChecks(f, c.machine, l ? (l.ptc ? LC.fromPrintTaskConfig(l.ptc) : l.loaded) : undefined, c.live, c.opts);
 };
 
 for (const c of V.cases) test(c.why, () => assert.deepEqual(run(c), c.want));
@@ -72,4 +72,20 @@ test('only placed extents can block on the bed: mesh, toolpath or unsaid bounds 
     assert.equal(S.blocks(f), false, String(source));
   }
   assert.equal(S.blocks(S.sendChecks({ name: 'p.gcode', bounds: { x: 500, y: 500, z: 500, source: 'placed-extents' } }, machine)), true);
+});
+
+test('the bed rule is the dispatcher\'s: a manual send and dispatch agree (shared bedState)', () => {
+  const AD = globalThis.KhaytAutoDispatch;
+  for (const c of V.cases.filter((x) => x.live !== undefined)) {
+    const why = AD.bedState(c.machine, c.live, c.opts || {});
+    const bed = run(c).filter((x) => x.code === 'bed-not-cleared' || x.code === 'bed-unknown');
+    assert.equal(why === null, bed.length === 0, c.why);
+  }
+});
+
+test('left out, the bed says nothing; a junk live entry is "nothing to go by"', () => {
+  const c = V.cases.find((x) => /Turki's manual send/.test(x.why));
+  assert.deepEqual(S.sendChecks({ name: 'a.gcode' }, c.machine, undefined), []);
+  assert.deepEqual(S.sendChecks({ name: 'a.gcode' }, c.machine, undefined, 'junk'), [{ code: 'bed-unknown', severity: 'info' }]);
+  assert.equal(S.blocks(run(c)), false, 'a bed is a warning, never a block');
 });
