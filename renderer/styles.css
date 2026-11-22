@@ -6012,3 +6012,50 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .pp-row .pp-fields { flex: 1; min-width: 0; }
 .pp-row.is-paid { background: var(--bg-elev); }
 .pp-summary.is-refused { color: var(--st-late-ink, var(--danger)); }
+
+/* ── Settings › General › Internet use (P8 PR 5; Figma 111:1041) ─────────── */
+.iu-back { background: none; border: 0; padding: 0; margin: 0 0 10px; color: var(--accent); font-size: 13px; cursor: pointer; }
+.iu-back:hover { text-decoration: underline; }
+.iu-switches { padding: 16px 17px; display: flex; flex-direction: column; gap: 12px; }
+.iu-switch-row { display: flex; align-items: flex-start; gap: 12px; }
+.iu-label { font-size: 14px; font-weight: 600; line-height: 20px; }
+.iu-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.45; }
+.iu-owner-only { margin: 0; }
+.iu-switch { flex: none; width: 36px; height: 20px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-soft); position: relative; cursor: pointer; padding: 0; transition: background .15s; }
+.iu-switch .iu-knob { position: absolute; top: 2px; inset-inline-start: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface, #fff); box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: inset-inline-start .15s; }
+[dir="rtl"] .iu-back .iu-chev { display: inline-block; transform: scaleX(-1); }
+.iu-switch.on { background: var(--accent); border-color: var(--accent); }
+.iu-switch.on .iu-knob { inset-inline-start: 18px; }
+.iu-switch:disabled { opacity: .55; cursor: not-allowed; }
+.iu-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.iu-section { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); margin: 18px 0 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.iu-cols, .iu-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px 150px 64px; gap: 16px; align-items: start; }
+.iu-cols.no-keep, .iu-row.no-keep { grid-template-columns: minmax(0, 1fr) 96px 150px; }
+.iu-cols { font-size: 12px; color: var(--text-muted); padding: 0 16px 8px; }
+.iu-rows { padding: 0; overflow: hidden; }
+.iu-row { padding: 14px 16px; border-top: 1px solid var(--border-soft); }
+.iu-row:first-child { border-top: 0; }
+.iu-name { font-size: 14px; font-weight: 600; }
+.iu-desc { font-size: 12px; color: var(--text-muted); margin-top: 3px; line-height: 1.45; }
+.iu-cons { font-size: 12px; margin-top: 3px; line-height: 1.45; }
+.iu-cons.iu-red { color: var(--danger); }
+.iu-when { font-size: 12px; color: var(--text-muted); }
+.iu-state { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+.iu-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--text-muted); }
+.iu-dot.ok { background: var(--success); }
+.iu-dot.bad { background: var(--danger); }
+.iu-keep { font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; justify-self: end; }
+.iu-keep input { width: auto; margin: 0; }
+.iu-lan { background: var(--bg-soft); }
+.iu-stale { background: var(--danger-soft); }
+.iu-muted { color: var(--text-muted); font-size: 13px; }
+.iu-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; padding: 12px 16px; border: 1px solid var(--danger); border-radius: var(--radius); background: var(--danger-soft); color: var(--danger); font-size: 13.5px; line-height: 1.5; }
+.iu-banner-text { flex: 1 1 320px; }
+.iu-banner-btns { display: flex; gap: 10px; }
+@media (max-width: 720px) {
+  .iu-cols { display: none; }
+  .iu-row, .iu-row.no-keep { grid-template-columns: minmax(0, 1fr) auto; }
+  .iu-when { grid-column: 1; }
+}
+/* Arabic letters join: no tracking and no monospace on the section label. */
+[dir="rtl"] .iu-section { letter-spacing: 0; font-family: inherit; text-transform: none; }

@@ -2584,7 +2584,32 @@ function startActiveCount() {
 // The Settings list (P8 PR 5 draws it): every purpose, its state and how
 // often the switch has refused it this session. And this computer's own
 // stricter switch, which is not in the book.
-ipcMain.handle('hub:outbound-describe', async () => ({ rows: outboundGate.describe(), local: { offline: outboundGate.local().offline === true } }));
+ipcMain.handle('hub:outbound-describe', async () => {
+  const st = (lanServerStore && lanServerStore.settings) || {};
+  const net = st.network && typeof st.network === 'object' && !Array.isArray(st.network) ? st.network : {};
+  const loc = outboundGate.local();
+  let lastChecked = null, blockedSince = null;
+  try { const U = require('./lib/updater'); lastChecked = U.lastUpdateCheckAt(); blockedSince = U.updatesBlockedSince(); } catch (_) { /* none */ }
+  let library = false;
+  try { library = !!printLibS3() || !!printLibDrive(); } catch (_) { library = false; }
+  return {
+    rows: outboundGate.describe(),
+    local: { offline: loc.offline === true, changedAt: loc.changedAt || null },
+    // The shop's switch as MAIN reads it from the saved book, so the page never
+    // shows a change a refused or failed save did not keep (review of #2633).
+    shop: {
+      offline: require('./lib/outbound.js').isOffline(st, { local: {} }),
+      keep: require('./lib/outbound.js').keptOf(st),
+      changedAt: typeof net.changedAt === 'string' ? net.changedAt : null,
+      changedBy: typeof net.changedBy === 'string' ? net.changedBy : null,
+    },
+    // For the Updates row's "Last checked" and the 30-day red row and banner (D2).
+    updatesLastCheckedAt: lastChecked,
+    updatesBlockedSince: blockedSince,
+    // Set up where only main can see it: the library's own bucket or Drive.
+    setup: { storageLibrary: library },
+  };
+});
 ipcMain.handle('hub:outbound-set-local', async (_e, patch) => {
   // Only the owner changes the switch under the staff lock, this computer's
   // own included (Turki, Nov 22 round 2). The book's settings.network is held

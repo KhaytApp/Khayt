@@ -429,6 +429,14 @@
       }
       return;
     }
+    // Refused by "Make no internet calls" (D2: no one-time override): the
+    // reason in the shop's language, never "update check failed".
+    if (res?.status === 'blocked') {
+      // Bed Ready has no Internet use page: the same words from the locale, never a blank line.
+      if (statusEl) statusEl.textContent = window.KhaytInternetUse?.refusalText?.(res.blocked)
+        || (typeof t === 'function' ? t('outbound.blocked.offline', { purpose: t('iu.in.updates') }) : 'Khayt is set to make no internet calls.');
+      return;
+    }
     if (res?.status === 'error') {
       if (statusEl) {
         statusEl.textContent = `⚠ Update check failed: ${res.message || 'unknown error'}`;
