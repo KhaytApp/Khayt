@@ -225,6 +225,19 @@ function gCards(ns, can) {
   if (ns.clockBehind) {
     out.push(`<div class="card iu-g" data-iu-g-card="clock"><div class="iu-g-title">${esc(tr('iu.g.clock'))}</div></div>`);
   }
+  // Frame H (signed off, Turki Nov 22): the "off" made here could not reach
+  // Khayt Cloud because this computer's sign-in ended (a 401). Khayt keeps it
+  // and sends it after the person signs in again; the button opens the Khayt
+  // Cloud pane, where that happens. Not a switch change, so not greyed for a
+  // non-owner: anyone may sign in.
+  if (ns.signIn && ns.pendingOff) {
+    const who = network().changedBy || '';
+    const at = ns.pendingOffAt || network().changedAt || null;
+    const body = tr(who ? 'iu.g.signin_body_by' : 'iu.g.signin_body', { who, time: at ? fmtTime(at) : '' });
+    out.push(`<div class="card iu-g" data-iu-g-card="signin"><div class="iu-g-title">${esc(tr('iu.g.signin_title'))}</div>
+      <div class="iu-sub">${esc(body)}</div>
+      <div class="iu-g-btns"><button type="button" class="btn primary" data-iu-signin>${esc(tr('iu.g.signin_again'))}</button></div></div>`);
+  }
   return out.join('');
 }
 
@@ -386,6 +399,10 @@ function wire(host) {
     try { r = await global.hubAPI.networkSwitchShare(turnOn); } catch (_) { r = { ok: false, why: 'error' }; }
     answerSay(r);
     await refresh();
+  });
+  const signIn = host.querySelector('[data-iu-signin]');
+  if (signIn) signIn.addEventListener('click', () => {
+    if (typeof global.openSettingsSection === 'function') global.openSettingsSection('cloud');
   });
   host.querySelectorAll('[data-iu-g]').forEach((b) => b.addEventListener('click', async () => {
     if (!mayChange()) return refuseSay('not_permitted');

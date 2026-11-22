@@ -743,3 +743,30 @@ test('decision B: a value AT this computer\'s change (the same instant) answers 
   assert.equal((await k.sync.answerConflict('adopt')).ok, false);
   assert.equal(k.book().network && k.book().network.offline === false && k.book().network.changedAt === mine, false);
 });
+
+test('frame H (signed off Nov 22): the "off" not sent because the sign-in ended shows a card with "Sign in again"', async () => {
+  // Main's state says so after a 401 on the retry.
+  const h = owedOff();
+  h.publishRemote(plain({ offline: true, changedAt: '2026-11-22T09:00:00.000Z' }));
+  h.server.putStatus = 401;
+  await h.sync.tick();
+  const st = h.sync.state();
+  assert.deepEqual([st.signIn, st.pendingOff, st.pendingOffAt], [true, true, OFF_10.changedAt]);
+  // The window draws it from that state (gCards, rendered with its own helpers stubbed).
+  const ui = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'internet-use.js'), 'utf8');
+  const src = ui.slice(ui.indexOf('function gCards('), ui.indexOf('/** What main said no to'));
+  const strings = { 'iu.g.signin_title': 'TITLE', 'iu.g.signin_body_by': 'BY {who} AT {time}', 'iu.g.signin_body': 'AT {time}', 'iu.g.signin_again': 'Sign in again' };
+  const tr = (k, v) => String(strings[k] || k).replace(/\{(\w+)\}/g, (_, x) => (v && v[x] != null ? v[x] : ''));
+  const gCards = new Function('tr', 'esc', 'fmtDate', 'fmtTime', 'network', src + '; return gCards;')(tr, (s) => String(s), (s) => s, () => '14:02', () => ({ changedBy: 'Sara Example', changedAt: OFF_10.changedAt }));
+  const html = gCards(st, false);
+  assert.match(html, /data-iu-g-card="signin"/);
+  assert.match(html, /BY Sara Example AT 14:02/);
+  assert.match(html, /<button type="button" class="btn primary" data-iu-signin>Sign in again<\/button>/, 'not greyed for a non-owner: anyone may sign in');
+  assert.doesNotMatch(gCards(Object.assign({}, st, { signIn: false }), true), /signin/, 'no card without the 401');
+  // The button opens the Khayt Cloud pane; all nine languages have the words.
+  assert.match(ui, /if \(typeof global\.openSettingsSection === 'function'\) global\.openSettingsSection\('cloud'\);/);
+  for (const l of ['en', 'ar', 'de', 'es', 'fr', 'ja', 'pt-BR', 'tr', 'zh']) {
+    const loc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'locales', l + '.js'), 'utf8');
+    for (const k of Object.keys(strings)) assert.match(loc, new RegExp(`"${k.replace(/\./g, '\\.')}":`), `${l} ${k}`);
+  }
+});
