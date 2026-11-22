@@ -226,6 +226,9 @@ jobs:
 
       - name: E2E smoke (the update gate holds until accepted)
         run: xvfb-run -a npm run test:e2e:consent
+
+      - name: E2E smoke (the update's items at the first launch, for Store and manual installs)
+        run: xvfb-run -a npm run test:e2e:launchgate
       - name: E2E job customer (Edit Order picker, option C)
         run: xvfb-run -a npm run test:e2e:jobcustomer
       - name: E2E split keeps the job's currency

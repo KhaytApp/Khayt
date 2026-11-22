@@ -868,6 +868,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Business Mode setup wizard (new first-run experience)
   initWizard();
 
+  // A major change reached this computer without the update dialog (the
+  // Microsoft Store, an installer run by hand): its items, held until read.
+  if (typeof showLaunchGateIfNeeded === 'function') showLaunchGateIfNeeded().catch((e) => console.error('launch gate:', e));
+
   // The staff lock is on and nobody is signed in: the window is a viewer until
   // someone is (P5, #2592), so ask who it is now rather than leave the shop to
   // find "Switch operator" (pre-cut review MED2). Not over the first-run
