@@ -1264,6 +1264,12 @@ same shapes `lib/printer-upload.js` sends to a real OctoPrint.
   wrong key **403**, ten wrong keys from one visitor **429** for a minute (its
   own bucket — it never locks the owner PIN). Not accepted in the query.
 - **`GET /api/version`** → `200 {"api":"0.1","server":"1.10.0","text":"OctoPrint 1.10.0 (Khayt)"}`.
+- **On the desktop (Windows/Linux), both routes:**
+  - The shop's network only: `421 {"error":"host-not-local"}` through the tunnel or for a `Host` that is not this computer, as the connector routes.
+  - At most 30 uploads an hour from one address, then `429` with `Retry-After`.
+  - An upload is ended after 60 s with no bytes (the Mac's idle read timeout), never by its total length of time, so a slow 1 GB file from a slicer is not cut off while it still flows. Every other request keeps a 300 s whole-request limit.
+  - A failed spool (a full or read-only disk) answers `500` and frees its upload slot.
+  - File names are made safe for Windows and ext4: `< > : " | ? *` become `_`, trailing dots and spaces go, a device name (`CON`, `NUL`, `COM1`, …) gets a leading `_`, and a name is cut to 200 UTF-8 bytes, keeping its extension.
 - **`POST /api/files/local`** — `multipart/form-data`, the file in the field
   `file`. Taken: `.gcode`, `.gco`, `.g`, `.bgcode`, `.gcode.3mf` (else
   **415**); no file part **400**. The key, the `Content-Length` and the cap are

@@ -25,6 +25,7 @@ const PP = require(path.join(ROOT, 'lib/main/phone-pairing.js'));
 const CP = require(path.join(ROOT, 'lib/main/connector-pairing.js'));
 const CR = require(path.join(ROOT, 'lib/main/connector-routes.js'));
 const Inbox = require(path.join(ROOT, 'lib/main/slicer-inbox.js'));
+const SlicerUpload = require(path.join(ROOT, 'lib/main/slicer-upload.js'));
 const Slices = require(path.join(ROOT, 'lib/main/connector-slices.js'));
 const Local = require(path.join(ROOT, 'lib/main/connector-local.js'));
 const SU = require(path.join(ROOT, 'lib/main/slicer-upload.js'));
@@ -178,6 +179,8 @@ before(async () => {
     connectorPairing, connectorLocal, slicerInbox, connectorSlices,
     lanAdvertiser: { start: (a) => { advertCalls.push(['start', a.bindLan, a.port]); return false; }, stop: () => advertCalls.push(['stop']) },
     connectorClock: () => rateT,
+    // Short, so the slow-stream test runs in seconds (production: 300 s whole request, 60 s idle upload).
+    lanTimeouts: { totalMs: 3000, uploadIdleMs: 700 },
   });
   assert.ok((await ipc('hub:start-lan-server', { port: PORT, pin: PIN, bindLan: 'loopback' })).ok);
 });
@@ -778,4 +781,136 @@ test('the LAN server starts the advert with its binding, and stops it on stop', 
   await ipc('hub:stop-lan-server');
   assert.deepEqual(advertCalls.slice(n), [['stop']]);
   assert.ok((await ipc('hub:start-lan-server', { port: PORT, pin: PIN, bindLan: 'loopback' })).ok);
+});
+
+// ── The security review (Nov 22) ─────────────────────────────────────────────
+
+/** A raw request whose body is written by `feed(req)`; resolves to { status, body } or { closed: true }. */
+function rawRequest(method, p, headers, feed) {
+  return new Promise((resolve) => {
+    const req = http.request({ host: '127.0.0.1', port: PORT, method, path: p, headers, agent: false }, (res) => {
+      const chunks = []; res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+      res.on('error', () => resolve({ closed: true }));
+    });
+    req.on('error', (e) => resolve({ closed: true, why: e && e.code }));
+    feed(req);
+  });
+}
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// Each starts a minute past any lockout an earlier test's wrong key left (the gate's clock is connectorClock).
+async function octoKey() { rateT += 2 * 60 * 1000; store.settings.operatorLockEnabled = false; const s = await ipc('hub:slicer-upload-set', { on: true }); return s.key; }
+
+test('a slow upload is not cut off while bytes still flow (longer than the whole-request limit); a stalled one is, and frees its slot', async () => {
+  const key = await octoKey();
+  const m = multipart(`slow-${crypto.randomBytes(3).toString('hex')}.gcode`, crypto.randomBytes(30 * 1024));
+  const headers = { 'x-api-key': key, 'content-type': `multipart/form-data; boundary=${m.boundary}`, 'content-length': String(m.body.length) };
+  const t0 = Date.now();
+  const slow = await rawRequest('POST', '/api/files/local', headers, async (req) => {
+    const n = 30, size = Math.ceil(m.body.length / n);
+    for (let i = 0; i < n; i++) { req.write(m.body.subarray(i * size, (i + 1) * size)); await wait(130); }
+    req.end();
+  });
+  assert.ok(Date.now() - t0 > 3000, 'it took longer than the whole-request limit (3 s here): ' + JSON.stringify(slow));
+  assert.equal(slow.status, 201, slow.body);
+  // Two uploads that stall after their head: each ended after the idle limit, and both slots come back.
+  const stalled = () => {
+    const s = multipart(`stall-${crypto.randomBytes(3).toString('hex')}.gcode`, crypto.randomBytes(4096));
+    const h = { 'x-api-key': key, 'content-type': `multipart/form-data; boundary=${s.boundary}`, 'content-length': String(s.body.length) };
+    return rawRequest('POST', '/api/files/local', h, (req) => { req.write(s.body.subarray(0, 300)); /* then nothing */ });
+  };
+  const [a, b] = await Promise.all([stalled(), stalled()]);
+  assert.ok(a.closed || a.status >= 400, 'stalled upload ended');
+  assert.ok(b.closed || b.status >= 400, 'stalled upload ended');
+  await wait(100);
+  const after = await octo(key, multipart(`after-${crypto.randomBytes(3).toString('hex')}.gcode`, crypto.randomBytes(512)));
+  assert.equal(after.status, 201, 'both slots were freed: ' + after.text);
+});
+
+test('every other request keeps the whole-request limit: a body dripped past it is cut off', async () => {
+  const r = await rawRequest('POST', '/api/waste', { 'content-type': 'application/json', 'content-length': '200', 'x-khayt-pin': PIN }, async (req) => {
+    for (let i = 0; i < 40; i++) { req.write(' '); await wait(120); }
+  });
+  assert.ok(r.closed || r.status === 408, JSON.stringify(r));
+});
+
+test('OctoPrint multipart: whitespace after a delimiter is not buffered without end (the review\'s 50 MB case)', async () => {
+  const key = await octoKey();
+  const pad = Buffer.alloc(2 * 1024 * 1024, 0x20);
+  const body = Buffer.concat([Buffer.from('--B'), pad, Buffer.from('\r\n')]);
+  const t0 = Date.now();
+  // Refused at the first chunk and the socket closed: the client may see the reset before the answer.
+  const r = await rawRequest('POST', '/api/files/local', { 'x-api-key': key, 'content-type': 'multipart/form-data; boundary=B', 'content-length': String(body.length) }, (req) => req.end(body));
+  assert.ok(r.closed || (r.status >= 400 && r.status < 500), JSON.stringify(r));
+  assert.ok(Date.now() - t0 < 2000, 'refused quickly');
+  const R = SlicerUpload.createMultipartReader('B', () => null);
+  R.push(Buffer.from('--B')); R.push(Buffer.alloc(65, 0x20));
+  assert.equal(R.bad, true, 'more than 64 bytes of padding is not multipart');
+  const ok = SlicerUpload.createMultipartReader('B', () => null);
+  ok.push(Buffer.from('--B  \r\n')); assert.equal(ok.bad, false, 'a little padding is fine');
+});
+
+test('the OctoPrint routes are the shop network\'s only: 421 for a Host that is not this computer', async () => {
+  const key = await octoKey();
+  const v = await rawRequest('GET', '/api/version', { 'x-api-key': key, host: 'evil.example.com' }, (req) => req.end());
+  assert.equal(v.status, 421);
+  const m = multipart('x.gcode', Buffer.from('G28\n'));
+  const u = await rawRequest('POST', '/api/files/local', { 'x-api-key': key, host: 'evil.example.com', 'content-type': `multipart/form-data; boundary=${m.boundary}`, 'content-length': String(m.body.length) }, (req) => req.end(m.body));
+  assert.equal(u.status, 421);
+});
+
+test('a spool that cannot be made (full or read-only disk) is answered 500 and frees the slot, every time', async () => {
+  const key = await octoKey();
+  const real = slicerInbox.spoolPath;
+  slicerInbox.spoolPath = () => { throw Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' }); };
+  try {
+    for (let i = 0; i < 3; i++) {
+      const r = await octo(key, multipart(`full-${i}-${crypto.randomBytes(3).toString('hex')}.gcode`, crypto.randomBytes(256)));
+      assert.equal(r.status, 500, r.text);
+    }
+  } finally { slicerInbox.spoolPath = real; }
+  const ok = await octo(key, multipart(`after-full-${crypto.randomBytes(3).toString('hex')}.gcode`, crypto.randomBytes(256)));
+  assert.equal(ok.status, 201, 'no slot leaked: ' + ok.text);
+});
+
+test('inbox names Windows and ext4 can hold', () => {
+  assert.equal(Inbox.safeName('Bracket "v2"?.gcode'), 'Bracket _v2__.gcode');
+  assert.equal(Inbox.safeName('a<b>c|d*e.gcode'), 'a_b_c_d_e.gcode');
+  assert.equal(Inbox.safeName('plate. . '), 'plate');
+  assert.equal(Inbox.safeName('CON.gcode'), '_CON.gcode');
+  assert.equal(Inbox.safeName('nul'), '_nul');
+  assert.equal(Inbox.safeName('lpt1.g'), '_lpt1.g');
+  assert.equal(Inbox.safeName('console.gcode'), 'console.gcode', 'only the device names themselves');
+  const ar = 'قطعة'.repeat(60) + '.gcode';
+  const out = Inbox.safeName(ar);
+  assert.ok(Buffer.byteLength(out, 'utf8') <= 200, String(Buffer.byteLength(out)));
+  assert.ok(out.endsWith('.gcode'));
+  assert.ok(!out.includes('�'), 'no character split');
+  assert.ok(Inbox.safeName('x'.repeat(300) + '.gcode.3mf').endsWith('.gcode.3mf'));
+});
+
+test('mDNS advertises private LAN addresses on real interfaces only', () => {
+  const Adv = require('../lib/main/lan-advertise.js');
+  if (typeof Adv.lanIPv4 !== 'function') return;
+  const got = Adv.lanIPv4({
+    en0: [{ family: 'IPv4', address: '192.168.1.20', internal: false }],
+    docker0: [{ family: 'IPv4', address: '172.17.0.1', internal: false }],
+    tailscale0: [{ family: 'IPv4', address: '100.101.1.2', internal: false }],
+    eth1: [{ family: 'IPv4', address: '100.64.3.4', internal: false }, { family: 'IPv4', address: '8.8.4.4', internal: false }, { family: 'IPv4', address: '10.0.0.5', internal: false }],
+    lo: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+  });
+  assert.deepEqual(got, ['192.168.1.20', '10.0.0.5']);
+});
+
+// Last: it uses up this visitor's hour.
+test('OctoPrint uploads: at most 30 an hour from one visitor, then 429 with Retry-After', async () => {
+  const key = await octoKey();
+  let refused = null;
+  for (let i = 0; i < 40 && !refused; i++) {
+    const r = await octo(key, multipart(`n${i}-${crypto.randomBytes(3).toString('hex')}.gcode`, crypto.randomBytes(64)));
+    if (r.status === 429) refused = r;
+    else assert.ok([201, 409].includes(r.status), r.text);
+  }
+  assert.ok(refused, 'refused within 40');
+  assert.ok(Number(refused.headers.get('retry-after')) > 0);
 });
