@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Windows/Linux (not on screen yet): how each print ended is written on its job, as on the Mac.** When a print ends on a job the book names, its run records finished, failed or cancelled, from the printer's own word: once, never over the shop's own mark, and a Bambu print the shop cancelled counts as cancelled, not as a failure. The same rule as the Mac (`lib/run-result.js`, #2624), so each printer's success rate has something to count.
+
 - **Shared rules (printer batch 3, not yet on screen): how each print ended, each printer's success rate, and "waiting at the machine" that survives a restart.**
   - **One result per print.** A printer's finished job now records how it ended (finished, cancelled or failed) when its last word says so (`lib/printer-poll-cache.js`). A Bambu print the shop cancelled ends on "FAILED" too; the cancel code it gives makes it a cancel, so it is not held against the printer. `lib/run-result.js` puts one result on each print run, once. The shop's own mark (a failed check, a scrapped print) beats the printer's "complete", which is kept beside it.
   - **Success rate per printer.** `lib/printer-success.js` counts finished against failed runs per printer, worst first. Cancelled runs are shown but not counted against the printer, and a printer with fewer than five decided runs is flagged as too few to judge.

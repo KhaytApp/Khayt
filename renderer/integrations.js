@@ -1826,6 +1826,47 @@ async function captureFinishPhotos(currCache) {
     } catch (e) { console.warn('finish photo failed:', e && e.message); }
   }
 }
+/* ── How each print ended, on its run (gap 6; the Mac's RunResults, #2624) ─
+ * The edge out of a job is print-finish-photo's `track` (its own memo here, so
+ * the photo and the meter keep theirs); the job is its `jobFor`, the Mac's
+ * printFinishJob. How it ended asks the shared rule first with the printer's
+ * last state and fault (printer-poll-cache `endedAs`: a Bambu print the shop
+ * cancelled is `cancelled`, not a failure), and its word wins only when it
+ * turns a failure into a cancel or agrees, exactly as the Mac's runResult;
+ * otherwise the edge's own outcome stands if it is one of the three, and
+ * "unknown" records nothing. lib/run-result.js `withResult` writes it ONCE on
+ * the run it belongs to, source 'printer': a re-poll, a restart or the Mac
+ * finding the same end change nothing, and the shop's own mark is never
+ * replaced. No UI: the success rate (#2613) reads it. */
+let _runEndMemo = {};
+function runResultFor(outcome, st) {
+  const RESULTS = ['finished', 'failed', 'cancelled'];
+  const PC = globalThis.KhaytPollCache;
+  const said = PC && typeof PC.endedAs === 'function' ? PC.endedAs(st && st.state, st && st.fault) : null;
+  if (said && (said === 'cancelled' || said === outcome)) return said;
+  return RESULTS.includes(outcome) ? outcome : null;
+}
+function recordRunResults(currCache) {
+  const FP = globalThis.KhaytPrintFinishPhoto, RR = globalThis.KhaytRunResult;
+  if (!FP || !RR) return;
+  let wrote = false;
+  for (const mid of Object.keys(currCache || {})) {
+    const st = currCache[mid];
+    if (!st || st.error) continue;          // a missed poll is not an edge
+    const r = FP.track(_runEndMemo, mid, st);
+    _runEndMemo = r.memo;
+    if (!r.outcome) continue;
+    const result = runResultFor(r.outcome, st);
+    if (!result) continue;
+    const jobId = FP.jobFor(printLog, mid, r.filename);
+    const job = jobId && printLog.find((o) => o && o.id === jobId);
+    if (!job) continue;
+    const runs = RR.withResult(job, { machineId: mid, at: Date.now(), result, source: 'printer' });
+    if (runs) { job.printRuns = runs; wrote = true; }
+  }
+  if (wrote && typeof saveAll === 'function') saveAll();
+}
+
 /* ── What each print drew from the wall, from its smart plug ──────────
  * lib/print-energy.js owns the rules (the trapezoid between readings, the gap
  * never bridged, the plug shared by two printers never metered) and names the
@@ -1922,6 +1963,7 @@ function dispatchPrinterAlerts(currCache) {
   try { notifyPrintTransitions(currCache); } catch (e) { /* non-fatal */ }
   captureFinishPhotos(currCache).catch(() => {});
   meterPrintEnergy(currCache).catch(() => {});
+  try { recordRunResults(currCache); } catch (e) { /* never break the alerts */ }
 
   const compute = (typeof computePrinterAlerts === 'function')
     ? computePrinterAlerts
