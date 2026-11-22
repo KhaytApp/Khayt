@@ -26,10 +26,14 @@ extension Shop {
     func openPairing() {
         guard permitted("settings", "edit") else { return }
         lanPairing.open()
+        // The code path shares the window the person opened; it stays shut
+        // unless this Mac has pairing by code on (`phoneCodeEnabled`).
+        lanPhonePairing.open()
     }
 
     func closePairing() {
         lanPairing.close()
+        lanPhonePairing.close()
     }
 
     func signOutPhone(_ id: String) {

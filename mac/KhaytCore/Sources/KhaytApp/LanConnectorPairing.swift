@@ -126,10 +126,31 @@ final class LanConnectorPairing {
     /// suite running beside others never has to write the shared static.
     @ObservationIgnored let enabledHere: Bool?
 
-    init(clock: @escaping () -> TimeInterval = LanPairingWindow.monotonic, enabled: Bool? = nil) {
+    /// Which kind of device this window pairs. The hashes are the same; the
+    /// PREFIXES differ, so a commitment, a signed offer or a check number made
+    /// for one kind can never stand for the other (phone pairing design, 1).
+    struct Flavor: Equatable, Sendable {
+        let commit: String
+        let check: String
+        let offer: String
+        static let connector = Flavor(commit: "khayt-connector-commit-v2", check: "khayt-connector-check-v2",
+                                      offer: "khayt-enrol-commit-v2")
+        static let phone = Flavor(commit: "khayt-phone-commit-v1", check: "khayt-phone-check-v1",
+                                  offer: "khayt-enrol-phone-v1")
+    }
+    @ObservationIgnored let flavor: Flavor
+
+    init(clock: @escaping () -> TimeInterval = LanPairingWindow.monotonic, enabled: Bool? = nil,
+         flavor: Flavor = .connector) {
         self.clock = clock
         self.enabledHere = enabled
+        self.flavor = flavor
     }
+
+    /// Pairing a phone by code is OFF until the phone ships it: no route
+    /// answers, so nothing can be offered. On for a developer with
+    /// `defaults write <bundle id> phonePairingByCode -bool YES`.
+    nonisolated static var phoneCodeEnabled: Bool { UserDefaults.standard.bool(forKey: "phonePairingByCode") }
 
     /// Pairing a slicer is OFF in beta.38 (Dev Hub, Nov 16): the protocol gets
     /// a commit-then-reveal before any plugin is public, and until then no
@@ -147,7 +168,7 @@ final class LanConnectorPairing {
     nonisolated static var pricesOn: Bool { UserDefaults.standard.bool(forKey: pricesKey) }
 
     func open() {
-        guard enabledHere ?? Self.enabled else { return }
+        guard enabledHere ?? (flavor == .phone ? Self.phoneCodeEnabled : Self.enabled) else { return }
         deadline = clock() + Self.length
         pending = nil
         outcomes = [:]
@@ -201,7 +222,7 @@ final class LanConnectorPairing {
         let serverPublic = serverKey.publicKey.rawRepresentation.base64EncodedString()
         let identityPublic = identity.publicKey.rawRepresentation.base64EncodedString()
         guard let sig = try? identity.signature(for: Self.offerMessage(
-            deviceId: deviceId, serverPublic: serverPublic, commitment: commitment)) else { throw .badCommit }
+            deviceId: deviceId, serverPublic: serverPublic, commitment: commitment, flavor: flavor)) else { throw .badCommit }
         offersLeft -= 1
         pending = Request(pairId: pairId, pollHash: Self.hash(pollSecret), deviceId: deviceId,
                           serverKey: serverKey, serverPublic: serverPublic, identityPublic: identityPublic,
@@ -225,7 +246,7 @@ final class LanConnectorPairing {
               let theirs = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw),
               LanDevices.derive(request.serverKey, theirs, deviceId: request.deviceId) != nil,
               let n = Data(base64Encoded: nonce), n.count >= Self.minNonce,
-              LanDevices.constantTimeEqual(request.commitment, Self.commitment(pluginPublic: publicKey, nonce: nonce))
+              LanDevices.constantTimeEqual(request.commitment, Self.commitment(pluginPublic: publicKey, nonce: nonce, flavor: flavor))
         else {
             answer(request, .expired)
             return .refused
@@ -233,7 +254,7 @@ final class LanConnectorPairing {
         var revealed = request
         revealed.pluginPublic = publicKey
         revealed.check = Self.check(deviceId: request.deviceId, identityPublic: request.identityPublic,
-                                    serverPublic: request.serverPublic, pluginPublic: publicKey, nonce: nonce)
+                                    serverPublic: request.serverPublic, pluginPublic: publicKey, nonce: nonce, flavor: flavor)
         pending = revealed
         return .accepted
     }
@@ -296,22 +317,23 @@ final class LanConnectorPairing {
     // computes the same.
 
     /// What the plugin commits to before it sees anything of the Mac's.
-    nonisolated static func commitment(pluginPublic: String, nonce: String) -> Data {
-        let text = ["khayt-connector-commit-v2", pluginPublic, nonce].joined(separator: "\n")
+    nonisolated static func commitment(pluginPublic: String, nonce: String, flavor: Flavor = .connector) -> Data {
+        let text = [flavor.commit, pluginPublic, nonce].joined(separator: "\n")
         return Data(SHA256.hash(data: Data(text.utf8)))
     }
 
     /// What the Mac's identity signs in its offer: its fresh key, bound to the
     /// device id and to the commitment it answers.
-    nonisolated static func offerMessage(deviceId: String, serverPublic: String, commitment: String) -> Data {
-        Data("khayt-enrol-commit-v2:\(deviceId):\(serverPublic):\(commitment)".utf8)
+    nonisolated static func offerMessage(deviceId: String, serverPublic: String, commitment: String,
+                                         flavor: Flavor = .connector) -> Data {
+        Data("\(flavor.offer):\(deviceId):\(serverPublic):\(commitment)".utf8)
     }
 
     /// The first four bytes, big-endian, of the SHA-256 the check number is
     /// cut from. Tests use it with a small modulus to measure grinding.
     nonisolated static func checkValue(deviceId: String, identityPublic: String, serverPublic: String,
-                                       pluginPublic: String, nonce: String) -> UInt32 {
-        let text = ["khayt-connector-check-v2", deviceId, identityPublic, serverPublic, pluginPublic, nonce]
+                                       pluginPublic: String, nonce: String, flavor: Flavor = .connector) -> UInt32 {
+        let text = [flavor.check, deviceId, identityPublic, serverPublic, pluginPublic, nonce]
             .joined(separator: "\n")
         let digest = Array(SHA256.hash(data: Data(text.utf8)))
         return (UInt32(digest[0]) << 24) | (UInt32(digest[1]) << 16) | (UInt32(digest[2]) << 8) | UInt32(digest[3])
@@ -319,9 +341,9 @@ final class LanConnectorPairing {
 
     /// The 6-digit number both screens show: `checkValue` modulo 10^6, zero-padded.
     nonisolated static func check(deviceId: String, identityPublic: String, serverPublic: String,
-                                  pluginPublic: String, nonce: String) -> String {
+                                  pluginPublic: String, nonce: String, flavor: Flavor = .connector) -> String {
         let six = String(checkValue(deviceId: deviceId, identityPublic: identityPublic, serverPublic: serverPublic,
-                                    pluginPublic: pluginPublic, nonce: nonce) % 1_000_000)
+                                    pluginPublic: pluginPublic, nonce: nonce, flavor: flavor) % 1_000_000)
         return String(repeating: "0", count: 6 - six.count) + six
     }
 

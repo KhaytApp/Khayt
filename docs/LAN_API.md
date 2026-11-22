@@ -1048,6 +1048,40 @@ Machine list glance. **Requires owner PIN.**
 ]
 ```
 
+### A paired phone's role (native Mac, Nov 2026, draft)
+
+> **Native Mac only for now.** `lib/lan-server.js` follows in the desktop lane. The rule is shared: `lib/device-roles.js`.
+
+A phone paired with this Mac carries a **role**: owner, manager, operator or viewer. The role is a set of scopes, and the Mac checks it on **every request the phone signs**. The phone's screens follow its role as a convenience; the server's answer is the check.
+
+- A request the role does not cover is answered **403** `{"reason":"role-scope","required":"<scope>"}`, the shape an API token gets for a scope it lacks. `required` is `owner` for a route the table does not name.
+- The check uses the path the server routes on. A segment that decodes to a slash, a dot segment or a control character is owner-only.
+- A phone paired with the owner PIN before roles existed has no role and is the **owner**, as it was.
+- A role holds whether the staff lock is on or off.
+- The owner PIN and API tokens are unchanged.
+
+| Role | Scopes |
+|---|---|
+| viewer | `queue:read`, `machines:read`, `orders:read`, `inventory:read` |
+| operator | viewer + `orders:write`, `inventory:write`, `waste:write`, `machines:control` |
+| manager | operator + `clients:read`, `clients:write`, `expense:write`, `quote:write`, `book:read` |
+| owner | everything, including `book:write` and every route not listed |
+
+#### `GET /api/devices/self`
+
+Signed by a paired device. Answers what that device is: `{"deviceId":"dev_…","role":"operator","scopes":["queue:read", …]}`. A request with the owner PIN and no device signature is 403 `device-auth`. A role change takes effect on the next request; nothing is re-keyed.
+
+#### `POST /api/devices/pair` (pairing by code; **off** until the phone ships it)
+
+The slicer plugin's commit-then-reveal flow (`POST /api/connectors/pair`) with the phone's own prefixes: `khayt-phone-commit-v1` (the commitment), `khayt-enrol-phone-v1` (what the Mac's identity signs in its offer) and `khayt-phone-check-v1` (the 6-digit check number). A commitment, an offer or a number made for one kind can never stand for the other. No PIN is sent.
+
+- `POST /api/devices/pair` with `{v:2, commit, name, app, version}` → `{pairId, pollSecret, deviceId, publicKey, sig, identity}`. Only while a person has opened **Pair a phone** (120 s, 3 offers). 404 while the Mac has pairing by code off.
+- `POST /api/devices/pair/<pairId>/reveal` with `{publicKey, nonce}` and `x-khayt-poll` → `{"state":"waiting"}`. A mismatch expires the offer; no number is ever shown for it.
+- `GET /api/devices/pair/<pairId>` with `x-khayt-poll` → `{"state":"waiting"|"approved"|"denied"|"expired"}`.
+- A person at the Mac compares the number, picks a role (Operator by default; only the owner may give Owner, a manager up to Manager) and approves. The device is enrolled with that role.
+
+**Signing out.** A phone paired by code holds no tag of the PIN: a PIN change does not sign it out. **Remove** does (`device-revoked`). A phone paired with the owner PIN is still signed out by a PIN change.
+
 ### `GET /api/machines/live`
 
 > **Served by both apps.** `lib/lan-server.js` and the native Mac's

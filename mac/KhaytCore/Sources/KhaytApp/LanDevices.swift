@@ -46,7 +46,27 @@ final class LanDevices: @unchecked Sendable {
         /// nil (none, the default), `price`, or `cost` (price, cost and
         /// margin). Only asked when the shop has turned prices on.
         var priceGrant: String? = nil
+        /// A PHONE's role on the ladder (`lib/device-roles.js`): what its key
+        /// opens. Kept as the text that was stored, never an enum: a role
+        /// this build does not know must reach the shared rule as it is, which
+        /// reads it as a viewer, not be dropped here and read as "no role".
+        var role: String? = nil
+        /// 1 once a role was ever written for this device. A phone with no
+        /// `role` AND no `rolesVersion` enrolled with the owner PIN before
+        /// roles existed, and is the owner, as it was (D-P1). A code-paired
+        /// phone always carries 1, so one that lost its role is a viewer.
+        var rolesVersion: Int? = nil
+
+        /// Paired by a code approved on this Mac, not by the PIN: it holds
+        /// no tag of any PIN, and a PIN change does not sign it out (D-P7).
+        /// Both must hold: an empty tag alone (a damaged record) is not a
+        /// code pairing, so such a device fails the PIN check and is removed
+        /// rather than surviving as a pre-roles owner.
+        var codePaired: Bool { pinTag.isEmpty && rolesVersion != nil }
     }
+
+    /// The version `rolesVersion` is written as.
+    static let rolesVersion = 1
 
     /// The grants a connector may hold, in order of what they show.
     static let priceGrants = ["price", "cost"]
@@ -207,13 +227,19 @@ final class LanDevices: @unchecked Sendable {
         let createdAt: Date
         let lastSeenAt: Date
         var kind: String? = nil
+        /// As stored: see `Device.role` and `Device.rolesVersion`. The role a
+        /// phone HOLDS is the shared rule's reading of these (`roleOf`).
+        var role: String? = nil
+        var rolesVersion: Int? = nil
+        var codePaired: Bool = false
     }
 
     /// Every paired phone, the one seen most recently first.
     func list() -> [Listed] {
         lock.lock(); defer { lock.unlock() }
         return saved.devices
-            .map { Listed(id: $0.id, name: $0.name, createdAt: $0.createdAt, lastSeenAt: $0.lastSeenAt, kind: $0.kind) }
+            .map { Listed(id: $0.id, name: $0.name, createdAt: $0.createdAt, lastSeenAt: $0.lastSeenAt, kind: $0.kind,
+                           role: $0.role, rolesVersion: $0.rolesVersion, codePaired: $0.codePaired) }
             .sorted { $0.lastSeenAt > $1.lastSeenAt }
     }
 
@@ -252,6 +278,35 @@ final class LanDevices: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         guard let d = saved.devices.first(where: { $0.id == id }), d.kind == Self.kindConnector else { return nil }
         return (d.key, d.name)
+    }
+
+    /// What the shared rule is asked about a device (`lib/device-roles.js`
+    /// `roleOf`, `allowsDevice`): its kind, role and rolesVersion exactly as
+    /// stored, and nothing else. Nil for an id nobody enrolled.
+    func rulesRecord(_ id: String) -> [String: String]? {
+        lock.lock(); defer { lock.unlock() }
+        guard let d = saved.devices.first(where: { $0.id == id }) else { return nil }
+        var out: [String: String] = [:]
+        if let kind = d.kind { out["kind"] = kind }
+        if let role = d.role { out["role"] = role }
+        if let v = d.rolesVersion { out["rolesVersion"] = String(v) }
+        return out
+    }
+
+    /// Give a PHONE a role. The caller has asked the shared rule whether the
+    /// person may grant it (`grantable`); this only stores it, with
+    /// `rolesVersion`, so the phone is never again read as a pre-roles owner.
+    /// A connector, or an id nobody enrolled, is left alone. Takes effect on
+    /// the phone's next request: nothing is re-keyed.
+    @discardableResult
+    func setRole(_ id: String, _ role: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let i = saved.devices.firstIndex(where: { $0.id == id }), saved.devices[i].kind == nil,
+              !role.isEmpty, role.count <= 32 else { return false }
+        saved.devices[i].role = role
+        saved.devices[i].rolesVersion = Self.rolesVersion
+        save()
+        return true
     }
 
     /// A connector's price grant: nil (none), `price` or `cost`.
@@ -315,13 +370,28 @@ final class LanDevices: @unchecked Sendable {
         insert(id: deviceId, name: name, key: key, pin: pin, now: now, kind: Self.kindConnector)
     }
 
-    private func insert(id deviceId: String, name: String, key: Data, pin: String, now: Date, kind: String?) {
+    /// Enrol a phone a person approved by its check number
+    /// (`LanConnectorPairing`, kind phone), with the role they chose. No PIN
+    /// was shown, so it carries no PIN tag: a PIN change does not sign it out,
+    /// Remove does (D-P7). `role` is stored with `rolesVersion`.
+    func admitPhone(phonePublic: String, serverKey: Curve25519.KeyAgreement.PrivateKey,
+                    deviceId: String, name: String, role: String, pin: String, now: Date) throws {
+        guard let raw = Data(base64Encoded: phonePublic), raw.count == 32,
+              let theirs = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw),
+              let key = Self.derive(serverKey, theirs, deviceId: deviceId),
+              !role.isEmpty, role.count <= 32 else { throw EnrolError.badKey }
+        insert(id: deviceId, name: name, key: key, pin: pin, now: now, kind: nil, role: role, codePaired: true)
+    }
+
+    private func insert(id deviceId: String, name: String, key: Data, pin: String, now: Date, kind: String?,
+                        role: String? = nil, codePaired: Bool = false) {
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxName))
 
         lock.lock(); defer { lock.unlock() }
         let current = tag(pin)
         // Anything enrolled under another PIN is gone now, not when next seen.
-        saved.devices.removeAll { $0.pinTag != current || $0.id == deviceId }
+        // A code-paired phone holds no PIN tag and stays (D-P7).
+        saved.devices.removeAll { (!$0.codePaired && $0.pinTag != current) || $0.id == deviceId }
         // A full store makes room within the SAME kind: a connector never
         // pushes out a phone (the shop would find it unpaired with no reason
         // shown), and a phone never pushes out a connector. Mac review, Nov 15.
@@ -332,8 +402,9 @@ final class LanDevices: @unchecked Sendable {
             seen.removeValue(forKey: saved.devices[oldest].id)
             saved.devices.remove(at: oldest)
         }
-        saved.devices.append(Device(id: deviceId, name: trimmed, key: key, pinTag: current,
-                                    createdAt: now, lastSeenAt: now, kind: kind))
+        saved.devices.append(Device(id: deviceId, name: trimmed, key: key, pinTag: codePaired ? Data() : current,
+                                    createdAt: now, lastSeenAt: now, kind: kind,
+                                    role: role, rolesVersion: role == nil ? nil : Self.rolesVersion))
         save()
     }
 
@@ -409,7 +480,9 @@ final class LanDevices: @unchecked Sendable {
         guard let at = saved.devices.firstIndex(where: { $0.id == id }) else {
             return .refused(saved.revoked?[id] != nil ? "device-revoked" : "device-unknown", now: nil)
         }
-        guard saved.devices[at].pinTag == tag(pin) else {
+        // A code-paired phone was never bound to a PIN (D-P7): only a phone or
+        // connector that enrolled under one is signed out when it changes.
+        guard saved.devices[at].codePaired || saved.devices[at].pinTag == tag(pin) else {
             saved.devices.remove(at: at)
             seen.removeValue(forKey: id)
             save()

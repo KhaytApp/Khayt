@@ -98,6 +98,9 @@ final class LanServer {
         /// The window the owner opens for a slicer plugin
         /// (`LanConnectorPairing`). Nil: never opened, `pairing-closed`.
         var connectorPairing: LanConnectorPairing? = nil
+        /// The window a PHONE may ask to pair by code in (the same state
+        /// machine, the phone's prefixes). Nil: the route is a 404.
+        var phonePairing: LanConnectorPairing? = nil
         /// "Show prices in OrcaSlicer" (Connected apps ▸ Slicers), off by
         /// default. Off, every connector is answered `{"prices":"off"}`
         /// whatever its grant. A test that never sets it has prices off.
@@ -1128,6 +1131,9 @@ final class LanServer {
         if let refused = connectorRefusal(request.headers, path: path) { return refused }
         // A paired slicer plugin's own routes (`LanServer+Connector`), exact
         // paths, 404 while "Pair a slicer" is off. The pairing routes below.
+        // A phone pairing by code, and what a paired device is (`roleRefusal`).
+        if let answered = await phonePairRoute(request, path: path) { return answered }
+        if path == "/api/devices/self", isGet { return await deviceSelf(request) }
         if let answered = await connectorRoute(request, path: path) { return answered }
         if let answered = await restRoute(request, path: path, isGet: isGet) { return answered }
 
@@ -2621,6 +2627,129 @@ final class LanServer {
         return .json(403, #"{"ok":false,"reason":"connector-scope"}"#)
     }
 
+    // ── A PHONE'S ROLE, CHECKED ON EVERY REQUEST IT SIGNS (C9) ───────────
+    //
+    // A paired phone carries a role (owner, manager, operator, viewer), and
+    // the role is a set of scopes (`lib/device-roles.js`). The computer
+    // enforces it, not the phone: a request whose signature passed is asked
+    // of the shared rule with the path THE ROUTER ROUTES ON (`request.path`,
+    // percent-decoded once here; the rule decodes each segment again and
+    // refuses anything that then holds a slash, a dot segment or a control
+    // character). A route the rule does not name is the owner's.
+    //
+    // This runs in `pinGate`, the one place a device's signature is accepted
+    // for the book's routes, so no route can accept a phone's key without it.
+    // The owner PIN and API tokens are unchanged. Roles hold with the staff
+    // lock off (D-P5): a role is a grant to that device.
+    //
+    // 403 `{"reason":"role-scope","required":…}`, the shape an API token gets
+    // for a scope it lacks. A rule that cannot be asked refuses: closed.
+    func roleRefusal(_ request: Request) async -> Response? {
+        guard let id = request.headers["x-khayt-device"], let stored = host.devices.rulesRecord(id) else {
+            return .json(401, #"{"reason":"device-unknown"}"#)
+        }
+        let device = KhaytEngine.deviceRecord(kind: stored["kind"], role: stored["role"],
+                                              rolesVersion: stored["rolesVersion"].flatMap(Int.init))
+        guard let answer = try? await host.engine.deviceAllows(device, path: request.path, method: request.method) else {
+            return .json(403, #"{"reason":"role-scope","required":"owner"}"#)
+        }
+        if answer.ok { return nil }
+        let body = (try? JSONEncoder().encode(["reason": "role-scope", "required": answer.required ?? "owner"])) ?? Data()
+        return .json(403, String(decoding: body, as: UTF8.self))
+    }
+
+    /// `GET /api/devices/self`: what the device that signed this request is:
+    /// its id, its role as the rule reads it, and the scopes that role holds.
+    /// The phone draws its screens from this; the 403 above is the check.
+    func deviceSelf(_ request: Request) async -> Response {
+        if let refused = await pinGate(request) { return refused }
+        guard LanDevices.isSigned(request.headers), let id = request.headers["x-khayt-device"],
+              let stored = host.devices.rulesRecord(id) else {
+            return .json(403, #"{"reason":"device-auth"}"#)
+        }
+        let device = KhaytEngine.deviceRecord(kind: stored["kind"], role: stored["role"],
+                                              rolesVersion: stored["rolesVersion"].flatMap(Int.init))
+        guard let role = try? await host.engine.deviceRole(device),
+              let scopes = try? await host.engine.deviceScopes(role: role) else {
+            return .json(500, #"{"reason":"role"}"#)
+        }
+        let answer: JSONValue = .object(["deviceId": .string(id), "role": .string(role),
+                                         "scopes": .array(scopes.map(JSONValue.string))])
+        return .json(200, Self.jsonText(answer))
+    }
+
+    // ── A PHONE ASKS TO PAIR BY CODE (C1) ─────────────────────────────────
+    //
+    // The slicer plugin's reviewed flow (commit, reveal, a check number on
+    // both screens, Approve on the Mac) with the phone's own prefixes, so an
+    // offer made to one kind can never be replayed as the other. No PIN is
+    // sent. Dark until the phone ships: 404 unless the Mac has it switched on
+    // (`LanConnectorPairing.phoneCodeEnabled`), and then only while the owner
+    // has opened Pair a phone. Exact paths, never a prefix match.
+    static let phonePairPath = "/api/devices/pair"
+
+    func phonePairRoute(_ request: Request, path: String) async -> Response? {
+        guard path == Self.phonePairPath || path.hasPrefix(Self.phonePairPath + "/") else { return nil }
+        guard let window = host.phonePairing, window.enabledHere ?? LanConnectorPairing.phoneCodeEnabled else {
+            return .json(404, #"{"error":"not_found"}"#)
+        }
+        guard Self.hostIsLocal(request.headers["host"]) else { return .json(421, #"{"error":"host-not-local"}"#) }
+        let isGet = request.method == "GET"
+        let rest = String(path.dropFirst(Self.phonePairPath.count))
+        if rest.isEmpty {
+            guard request.method == "POST" else { return .json(405, #"{"error":"method"}"#) }
+            guard window.isOpen() else { return .json(403, LanConnectorPairing.closedBody) }
+            guard case .object(let asked)? = try? JSONDecoder().decode(JSONValue.self, from: request.body),
+                  case .number(let v)? = asked["v"], v == 2, case .string(let commit)? = asked["commit"] else {
+                return .json(400, #"{"error":"commit"}"#)
+            }
+            guard let identity = host.identity() else { return .json(503, #"{"error":"no_identity"}"#) }
+            func text(_ key: String) -> String {
+                if case .string(let given)? = asked[key] { return given }
+                return ""
+            }
+            do throws(LanConnectorPairing.Refusal) {
+                let offer = try window.request(commitment: commit, name: text("name"), app: text("app"),
+                                               version: text("version"), address: request.remote, identity: identity)
+                let body: JSONValue = .object([
+                    "pairId": .string(offer.pairId), "pollSecret": .string(offer.pollSecret),
+                    "deviceId": .string(offer.deviceId), "publicKey": .string(offer.publicKey),
+                    "sig": .string(offer.sig), "identity": .string(offer.identity)])
+                return .json(200, Self.jsonText(body))
+            } catch .closed {
+                return .json(403, LanConnectorPairing.closedBody)
+            } catch .busy {
+                return .json(409, LanConnectorPairing.busyBody)
+            } catch {
+                return .json(400, #"{"error":"commit"}"#)
+            }
+        }
+        // `/api/devices/pair/<pairId>` and `/api/devices/pair/<pairId>/reveal`.
+        let parts = rest.dropFirst().split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard let pairId = parts.first, LanConnectorPairing.plausiblePairId(pairId) else {
+            return .json(404, #"{"state":"unknown"}"#)
+        }
+        let secret = request.headers["x-khayt-poll"] ?? ""
+        if parts.count == 1, isGet {
+            guard let outcome = window.poll(pairId: pairId, secret: secret) else { return .json(404, #"{"state":"unknown"}"#) }
+            return .json(200, #"{"state":"\#(outcome.rawValue)"}"#)
+        }
+        if parts.count == 2, parts[1] == "reveal", request.method == "POST" {
+            var publicKey = "", nonce = ""
+            if case .object(let shown)? = try? JSONDecoder().decode(JSONValue.self, from: request.body) {
+                if case .string(let k)? = shown["publicKey"] { publicKey = k }
+                if case .string(let n)? = shown["nonce"] { nonce = n }
+            }
+            switch window.reveal(pairId: pairId, secret: secret, publicKey: publicKey, nonce: nonce) {
+            case .accepted: return .json(200, #"{"state":"waiting"}"#)
+            case .unknown: return .json(404, #"{"state":"unknown"}"#)
+            case .already: return .json(409, #"{"reason":"already-revealed"}"#)
+            case .refused: return .json(403, #"{"state":"expired","reason":"bad-reveal"}"#)
+            }
+        }
+        return .json(404, #"{"state":"unknown"}"#)
+    }
+
     /// `route`'s own spelling of a path: no trailing slash, `/v1` as `/api`.
     nonisolated static func routePath(_ raw: String) -> String {
         var path = raw
@@ -2683,7 +2812,9 @@ final class LanServer {
                                               target: request.target.isEmpty ? request.path : request.target,
                                               body: request.body, pin: host.pin,
                                               now: host.now(), headOnly: headOnly)
-            return verdict == .pass ? nil : .json(401, LanDevices.body(verdict))
+            guard verdict == .pass else { return .json(401, LanDevices.body(verdict)) }
+            // The key is good: now what this PHONE's role opens (C9).
+            return await roleRefusal(request)
         }
         let provided = (formPin ?? Self.pinProvided(request)).trimmingCharacters(in: .whitespaces)
         // Under the counter lock: see `lockCounters`.
@@ -3146,6 +3277,7 @@ extension Shop {
         host.devices = lanDeviceStore
         host.pairing = lanPairing
         host.connectorPairing = lanConnectorPairing
+        host.phonePairing = lanPhonePairing
         // "Show prices in OrcaSlicer": this Mac's, beside "Pair a slicer".
         host.connectorPrices = { LanConnectorPairing.pricesOn }
         host.slicePriceContext = { [weak self] in self?.slicePriceContext ?? .object([:]) }

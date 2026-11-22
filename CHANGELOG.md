@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a paired phone carries a role, and the Mac enforces it on every request (draft, stacked on #2625; no new screens).** Phone pairing design, decided Nov 22.
+  - **The check.** A request a phone signs is asked of the shared rule (`lib/device-roles.js`) with the path the server routes on. A request the phone's role does not cover is answered 403 `role-scope` with the scope it lacked. A route the rule does not name is the owner's. The check sits in the one place a device's signature is accepted, so no route can take a phone's key without it.
+  - **Phones already paired are unchanged.** A phone paired with the owner PIN has no role and is the owner, as it was.
+  - **`GET /api/devices/self`** tells a paired device its role and scopes, so the phone can draw its screens by role.
+  - **Pairing by code, server side only, switched off.** `POST /api/devices/pair` is the slicer plugin's reviewed commit-then-reveal flow with the phone's own prefixes, so one kind's offer can never be replayed as the other. It answers 404 until the Mac has it on, and then only inside Pair a phone. Approving with a role exists as a function; its sheet waits for the Figma frames.
+  - **Who may give which role.** The owner any role, a manager up to manager, anyone else none. Changing a paired phone's role is the owner's alone. Roles hold with the staff lock off.
+  - **Signing out.** A phone paired by code is not signed out by a PIN change; Remove signs it out. A phone paired with the PIN is still signed out when the PIN changes.
+  - **Tests.** The shared vectors (39 cases, the role of 12 device records, the phone's 29 paths) through the Mac's engine; each role against the server; encoded paths; pairing by code end to end; a slicer's commitment refused as a phone; who may grant.
 - **Shared rule (not yet wired): what a paired phone may do, by the role the shop gives it.** `lib/device-roles.js` is the role-to-scope table decided for pairing a phone by code. A viewer reads the queue, printers, jobs and stock. An operator also updates jobs, stock and waste, and may pause, resume and stop printers. A manager also handles customers, expenses and pricing, and keeps a local copy of the book. Only the owner writes the book back. A phone paired before roles existed stays the owner. Any route the table does not name needs the owner, so a new route is closed until it is listed. The Mac's LAN server and the iPhone wire it later. Tests: `test/device-roles.test.js`, with vectors in `test/fixtures/device-roles-vectors.json` for the Mac and iPhone.
 
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
