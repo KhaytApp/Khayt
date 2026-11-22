@@ -204,6 +204,27 @@ struct MoveJobTests {
         #expect(!String(describing: entry).contains("Dana"))
     }
 
+    @Test("who is credited: the person signed in here; nobody with the lock off, before sign-in, or for a system write")
+    func whoIsCredited() async throws {
+        let shop = await OperatorLockTests.shop()
+        #expect(shop.lockInForce)
+        #expect(shop.actorHere == nil, "nobody is signed in yet")
+        #expect(await shop.signIn("OP-o", pin: "1111") == .ok)
+        let here = try #require(shop.actorHere)
+        #expect(here.id == "OP-o" && !here.name.isEmpty)
+        #expect(shop.actor(for: .person("orders", "edit"))?.id == "OP-o")
+        #expect(shop.actor(for: .system("a payment the provider confirmed")) == nil,
+                "a system write was credited to whoever was signed in")
+        // The lock off: there is no person this Mac can name, whatever the book says.
+        let open = await OperatorLockTests.shop(on: false, extra: ["activeOperatorId": .string("OP-o")])
+        #expect(open.actorHere == nil && open.actor(for: .person("orders", "edit")) == nil)
+        // The portal watch's move says it is nobody's.
+        let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let watch = try String(contentsOf: app.appending(path: "Shop+PortalWatch.swift"), encoding: .utf8)
+        #expect(watch.contains("moveJob(job.id, to: .pending, byPersonHere: false)"))
+    }
+
     @Test("no Mac source reads the book's activeOperatorId, and the log's writer cannot be handed the settings")
     func nobodyReadsIt() throws {
         let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

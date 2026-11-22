@@ -1675,7 +1675,9 @@ extension Shop {
                 guard let target = orders.first(where: { Self.recordId($0) == id }) else {
                     throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
                 }
-                let actor = await self.actorHere
+                // A `.system` write is not a person's (a payment the
+                // provider confirmed): nobody at this Mac is credited for it.
+                let actor = self.actor(for: gate)
                 let edit = try await change(target, engine, root)
                 Self.write(&root, "printLog", changed: [edit.order], before: orders, into: &undo)
                 // The shared rules ask for this and it is the app's to write. A

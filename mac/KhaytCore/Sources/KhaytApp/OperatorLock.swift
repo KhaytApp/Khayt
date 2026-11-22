@@ -105,6 +105,14 @@ extension Shop {
         return (who.id, who.name)
     }
 
+    /// Who to credit for a write made under `gate`: a person's action is the
+    /// person here; a `.system` write is nobody's, whoever happens to be
+    /// signed in while it runs.
+    func actor(for gate: LockGate) -> (id: String, name: String)? {
+        if case .system = gate { return nil }
+        return actorHere
+    }
+
     /// The sign-in screen stands in front of everything.
     var needsSignIn: Bool { lockInForce && signedIn == nil }
 

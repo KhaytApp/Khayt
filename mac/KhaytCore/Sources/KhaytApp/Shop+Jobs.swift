@@ -2252,7 +2252,10 @@ extension Shop {
 
     func moveJob(_ id: Order.ID, to stage: Stage,
                  holdReason: String? = nil, qcNotes: String? = nil, qcInspector: String? = nil,
-                 actuals: Actuals? = nil) async {
+                 actuals: Actuals? = nil,
+                 // False for a move nobody at this Mac made (the portal watch
+                 // acting on a customer's answer): the log credits nobody.
+                 byPersonHere: Bool = true) async {
         moveProblem = nil
         moveNotices = []
         guard permitted("orders", "edit") else { return }
@@ -2279,7 +2282,7 @@ extension Shop {
         // cannot answer: did the job step INTO a milestone the customer is
         // told about on WhatsApp (`lib/whatsapp-message.js wouldSend`).
         var wasOrder: JSONValue?
-        let actor = actorHere
+        let actor = byPersonHere ? actorHere : nil
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
