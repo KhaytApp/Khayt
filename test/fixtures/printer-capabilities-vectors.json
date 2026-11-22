@@ -1,0 +1,202 @@
+{
+ "about": "lib/printer-capabilities.js cardControls(machine, opts) and capability(machine, 'light', opts): what a printer card draws, per model on top of the protocol (C5). Synthetic machines; catalogId is lib/printer-catalog.js's.",
+ "cases": [
+  {
+   "why": "X1C: everything a Bambu sends, light included",
+   "machine": {
+    "catalogId": "bambu-x1c",
+    "printerApi": {
+     "type": "bambu"
+    }
+   },
+   "opts": null,
+   "want": [
+    "pause",
+    "resume",
+    "cancel",
+    "speed",
+    "light"
+   ],
+   "light": {
+    "state": "yes",
+    "reason": null
+   }
+  },
+  {
+   "why": "P1P without the camera-and-LED kit: no light",
+   "machine": {
+    "catalogId": "bambu-p1p",
+    "printerApi": {
+     "type": "bambu"
+    }
+   },
+   "opts": null,
+   "want": [
+    "pause",
+    "resume",
+    "cancel",
+    "speed"
+   ],
+   "light": {
+    "state": "addon",
+    "reason": "addon",
+    "addon": "bambu-p1-camera-led"
+   }
+  },
+  {
+   "why": "P1P with the kit recorded: light",
+   "machine": {
+    "catalogId": "bambu-p1p",
+    "printerApi": {
+     "type": "bambu"
+    },
+    "addons": [
+     "bambu-p1-camera-led"
+    ]
+   },
+   "opts": null,
+   "want": [
+    "pause",
+    "resume",
+    "cancel",
+    "speed",
+    "light"
+   ],
+   "light": {
+    "state": "yes",
+    "reason": null
+   }
+  },
+  {
+   "why": "A1: light not confirmed either way, so left to the protocol (shown)",
+   "machine": {
+    "catalogId": "bambu-a1",
+    "printerApi": {
+     "type": "bambu"
+    }
+   },
+   "opts": null,
+   "want": [
+    "pause",
+    "resume",
+    "cancel",
+    "speed",
+    "light"
+   ],
+   "light": {
+    "state": "unknown",
+    "reason": null
+   }
+  },
+  {
+   "why": "a Bambu from an app that cannot speak MQTT: nothing",
+   "machine": {
+    "catalogId": "bambu-x1c",
+    "printerApi": {
+     "type": "bambu"
+    }
+   },
+   "opts": {
+    "transports": []
+   },
+   "want": [],
+   "light": {
+    "state": "no",
+    "reason": "protocol"
+   }
+  },
+  {
+   "why": "Snapmaker U1: job verbs, the chamber light, exclude object",
+   "machine": {
+    "catalogId": "snapmaker-u1",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "opts": null,
+   "want": [
+    "pause",
+    "resume",
+    "cancel",
+    "chamber-light",
+    "exclude-object"
+   ],
+   "light": {
+    "state": "no",
+    "reason": "protocol"
+   }
+  },
+  {
+   "why": "a resin printer on Moonraker: no exclude object",
+   "machine": {
+    "catalogId": "elegoo-saturn4-ultra",
+    "printerApi": {
+     "type": "moonraker"
+    }
+   },
+   "opts": null,
+   "want": [
+    "pause",
+    "resume",
+    "cancel"
+   ],
+   "light": {
+    "state": "no",
+    "reason": "protocol"
+   }
+  },
+  {
+   "why": "PrusaLink MK4: the job verbs only",
+   "machine": {
+    "catalogId": "prusa-mk4",
+    "printerApi": {
+     "type": "prusalink"
+    }
+   },
+   "opts": null,
+   "want": [
+    "pause",
+    "resume",
+    "cancel"
+   ],
+   "light": {
+    "state": "no",
+    "reason": "protocol"
+   }
+  },
+  {
+   "why": "a model not in the table on OctoPrint: what the protocol sends",
+   "machine": {
+    "catalogId": "voron-24-350",
+    "printerApi": {
+     "type": "octoprint"
+    }
+   },
+   "opts": null,
+   "want": [
+    "pause",
+    "resume",
+    "cancel"
+   ],
+   "light": {
+    "state": "no",
+    "reason": "protocol"
+   }
+  },
+  {
+   "why": "no printer connection: nothing",
+   "machine": {
+    "catalogId": "bambu-x1c",
+    "printerApi": {
+     "type": "none"
+    }
+   },
+   "opts": null,
+   "want": [],
+   "light": {
+    "state": "no",
+    "reason": "protocol"
+   }
+  }
+ ]
+}
