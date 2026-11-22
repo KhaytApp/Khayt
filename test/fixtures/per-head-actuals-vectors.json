@@ -172,6 +172,36 @@
     }
    },
    "want": null
+  },
+  {
+   "why": "a job id that is not a short plain token writes nothing",
+   "job": {
+    "job_id": "A B/../x",
+    "status": "completed",
+    "filament_used": 10600,
+    "metadata": {
+     "filament_weight": [
+      30
+     ],
+     "filament_total": 10000
+    }
+   },
+   "want": null
+  },
+  {
+   "why": "a job id longer than 64 characters writes nothing",
+   "job": {
+    "job_id": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "status": "completed",
+    "filament_used": 10600,
+    "metadata": {
+     "filament_weight": [
+      30
+     ],
+     "filament_total": 10000
+    }
+   },
+   "want": null
   }
  ],
  "patch": [
@@ -222,263 +252,248 @@
    "want": null
   }
  ],
- "colour": [
+ "actualsJob": [
   {
-   "why": "a tag that was read names the head's colour and material",
-   "head": 0,
-   "at": {
-    "trays": [
-     {
-      "vendor": "Snapmaker",
-      "manufacturer": null,
-      "material": "PLA",
-      "sub": "Basic",
-      "colours": [
-       "#080A0D"
-      ],
-      "weightG": 500,
-      "diameterMm": 1.75,
-      "lengthM": 150,
-      "sku": 900001,
-      "official": true
-     },
-     null
-    ],
-    "loaded": [
-     {
-      "slot": 0,
-      "hex": "#FF0000",
-      "material": "PETG"
-     }
-    ]
-   },
-   "want": {
-    "hex": "#080A0D",
-    "material": "PLA Basic",
-    "colourFrom": "rfid"
-   }
+   "why": "printing on this machine and naming the file",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "Models/Cube.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "cube.gcode",
+   "want": "J1"
   },
   {
-   "why": "no tag on the head: what the machine is recorded as holding",
-   "head": 1,
-   "at": {
-    "trays": [
-     {
-      "vendor": "Snapmaker",
-      "manufacturer": null,
-      "material": "PLA",
-      "sub": "Basic",
-      "colours": [
-       "#080A0D"
-      ],
-      "weightG": 500,
-      "diameterMm": 1.75,
-      "lengthM": 150,
-      "sku": 900001,
-      "official": true
-     },
-     null
-    ],
-    "loaded": [
-     {
-      "slot": 0,
-      "hex": "#FF0000",
-      "material": "PETG"
-     },
-     {
-      "slot": 1,
-      "hex": "00aa11",
-      "material": " PLA Silk "
-     }
-    ]
-   },
-   "want": {
-    "hex": "#00AA11",
-    "material": "PLA Silk",
-    "colourFrom": "loaded"
-   }
-  },
-  {
-   "why": "neither says: nothing is guessed",
-   "head": 2,
-   "at": {
-    "trays": [
-     null,
-     null,
-     null
-    ],
-    "loaded": [
-     {
-      "slot": 0,
-      "hex": "#FF0000",
-      "material": "PETG"
-     }
-    ]
-   },
+   "why": "the only printing job, but it does not name the file: a calibration print is not this job's",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "cube.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "calibration.gcode",
    "want": null
   },
   {
-   "why": "a loaded row with no slot is its position in the list",
-   "head": 1,
-   "at": {
-    "loaded": [
-     {
-      "hex": "#111111",
-      "material": "PLA"
-     },
-     {
-      "hex": "#222222",
-      "material": "ABS"
-     }
-    ]
-   },
-   "want": {
-    "hex": "#222222",
-    "material": "ABS",
-    "colourFrom": "loaded"
-   }
-  },
-  {
-   "why": "a tag with no readable colour falls back to what is recorded as loaded",
-   "head": 0,
-   "at": {
-    "trays": [
-     {
-      "vendor": "Snapmaker",
-      "manufacturer": null,
-      "material": "PLA",
-      "sub": null,
-      "colours": [],
-      "weightG": 500,
-      "diameterMm": 1.75,
-      "lengthM": 150,
-      "sku": 900001,
-      "official": true
-     }
-    ],
-    "loaded": [
-     {
-      "slot": 0,
-      "hex": "#ABCDEF",
-      "material": "PLA"
-     }
-    ]
-   },
-   "want": {
-    "hex": "#ABCDEF",
-    "material": "PLA",
-    "colourFrom": "loaded"
-   }
-  },
-  {
-   "why": "a multi-colour tag gives its first colour",
-   "head": 0,
-   "at": {
-    "trays": [
-     {
-      "vendor": "Snapmaker",
-      "manufacturer": null,
-      "material": "PLA",
-      "sub": "Silk",
-      "colours": [
-       "#112233",
-       "#445566"
-      ],
-      "weightG": 500,
-      "diameterMm": 1.75,
-      "lengthM": 150,
-      "sku": 900001,
-      "official": true
-     }
-    ]
-   },
-   "want": {
-    "hex": "#112233",
-    "material": "PLA Silk",
-    "colourFrom": "rfid"
-   }
-  },
-  {
-   "why": "a loaded row whose colour is not one names nothing",
-   "head": 0,
-   "at": {
-    "loaded": [
-     {
-      "slot": 0,
-      "hex": "red",
-      "material": "PLA"
-     }
-    ]
-   },
+   "why": "a job already moved on is not taken, even naming the file",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "qc",
+     "parts": [
+      {
+       "fileRef": "cube.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "cube.gcode",
    "want": null
   },
   {
-   "why": "nothing known about the printer",
-   "head": 0,
-   "at": null,
+   "why": "another machine's job is not taken",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M2",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "cube.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "cube.gcode",
+   "want": null
+  },
+  {
+   "why": "two printing jobs naming the file: null, not a guess",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "cube.gcode"
+      }
+     ]
+    },
+    {
+     "id": "J2",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "cube.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "cube.gcode",
+   "want": null
+  },
+  {
+   "why": "no file name, no job",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "cube.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "",
    "want": null
   }
  ],
- "patchWithColour": {
-  "why": "the split carries what was in each head; a head nobody can name has no colour fields",
-  "order": {
-   "id": "J1"
-  },
-  "split": "000A2",
-  "at": {
-   "trays": [
+ "historyRun": [
+  {
+   "why": "the closest run in the window, not the first row",
+   "jobs": [
     {
-     "vendor": "Snapmaker",
-     "manufacturer": null,
-     "material": "PLA",
-     "sub": "Basic",
-     "colours": [
-      "#080A0D"
-     ],
-     "weightG": 500,
-     "diameterMm": 1.75,
-     "lengthM": 150,
-     "sku": 900001,
-     "official": true
-    },
-    null,
-    null,
-    null
-   ],
-   "loaded": [
-    {
-     "slot": 1,
-     "hex": "#FFFFFF",
-     "material": "PETG"
-    }
-   ]
-  },
-  "want": {
-   "actualHeads": [
-    {
-     "head": 0,
-     "grams": 18,
-     "estimateG": 20,
-     "hex": "#080A0D",
-     "material": "PLA Basic",
-     "colourFrom": "rfid"
+     "job_id": "A3",
+     "filename": "cube.gcode",
+     "status": "completed",
+     "end_time": 1900
     },
     {
-     "head": 1,
-     "grams": 9,
-     "estimateG": 10,
-     "hex": "#FFFFFF",
-     "material": "PETG",
-     "colourFrom": "loaded"
+     "job_id": "A2",
+     "filename": "cube.gcode",
+     "status": "completed",
+     "end_time": 1010
     },
     {
-     "head": 3,
-     "grams": 9,
-     "estimateG": 10
+     "job_id": "A1",
+     "filename": "cube.gcode",
+     "status": "completed",
+     "end_time": 400
     }
    ],
-   "actualHeadsJobId": "000A2",
-   "actualHeadsBasis": "proportional"
+   "filename": "cube.gcode",
+   "endedAt": 1000,
+   "taken": [],
+   "want": "A2"
+  },
+  {
+   "why": "a run another job already holds is skipped: the earlier run of the same file",
+   "jobs": [
+    {
+     "job_id": "A2",
+     "filename": "cube.gcode",
+     "status": "completed",
+     "end_time": 1010
+    },
+    {
+     "job_id": "A1",
+     "filename": "cube.gcode",
+     "status": "completed",
+     "end_time": 700
+    }
+   ],
+   "filename": "cube.gcode",
+   "endedAt": 1000,
+   "taken": [
+    "A2"
+   ],
+   "want": "A1"
+  },
+  {
+   "why": "nothing within twenty minutes",
+   "jobs": [
+    {
+     "job_id": "A1",
+     "filename": "cube.gcode",
+     "status": "completed",
+     "end_time": -201
+    }
+   ],
+   "filename": "cube.gcode",
+   "endedAt": 1000,
+   "taken": [],
+   "want": null
+  },
+  {
+   "why": "exactly twenty minutes is still this print",
+   "jobs": [
+    {
+     "job_id": "A1",
+     "filename": "cube.gcode",
+     "status": "completed",
+     "end_time": -200
+    }
+   ],
+   "filename": "cube.gcode",
+   "endedAt": 1000,
+   "taken": [],
+   "want": "A1"
+  },
+  {
+   "why": "a cancelled run and another file are not it",
+   "jobs": [
+    {
+     "job_id": "A1",
+     "filename": "cube.gcode",
+     "status": "cancelled",
+     "end_time": 1000
+    },
+    {
+     "job_id": "A2",
+     "filename": "other.gcode",
+     "status": "completed",
+     "end_time": 1000
+    }
+   ],
+   "filename": "cube.gcode",
+   "endedAt": 1000,
+   "taken": [],
+   "want": null
+  },
+  {
+   "why": "a row with no usable id is not it",
+   "jobs": [
+    {
+     "job_id": "",
+     "filename": "cube.gcode",
+     "status": "completed",
+     "end_time": 1000
+    },
+    {
+     "job_id": "x y",
+     "filename": "cube.gcode",
+     "status": "completed",
+     "end_time": 1001
+    }
+   ],
+   "filename": "cube.gcode",
+   "endedAt": 1000,
+   "taken": [],
+   "want": null
   }
- }
+ ]
 }

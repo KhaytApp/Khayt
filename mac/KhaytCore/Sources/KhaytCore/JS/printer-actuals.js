@@ -358,6 +358,61 @@ function measuredSoFar(input) {
   return { grams: pre.weightG, source: pre.source || null };
 }
 
+/** A printer's history job id, as it may be written on a job: 1 to 64 of A-Z a-z 0-9 _ . : - */
+const RUN_ID = /^[A-Za-z0-9_.:-]{1,64}$/;
+
+const leafOf = (name) => (String(name == null ? '' : name).trim().toLowerCase().split(/[\\/]/).pop() || '');
+
+/**
+ * The job a finished print's per-head figures may be written on, or null.
+ *
+ * STRICTER THAN THE FINISH PHOTO'S RULE (lib/print-finish-photo.js jobFor),
+ * on purpose. A photo on a likely job is harmless and can be removed; grams
+ * are money, written once and never replaced. So only: a job on THIS machine,
+ * still `printing`, with a part whose `fileRef` is the file that finished.
+ * Never "the only printing job" (a calibration print started at the printer's
+ * own screen would land on it) and never a job already moved on. Two such
+ * jobs is null, not a guess.
+ */
+function actualsJob(printLog, machineId, filename) {
+  const id = String(machineId || '');
+  const key = leafOf(filename);
+  if (!id || !key) return null;
+  const hits = (Array.isArray(printLog) ? printLog : []).filter((j) => j && typeof j === 'object'
+    && String(j.machineId || '') === id && j.status === 'printing'
+    && (Array.isArray(j.parts) ? j.parts : []).some((p) => p && leafOf(p.fileRef) === key));
+  return hits.length === 1 && hits[0].id ? String(hits[0].id) : null;
+}
+
+/**
+ * Which history row is THIS print: a completed run of the file that ended
+ * within `windowS` seconds of when the print was seen to end, that no job
+ * already holds (`taken`: the `actualHeadsJobId` of every job), the CLOSEST
+ * one if several. An earlier run of the same file is somebody else's print:
+ * taking the first row in the window wrote one print onto two jobs, and the
+ * second job's real figures were then refused for good.
+ *
+ * @returns the history row, or null
+ */
+function historyRun(jobs, filename, endedAtS, opts = {}) {
+  const windowS = Number(opts.windowS) > 0 ? Number(opts.windowS) : 20 * 60;
+  const taken = new Set((Array.isArray(opts.taken) ? opts.taken : []).map((x) => String(x)));
+  const at = Number(endedAtS);
+  if (!Number.isFinite(at) || typeof filename !== 'string' || !filename) return null;
+  let best = null;
+  let bestGap = Infinity;
+  for (const row of (Array.isArray(jobs) ? jobs : []).slice(0, 200)) {
+    if (!row || typeof row !== 'object' || row.filename !== filename || row.status !== 'completed') continue;
+    const end = Number(row.end_time);
+    if (!Number.isFinite(end)) continue;
+    const id = row.job_id != null ? String(row.job_id).trim() : '';
+    if (!RUN_ID.test(id) || taken.has(id)) continue;
+    const gap = Math.abs(end - at);
+    if (gap <= windowS && gap < bestGap) { best = row; bestGap = gap; }
+  }
+  return best;
+}
+
 /**
  * A multi-head print's measured filament, PER HEAD (U1 idea 4, Mac plan
  * Nov 19; ideas only from bloodf/u1control, no code).
@@ -385,7 +440,9 @@ function measuredSoFar(input) {
 function perHeadActuals(job, opts = {}) {
   if (!job || typeof job !== 'object') return null;
   const jobId = job.job_id != null ? String(job.job_id).trim() : '';
-  if (!jobId) return null;
+  // The id is written on a job and compared for ever after, and it comes from
+  // a printer on the LAN: a short plain token or nothing.
+  if (!RUN_ID.test(jobId)) return null;
   const usedMm = num(job.filament_used);
   if (usedMm === null || usedMm === 0) return null;
   const meta = job.metadata && typeof job.metadata === 'object' ? job.metadata : {};
@@ -406,6 +463,8 @@ function perHeadActuals(job, opts = {}) {
   const r1 = (n) => Math.round(n * 10) / 10;
   const heads = [];
   per.forEach((g, i) => { if (g > 0) heads.push({ head: i, estimateG: r1(g), grams: r1(totalG * (g / estTotalG)) }); });
+  // Every figure a real number, or nothing is written (a huge estimate can overflow to Infinity).
+  if (!Number.isFinite(totalG) || heads.some((h) => !Number.isFinite(h.grams) || !Number.isFinite(h.estimateG))) return null;
   return { jobId, status: typeof job.status === 'string' ? job.status : null, totalG: r1(totalG), heads, basis: 'proportional', weighed };
 }
 
@@ -481,6 +540,8 @@ function perHeadPatch(order, split, at) {
 const api = {
   measuredSoFar,
   perHeadActuals,
+  actualsJob,
+  historyRun,
   perHeadPatch,
   headColour,
   extractActuals,
