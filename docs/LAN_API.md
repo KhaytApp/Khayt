@@ -208,7 +208,7 @@ computer refuses, with **401**:
 | Body | When | The phone |
 |---|---|---|
 | `{"reason":"device-unknown"}` | no such device, or removed | forgets it, retries once with the PIN, enrols again |
-| `{"reason":"device-revoked"}` | the shop signed this phone out (Mac: Settings → Online → Paired phones; Windows and Linux: Settings → Online → LAN API → Paired phones) | **signed** (its `x-khayt-reply-mac` verifies over the nonce just sent; see "Signed answers a phone can trust"): forgets its key AND the PIN and asks the person to pair again. **Unsigned, or not verified**: wipes nothing, stops showing the book as live and asks the person to pair again. Never enrols by itself either way |
+| `{"reason":"device-revoked"}` | the shop signed this phone out (Mac: Settings → Online → Paired phones; Windows and Linux: Settings → Online → LAN API → Paired phones) | **signed** (its `x-khayt-reply-mac` verifies over the nonce just sent; see "A signed `device-revoked`"): forgets its key, the PIN and its copy of the book, and asks the person to pair again. **Unsigned, or not verified**: wipes nothing; it keeps its key, its enrolment and the PIN, stops showing the book as live and asks the person to pair again. Never enrols by itself either way |
 | `{"reason":"device-clock","now":<unix seconds>}` | `time` more than 120 s from the computer's clock | keeps the difference and retries once |
 | `{"reason":"device-replay"}` | the nonce was seen for this device in the last 300 s | fails the request |
 | `{"reason":"device-auth"}` | anything else: a bad MAC, missing or malformed headers | fails the request |
@@ -1156,6 +1156,8 @@ When the shop signs a phone out, that phone's next signed request is answered `4
 - **The phone must drop its key and its book only on a `device-revoked` whose reply MAC verifies over the nonce it just sent.** An unsigned one is not proof of anything.
 - The Mac keeps a signed-out phone's old key for this only (it opens nothing), for the 256 most recent sign-outs. A phone signed out longer ago than that, or by an older Mac, gets an unsigned `device-revoked`, as does any connector.
 - `device-unknown` (a PIN change, or an id never seen) is not signed: the Mac holds no key for it.
+- **A large upload is refused from its headers alone, before its body is read, and that refusal is unsigned** (a receipt or job photo over 1 MB, a large estimate file): the phone's MAC covers the body, so the Mac cannot yet tell that the request is the phone's own. A phone that gets an unsigned `device-revoked` there should ask something small and signed, such as `GET /api/devices/self`, and act on that answer.
+- **When no signed one ever comes** (signed out by an older Mac, or longer ago than the Mac remembers) every request keeps answering an unsigned 401. The phone should not wipe on that; it should stop showing the book as live and ask the person to pair again. What it does with the copy it holds is the phone's decision (iPhone #2641).
 
 #### `POST /api/devices/pair` (pairing by code; **off** until the phone ships it)
 

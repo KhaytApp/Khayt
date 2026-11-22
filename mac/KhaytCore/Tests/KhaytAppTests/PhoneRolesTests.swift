@@ -385,9 +385,23 @@ struct PhoneRolesTests {
         reply = try await ask(stranger.headers("GET", "/api/queue"))
         #expect(reply.status == 401 && reply.json["reason"] as? String == "device-unknown" && reply.headers["x-khayt-reply-mac"] == nil)
         // The old key opens nothing, and the phone that is still paired is untouched.
-        #expect(bench.devices.phoneKey(phone.id) == nil)
+        #expect(bench.devices.phoneKey(phone.id) == nil && bench.devices.rulesRecord(phone.id) == nil)
         #expect(try await ask(other.headers("GET", "/api/queue")).status == 200)
-        // The key is held only as long as the sign-out is remembered.
+        #expect(reply.headers["x-khayt-reply-mac"] == nil)
+        // A target with a query string is bound like any other.
+        headers = phone.headers("GET", "/api/status?format=json")
+        reply = try await ask(headers, "/api/status?format=json")
+        #expect(reply.status == 200, "the public route stays public, and tells a signed-out phone nothing new")
+        // The signed refusal is not to be cached.
+        headers = phone.headers("GET", "/api/queue")
+        reply = try await ask(headers)
+        #expect(reply.headers["Cache-Control"] == "no-store" || reply.headers["cache-control"] == "no-store")
+        // A connector that is removed keeps no key: its refusals are not signed this way.
+        let plugin = try LanConnectorRoutesTests.enrol(bench)
+        #expect(bench.devices.remove(plugin.id))
+        #expect(bench.devices.revokedReplyKey(headers: plugin.headers("GET", "/api/queue"), method: "GET", target: "/api/queue",
+                                              body: Data(), now: Date(timeIntervalSince1970: TimeInterval(LanConnectorRoutesTests.now))) == nil)
+        // The key is given for the phone's own fresh request, and for no stale one.
         #expect(bench.devices.revokedReplyKey(headers: phone.headers("GET", "/api/queue"), method: "GET", target: "/api/queue",
                                               body: Data(), now: Date(timeIntervalSince1970: TimeInterval(LanConnectorRoutesTests.now))) == phone.key)
         #expect(bench.devices.revokedReplyKey(headers: phone.headers("GET", "/api/queue"), method: "GET", target: "/api/queue", body: Data(),
