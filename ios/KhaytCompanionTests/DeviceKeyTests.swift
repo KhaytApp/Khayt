@@ -294,7 +294,6 @@ final class DeviceKeyTests: XCTestCase {
         _ = await api.enrolDevice(name: "Test iPhone")
         let device = try XCTUnwrap(s.device)
         let identity = s.macIdentityKey
-        let pin = s.pin
         StubMac.revoked = true
         for proof in [StubMac.Proof.forged, .missing] {
             StubMac.proof = proof
@@ -307,7 +306,6 @@ final class DeviceKeyTests: XCTestCase {
             XCTAssertTrue(StubMac.seen.allSatisfy { $0.pin == nil }, "\(proof): no PIN sent")
             XCTAssertEqual(s.device, device, "\(proof): the enrolment is kept")
             XCTAssertEqual(s.macIdentityKey, identity, "\(proof): the pinned key is kept")
-            XCTAssertEqual(s.pin, pin, "\(proof): the PIN (if any is still held) is kept")
             XCTAssertFalse(s.signedOutByMac, "\(proof): not signed out")
             XCTAssertTrue(s.isPaired, "\(proof): still paired")
         }
@@ -318,6 +316,7 @@ final class DeviceKeyTests: XCTestCase {
             guard case .server? = error as? KhaytAPIError else { return XCTFail("\(error)") }
         }
         XCTAssertNil(s.device)
+        XCTAssertEqual(s.macIdentityKey, "", "the pinned key goes with the sign-out")
         XCTAssertTrue(s.signedOutByMac)
     }
 

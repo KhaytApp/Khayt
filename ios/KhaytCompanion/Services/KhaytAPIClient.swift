@@ -2335,6 +2335,14 @@ final class KhaytAPIClient: ObservableObject {
             // proves it holds the PINNED Mac key (`/api/proof`). Proven: the
             // Mac really signed this phone out. Not proven, or no answer:
             // nothing changes and the request fails as a network fault.
+            //
+            // LIMIT (Opus review): the proof shows the real Mac is reachable,
+            // not that it sent THIS refusal. An attacker already on-path can
+            // forge the 401 and relay the phone's /api/proof to the real Mac.
+            // That stops impostors that cannot relay (a device on the Mac's
+            // old address, a spoofer), not a man in the middle. The full fix
+            // is the Mac signing the refusal itself, over the device id and
+            // this request's nonce (Mac lane). No PIN goes anywhere either way.
             let key = settings.macIdentityKey
             guard !key.isEmpty, await proves(host: settings.host, port: settings.port, key: key) else {
                 throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
