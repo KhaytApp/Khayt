@@ -139,3 +139,76 @@ test('the vectors are plain data: no seed or key that is not a sample pattern', 
     }
   }
 });
+
+// ── The desktop's own code (lib/main/phone-pairing.js, lib/lan-identity.js,
+// lib/lan-devices.js admitPhone) reproduces every phone vector ─────────────
+
+test('desktop: the commitment, the offer message and the check number, every case', () => {
+  const PP = require('../lib/main/phone-pairing.js');
+  assert.deepEqual(PP.FLAVOR, phone.prefixes);
+  for (const c of phone.cases) {
+    assert.equal(PP.commitment(c.pluginPublic, c.nonce).toString('base64'), c.commit, c.name);
+    assert.equal(PP.offerMessage(c.deviceId, c.serverPublic, c.commit), c.offerMessage, c.name);
+    assert.equal(PP.checkNumber(c.deviceId, c.identityPublic, c.serverPublic, c.pluginPublic, c.nonce), c.check, c.name);
+  }
+});
+
+test('desktop: the whole exchange with the vector keys gives the vector offer, number and key', () => {
+  const os = require('os');
+  const path = require('path');
+  const PP = require('../lib/main/phone-pairing.js');
+  const { createLanIdentity } = require('../lib/lan-identity.js');
+  const LD = require('../lib/lan-devices.js');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-pair-vec-'));
+  const x = (hex) => crypto.createPrivateKey({ key: Buffer.concat([Buffer.from('302e020100300506032b656e04220420', 'hex'), Buffer.from(hex, 'hex')]), format: 'der', type: 'pkcs8' });
+  try {
+    for (const c of phone.cases) {
+      const keyPath = path.join(tmp, `${c.name}.key`);
+      const ed = crypto.createPrivateKey({ key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.from(c.identitySeedHex, 'hex')]), format: 'der', type: 'pkcs8' });
+      fs.writeFileSync(keyPath, ed.export({ type: 'pkcs8', format: 'pem' }));
+      const id = createLanIdentity({ fs, keyPath });
+      assert.equal(id.identity().publicKey, c.identityPublic);
+      assert.equal(id.signPhoneOffer(c.offerMessage), c.sig, `${c.name}: the identity's signature`);
+      const serverPrivate = x(c.serverPrivateHex);
+      let n = 0;
+      const w = PP.createPhonePairing({ clock: () => 0, enabled: () => true, newKeyPair: () => ({ privateKey: serverPrivate, publicKey: crypto.createPublicKey(serverPrivate) }),
+        newDeviceId: () => c.deviceId, newSecret: (len) => String(n++).padStart(len, 'a').replace(/[^a-z0-9]/g, 'a') });
+      w.open();
+      const { offer } = w.request({ commit: c.commit, name: 'p', identity: { publicKey: id.identity().publicKey, sign: (m) => id.signPhoneOffer(m) } });
+      assert.deepEqual([offer.deviceId, offer.publicKey, offer.sig, offer.identity], [c.deviceId, c.serverPublic, c.sig, c.identityPublic], c.name);
+      assert.equal(w.reveal(offer.pairId, offer.pollSecret, c.pluginPublic, c.nonce), 'accepted', c.name);
+      assert.equal(w.snapshot().pending.check, c.check, c.name);
+      const devs = LD.createLanDevices({ fs, keyPath: path.join(tmp, `${c.name}-devices.key`) });
+      assert.equal(w.approve({ pairId: offer.pairId, check: c.check }, (r) => {
+        assert.deepEqual(devs.admitPhone({ serverPrivate: r.serverPrivate, phonePublic: r.phonePublic, deviceId: r.deviceId, name: 'p', role: 'viewer', pin: '12345678' }), { deviceId: c.deviceId });
+      }), true);
+      // The phone signs with derivedKey, and this computer takes it.
+      const t = Math.floor(Date.now() / 1000);
+      const nonce = '00112233445566778899aabbccddeeff';
+      const mac = LD.requestMac(Buffer.from(c.derivedKey, 'base64'), LD.canonicalRequest('GET', '/api/devices/self', String(t), nonce));
+      const v = devs.verify({ headers: { 'x-khayt-device': c.deviceId, 'x-khayt-time': String(t), 'x-khayt-nonce': nonce, 'x-khayt-mac': mac }, method: 'GET', target: '/api/devices/self', pin: '12345678' });
+      assert.equal(v.ok, true, `${c.name}: the derived key`);
+    }
+    // The identity signs a phone offer of that exact shape and nothing else.
+    const id = createLanIdentity({ fs, keyPath: path.join(tmp, 'first.key') });
+    for (const bad of ['khayt-enrol-phone-v1:anything', 'khayt-proof:00', phone.cases[0].offerMessage + ':x', phone.refuse.find((r) => r.name === 'bad-device-id').offerMessage.replace('dev_SamplePhone0001', 'dev_Sample:Phone0001')]) {
+      assert.throws(() => id.signPhoneOffer(bad), bad);
+    }
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('desktop: every reveal the vectors say the computer must refuse is refused', () => {
+  const PP = require('../lib/main/phone-pairing.js');
+  const first = phone.cases[0];
+  const serverPrivate = crypto.createPrivateKey({ key: Buffer.concat([Buffer.from('302e020100300506032b656e04220420', 'hex'), Buffer.from(first.serverPrivateHex, 'hex')]), format: 'der', type: 'pkcs8' });
+  const ident = { publicKey: first.identityPublic, sign: () => 'sig' };
+  const macSide = phone.refuse.filter((r) => r.refusedBy === 'mac');
+  assert.ok(macSide.length >= 3);
+  for (const r of macSide) {
+    const w = PP.createPhonePairing({ clock: () => 0, enabled: () => true, newKeyPair: () => ({ privateKey: serverPrivate, publicKey: crypto.createPublicKey(serverPrivate) }) });
+    w.open();
+    const { offer } = w.request({ commit: r.commit, identity: ident });
+    assert.equal(w.reveal(offer.pairId, offer.pollSecret, r.revealPublic, r.revealNonce), 'refused', r.name);
+    assert.equal(w.poll(offer.pairId, offer.pollSecret), 'expired', r.name);
+  }
+});
