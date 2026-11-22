@@ -6113,6 +6113,18 @@ async function moonrakerRead(machine, pathAndQuery, timeoutMs) {
 }
 const MOONRAKER_READ_MAX = 1024 * 1024;
 
+/* What each head of a Snapmaker U1 holds, from its spool tags (Figma 134:282,
+ * U1-1): one read-only GET of filament_detect, decoded by lib/rfid-tray.js.
+ * Nothing is written; linking a head to a spool is the window's, by a click. */
+ipcMain.handle('hub:printer-spool-tags', async (_e, { machine } = {}) => {
+  try {
+    const body = await moonrakerRead(machine, '/printer/objects/query?filament_detect', 10000);
+    const detect = body && body.result && body.result.status && body.result.status.filament_detect;
+    if (!detect || typeof detect !== 'object') return { ok: true, heads: [] };
+    return { ok: true, heads: require('./lib/rfid-tray.js').trays(detect) };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
 /* Filament used per head after a finished U1 (Moonraker) print, with each
  * head's colour and material, on the job (lib/main/head-actuals.js; the Mac's
  * HeadActuals.swift). Two read-only GETs on the printer, a write through
@@ -6387,6 +6399,27 @@ async function sendPrinterControl(machine, control, value) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
+  // The Snapmaker U1's chamber light (Figma 134:153, CAP1): Snapmaker's own
+  // Moonraker LED, switched by exactly the two lines lib/webcam.js writes and
+  // nothing else (scriptAllowed).
+  if (control === 'chamber-light' && type === 'moonraker') {
+    const Webcam = require('./lib/webcam.js');
+    const script = Webcam.chamberLightScript(value === 'on' || value === true);
+    if (!script || !Webcam.scriptAllowed(script)) return { ok: false, error: 'invalid light state' };
+    const target = await resolvePrinterTarget(host);
+    if (!target.ok) return { ok: false, error: target.error };
+    const portNum = parseInt(port || defaultPrinterPort(type), 10);
+    if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) return { ok: false, error: 'Invalid port number' };
+    const headers = { 'Content-Type': 'application/json' };
+    if (machine.printerApi.apiKey) headers['X-Api-Key'] = machine.printerApi.apiKey;
+    try {
+      // outbound: lan (a printer: resolvePrinterTarget keeps it on the LAN)
+      const res = await fetch(`http://${target.urlHost}:${portNum}/printer/gcode/script`, {
+        method: 'POST', headers, body: JSON.stringify({ script }), redirect: 'manual', signal: AbortSignal.timeout(10000),
+      });
+      return res.ok ? { ok: true, control } : { ok: false, error: `Printer answered HTTP ${res.status}` };
+    } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+  }
   if (type !== 'bambu') return { ok: false, error: `${control} is not available for this printer type` };
   const target = await resolvePrinterTarget(host);
   if (!target.ok) return { ok: false, error: target.error };

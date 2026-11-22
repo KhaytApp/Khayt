@@ -1,0 +1,122 @@
+/**
+ * E2E smoke — Figma page 134 on Windows/Linux: a printer card draws only the
+ * controls its model has (CAP1), Edit printer's Accessories (CAP2), and what a
+ * Snapmaker U1's heads hold with the Link dialog (U1-1, U1-2).
+ *
+ * No printer answers here: the poll cache and the U1's spool tags are set in
+ * the window, as the poll and hub:printer-spool-tags would set them. Every
+ * rule underneath (lib/printer-capabilities.js, lib/rfid-tray.js) is real.
+ *
+ * Run: npm run test:e2e:capabilities   (CI wraps it in xvfb-run)
+ */
+import fs from 'node:fs'; import path from 'node:path';
+import { launchApp, makeUserDataDir, dismissWizard } from './e2e/helpers.mjs';
+
+const ok = (c, m) => { if (!c) throw new Error('ASSERT FAILED: ' + m); console.log('  ✓ ' + m); };
+const shot = process.env.KHAYT_SHOT_DIR || '';
+const api = (type, host) => ({ type, host, serial: 'SN', accessCode: 'x' });
+const machines = [
+  { id: 'X1', name: 'Bambu X1C', color: '#3b82f6', printerModelName: 'Bambu Lab X1 Carbon', printerApi: api('bambu', '192.0.2.10') },
+  { id: 'P1', name: 'Bambu P1P', color: '#f97316', printerModelName: 'Bambu Lab P1P', printerApi: api('bambu', '192.0.2.11') },
+  { id: 'U1', name: 'Workshop U1', color: '#22c55e', printerModelName: 'Snapmaker U1', printerApi: { type: 'moonraker', host: '192.0.2.12' } },
+  { id: 'RS', name: 'Resin bay', color: '#a855f7', printerModelName: 'Elegoo Saturn 4 Ultra', printerApi: { type: 'moonraker', host: '192.0.2.13' } },
+  { id: 'A1', name: 'Garage A1', color: '#eab308', printerModelName: 'Bambu Lab A1', printerApi: api('bambu', '192.0.2.14') },
+];
+const inventory = [
+  { id: 'S2', material: 'PLA', colourVariant: 'Black', color: '#080A0D', weight: 640, cost: 80, brand: 'Snapmaker', materialType: 'fdm' },
+];
+const now = Date.now();
+const cache = {
+  X1: { state: 'printing', progress: 62, lastUpdated: now },
+  P1: { state: 'printing', progress: 18, lastUpdated: now },
+  U1: { state: 'idle', lastUpdated: now, loaded: [
+    { slot: 0, hex: '#080A0D', material: 'PLA' }, { slot: 1, hex: '#FFFFFF', material: 'PETG' }, { slot: 2, hex: '#D62828', material: 'PLA' } ] },
+  RS: { state: 'printing', progress: 40, lastUpdated: now },
+  A1: { state: 'idle', lastUpdated: now },
+};
+const tags = [
+  { vendor: 'Snapmaker', manufacturer: 'Snapmaker', material: 'PLA', sub: '', colours: ['#080A0D'], weightG: 1000, diameterMm: 1.75, lengthM: null, sku: null, official: true },
+  { vendor: 'Snapmaker', manufacturer: 'Snapmaker', material: 'PETG', sub: '', colours: ['#FFFFFF'], weightG: 1000, diameterMm: 1.75, lengthM: null, sku: null, official: true },
+  null, null,
+];
+
+async function run(lang) {
+  const dir = makeUserDataDir();
+  fs.writeFileSync(path.join(dir, 'khayt-store.json'), JSON.stringify({
+    settings: { firstRun: false, firstRunDone: true, bizName: 'Sample Shop', lang, mode: 'professional' },
+    machines: machines.map((m) => (m.id === 'U1' ? { ...m, headSpools: { 0: 'S2' } } : m)), printLog: [], clients: [], inventory,
+  }));
+  const { electronApp, window } = await launchApp(dir);
+  try {
+    await dismissWizard(window);
+    await window.setViewportSize({ width: 1300, height: 1000 });
+    const paint = async () => {
+      await window.evaluate((arg) => {
+        Object.assign(machineStatusCache, arg.cache);
+        setHeadTags('U1', arg.tags);
+        renderMachines();
+      }, { cache, tags });
+      await window.waitForTimeout(250);
+    };
+    await window.evaluate((l) => { if (typeof i18n !== 'undefined') i18n.set(l); openSettingsSection('printers'); }, lang);
+    await paint();
+    const card = (id) => window.evaluate((i) => {
+      const row = document.querySelector(`.machine-row[data-machine-id="${i}"]`);
+      return { switches: [...row.querySelectorAll('[data-printer-switch]')].map((s) => s.dataset.control),
+        drop: !!row.querySelector('[data-act="printer-drop"]'), speed: !!row.querySelector('select[data-printer-control]'),
+        note: row.querySelector('.mcap-note')?.innerText || '' };
+    }, id);
+    const x1 = await card('X1'), p1 = await card('P1'), u1 = await card('U1'), rs = await card('RS'), a1 = await card('A1');
+    ok(x1.switches.includes('light') && x1.speed, `${lang}: X1C has its light and speed`);
+    ok(!p1.switches.includes('light') && p1.note.length > 0, `${lang}: P1P has no light switch, and says why`);
+    ok(u1.switches.includes('chamber-light') && !u1.drop, `${lang}: the U1 has its chamber light (idle, so no job controls)`);
+    ok(!rs.drop && !rs.switches.length, `${lang}: a resin printer has no "skip an object"`);
+    ok(a1.switches.includes('light') && a1.note.length > 0, `${lang}: an A1's light is shown, with "not known"`);
+    if (lang === 'en') ok(/Edit printer › Accessories/.test(p1.note), 'the P1P note says where to fix it');
+
+    // U1-1: what each head holds.
+    const heads = await window.evaluate(() => [...document.querySelectorAll('[data-machine-heads="U1"] .mhead')].map((h) => h.innerText.replace(/\s+/g, ' ')));
+    ok(heads.length === 4, `${lang}: four heads listed`);
+    if (lang === 'en') {
+      ok(/Tool 1 · PLA · Snapmaker/.test(heads[0]) && /Linked to Snapmaker PLA Black · 640 g left/.test(heads[0]) && /Change…/.test(heads[0]), 'tool 1: its tag, and the spool it is linked to');
+      ok(/No spool in your inventory matches this tag/.test(heads[1]), 'tool 2: a tag that matches nothing says so');
+      ok(/Set on the printer · no tag/.test(heads[2]) && /Not linked to a spool/.test(heads[2]), 'tool 3: set on the printer, no tag');
+      ok(/Tool 4 · Nothing loaded/.test(heads[3]), 'tool 4: nothing loaded');
+    }
+    if (shot) await (await window.$('#machinesList')).screenshot({ path: path.join(shot, `p134-cap1-u1-1-${lang}.png`) });
+
+    // U1-2: link tool 2 to a new spool filled in from its tag.
+    await window.click('[data-head-link="U1"][data-head="1"]');
+    await window.waitForSelector('.mlink-opt', { timeout: 5000 });
+    const opts = await window.evaluate(() => [...document.querySelectorAll('.mlink-opt')].map((o) => o.querySelector('input').value));
+    ok(opts.includes('__new'), `${lang}: the dialog offers "Add as a new spool" when nothing matches`);
+    if (shot) await (await window.$('.modal')).screenshot({ path: path.join(shot, `p134-u1-2-${lang}.png`) });
+    if (lang === 'en') {
+      await window.click('[data-act="save"]');
+      await window.waitForTimeout(300);
+      const after = await window.evaluate(() => ({ head: machines.find((m) => m.id === 'U1').headSpools, n: inventory.length, made: inventory[inventory.length - 1], s2: inventory.find((x) => x.id === 'S2') }));
+      ok(after.n === 2 && after.made.material === 'PETG' && after.head[1] === after.made.id, 'Link adds the spool from the tag and links tool 2 to it');
+      ok(after.head[0] === 'S2' && after.s2.weight === 640 && after.s2.cost === 80 && after.s2.color === '#080A0D', 'tool 1 and the existing spool are untouched');
+      await window.keyboard.press('Escape');   // the spool editor opened for its price
+      await window.waitForTimeout(200);
+
+      // CAP2: tick the P1P's kit in Edit printer; its card gains the light.
+      await window.click('.machine-row[data-machine-id="P1"] [data-act="edit-mach"]');
+      await window.waitForSelector('#machAccessories [data-addon]', { timeout: 5000 });
+      if (shot) await (await window.$('.modal')).screenshot({ path: path.join(shot, 'p134-cap2-en.png') });
+      await window.click('#machAccessories [data-addon="bambu-p1-camera-led"]');
+      await window.click('[data-act="save"]');
+      await window.waitForTimeout(300);
+      await paint();
+      const p1b = await card('P1');
+      ok(p1b.switches.includes('light') && !p1b.note, 'with the kit ticked, the P1P card has its light switch');
+      const noAcc = await window.evaluate(async () => { openMachineEditor('X1'); await new Promise((r) => setTimeout(r, 200)); const n = document.querySelectorAll('#machAccessories [data-addon]').length; document.querySelector('[data-act="cancel"]')?.click(); return n; });
+      ok(noAcc === 0, 'a model with no known accessories has no Accessories section');
+    }
+  } finally { await electronApp.close(); }
+}
+
+let failed = false;
+try { await run('en'); await run('ar'); console.log('\ne2e-printer-capabilities: ok'); }
+catch (e) { failed = true; console.error('\ne2e-printer-capabilities FAILED: ' + (e && e.message || e)); }
+process.exit(failed ? 1 : 0);

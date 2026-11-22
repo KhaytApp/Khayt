@@ -357,6 +357,7 @@ const hubAPI = {
   // What is on the plate, and dropping one of it. Klipper only, and the drop
   // cannot be undone — see lib/exclude-object.js.
   printerPlate:        (machine) => ipcRenderer.invoke('hub:printer-plate', { machine }),
+  printerSpoolTags:    (machine) => ipcRenderer.invoke('hub:printer-spool-tags', { machine }),
   printerExcludeObject: (machine, name) => ipcRenderer.invoke('hub:printer-exclude-object', { machine, name }),
   printerHistory: (payload) => ipcRenderer.invoke('hub:printer-history', payload),
   spoolmanFetch: (payload) => ipcRenderer.invoke('hub:spoolman-fetch', payload),
