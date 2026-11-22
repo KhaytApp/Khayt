@@ -259,9 +259,11 @@ private struct MachineCard: View {
     private enum Mode { case printing, idle, error, offline }
 
     private var mode: Mode {
-        if live.hasError { return .error }
-        if offline && !live.isPrinting { return .offline }
-        if live.isPrinting { return .printing }
+        if live.needsPerson { return .error }
+        if (offline || live.saysUnlinked) && !live.isBusy { return .offline }
+        // Paused is busy, never free (C2): it keeps the printing card until
+        // the signed-off Paused chip replaces the label.
+        if live.isBusy { return .printing }
         if let s = fallbackStatus?.lowercased(), s.contains("print") { return .printing }
         return .idle
     }
@@ -287,7 +289,7 @@ private struct MachineCard: View {
         switch mode {
         case .printing: return live.filename.flatMap { $0.isEmpty ? nil : $0 }
         case .idle: return live.hasPrinterApi ? L10n.tr("machines.ready") : L10n.tr("machines.no_live")
-        case .error: return live.error
+        case .error: return live.error.flatMap { $0.isEmpty ? nil : $0 } ?? live.state
         case .offline: return L10n.tr("machines.offline.sub")
         }
     }
