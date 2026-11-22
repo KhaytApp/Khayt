@@ -1476,13 +1476,13 @@
 "pair.not.busy.title" = "جهاز Mac يقترن بشيء آخر";
 "pair.not.busy.body" = "انتظر قليلًا ثم حاول مرة أخرى.";
 "pair.not.refused.title" = "رد جهاز Mac لم يجتز التحقق";
-"pair.not.refused.body" = "لم يُقترن شيء. ابدأ من جديد، وإن تكرر ذلك فاقترن برمز المالك.";
+"pair.not.refused.body" = "لم يُقترن شيء. ابدأ من جديد.";
 "pair.not.unreachable.title" = "لم يرد جهاز Mac";
 "pair.not.unreachable.body" = "تأكد أن هذا الهاتف على شبكة Wi-Fi الخاصة بالمتجر وأن Khayt مفتوح على جهاز Mac.";
 "pair.not.again" = "ابدأ من جديد";
 "pair.older.title" = "أدخل رمز المالك";
 "pair.older.body" = "لا يستطيع جهاز Mac هذا الاقتران بالرقم بعد (يحتاج Khayt 4.0 beta مع إقران الهاتف). رمز المالك يقرن هذا الهاتف بصفة المالك كما كان.";
-"pair.older.foot" = "يُرسل الرمز مرة واحدة للاقتران ولا يُحفظ على هذا الهاتف.";
+"pair.older.foot" = "يقرن الرمز هذا الهاتف مرة واحدة. عندما يسجّل جهاز Mac الهاتف لا يُحفظ الرمز عليه.";
 "pair.older.pair" = "اقتران";
 "floor.today.title" = "اليوم";
 "floor.today.banner.operator" = "هاتف مشغّل. يسأل جهاز Mac في كل مرة: لا سجل متجر ولا أسعار ولا عملاء على هذا الهاتف.";

@@ -110,7 +110,6 @@ struct MainTabView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .environment(\.hidesClients, settings.isFloorPhone)
         .tint(KhaytDesign.accent)
         .onAppear { health.startPolling(); keepSelectionShown() }
         .onDisappear { health.stopPolling() }
@@ -145,6 +144,9 @@ struct MainTabView: View {
             }
         }
         .sheet(isPresented: $alertIntake) { IntakeView() }
+        // After every sheet, so a job opened from an alert or a link hides the
+        // customer too (a modifier reaches only what is inside it).
+        .environment(\.hidesClients, settings.isFloorPhone)
         // Folding iPhone Duo with Settings open takes that tab away, and so
         // does asking for it in compact width: Home, rather than a blank page.
         .onChange(of: widthClass) { _, _ in keepSelectionShown() }
@@ -155,6 +157,8 @@ struct MainTabView: View {
     private func openAskedIntake() {
         guard ordersNav.intakeAsked else { return }
         ordersNav.intakeAsked = false
+        // Customer requests are clients: not a floor phone's.
+        guard !settings.isFloorPhone else { return }
         alertIntake = true
     }
 

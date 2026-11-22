@@ -1476,13 +1476,13 @@
 "pair.not.busy.title" = "Mac 正在配对别的设备";
 "pair.not.busy.body" = "请稍候再试。";
 "pair.not.refused.title" = "Mac 的回复未通过验证";
-"pair.not.refused.body" = "没有配对任何东西。请重新开始；如果反复出现，请用店主 PIN 配对。";
+"pair.not.refused.body" = "没有配对任何东西。请重新开始。";
 "pair.not.unreachable.title" = "Mac 没有回应";
 "pair.not.unreachable.body" = "请确认这部手机连接着店里的 Wi-Fi，并且 Mac 上已打开 Khayt。";
 "pair.not.again" = "重新开始";
 "pair.older.title" = "输入店主 PIN";
 "pair.older.body" = "这台 Mac 还不能用数字配对（需要支持手机配对的 Khayt 4.0 beta）。店主 PIN 会像以前一样把这部手机配对为店主。";
-"pair.older.foot" = "PIN 只为配对发送一次，不会保存在这部手机上。";
+"pair.older.foot" = "PIN 用于配对这部手机一次。Mac 登记这部手机后，PIN 不会保存在手机上。";
 "pair.older.pair" = "配对";
 "floor.today.title" = "今天";
 "floor.today.banner.operator" = "操作员手机。每次都询问 Mac：这部手机上没有店铺账本、价格和客户。";

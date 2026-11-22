@@ -1476,13 +1476,13 @@
 "pair.not.busy.title" = "Mac başka bir şeyi eşleştiriyor";
 "pair.not.busy.body" = "Biraz bekleyip yeniden deneyin.";
 "pair.not.refused.title" = "Mac’in yanıtı doğrulanamadı";
-"pair.not.refused.body" = "Hiçbir şey eşleştirilmedi. Yeniden başlayın; tekrarlarsa sahip PIN’iyle eşleştirin.";
+"pair.not.refused.body" = "Hiçbir şey eşleştirilmedi. Yeniden başlayın.";
 "pair.not.unreachable.title" = "Mac yanıt vermedi";
 "pair.not.unreachable.body" = "Bu telefonun dükkânın Wi-Fi’sinde olduğunu ve Mac’te Khayt’ın açık olduğunu kontrol edin.";
 "pair.not.again" = "Yeniden başla";
 "pair.older.title" = "Sahip PIN’ini girin";
 "pair.older.body" = "Bu Mac henüz sayıyla eşleştiremiyor (telefon eşleştirmeli Khayt 4.0 beta gerekir). Sahip PIN’i bu telefonu önceki gibi sahip olarak eşleştirir.";
-"pair.older.foot" = "PIN eşleştirmek için bir kez gönderilir ve bu telefonda saklanmaz.";
+"pair.older.foot" = "PIN bu telefonu bir kez eşleştirir. Mac telefonu kaydettiğinde PIN telefonda saklanmaz.";
 "pair.older.pair" = "Eşleştir";
 "floor.today.title" = "Bugün";
 "floor.today.banner.operator" = "Operatör telefonu. Her seferinde Mac’e sorar: bu telefonda dükkân defteri, fiyat ve müşteri yok.";

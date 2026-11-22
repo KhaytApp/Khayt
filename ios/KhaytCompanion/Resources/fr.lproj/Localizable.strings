@@ -1476,13 +1476,13 @@
 "pair.not.busy.title" = "Le Mac associe autre chose";
 "pair.not.busy.body" = "Patientez un instant et réessayez.";
 "pair.not.refused.title" = "La réponse du Mac n’a pas pu être vérifiée";
-"pair.not.refused.body" = "Rien n’a été associé. Recommencez ; si cela se reproduit, associez avec le code PIN du propriétaire.";
+"pair.not.refused.body" = "Rien n’a été associé. Recommencez.";
 "pair.not.unreachable.title" = "Le Mac n’a pas répondu";
 "pair.not.unreachable.body" = "Vérifiez que ce téléphone est sur le Wi-Fi de l’atelier et que Khayt est ouvert sur le Mac.";
 "pair.not.again" = "Recommencer";
 "pair.older.title" = "Saisissez le code PIN du propriétaire";
 "pair.older.body" = "Ce Mac ne peut pas encore associer par nombre (il lui faut Khayt 4.0 beta avec l’association de téléphones). Le code PIN du propriétaire associe ce téléphone en tant que propriétaire, comme avant.";
-"pair.older.foot" = "Le code PIN est envoyé une fois, pour associer, et n’est pas conservé sur ce téléphone.";
+"pair.older.foot" = "Le code PIN associe ce téléphone une fois. Dès que le Mac enregistre le téléphone, le code PIN n’y est pas conservé.";
 "pair.older.pair" = "Associer";
 "floor.today.title" = "Aujourd’hui";
 "floor.today.banner.operator" = "Téléphone opérateur. Il interroge le Mac à chaque fois : ni registre, ni prix, ni clients sur ce téléphone.";

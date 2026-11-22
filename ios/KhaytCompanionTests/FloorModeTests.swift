@@ -84,6 +84,6 @@ final class FloorModeTests: XCTestCase {
 
     /// A floor phone is offered no money step on the job page.
     func testMoneyStepsAreNamed() {
-        XCTAssertEqual(OrderDetailPage.moneySteps, ["send_quote", "take_job", "record_payment"])
+        XCTAssertEqual(OrderDetailPage.moneySteps, ["send_quote", "take_job", "record_payment", "hand_over", "ship"])
     }
 }

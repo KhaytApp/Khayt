@@ -58,6 +58,11 @@ struct PairingView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: step)
         .sheet(isPresented: $showCloudSignIn) { CloudSignInSheet() }
+        // Approved on the Mac, then the app was closed before Continue: the
+        // enrolment is live, so pick up at the approved screen, not Find.
+        .onAppear {
+            if settings.pairedByCode, settings.device != nil, !settings.isPaired { step = .approved }
+        }
         #if DEBUG
         // `-KhaytPairStep pin`: open on the PIN step, for a screenshot.
         .onAppear {
@@ -274,7 +279,12 @@ struct PairingView: View {
         guard mine == attempt, step == .code else { return }
         switch started {
         case .number(let t): ticket = t
-        case .unsupported: olderMac = true; goToPin()
+        case .unsupported:
+            // A phone that has paired with this Mac by number does not fall
+            // back to the PIN because something answered "no such route":
+            // that is how a host on the Wi-Fi would ask for the owner PIN.
+            if settings.pairedByCode, settings.macIdentityKey != nil { return stop(.refused) }
+            olderMac = true; goToPin()
         case .closed: stop(.expired)
         case .busy: stop(.busy)
         case .refused: stop(.refused)
@@ -296,13 +306,20 @@ struct PairingView: View {
         while !Task.isCancelled, mine == attempt, step == .code {
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled, mine == attempt, step == .code else { return }
-            switch await api.pollCodePairing(t) {
+            let state = await api.pollCodePairing(t)
+            // Cancel, Start again or the PIN may have been chosen while the
+            // Mac was asked: their choice stands, not this answer.
+            guard !Task.isCancelled, mine == attempt, step == .code else { return }
+            switch state {
             case .waiting, .unreachable: continue
             case .denied: return stop(.denied)
             case .expired, .unknown: return stop(.expired)
             case .approved:
-                guard mine == attempt, step == .code else { return }
-                if await api.finishCodePairing(t, markPaired: false) {
+                let done = await api.finishCodePairing(t, markPaired: false) {
+                    !Task.isCancelled && mine == attempt && step == .code
+                }
+                guard !Task.isCancelled, mine == attempt, step == .code else { return }
+                if done {
                     CompanionHaptics.success()
                     step = .approved
                 } else {
@@ -518,6 +535,9 @@ struct PairingView: View {
     }
 
     private func connect() async {
+        // The owner PIN pairs as the owner: a number pairing left over from
+        // before must not make this a floor phone.
+        settings.pairedByCode = false
         isConnecting = true
         defer { isConnecting = false }
         do {

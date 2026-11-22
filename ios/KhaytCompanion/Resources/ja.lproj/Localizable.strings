@@ -1476,13 +1476,13 @@
 "pair.not.busy.title" = "Macは別のものをペアリング中です";
 "pair.not.busy.body" = "少し待ってから、もう一度お試しください。";
 "pair.not.refused.title" = "Macの応答を確認できませんでした";
-"pair.not.refused.body" = "何もペアリングされていません。もう一度始めてください。繰り返す場合はオーナーPINでペアリングしてください。";
+"pair.not.refused.body" = "何もペアリングされていません。もう一度始めてください。";
 "pair.not.unreachable.title" = "Macから応答がありません";
 "pair.not.unreachable.body" = "この電話が店舗のWi-Fiに接続され、MacでKhaytが開いているか確認してください。";
 "pair.not.again" = "もう一度始める";
 "pair.older.title" = "オーナーPINを入力";
 "pair.older.body" = "このMacはまだ番号でペアリングできません（電話のペアリングに対応したKhayt 4.0 betaが必要です）。オーナーPINでは、これまでどおりこの電話をオーナーとしてペアリングします。";
-"pair.older.foot" = "PINはペアリングのために一度だけ送信され、この電話には保存されません。";
+"pair.older.foot" = "PINはこの電話を一度ペアリングします。Macが電話を登録すると、PINは電話に保存されません。";
 "pair.older.pair" = "ペアリング";
 "floor.today.title" = "今日";
 "floor.today.banner.operator" = "オペレーターの電話。毎回Macに問い合わせます：この電話には店舗データ、価格、顧客はありません。";

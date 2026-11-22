@@ -84,8 +84,9 @@ struct OrderDetailPage: View {
 
     private var isQuote: Bool { order.status == OrderStatus.quote.rawValue }
     private var isCancelled: Bool { order.status == "cancelled" }
-    /// Steps that are money: never offered on a floor phone.
-    static let moneySteps: Set<String> = ["send_quote", "take_job", "record_payment"]
+    /// Steps that are money or the customer (a quote, a payment, a hand-over
+    /// or shipment with its address): never offered on a floor phone.
+    static let moneySteps: Set<String> = ["send_quote", "take_job", "record_payment", "hand_over", "ship"]
     private var canShip: Bool { !(shipChoices ?? []).isEmpty }
     private var canRecordPayment: Bool { payment.map { $0.status != "paid" } ?? false }
 
@@ -212,7 +213,7 @@ struct OrderDetailPage: View {
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                if api.holdsBook, !isCancelled {
+                if api.holdsBook, !settings.isFloorPhone, !isCancelled {
                     Button(L10n.tr("edit.title")) { Task { await startEditing() } }
                         .disabled(!api.canWrite)
                 }
@@ -322,7 +323,7 @@ struct OrderDetailPage: View {
     private var activityRegion: some View {
         VStack(alignment: .leading, spacing: 16) {
             JobRegionTitle(text: L10n.tr("job.section.activity"))
-            if canShip {
+            if canShip, !settings.isFloorPhone {
                 Button { shipping = true } label: { ShipCard() }
                     .buttonStyle(.plain)
                     .disabled(!api.canWrite)
@@ -344,23 +345,25 @@ struct OrderDetailPage: View {
             }
             // The papers besides the invoice, from the book. A quote is not
             // work yet; a cancelled job is nothing to pack or make.
-            if api.holdsBook, !isQuote, !isCancelled {
+            if api.holdsBook, !settings.isFloorPhone, !isQuote, !isCancelled {
                 JobPapersCard { kind in paper = .job(kind, orderId: order.id) }
             }
             // Only an order the Mac has published has a page to put a photo on.
-            if let photoAccess, photoAccess != .notPublished {
+            if let photoAccess, photoAccess != .notPublished, !settings.isFloorPhone {
                 OrderPhotosCard(access: photoAccess)
             }
             // The customer's page: its link, and the messages on it.
             // On a quote, a share from here is a send, stamped as Send quote's is.
-            if case .ready(let token)? = photoAccess {
+            if settings.isFloorPhone {
+                // The customer's page is the customer's: not on a floor phone.
+            } else if case .ready(let token)? = photoAccess {
                 PortalCard(token: token, quoteId: isQuote ? order.id : nil, onQuoteShared: quoteShared)
             } else if case .viewOnly(let token)? = photoAccess {
                 PortalCard(token: token, quoteId: isQuote ? order.id : nil, onQuoteShared: quoteShared)
             }
             // The shop's connectors: their buttons for a job, and their own
             // fields on it (read-only). Nothing is drawn without one.
-            if api.holdsBook {
+            if api.holdsBook, !settings.isFloorPhone {
                 ConnectorsCard(place: .order(order.id), outer: EdgeInsets())
                     .id("connectors")
             }
@@ -393,6 +396,14 @@ struct OrderDetailPage: View {
                     .disabled(step.blocked != nil || !api.canWrite || isUpdating)
             }
         }
+        // Below this line everything is money, a customer or the book's
+        // papers: none of it is a floor phone's (D-P6 a), whatever is left
+        // in a book it could not yet forget.
+        if !settings.isFloorPhone { ownerMore }
+    }
+
+    @ViewBuilder
+    private var ownerMore: some View {
         if isQuote {
             if quoteState != nil {
                 Button { Task { await startRevising() } } label: { Label(L10n.tr("quote.revise"), systemImage: "pencil.and.list.clipboard") }

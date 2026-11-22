@@ -1476,13 +1476,13 @@
 "pair.not.busy.title" = "O Mac está pareando outra coisa";
 "pair.not.busy.body" = "Espere um pouco e tente de novo.";
 "pair.not.refused.title" = "A resposta do Mac não pôde ser verificada";
-"pair.not.refused.body" = "Nada foi pareado. Comece de novo; se continuar, pareie com o PIN do proprietário.";
+"pair.not.refused.body" = "Nada foi pareado. Comece de novo.";
 "pair.not.unreachable.title" = "O Mac não respondeu";
 "pair.not.unreachable.body" = "Verifique se este telefone está no Wi-Fi da loja e se o Khayt está aberto no Mac.";
 "pair.not.again" = "Começar de novo";
 "pair.older.title" = "Digite o PIN do proprietário";
 "pair.older.body" = "Este Mac ainda não pareia por número (precisa do Khayt 4.0 beta com pareamento de telefone). O PIN do proprietário pareia este telefone como proprietário, como antes.";
-"pair.older.foot" = "O PIN é enviado uma vez, para parear, e não fica guardado neste telefone.";
+"pair.older.foot" = "O PIN pareia este telefone uma vez. Quando o Mac registra o telefone, o PIN não fica guardado nele.";
 "pair.older.pair" = "Parear";
 "floor.today.title" = "Hoje";
 "floor.today.banner.operator" = "Telefone de operador. Pergunta ao Mac toda vez: sem livro da loja, preços ou clientes neste telefone.";

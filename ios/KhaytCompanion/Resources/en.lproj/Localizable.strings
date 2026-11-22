@@ -1476,13 +1476,13 @@
 "pair.not.busy.title" = "The Mac is pairing something else";
 "pair.not.busy.body" = "Wait a moment and try again.";
 "pair.not.refused.title" = "The Mac’s answer didn’t check out";
-"pair.not.refused.body" = "Nothing was paired. Start again; if it keeps happening, pair with the owner PIN.";
+"pair.not.refused.body" = "Nothing was paired. Start again.";
 "pair.not.unreachable.title" = "The Mac didn’t answer";
 "pair.not.unreachable.body" = "Check this phone is on the shop’s Wi-Fi and Khayt is open on the Mac.";
 "pair.not.again" = "Start again";
 "pair.older.title" = "Enter the owner PIN";
 "pair.older.body" = "This Mac can’t pair by number yet (it needs Khayt 4.0 beta with phone pairing). The owner PIN pairs this phone as the owner, as before.";
-"pair.older.foot" = "The PIN is sent once, to pair, and not kept on this phone.";
+"pair.older.foot" = "The PIN pairs this phone once. When the Mac enrols the phone, the PIN is not kept on it.";
 "pair.older.pair" = "Pair";
 "floor.today.title" = "Today";
 "floor.today.banner.operator" = "Operator phone. Asks the Mac each time: no shop book, prices or clients on this phone.";

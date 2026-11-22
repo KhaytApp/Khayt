@@ -1476,13 +1476,13 @@
 "pair.not.busy.title" = "Der Mac koppelt gerade etwas anderes";
 "pair.not.busy.body" = "Warte kurz und versuch es noch einmal.";
 "pair.not.refused.title" = "Die Antwort des Macs ließ sich nicht prüfen";
-"pair.not.refused.body" = "Es wurde nichts gekoppelt. Starte neu; wenn es wieder passiert, koppel mit der Inhaber-PIN.";
+"pair.not.refused.body" = "Es wurde nichts gekoppelt. Starte neu.";
 "pair.not.unreachable.title" = "Der Mac hat nicht geantwortet";
 "pair.not.unreachable.body" = "Prüfe, ob das Telefon im WLAN des Shops ist und Khayt auf dem Mac geöffnet ist.";
 "pair.not.again" = "Neu starten";
 "pair.older.title" = "Inhaber-PIN eingeben";
 "pair.older.body" = "Dieser Mac kann noch nicht per Zahl koppeln (dafür braucht er Khayt 4.0 beta mit Telefon-Kopplung). Die Inhaber-PIN koppelt dieses Telefon wie bisher als Inhaber.";
-"pair.older.foot" = "Die PIN wird einmal zum Koppeln gesendet und nicht auf diesem Telefon gespeichert.";
+"pair.older.foot" = "Die PIN koppelt dieses Telefon einmal. Sobald der Mac das Telefon registriert, wird die PIN darauf nicht gespeichert.";
 "pair.older.pair" = "Koppeln";
 "floor.today.title" = "Heute";
 "floor.today.banner.operator" = "Bedienungs-Telefon. Fragt jedes Mal den Mac: kein Buch des Shops, keine Preise und Kunden auf diesem Telefon.";

@@ -2414,7 +2414,7 @@ final class KhaytAPIClient: ObservableObject {
 
     /// The Mac takes a job photo only from a phone it enrolled (signed), never
     /// on the PIN alone: `POST /api/orders/{id}/photos` (docs/LAN_API.md).
-    var canAddJobPhoto: Bool { usableDevice != nil && !settings.isSampleShop }
+    var canAddJobPhoto: Bool { usableDevice != nil && !settings.isSampleShop && settings.can("orders:write") }
 
     /// Send one photo of the finished print to the Mac, which keeps it full
     /// size beside the book, makes the small copy every app shows, and adds it
@@ -2691,9 +2691,13 @@ extension KhaytAPIClient {
     /// the PIN's didSet throwing the new enrolment away), the identity that
     /// signed the offer is pinned, the key kept, the role taken.
     @discardableResult
-    func finishCodePairing(_ ticket: CodePairTicket, markPaired: Bool = true) async -> Bool {
+    /// `stillWanted` is asked after the Mac answers and before anything is
+    /// written: a person who cancelled meanwhile keeps the phone as it was.
+    func finishCodePairing(_ ticket: CodePairTicket, markPaired: Bool = true,
+                           stillWanted: () -> Bool = { true }) async -> Bool {
         guard let credential = ticket.pairing.credential(ticket.offer),
-              case .some(let role) = await deviceSelf(credential) else { return false }
+              case .some(let role) = await deviceSelf(credential),
+              !Task.isCancelled, stillWanted() else { return false }
         settings.dropPinAfterEnrolment()
         settings.signedOutByMac = false
         settings.needsPairAgain = false
@@ -2737,10 +2741,9 @@ extension KhaytAPIClient {
     /// phone has a role to read: a phone enrolled on the owner PIN is the
     /// owner, and no reply can make it less.
     ///
-    /// Replies to a phone carry no MAC yet, so this answer can be forged by a
-    /// host on the Wi-Fi. That can only make the phone show LESS (a forged
-    /// "owner" gains nothing: the Mac checks every request), and the book it
-    /// may then drop is one with nothing unsent in it (`forgetBookForFloorMode`).
+    /// The answer is believed only with a reply MAC that verifies over this
+    /// request's nonce (`deviceSelf`): something else on the Wi-Fi cannot
+    /// raise this phone to owner, nor push it down to a floor phone.
     func refreshDeviceRole() async {
         guard settings.pairedByCode, let device = usableDevice,
               case .some(let role) = await deviceSelf(device) else { return }
@@ -2757,7 +2760,7 @@ extension KhaytAPIClient {
         // Only on the way down (a book is held): a floor phone's own cached
         // answers are what it is allowed to see, and clearing them each round
         // would leave its screens blank offline.
-        guard settings.pairedByCode, !settings.mayHoldBook, pendingCount == 0,
+        guard settings.pairedByCode, !settings.mayHoldBook, !settings.isSampleShop, pendingCount == 0,
               holdsBookOnDisk || holdsBook else { return }
         book?.forget()
         Task { await CompanionCache.shared.clear() }

@@ -1476,13 +1476,13 @@
 "pair.not.busy.title" = "El Mac está vinculando otra cosa";
 "pair.not.busy.body" = "Espera un momento y vuelve a intentarlo.";
 "pair.not.refused.title" = "La respuesta del Mac no se pudo verificar";
-"pair.not.refused.body" = "No se vinculó nada. Vuelve a empezar; si se repite, vincula con el PIN del propietario.";
+"pair.not.refused.body" = "No se vinculó nada. Vuelve a empezar.";
 "pair.not.unreachable.title" = "El Mac no respondió";
 "pair.not.unreachable.body" = "Comprueba que este teléfono está en la Wi-Fi de la tienda y que Khayt está abierto en el Mac.";
 "pair.not.again" = "Volver a empezar";
 "pair.older.title" = "Introduce el PIN del propietario";
 "pair.older.body" = "Este Mac aún no puede vincular por número (necesita Khayt 4.0 beta con vinculación de teléfonos). El PIN del propietario vincula este teléfono como propietario, como antes.";
-"pair.older.foot" = "El PIN se envía una vez, para vincular, y no se guarda en este teléfono.";
+"pair.older.foot" = "El PIN vincula este teléfono una vez. Cuando el Mac registra el teléfono, el PIN no se guarda en él.";
 "pair.older.pair" = "Vincular";
 "floor.today.title" = "Hoy";
 "floor.today.banner.operator" = "Teléfono de operador. Pregunta al Mac cada vez: sin libro de la tienda, precios ni clientes en este teléfono.";
