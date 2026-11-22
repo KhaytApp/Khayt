@@ -162,6 +162,59 @@ struct HeadActualsTests {
         #expect(try await Self.engine.perHeadPatch(order: other, historyJob: job) == .null)
     }
 
+    @Test("each head keeps the colour and material that were in it: the tag if read, else what the machine is recorded as holding")
+    func colourStamp() async throws {
+        let history = Self.obj(try Self.json("u1-history-around-timelapse.json"))
+        let found = await HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
+                                              endedAt: Date(timeIntervalSince1970: 1785823749), engine: OperatorLockTests.sharedEngine)
+        let job = try #require(found)
+        // The shop's own U1 reading: heads 1 and 2 tagged, 3 and 4 empty.
+        let detect = try #require(HeadActuals.filamentDetect(in: Self.obj(try Self.json("u1-filament-detect.json"))))
+        let loaded: JSONValue = .array([.object(["slot": .number(0), "hex": .string("#FF0000"), "material": .string("PETG")]),
+                                        .object(["slot": .number(1), "hex": .string("#00FF00"), "material": .string("PETG")])])
+        func heads(_ patch: JSONValue) -> [[String: JSONValue]] {
+            guard case .array(let list)? = Self.obj(patch)["actualHeads"] else { return [] }
+            return list.map(Self.obj)
+        }
+        let order: JSONValue = .object(["id": .string("J1")])
+        // A tag read wins over the list.
+        let tagged = heads(try await Self.engine.perHeadPatch(order: order, historyJob: job,
+                                                              filamentDetect: detect, machineLoaded: loaded))
+        #expect(tagged.count == 2)
+        for head in tagged {
+            #expect(head["colourFrom"] == .string("rfid"))
+            guard case .string(let hex)? = head["hex"], case .string(let material)? = head["material"] else {
+                Issue.record("no colour on a tagged head"); continue
+            }
+            #expect(hex.count == 7 && hex.hasPrefix("#") && hex != "#FF0000" && hex != "#00FF00")
+            #expect(!material.isEmpty && material != "PETG")
+        }
+        // No reading: what the machine is recorded as holding.
+        let listed = heads(try await Self.engine.perHeadPatch(order: order, historyJob: job, machineLoaded: loaded))
+        #expect(listed.map { $0["hex"] } == [.string("#FF0000"), .string("#00FF00")])
+        #expect(listed.allSatisfy { $0["colourFrom"] == .string("loaded") && $0["material"] == .string("PETG") })
+        // Neither: the split as it always was, with no colour fields at all.
+        let bare = heads(try await Self.engine.perHeadPatch(order: order, historyJob: job))
+        #expect(bare.count == 2)
+        #expect(bare.allSatisfy { Set($0.keys) == ["head", "grams", "estimateG"] })
+        // The grams are the same whichever way the colour was found.
+        #expect(tagged.map { $0["grams"] } == bare.map { $0["grams"] })
+        // Not an answer: nothing to read.
+        #expect(HeadActuals.filamentDetect(in: ["result": .object(["status": .object([:])])]) == nil)
+        #expect(HeadActuals.filamentDetect(in: [:]) == nil)
+    }
+
+    @Test("the shared colour vectors, through the bundled rule")
+    func colourVectors() async throws {
+        let v = Self.obj(try Self.json("per-head-actuals-vectors.json"))
+        guard case .array(let cases)? = v["colour"] else { Issue.record("no vectors"); return }
+        #expect(cases.count >= 8)
+        for c in cases.map(Self.obj) {
+            let got = try await Self.engine.headColour(head: c["head"] ?? .null, at: c["at"] ?? .null)
+            #expect(got == (c["want"] ?? .null), Comment(rawValue: "\(c["why"] ?? .null)"))
+        }
+    }
+
     @Test("the write is the printer's own record: asked of the lock as a system write, never as a person's edit")
     func gate() throws {
         let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

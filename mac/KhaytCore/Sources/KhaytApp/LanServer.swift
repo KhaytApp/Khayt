@@ -4018,6 +4018,12 @@ extension LanServer {
             "tempBed": int(s?.tempBed),
             "error": text(reading?.problem),
             "lastUpdated": reading.map { .string(StoreWriter.iso($0.at)) } ?? .null,
+            // When it last ANSWERED (`lastUpdated` moves on a failed poll
+            // too), and why it is not answering in a word no language
+            // changes: `error` is a sentence in the shop's language.
+            "lastOkAt": (reading?.lastOkAt).map { .string(StoreWriter.iso($0)) } ?? .null,
+            "errorCode": text(reading?.problem == nil ? nil : (reading?.problemCode ?? "unreachable")),
+            "httpStatus": (reading?.problem == nil ? nil : reading?.httpStatus).map { .number(Double($0)) } ?? .null,
             // The printer's own word for itself, else the type the shop set.
             "apiType": text((s?.type ?? "").isEmpty ? type : s?.type),
             // What it needs from a person, worked out HERE by the shared rules

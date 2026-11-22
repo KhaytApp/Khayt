@@ -475,7 +475,10 @@ function perHeadActuals(job, opts = {}) {
   return { jobId, status: typeof job.status === 'string' ? job.status : null, totalG: r1(totalG), heads, basis: 'proportional', weighed };
 }
 
-const HEX6 = /^#?([0-9a-f]{6})$/i;
+// Six digits, or eight (RRGGBBAA: the alpha is dropped), as lib/loaded-colours.js reads a colour.
+const HEX6 = /^#?([0-9a-f]{6})(?:[0-9a-f]{2})?$/i;
+/** At most 40 characters, counted as characters: a cut never splits one in two. */
+const short40 = (s) => Array.from(String(s == null ? '' : s).trim()).slice(0, 40).join('');
 const hex6 = (v) => { const m = typeof v === 'string' ? HEX6.exec(v.trim()) : null; return m ? '#' + m[1].toUpperCase() : null; };
 
 /**
@@ -483,9 +486,14 @@ const hex6 = (v) => { const m = typeof v === 'string' ? HEX6.exec(v.trim()) : nu
  *
  *   at.trays   lib/rfid-tray.js trays(filament_detect): per head, the spool's
  *              own tag or null. A tag that was READ wins: `colourFrom: 'rfid'`.
- *   at.loaded  the machine's `loaded` list ({ slot, hex, material }, slot is
- *              the head's index): what the shop or the printer's own report
- *              said was loaded. `colourFrom: 'loaded'`.
+ *   at.loaded  what is loaded, { slot, hex, material } with slot the head's
+ *              index: the printer's own report when it makes one (a U1's
+ *              print_task_config, which also covers spools with no tag),
+ *              else what the shop typed on the machine. `colourFrom: 'loaded'`.
+ *
+ * The host reads both shortly AFTER the print ends (the history row it needs
+ * is only written then), so a spool swapped in that first minute or two is
+ * what gets stamped. Said here so nobody reads the stamp as more than it is.
  *
  * Null when neither names a colour for this head: nothing is guessed, and an
  * empty head's white (the U1 reports #FFFFFF with no tag) is never a tag.
@@ -501,7 +509,7 @@ function headColour(head, at) {
     const hex = hex6(tray.colours[0]);
     if (hex) {
       const material = [tray.material, tray.sub].filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim()).join(' ');
-      return { hex, material: material.slice(0, 40), colourFrom: 'rfid' };
+      return { hex, material: short40(material), colourFrom: 'rfid' };
     }
   }
   const rows = Array.isArray(at.loaded) ? at.loaded.slice(0, 16) : [];
@@ -510,9 +518,11 @@ function headColour(head, at) {
     if (!row || typeof row !== 'object') continue;
     const slot = Number.isInteger(row.slot) ? row.slot : i;
     if (slot !== head) continue;
-    const hex = hex6(row.hex);
-    if (!hex) return null;
-    return { hex, material: (typeof row.material === 'string' ? row.material.trim() : '').slice(0, 40), colourFrom: 'loaded' };
+    // A row whose colour is not one is no row (normalizeLoaded drops it too);
+    // a later row for the same head may still say.
+    const hex = hex6(row.hex || row.color || row.colour);
+    if (!hex) continue;
+    return { hex, material: short40(typeof row.material === 'string' ? row.material : ''), colourFrom: 'loaded' };
   }
   return null;
 }
