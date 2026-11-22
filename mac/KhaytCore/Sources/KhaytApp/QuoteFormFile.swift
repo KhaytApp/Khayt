@@ -123,14 +123,24 @@ enum QuoteFormFile {
         /// The visitor's file name, made safe to put on disk: the last path
         /// component only, no separators or control characters, bounded.
         /// The name is from a stranger and is never trusted as a path.
+        ///
+        /// SAFE ON WINDOWS TOO, not only here: a file taken on this Mac can
+        /// reach a Windows computer (the shop's folder synced, a backup
+        /// restored there). So none of `< > " | ? *`, no dot or space at the
+        /// end, and not one of the device names (`CON`, `NUL`, `COM1`…),
+        /// which Windows will not create whatever the extension.
         var safeName: String {
             var leaf = name.replacingOccurrences(of: "\\", with: "/")
                 .split(separator: "/").last.map(String.init) ?? ""
             leaf = String(leaf.unicodeScalars.filter {
-                !CharacterSet.controlCharacters.contains($0) && $0 != ":"
+                !CharacterSet.controlCharacters.contains($0) && !Self.unsafeScalars.contains($0)
             }.map(Character.init))
             leaf = leaf.trimmingCharacters(in: .whitespaces)
             while leaf.hasPrefix(".") { leaf.removeFirst() }
+            while leaf.hasSuffix(".") || leaf.hasSuffix(" ") { leaf.removeLast() }
+            let stemOnly = (leaf.split(separator: ".", omittingEmptySubsequences: false).first.map(String.init) ?? "")
+                .trimmingCharacters(in: .whitespaces).uppercased()
+            if Self.windowsDevices.contains(stemOnly) { leaf = "_" + leaf }
             // Bounded in UTF-8 bytes, which is what NAME_MAX (255) counts:
             // 120 emoji are 120 Characters and far more bytes.
             if leaf.utf8.count > 200 {
@@ -139,8 +149,16 @@ enum QuoteFormFile {
                 while stem.utf8.count > 180 { stem.removeLast() }
                 leaf = ext.isEmpty ? stem : stem + "." + ext
             }
+            while leaf.hasSuffix(".") || leaf.hasSuffix(" ") { leaf.removeLast() }
             return leaf.isEmpty ? "model" : leaf
         }
+
+        /// `: < > " | ? *`: not allowed in a Windows file name (`/` and `\`
+        /// are gone already, with the path).
+        static let unsafeScalars: Set<Unicode.Scalar> = [":", "<", ">", "\"", "|", "?", "*"]
+        /// Names Windows keeps for devices, with any extension.
+        static let windowsDevices: Set<String> = Set(["CON", "PRN", "AUX", "NUL"]
+            + (1...9).flatMap { ["COM\($0)", "LPT\($0)"] })
     }
 
     /// Why a request with a file was left in the queue.

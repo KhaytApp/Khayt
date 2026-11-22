@@ -839,6 +839,16 @@ struct QuoteFormImportTests {
         #expect(name("a:b\u{0}.stl") == "ab.stl")
         #expect(name("/") == "model")
         #expect(name(String(repeating: "x", count: 300) + ".3mf").utf8.count <= 200)
+        // Safe on Windows too: the file can end up on one.
+        #expect(name("a<b>c\"d|e?f*g.stl") == "abcdefg.stl")
+        #expect(name("part.stl. . .") == "part.stl")
+        #expect(name("CON.gcode") == "_CON.gcode")
+        #expect(name("nul") == "_nul")
+        #expect(name("com1.3mf") == "_com1.3mf" && name("LPT9.stl") == "_LPT9.stl")
+        #expect(name("console.gcode") == "console.gcode" && name("COM10.stl") == "COM10.stl", "only the device names themselves")
+        #expect(name("???") == "model" && name(" . ") == "model")
+        let long = name(String(repeating: "x", count: 180) + String(repeating: ".", count: 40) + "stl")
+        #expect(long.utf8.count <= 200 && !long.hasSuffix(".") && !long.hasSuffix(" "))
     }
 
     @Test("the payload's file is read; an intake row shows its name, size and expiry")
