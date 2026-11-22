@@ -269,6 +269,8 @@ final class Shop {
     /// a test answers as the server would.
     var networkSwitchFetch: NetworkSwitchFetch?
     var networkSwitchTask: Task<Void, Never>?
+    /// A test's own Khayt Cloud session (where to ask, a token, the shop key).
+    var networkSwitchSessionForTests: (CloudReader.Connection, String, Data)?
     /// The gate this shop tells and asks; the app's, unless a test hands one in.
     var outboundGate: OutboundGate = .app
     /// Where this Mac keeps its own "make no internet calls" switch.

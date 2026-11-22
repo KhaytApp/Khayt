@@ -44,14 +44,14 @@ extension Shop {
 
     /// The newest stamp this Mac has seen, applied or set itself. Never lowered.
     nonisolated static let highestSeenKey = "network.switchHighestSeen"
-    /// This Mac is offline because of a value it took from the route or sent
-    /// to it: the one call is kept.
-    nonisolated static let viaCloudKey = "network.switchViaCloud"
     /// A published stamp waiting for a person's answer: never applied on its own.
     nonisolated static let heldStampKey = "network.switchHeld"
 
     var networkSwitchHighestSeen: String? { outboundDefaults.string(forKey: Self.highestSeenKey) }
-    var networkSwitchViaCloud: Bool { outboundDefaults.bool(forKey: Self.viaCloudKey) }
+    /// The shop's switch came through Khayt Cloud (`settings.network.via`):
+    /// applied from the route, or sent there by this Mac. The rule keeps the
+    /// one call for it, and only for it.
+    var networkSwitchViaCloud: Bool { networkSettings["via"] == .string(NetworkSwitch.viaCloud) }
 
     private func sawStamp(_ stamp: String) {
         if let next = NetworkSwitch.later(networkSwitchHighestSeen, stamp) {
@@ -59,9 +59,19 @@ extension Shop {
         }
     }
 
-    private func setViaCloud(_ on: Bool) {
-        outboundDefaults.set(on, forKey: Self.viaCloudKey)
-        tellOutboundGate()
+    /// Write whether the switch came through Khayt Cloud, and tell the gate.
+    private func markViaCloud(_ on: Bool) async {
+        // lock: system — a marker of where the shop's switch came from, set by what Khayt Cloud answered
+        guard networkSwitchViaCloud != on, let build = source.build, source.isReal else { return }
+        try? await StoreWriter.updateOffMain(build) { root in
+            var settings: [String: JSONValue] = { if case .object(let o)? = root["settings"] { return o }; return [:] }()
+            settings["network"] = NetworkSwitch.marked(settings["network"], viaCloud: on)
+            root["settings"] = .object(settings)
+        }
+        var now = settingsDict
+        now["network"] = NetworkSwitch.marked(now["network"], viaCloud: on)
+        settingsValue = .object(now)
+        await load(source)
     }
 
     /// The rule's purpose ids, for a value's `keep` list.
@@ -92,6 +102,7 @@ extension Shop {
     /// The session, the key and where to ask, or nil when this Mac is not
     /// signed in to Khayt Cloud with the key open.
     private func networkSwitchSession() async -> (CloudReader.Connection, String, Data)? {
+        if let pretend = networkSwitchSessionForTests { return pretend }
         guard source.isReal, let dek = cloudDek, let (connection, token) = await vaultSession() else { return nil }
         return (connection, token, dek)
     }
@@ -147,12 +158,28 @@ extension Shop {
     /// Returns whether the others were told. A 409 is not "told": somebody
     /// changed the switch at another computer at or after this moment, which
     /// is said and never silently obeyed or overridden.
-    func tellOthersSwitchedOn(_ network: JSONValue) async {
+    @discardableResult
+    func tellOthersSwitchedOn(_ network: JSONValue) async -> Bool {
         // lock: callers — setOutboundOffline
-        guard outboundTellsOthers, let value = NetworkSwitch.value(of: network, purposes: outboundPurposeIds) else { return }
-        guard let (connection, token, dek) = await networkSwitchSession() else { noteTold(.failed); return }
+        guard outboundTellsOthers, let value = NetworkSwitch.value(of: network, purposes: outboundPurposeIds) else { return false }
+        guard let (connection, token, dek) = await networkSwitchSession() else { noteTold(.failed); return false }
         let sent = await Self.networkSwitchPut(value, connection: connection, token: token, dek: dek, fetch: networkSwitchFetcher)
         afterSending(sent, value: value)
+        if case .stale = sent { await holdPublished(connection, token: token, dek: dek) }
+        return sent == .ok
+    }
+
+    /// After a 409: read what the other computer set, so the person can be
+    /// offered it. It is held, never applied here. This Mac may still call:
+    /// it has not stopped yet (turning on), or is online again (turning off).
+    private func holdPublished(_ connection: CloudReader.Connection, token: String, dek: Data) async {
+        let (_, published) = await Self.networkSwitchGet(connection, token: token, fetch: networkSwitchFetcher)
+        guard let published,
+              case .success(let value) = NetworkSwitch.read(published, shopId: connection.shopId, dek: dek,
+                                                            highestSeen: nil, purposes: outboundPurposeIds) else { return }
+        held = value
+        outboundDefaults.set(value.changedAt, forKey: Self.heldStampKey)
+        networkSwitchAsk = .changedElsewhere(at: NetworkSwitch.date(value.changedAt))
     }
 
     /// The switch was turned OFF here, by the owner: a GET first, then
@@ -160,7 +187,6 @@ extension Shop {
     /// on. This Mac is online again by now, so these are its first calls.
     func tellOthersSwitchedOff(_ network: JSONValue) async {
         // lock: callers — setOutboundOffline
-        defer { outboundDefaults.set(false, forKey: Self.viaCloudKey) }
         guard let value = NetworkSwitch.value(of: network, purposes: outboundPurposeIds) else { return }
         guard let (connection, token, dek) = await networkSwitchSession() else {
             if outboundTellsOthers { noteTold(.failed) }
@@ -170,21 +196,23 @@ extension Shop {
         let publishedThere: Bool = { if case .published = heard { return true }; return false }()
         // Nothing published and the option off here: the shop does not share
         // the switch, and this Mac sends nothing.
-        guard publishedThere || outboundTellsOthers else { return }
+        guard NetworkSwitch.sendsOff(publishedThere: publishedThere, optionOn: outboundTellsOthers) else { return }
         let sent = await Self.networkSwitchPut(value, connection: connection, token: token, dek: dek, fetch: networkSwitchFetcher)
         afterSending(sent, value: value, option: outboundTellsOthers)
+        if case .stale = sent { await holdPublished(connection, token: token, dek: dek) }
     }
 
     private func afterSending(_ sent: Sent, value: NetworkSwitch.Value, option: Bool = true) {
         switch sent {
         case .ok:
             noteTold(.told(Date()))
-            // Offline because of a value this Mac sent: the one call is kept.
-            if value.offline { outboundDefaults.set(true, forKey: Self.viaCloudKey) }
         case .stale(let at):
             // Changed at another computer at or after this moment. Said, and
-            // held: it is not applied over what the person just did here.
-            noteTold(.failed)
+            // held: it is not applied over what the person just did here. The
+            // others were not told of THIS change, and Khayt Cloud was reached,
+            // so neither "told" nor "could not be reached" is claimed.
+            outboundDefaults.removeObject(forKey: Self.toldAtKey)
+            outboundDefaults.set(false, forKey: Self.tellFailedKey)
             if let at { outboundDefaults.set(at, forKey: Self.heldStampKey) }
             networkSwitchAsk = .changedElsewhere(at: at.flatMap(NetworkSwitch.date))
         case .refused, .failed:
@@ -205,13 +233,15 @@ extension Shop {
 
     // MARK: - Hearing
 
-    /// Whether this Mac may ask the route now: signed in, and either online
-    /// or offline because of a value from the route. Its own switch, or a
-    /// shop switch nobody shared, means no call at all.
+    /// Whether this Mac may ask the route now. The RULE answers
+    /// (`switch-sync`): yes while online; while offline only when the switch
+    /// came through Khayt Cloud and the row is not unticked; never under this
+    /// Mac's own switch. Asked without counting a refusal: nobody pressed
+    /// anything.
     var hearsNetworkSwitch: Bool {
-        guard feedsOutboundGate, source.isReal else { return false }
-        if outboundOfflineHere { return false }
-        return !outboundGate.isShopOffline || networkSwitchViaCloud
+        guard feedsOutboundGate || networkSwitchSessionForTests != nil,
+              source.isReal || networkSwitchSessionForTests != nil else { return false }
+        return outboundGate.verdict(.switchSync).allowed
     }
 
     /// One GET, and what it leads to. Called at start and every fifteen
@@ -224,7 +254,7 @@ extension Shop {
         case .none:
             // The shop stopped sharing: the one call ends. Nothing is turned
             // on or off by that; this Mac keeps the value it last applied.
-            if networkSwitchViaCloud { setViaCloud(false) }
+            await markViaCloud(false)
         case .published:
             guard let published else { return }
             await heardNetworkSwitch(published, shopId: connection.shopId, dek: dek, now: now)
@@ -237,21 +267,24 @@ extension Shop {
             if case .string(let s)? = networkSettings["changedAt"], NetworkSwitch.date(s) != nil { return s }
             return nil
         }()
-        let seen = NetworkSwitch.later(networkSwitchHighestSeen, ownStamp)
-        switch NetworkSwitch.read(published, shopId: shopId, dek: dek, highestSeen: seen, purposes: outboundPurposeIds) {
-        case .failure(.old): return
-        case .failure(let why):
+        switch NetworkSwitch.hearing(published, shopId: shopId, dek: dek, highestSeen: networkSwitchHighestSeen,
+                                     ownStamp: ownStamp, heldStamp: outboundDefaults.string(forKey: Self.heldStampKey),
+                                     purposes: outboundPurposeIds, now: now) {
+        case .ignore(.old): return
+        case .ignore(let why):
             FileHandle.standardError.write(Data("khayt: network switch: ignored, \(why.rawValue)\n".utf8))
-        case .success(let value):
-            // Waiting for a person already: not applied on its own, not asked twice.
-            if outboundDefaults.string(forKey: Self.heldStampKey) == value.changedAt {
-                if networkSwitchAsk == nil { networkSwitchAsk = .changedElsewhere(at: NetworkSwitch.date(value.changedAt)) }
+        case .askChangedElsewhere(let value):
+            held = value
+            if networkSwitchAsk == nil { networkSwitchAsk = .changedElsewhere(at: NetworkSwitch.date(value.changedAt)) }
+        case .askOld(let value):
+            held = value
+            networkSwitchAsk = .oldSwitch(at: NetworkSwitch.date(value.changedAt))
+        case .apply(let value):
+            // A change made here was answered with "changed elsewhere" and the
+            // person has not chosen yet: whatever is published now waits too.
+            if case .changedElsewhere? = networkSwitchAsk {
                 held = value
-                return
-            }
-            if NetworkSwitch.asksFirst(value, hasOwnStamp: seen != nil, now: now) {
-                held = value
-                networkSwitchAsk = .oldSwitch(at: NetworkSwitch.date(value.changedAt))
+                outboundDefaults.set(value.changedAt, forKey: Self.heldStampKey)
                 return
             }
             await applyNetworkSwitch(value)
@@ -298,8 +331,6 @@ extension Shop {
             }
         } catch { return false }
         sawStamp(value.changedAt)
-        // Offline because of a value from the route: the one call is kept.
-        outboundDefaults.set(value.offline, forKey: Self.viaCloudKey)
         var now = settingsDict
         now["network"] = NetworkSwitch.applied(value, to: now["network"])
         settingsValue = .object(now)

@@ -35,6 +35,9 @@ public enum NetworkSwitch {
     /// The cap on the one last call when the switch is turned on.
     public static let lastCallCap: TimeInterval = 10
     public static let maxChangedBy = 80
+    /// Never in a `keep` list: `lan` is always allowed, and the switch-sync
+    /// call is each computer's own choice, kept by the rule's own test.
+    public static let neverKept: Set<String> = ["lan", "switch-sync"]
 
     /// The shop's switch, as it travels.
     public struct Value: Sendable, Equatable {
@@ -151,7 +154,7 @@ public enum NetworkSwitch {
         if let highestSeen, let seen = date(highestSeen), when <= seen { return .failure(.old) }
         var keep: [String] = []
         if case .array(let list)? = plain["keep"] {
-            for case .string(let id) in list where purposes.contains(id) && id != "lan" && !keep.contains(id) { keep.append(id) }
+            for case .string(let id) in list where purposes.contains(id) && !neverKept.contains(id) && !keep.contains(id) { keep.append(id) }
         }
         var by: String?
         if case .string(let name)? = plain["changedBy"] {
@@ -170,6 +173,42 @@ public enum NetworkSwitch {
         return now.timeIntervalSince(when) > askAfter
     }
 
+    /// What a published value leads to on this computer.
+    public enum Hearing: Sendable, Equatable {
+        /// Every check holds: put it in the book.
+        case apply(Value)
+        /// A new install met an old `offline: true`: ask before applying.
+        case askOld(Value)
+        /// The value the server answered a change made here with (a 409),
+        /// still waiting for the person's answer: never applied on its own.
+        case askChangedElsewhere(Value)
+        /// Not applied, and why. `.old` is the everyday case and is not logged.
+        case ignore(Ignored)
+    }
+
+    /// `read`, then the two cases that wait for a person.
+    ///
+    /// - `ownStamp`: the stamp in this computer's own book, if it has one.
+    /// - `heldStamp`: a published stamp already waiting for an answer.
+    public static func hearing(_ published: Published, shopId: String, dek: Data, highestSeen: String?, ownStamp: String?,
+                               heldStamp: String?, purposes: Set<String>, now: Date) -> Hearing {
+        let seen = later(highestSeen, ownStamp)
+        switch read(published, shopId: shopId, dek: dek, highestSeen: seen, purposes: purposes) {
+        case .failure(let why): return .ignore(why)
+        case .success(let value):
+            if let heldStamp, heldStamp == value.changedAt { return .askChangedElsewhere(value) }
+            if asksFirst(value, hasOwnStamp: seen != nil, now: now) { return .askOld(value) }
+            return .apply(value)
+        }
+    }
+
+    /// When the switch is turned OFF here: whether `offline: false` is sent.
+    /// Yes when a value is published there, whatever this computer's own
+    /// option says (another computer published it, and an `offline: true`
+    /// left there would keep reaching every computer that starts); yes when
+    /// this computer's option is on; otherwise nothing is sent.
+    public static func sendsOff(publishedThere: Bool, optionOn: Bool) -> Bool { publishedThere || optionOn }
+
     /// The later of two stamps: how `highestSeen` only ever goes up.
     public static func later(_ a: String?, _ b: String?) -> String? {
         guard let a, let da = date(a) else { return b.flatMap { date($0) != nil ? $0 : nil } }
@@ -186,6 +225,20 @@ public enum NetworkSwitch {
         n["keep"] = .array(value.keep.map(JSONValue.string))
         n["changedAt"] = .string(value.changedAt)
         n["changedBy"] = value.changedBy.map(JSONValue.string) ?? .null
+        // It came through Khayt Cloud: the rule keeps the one call that hears
+        // it turned off (`lib/outbound.js switchSyncKept`).
+        n["via"] = .string(viaCloud)
+        return .object(n)
+    }
+
+    /// `settings.network.via` for a switch that came through Khayt Cloud:
+    /// applied from the route, or sent there by this computer.
+    public static let viaCloud = "cloud"
+
+    /// `settings.network` saying whether the switch came through Khayt Cloud.
+    public static func marked(_ network: JSONValue?, viaCloud on: Bool) -> JSONValue {
+        var n: [String: JSONValue] = { if case .object(let o)? = network { return o }; return [:] }()
+        if on { n["via"] = .string(viaCloud) } else { n["via"] = nil }
         return .object(n)
     }
 
@@ -196,7 +249,7 @@ public enum NetworkSwitch {
         let offline: Bool = { guard let v = n["offline"] else { return false }; return v != .bool(false) && v != .null }()
         var keep: [String] = []
         if case .array(let list)? = n["keep"] {
-            for case .string(let id) in list where purposes.contains(id) && id != "lan" && !keep.contains(id) { keep.append(id) }
+            for case .string(let id) in list where purposes.contains(id) && !neverKept.contains(id) && !keep.contains(id) { keep.append(id) }
         }
         var by: String?
         if case .string(let name)? = n["changedBy"], !name.isEmpty { by = name }

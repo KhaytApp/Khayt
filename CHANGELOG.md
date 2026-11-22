@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: "Also tell my other computers through Khayt Cloud" now does it (draft; stacked on the Internet use page, the gate and the shared rule; needs khayt-cloud #223).** The option on Settings ▸ General ▸ Internet use is shown now that its call is wired. It is off unless the owner turns it on.
+  - **Turned on.** With the option on, this Mac sends the switch, sealed with the shop's key, to Khayt Cloud as its last call (ten seconds at most), then stops either way.
+  - **Turned off.** This Mac first asks Khayt Cloud whether a switch is published there. If one is, it sends "off" even when its own option is off, so an "on" another computer published does not keep reaching every computer that starts.
+  - **Hearing.** Every signed-in Mac asks at start, beside each sync, and every 15 minutes. While the switch is on, it keeps asking only if the switch came through Khayt Cloud (sent from here, or applied from there): that one call, which carries nothing, is how the computers come back online together. It has a row of its own on the page ("Hearing when the switch is turned off"), which can be unticked. A Mac that is offline by its own switch asks nothing.
+  - **What is obeyed.** Only a value that opens with the shop's key, names this shop, carries the stamp the server returned, and is newer than anything this Mac has seen. This Mac's own "on this Mac only" switch is never changed by it.
+  - **Asked first, never applied silently.** A Mac with no switch history of its own asks before applying an "off the internet" more than 7 days old. And if another computer changed the switch at the moment it was changed here, the Mac says so and keeps what was set here until the owner chooses.
+  - **Not proven by the seal:** any member who signed in holds the shop's key, so "owner only" is enforced by Khayt Cloud on the write, not by a signature a computer can check. An owner signing key comes later (accepted Nov 22).
+  - 8 new strings and one changed, in 9 languages.
 - **Mac: Settings ▸ General ▸ Internet use.** The page for the switch that stops Khayt calling the internet (Figma page 27).
   - **Two switches.** "Make no internet calls", and "Also on this Mac only", which can only be stricter. Only the owner can change them; a manager sees the page and is told so.
   - **One row for each kind of call**, from the shared rule: what it sends and where, whether it is automatic, and whether it is Allowed, Blocked, Kept, Off by its own switch or Not set up. While the switch is on, each row has a Keep tick.

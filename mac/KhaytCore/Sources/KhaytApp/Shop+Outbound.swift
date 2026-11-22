@@ -118,7 +118,8 @@ extension Shop {
 
     /// `settings.network` with the shop's switch set. The stamp moves only
     /// when the switch itself changes; `keep` is left as it was.
-    nonisolated static func network(_ network: JSONValue?, offline: Bool, by name: String?, at: Date) -> JSONValue {
+    nonisolated static func network(_ network: JSONValue?, offline: Bool, by name: String?, at: Date,
+                                    viaCloud: Bool? = nil) -> JSONValue {
         var n: [String: JSONValue] = { if case .object(let o)? = network { return o }; return [:] }()
         // Anything stored that is not exactly `false` reads as on (the rule's
         // `onSwitch`), so "was it on" is asked the same way.
@@ -128,6 +129,8 @@ extension Shop {
             n["changedAt"] = .string(StoreWriter.iso(at))
             n["changedBy"] = name.map(JSONValue.string) ?? .null
         }
+        // Whether this change went through Khayt Cloud (nil: not a change).
+        if let viaCloud { n["via"] = viaCloud ? .string(NetworkSwitch.viaCloud) : nil }
         return .object(n)
     }
 
@@ -143,11 +146,17 @@ extension Shop {
     /// and never `tunnel` (the Mac has none). The stamp is not touched.
     nonisolated static func network(_ network: JSONValue?, keep purpose: OutboundPurpose, _ kept: Bool) -> JSONValue {
         var n: [String: JSONValue] = { if case .object(let o)? = network { return o }; return [:] }()
+        // The switch-sync call is not in `keep`: unticking its row writes
+        // `dropSwitchSync`, which the rule reads (`switchSyncKept`).
+        if purpose == .switchSync {
+            if kept { n["dropSwitchSync"] = nil } else { n["dropSwitchSync"] = .bool(true) }
+            return .object(n)
+        }
         var list: [String] = { if case .array(let a)? = n["keep"] { return a.compactMap { if case .string(let s) = $0 { s } else { nil } } }; return [] }()
         list.removeAll { $0 == purpose.rawValue }
         if kept { list.append(purpose.rawValue) }
         let known = Set(OutboundPurpose.allCases.map(\.rawValue))
-        n["keep"] = .array(list.filter { known.contains($0) && $0 != "lan" }.map(JSONValue.string))
+        n["keep"] = .array(list.filter { known.contains($0) && !NetworkSwitch.neverKept.contains($0) }.map(JSONValue.string))
         return .object(n)
     }
 
@@ -189,11 +198,16 @@ extension Shop {
         let changed = Self.offlineOf(.object(before)) != on
         // TURNED ON, WITH THE OPTION ON: the one last call, while this Mac may
         // still make it. Ten seconds at most; then it stops whatever came back.
-        if on, changed { await tellOthersSwitchedOn(next) }
-        guard await writeNetwork({ Self.network($0, offline: on, by: name, at: now) }) else { return false }
+        // It "came through Khayt Cloud" only if that call was answered: then
+        // the rule keeps the one call that hears it turned off. A switch
+        // turned on with nothing sent, or turned off, is this Mac's alone.
+        var told = false
+        if on, changed { told = await tellOthersSwitchedOn(next) }
+        let via: Bool? = changed ? (on && told) : nil
+        guard await writeNetwork({ Self.network($0, offline: on, by: name, at: now, viaCloud: via) }) else { return false }
         // Before the reload, which awaits: told now from what was written.
         var held = settingsDict
-        held["network"] = Self.network(held["network"], offline: on, by: name, at: now)
+        held["network"] = Self.network(held["network"], offline: on, by: name, at: now, viaCloud: via)
         settingsValue = .object(held)
         if changed, case .object(let n) = next, case .string(let stamp)? = n["changedAt"] {
             if let later = NetworkSwitch.later(networkSwitchHighestSeen, stamp) { outboundDefaults.set(later, forKey: Self.highestSeenKey) }

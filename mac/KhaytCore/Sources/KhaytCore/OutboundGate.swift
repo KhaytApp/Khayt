@@ -22,6 +22,11 @@ public enum OutboundPurpose: String, CaseIterable, Sendable, Codable {
     /// The desktop's public tunnel. The Mac has none and never asks for it;
     /// the case exists so this list equals the rule's.
     case tunnel
+    /// The one call an offline computer keeps when the switch came through
+    /// Khayt Cloud: a GET of its network-switch route, only to hear the switch
+    /// turned off. Kept by the rule's own test (`settings.network.via` is
+    /// `cloud` and the row is not unticked), never by a Keep tick.
+    case switchSync = "switch-sync"
     /// Printers, cameras and phones on the shop's own network: never blocked,
     /// but only at a private address while the switch is on.
     case lan

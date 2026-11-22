@@ -52,7 +52,12 @@ struct InternetUseTests {
         #expect(line(.webhooks).state == .notSetUp && line(.taxAuthority).state == .notSetUp)
         #expect(line(.crashReports).state == .blocked, "opted in, and the switch refuses it")
         #expect(line(.lan).state == .always && !line(.lan).keepShown)
-        #expect(lines.filter { $0.purpose != .lan }.allSatisfy { $0.keepShown })
+        #expect(lines.filter { $0.purpose != .lan && $0.purpose != .switchSync }.allSatisfy { $0.keepShown })
+        // The switch-sync row's tick exists only where the rule reads it: the
+        // switch came through Khayt Cloud.
+        #expect(lines.first { $0.purpose == .switchSync }?.keepShown == false)
+        let shared = InternetUse.lines(rows: Self.rows(offline: true), offline: true, notSetUp: [], viaCloud: true, blocked: [:])
+        #expect(shared.first { $0.purpose == .switchSync }?.keepShown == true)
         #expect(line(.ai).automatic == false && line(.updates).automatic)
     }
 
@@ -177,9 +182,9 @@ struct InternetUseTests {
         for text in [off, notTold, told, failed, pending] { #expect(!text.contains("{") && !text.contains("mac.net_")) }
     }
 
-    @Test("telling the other computers: hidden and off until its call is wired; the owner's alone when offered")
+    @Test("telling the other computers: offered now its call is wired (NetworkSwitchWiringTests), off by default, the owner's alone")
     func tellOthers() async {
-        #expect(Shop.tellOthersOffered == false, "flip this only with the wiring that makes the call")
+        #expect(Shop.tellOthersOffered, "its one call is wired in Shop+NetworkSwitch")
         let shop = await OperatorLockTests.shop()
         shop.outboundDefaults = UserDefaults(suiteName: "khayt.outbound.test.\(UUID().uuidString)")!
         shop.lockNow()
@@ -189,7 +194,7 @@ struct InternetUseTests {
         #expect(await shop.signIn("OP-o", pin: "1111") == .ok)
         #expect(shop.setOutboundTellsOthers(true))
         #expect(shop.outboundDefaults.bool(forKey: Shop.tellOthersKey))
-        #expect(!shop.outboundTellsOthers, "stored, and still not acted on while the row is not offered")
+        #expect(shop.outboundTellsOthers)
     }
 
     @Test("a refusal of something a person asked for is noted for every screen; an automatic one is not")

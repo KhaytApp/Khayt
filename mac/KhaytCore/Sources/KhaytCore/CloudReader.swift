@@ -134,6 +134,10 @@ public enum CloudReader {
 
     nonisolated public static func purpose(forTail tail: String) -> OutboundPurpose {
         let path = tail.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? tail
+        // The shop's switch itself (`NetworkSwitch`): its own purpose, so the
+        // one call an offline computer keeps is never kept by `cloud`, and
+        // keeping `cloud` never keeps it.
+        if path == NetworkSwitch.tail { return .switchSync }
         return storefrontTails.contains { path == $0 || path.hasPrefix($0 + "/") } ? .storefront : .cloud
     }
 

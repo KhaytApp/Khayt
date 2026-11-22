@@ -14,7 +14,7 @@ enum InternetUse {
 
     /// The frames' order. `tunnel` is not listed: the Mac has no public tunnel.
     static let order: [OutboundPurpose] = [
-        .updates, .installCount, .crashReports, .usageStats, .cloud, .storage, .messaging, .webhooks,
+        .updates, .installCount, .crashReports, .usageStats, .cloud, .switchSync, .storage, .messaging, .webhooks,
         .storefront, .payments, .ai, .taxAuthority, .exchangeRates, .makerrun, .catalogues, .lookups, .lan,
     ]
 
@@ -62,7 +62,7 @@ enum InternetUse {
     ///   alone: this Mac's own switch is answered before `keep`, so under it
     ///   a tick would be drawn, written to the shared book, and ignored.
     static func lines(rows: [OutboundGate.Row], offline: Bool, shopOffline: Bool? = nil, notSetUp: Set<OutboundPurpose>,
-                      ownOff: Set<OutboundPurpose> = [],
+                      ownOff: Set<OutboundPurpose> = [], viaCloud: Bool = false,
                       blocked: [OutboundPurpose: OutboundGate.Blocked]) -> [Line] {
         let byId = Dictionary(rows.map { ($0.purpose, $0) }, uniquingKeysWith: { a, _ in a })
         return order.compactMap { purpose in
@@ -75,7 +75,11 @@ enum InternetUse {
             else if row.allowed { state = .allowed }
             else { state = .blocked }
             return Line(purpose: purpose, state: state, automatic: row.automatic,
-                        keepShown: (shopOffline ?? offline) && purpose != .lan, kept: row.kept,
+                        // The switch-sync row's tick exists only where the rule
+                        // reads it: the switch came through Khayt Cloud.
+                        keepShown: (shopOffline ?? offline) && purpose != .lan
+                            && (purpose != .switchSync || viaCloud),
+                        kept: row.kept,
                         blocked: state == .blocked ? blocked[purpose] : nil)
         }
     }
@@ -182,6 +186,11 @@ extension Shop {
         if !filled(ai["apiKey"]), ai["provider"] != .string("compatible") { missing.insert(.ai) }
         if !ZatcaSubmit.phase2Ready(settings: s) { missing.insert(.taxAuthority) }
         if !makerRunLinked { missing.insert(.makerrun) }
+        // The switch is asked of Khayt Cloud only by a shop that shares it
+        // there: signed in, and either this Mac's option is on or the switch
+        // came through Khayt Cloud. Otherwise nothing is asked, whatever the
+        // switch says, and the row says so.
+        if !cloudConnected || !(outboundTellsOthers || networkSwitchViaCloud) { missing.insert(.switchSync) }
         return missing
     }
 
@@ -194,6 +203,7 @@ extension Shop {
         return InternetUse.lines(rows: outboundGate.rows(), offline: outboundGate.isOffline,
                           shopOffline: outboundGate.isShopOffline,
                           notSetUp: internetUseNotSetUp(makerRunLinked: makerRunLinked), ownOff: ownOff,
+                          viaCloud: networkSwitchViaCloud,
                           blocked: outboundGate.blockedCounts())
     }
 
