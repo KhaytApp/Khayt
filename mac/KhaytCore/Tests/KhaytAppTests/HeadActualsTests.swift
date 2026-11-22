@@ -81,7 +81,7 @@ struct HeadActualsTests {
         let engine = OperatorLockTests.sharedEngine
         let v = Self.obj(try Self.json("per-head-actuals-vectors.json"))
         guard case .array(let jobs)? = v["actualsJob"], case .array(let runs)? = v["historyRun"] else { Issue.record("no vectors"); return }
-        #expect(jobs.count >= 6 && runs.count >= 6)
+        #expect(jobs.count >= 9 && runs.count >= 6)
         for c in jobs.map({ Self.obj($0) }) {
             guard case .array(let log)? = c["printLog"], case .string(let machine)? = c["machineId"], case .string(let file)? = c["filename"] else { continue }
             let got = try await engine.headActualsJob(printLog: log, machineId: machine, filename: file)
@@ -109,10 +109,30 @@ struct HeadActualsTests {
         // ...the figures' rule does not.
         #expect(try await engine.headActualsJob(printLog: log, machineId: "M1", filename: "calibration.gcode") == nil)
         #expect(try await engine.headActualsJob(printLog: log, machineId: "M1", filename: "bracket.gcode") == "J1")
+
+        // A PRINT KHAYT ITSELF SENT. The printer never hears the job's file
+        // name: it is uploaded as khayt-<time>.gcode, and that is what comes
+        // back when it ends. The send records that name on the job, through
+        // the same write the Mac makes after a send, and the figures find it.
+        var root: [String: JSONValue] = ["printLog": .array(log)]
+        #expect(try await Shop.applyPrintRun(to: &root, jobId: "J1", machineId: "M1", started: true,
+                                             file: "bracket.gcode", sentAs: "khayt-mb1x2y3.gcode",
+                                             at: "2026-11-22T10:00:00.000Z", engine: engine))
+        let sent = Shop.rows(root, "printLog")
+        guard case .object(let job)? = sent.first, case .array(let runs)? = job["printRuns"], case .object(let run)? = runs.last else {
+            Issue.record("no run recorded"); return
+        }
+        #expect(run["sentAs"] == .string("khayt-mb1x2y3.gcode") && run["file"] == .string("bracket.gcode"))
+        #expect(try await engine.headActualsJob(printLog: sent, machineId: "M1", filename: "khayt-mb1x2y3.gcode") == "J1",
+                "a print Khayt sent never gets its figures")
+        #expect(try await engine.headActualsJob(printLog: sent, machineId: "M1", filename: "khayt-other.gcode") == nil)
+        #expect(try await engine.headActualsJob(printLog: sent, machineId: "M2", filename: "khayt-mb1x2y3.gcode") == nil)
         let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
         let photos = try String(contentsOf: app.appending(path: "Shop+Photos.swift"), encoding: .utf8)
         #expect(photos.contains("noteHeadActuals(ended, machine: machine, jobId: figuresJob)"))
+        let printers = try String(contentsOf: app.appending(path: "Shop+Printers.swift"), encoding: .utf8)
+        #expect(printers.contains("file: file.lastPathComponent, sentAs: sent.remoteName)"), "the send does not record the name on the printer")
         let heads = try String(contentsOf: app.appending(path: "HeadActuals.swift"), encoding: .utf8)
         #expect(!heads.contains("ended.orderId,"), "the photo's job is used for the figures again")
     }

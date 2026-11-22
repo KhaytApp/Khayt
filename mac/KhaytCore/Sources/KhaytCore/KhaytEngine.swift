@@ -5524,10 +5524,12 @@ public actor KhaytEngine {
     /// finished job, no machine). A `plannedMachineId` of `.null` means the
     /// key comes OFF the record.
     public func printRunFields(order: JSONValue, machineId: String, at: String,
-                               started: Bool, file: String) throws -> [String: JSONValue]? {
+                               started: Bool, file: String, sentAs: String = "") throws -> [String: JSONValue]? {
         try runtime.call2("globalThis.KhaytPrintRuns.fields(ARG0, ARG1)",
                           [order, .object(["machineId": .string(machineId), "at": .string(at),
-                                           "started": .bool(started), "file": .string(file)])],
+                                           "started": .bool(started), "file": .string(file),
+                                           // The name it was given on the printer (`PrinterSend.Sent.remoteName`).
+                                           "sentAs": .string(sentAs)])],
                           as: [String: JSONValue]?.self)
     }
 

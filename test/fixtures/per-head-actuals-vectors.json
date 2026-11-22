@@ -706,6 +706,85 @@
    "machineId": "M1",
    "filename": "",
    "want": null
+  },
+  {
+   "why": "a print Khayt sent: the printer says the upload name, and the send recorded it",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "Models/Cube.gcode"
+      }
+     ],
+     "printRuns": [
+      {
+       "machineId": "M1",
+       "at": "2026-11-22T10:00:00.000Z",
+       "started": true,
+       "file": "Cube.gcode",
+       "sentAs": "khayt-mb1x2y3.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "khayt-mb1x2y3.gcode",
+   "want": "J1"
+  },
+  {
+   "why": "the same upload name recorded for a send to ANOTHER machine is not this machine's print",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "Cube.gcode"
+      }
+     ],
+     "printRuns": [
+      {
+       "machineId": "M2",
+       "at": "2026-11-22T10:00:00.000Z",
+       "started": true,
+       "sentAs": "khayt-mb1x2y3.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "khayt-mb1x2y3.gcode",
+   "want": null
+  },
+  {
+   "why": "another Khayt upload (a different time) is not this job's",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "Cube.gcode"
+      }
+     ],
+     "printRuns": [
+      {
+       "machineId": "M1",
+       "at": "2026-11-22T10:00:00.000Z",
+       "started": true,
+       "sentAs": "khayt-mb1x2y3.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "khayt-zzzzzzz.gcode",
+   "want": null
   }
  ],
  "historyRun": [
