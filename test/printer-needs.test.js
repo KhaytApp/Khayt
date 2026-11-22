@@ -134,3 +134,23 @@ test('live rows (the Mac\'s names): lastOkAt when it last ANSWERED, errorCode in
   const n = PC.mergePollSuccess(e, { ok: false, error: 'Invalid port number' }, 5000);
   assert.deepEqual([n.errorCode, n.lastOkAt, n.error], ['not-set-up', 4000, 'Invalid port number']);
 });
+
+test('review fixes: not set up is never "offline" (no relocation scan) and drops an old "it moved" hint; CONNACK and redirect words', () => {
+  const PC = require('../lib/printer-poll-cache.js');
+  let e = { state: 'idle', lastUpdated: 1, relocated: { host: '10.0.0.9' } };
+  for (let i = 0; i < 6; i++) e = PC.mergePollSuccess(e, { ok: false, error: 'Bambu needs the LAN access code.' }, 10 + i);
+  assert.equal(e.errorCode, 'not-set-up');
+  assert.equal(e.consecutiveFailures, 6);
+  assert.equal(PC.isOffline(e, 3), false, 'nothing was asked: nothing to look for on the network');
+  assert.equal(e.relocated, undefined, 'a config error, not a printer that moved');
+  // A printer that went quiet still counts, and keeps its hint.
+  let q = { state: 'idle', relocated: { host: '10.0.0.9' } };
+  for (let i = 0; i < 3; i++) q = PC.mergePollFailure(q, 'timeout', 10 + i, null, 'unreachable');
+  assert.equal(PC.isOffline(q, 3), true);
+  assert.deepEqual(q.relocated, { host: '10.0.0.9' });
+  const err = (o) => Object.assign(new Error(o.message || 'x'), o);
+  assert.equal(PC.failureCode(err({ message: 'Bambu rejected the access code (CONNACK 5)' })), 'access-refused');
+  assert.equal(PC.failureCode(err({ message: 'Bambu rejected the access code (CONNACK 4)' })), 'access-refused');
+  assert.equal(PC.failureCode(err({ message: 'Bambu rejected the access code (CONNACK 3)' })), 'unreachable', 'server unavailable is not a refusal');
+  assert.equal(PC.failureCode(err({ message: 'Unexpected redirect from printer', code: 'ERR_REDIRECT' })), 'unreadable', 'the Mac\'s .redirected');
+});
