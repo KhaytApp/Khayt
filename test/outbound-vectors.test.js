@@ -74,3 +74,17 @@ test('loads in JavaScriptCore\'s shape, alone', () => {
   assert.equal(vm.runInContext("KhaytOutbound.allowed({network:{offline:true}}, 'lan', {host:'2130706433'}).reason", ctx), 'lan', 'numeric IPv4 loopback');
   assert.equal(vm.runInContext("KhaytOutbound.allowed({network:{offline:true}}, 'lan', {host:'example.com'}).reason", ctx), 'lan-host-public');
 });
+
+test('switch-sync (Turki, Nov 22): kept only through Khayt Cloud, shown kept in the list, untickable', () => {
+  const via = { network: { offline: true, via: 'cloud', keep: ['updates', 'switch-sync'] } };
+  assert.deepEqual(O.keptOf(via), ['updates', 'switch-sync'], 'the keep entry is ignored; the via rule adds it once');
+  assert.equal(O.switchSyncKept(via), true);
+  const row = O.describe(via).find((r) => r.purpose === 'switch-sync');
+  assert.deepEqual([row.allowed, row.reason, row.kept, row.automatic], [true, 'kept', true, true]);
+  const dropped = { network: { offline: true, via: 'cloud', dropSwitchSync: true } };
+  assert.equal(O.describe(dropped).find((r) => r.purpose === 'switch-sync').kept, false);
+  assert.deepEqual(O.keptOf({ network: { offline: true, keep: ['switch-sync'] } }), []);
+  assert.equal(O.INFO['switch-sync'].every, '15m');
+  // Through Khayt Cloud keeps nothing else: every other purpose but lan is still blocked.
+  for (const p of O.PURPOSES) if (p !== 'lan' && p !== 'switch-sync') assert.equal(O.allowed({ network: { offline: true, via: 'cloud' } }, p).allowed, false, p);
+});
