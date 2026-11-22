@@ -332,11 +332,19 @@ struct PhoneRolesTests {
         let open = try await bench.get("/api/status?format=json")
         #expect(open.status == 200 && open.json["network"] == nil && open.headers["x-khayt-reply-mac"] == nil)
         let pin = try await bench.get("/api/status?format=json", headers: ["x-khayt-pin": Self.pin])
-        #expect(pin.status == 200 && pin.json["network"] == nil)
+        #expect(pin.status == 200 && pin.json["network"] == nil && pin.headers["x-khayt-reply-mac"] == nil)
         var forged = op.headers("GET", "/api/status?format=json")
         forged["x-khayt-mac"] = Data(repeating: 1, count: 32).base64EncodedString()
         let bad = try await bench.send("GET", "/api/status?format=json", headers: forged, timeout: 30)
-        #expect(bad.json["network"] == nil && bad.headers["x-khayt-reply-mac"] == nil)
+        #expect(bad.status == 200 && bad.json["network"] == nil && bad.headers["x-khayt-reply-mac"] == nil)
+        // The counts are still whole numbers after the block is added.
+        let text = String(decoding: on.body, as: UTF8.self)
+        #expect(!text.contains(".0") && text.contains("\"queued\":"), Comment(rawValue: text))
+        #expect(on.headers["Cache-Control"] == "no-store" || on.headers["cache-control"] == "no-store")
+        // A phone that was removed is told nothing new, and nothing is signed for it.
+        #expect(bench.devices.remove(op.id))
+        let gone = try await bench.send("GET", "/api/status?format=json", headers: op.headers("GET", "/api/status?format=json"), timeout: 30)
+        #expect(gone.status == 200 && gone.json["network"] == nil && gone.headers["x-khayt-reply-mac"] == nil)
         // The public answer is byte for byte what it was.
         let expected = try await bench.engine.lanStatusBody(store: .object(bench.book.value), today: LanServer.localDay(bench.box.now))
         #expect(String(decoding: open.body, as: UTF8.self) == expected)

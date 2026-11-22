@@ -1156,12 +1156,24 @@ final class LanServer {
             // signature verified, and signed back (`signedForPhone`) so a
             // device on the Wi-Fi cannot tell the phone the switch is off.
             // Anyone else gets the public counts, unchanged.
-            if LanDevices.isSigned(request.headers), await pinGate(request) == nil,
+            //
+            // `!request.tokenScoped`: a scoped API token makes `pinGate`
+            // answer nil without verifying anything. This route is always
+            // public, so a token is never judged here today; said outright so
+            // that stays true if it ever is.
+            if !request.tokenScoped, LanDevices.isSigned(request.headers), await pinGate(request) == nil,
                case .object(var counts)? = try? JSONDecoder().decode(JSONValue.self, from: Data(body.utf8)),
                case .object(let book) = store,
                let network = try? await engine.outboundShopSwitch(settings: book["settings"] ?? .object([:])) {
                 counts["network"] = network
-                return signedForPhone(.json(200, Self.jsonText(.object(counts))), request)
+                var answer = signedForPhone(.json(200, Self.jsonText(.object(counts))), request)
+                // NEVER the block without its signature: a phone removed
+                // while the rule was being asked has no key to sign with, and
+                // gets the public counts like anyone else.
+                if answer.headers["x-khayt-reply-mac"] != nil {
+                    answer.headers["Cache-Control"] = "no-store"
+                    return answer
+                }
             }
             return .json(200, body)
 
