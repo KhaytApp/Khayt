@@ -242,11 +242,28 @@ async function saveNetwork(patch) {
   const next = Object.assign({}, network(), { offline: !!cur.offline, keep: keptList() }, patch);
   // When and by whom are the SWITCH's: a Keep tick changes neither (review of
   // #2633: it re-dated "Turned on by" and reset the 30-day clock).
-  if (!!next.offline !== !!cur.offline) { next.changedAt = new Date().toISOString(); next.changedBy = whoChanges(); }
+  const flipped = !!next.offline !== !!cur.offline;
+  if (flipped) { next.changedAt = new Date().toISOString(); next.changedBy = whoChanges(); }
   else { next.changedAt = cur.changedAt || null; next.changedBy = cur.changedBy || null; }
+  // Through Khayt Cloud (lib/main/network-switch-sync.js): turning it ON
+  // tells the cloud FIRST, while this computer is still online (the last
+  // call); only a value the cloud took makes this `via: 'cloud'`, which keeps
+  // the 15-minute check while offline. Main decides whether to send at all
+  // (the owner, this computer's option); it answers at once when it does not.
+  if (flipped && next.offline) {
+    let pub = null;
+    try { pub = global.hubAPI && global.hubAPI.networkSwitchPublish ? await global.hubAPI.networkSwitchPublish({ offline: true, network: next, changedBy: next.changedBy }) : null; } catch (_) { pub = null; }
+    next.via = pub && pub.ok && pub.via === 'cloud' ? 'cloud' : null;
+  }
   settings.network = next;
   if (typeof saveAll === 'function') saveAll();
   if (typeof flushSave === 'function') { try { await flushSave(); } catch (_) { /* the refusal toast says it */ } }
+  // Turning it OFF tells the cloud AFTER, as the first call back: main asks
+  // first and sends offline:false if a value is published there, whatever
+  // this computer's own option (contract rule 1).
+  if (flipped && !next.offline && global.hubAPI && global.hubAPI.networkSwitchPublish) {
+    try { await global.hubAPI.networkSwitchPublish({ offline: false, network: next, changedBy: next.changedBy }); } catch (_) { /* main keeps the outcome */ }
+  }
   // What main kept is what the window holds: a save that failed or was put
   // back must not wait in memory for the next save to carry it.
   const ctx = await load();
@@ -423,6 +440,15 @@ function boot() {
   });
   // The page, the entry line and the banner follow a language change.
   document.addEventListener('languagechange', () => { refresh().catch(() => {}); });
+  // A switch main applied from Khayt Cloud: the window takes it, so its next
+  // save does not carry the older one (main refuses that anyway).
+  if (global.hubAPI && typeof global.hubAPI.onNetworkApplied === 'function') {
+    global.hubAPI.onNetworkApplied((n) => {
+      if (!n || typeof settings === 'undefined' || !settings) return;
+      settings.network = Object.assign({}, n);
+      refresh().catch(() => {});
+    });
+  }
   // Hourly, so the 30-day banner appears on a computer left running.
   setInterval(() => { refresh().catch(() => {}); }, 60 * 60 * 1000);
 }

@@ -363,6 +363,7 @@ const {
   isEncryptionAvailable,
   persistLanStoreUpdate,
   updateStoreOnDisk,
+  updateStoreOnDiskAllowingLock,
   resolveStoreSecret,
   resolveStoreSecretFor,
   isStoreSecretMasked,
@@ -2638,6 +2639,10 @@ function guardWindowStore(normalized) {
     console.error('store guard: role guard failed:', e && e.message);
     return { error: 'role_guard_failed' };
   }
+  // A switch main applied from Khayt Cloud is not moved back by a window
+  // still holding the older one (lib/network-switch.js keepNewerNetwork).
+  try { merged = require('./lib/network-switch.js').keepNewerNetwork(merged, guardDisk); }
+  catch (e) { console.error('store guard: network guard failed:', e && e.message); }
   // What was put back as it is on disk: the window reloads and says so
   // (#2592 review), instead of showing an edit that was never kept.
   return { store: merged, refused };
@@ -6769,6 +6774,48 @@ let cloudBackend = null;
 // The shop's data key while Khayt Cloud is unlocked here, for the off-site
 // backup to seal with (lib/main/offsite-backup.js). Cleared on lock.
 let cloudDek = null;
+// Where the unlocked session talks to, for the network-switch route (the
+// token resolved for that server's origin). Cleared with the key.
+let cloudSessionInfo = null;
+
+/* The shop's switch through Khayt Cloud (khayt-cloud #223; Turki, Nov 22):
+ * GET at unlock and every 15 min, apply a value that opens with the shop key
+ * and passes lib/network-switch.js, and publish the owner's change here.
+ * This computer's own option and stamps: userData/network-switch-cloud.json. */
+const NETWORK_SWITCH_FILE = () => path.join(app.getPath('userData'), 'network-switch-cloud.json');
+const networkSwitchSync = require('./lib/main/network-switch-sync.js').createNetworkSwitchSync({
+  client: cloudClient,
+  crypto: require('./lib/sync-crypto.js'),
+  session: () => {
+    if (!cloudBackend || !cloudDek || !cloudSessionInfo) return null;
+    let role = 'owner';
+    try { const b = readStoreDecryptedFromDisk(); role = (b && b.settings && b.settings.cloud && b.settings.cloud.role) || 'owner'; } catch (_) { /* owner, as the window reads it */ }
+    return Object.assign({}, cloudSessionInfo, { dek: cloudDek, role });
+  },
+  getSettings: () => (lanServerStore && lanServerStore.settings) || null,
+  // Through the write chain, with `network` the one lock field it may change.
+  updateNetwork: (fn) => updateStoreOnDiskAllowingLock((cur) => {
+    const before = (cur.settings && cur.settings.network && typeof cur.settings.network === 'object') ? cur.settings.network : {};
+    const next = fn(before);
+    if (next === before) return cur;
+    return Object.assign({}, cur, { settings: Object.assign({}, cur.settings, { network: next }) });
+  }, ['settings.network']),
+  notify: (network) => BrowserWindow.getAllWindows().forEach((w) => { try { w.webContents.send('hub:network-applied', network); } catch (_) { /* gone */ } }),
+  readMine: () => { try { return JSON.parse(fs.readFileSync(NETWORK_SWITCH_FILE(), 'utf8')); } catch (_) { return {}; } },
+  writeMine: (v) => { const f = NETWORK_SWITCH_FILE(); fs.writeFileSync(f + '.tmp', JSON.stringify(v)); fs.renameSync(f + '.tmp', f); },
+});
+ipcMain.handle('hub:network-switch-state', () => networkSwitchSync.state());
+ipcMain.handle('hub:network-switch-share', (_e, on) => networkSwitchSync.setShare(on === true));
+ipcMain.handle('hub:network-switch-answer', (_e, apply) => networkSwitchSync.answerPending(apply === true));
+// The owner changed the switch here: `on` BEFORE the window saves it (the last
+// call, while still online), `off` AFTER (the first call back). The network
+// sent is the window's; main reads nothing else from it.
+ipcMain.handle('hub:network-switch-publish', async (_e, { offline, network, changedBy } = {}) => {
+  try {
+    const n = network && typeof network === 'object' && !Array.isArray(network) ? network : null;
+    return await networkSwitchSync.publish({ offline: offline === true, network: n, changedBy: typeof changedBy === 'string' ? changedBy : '' });
+  } catch (e) { return { ok: false, why: 'error', error: String((e && e.message) || e) }; }
+});
 
 // The shop's cloud token, for the server it was saved for. Every handler below
 // takes the URL from the window; a saved token goes only to the saved server's
@@ -7404,6 +7451,7 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
     token = cloudToken(token, url);
     const dek = cloudClient.unlockWithPassphrase(String(passphrase || ''), keyset);
     cloudDek = dek;
+    cloudSessionInfo = { url, shopId, token };
     cloudBackend = cloudClient.backendFor(url, shopId, token, dek, {
       // Warm launch: let this session start from the server view the last one
       // left behind, so the first pull asks for a slice instead of the base and
@@ -7420,8 +7468,10 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
         try { return recoverStoreRaw(MAX_STORE_BYTES).data || null; } catch (e) { return null; }
       },
     });
+    // The key exists now: hear the switch at once, then every 15 minutes.
+    networkSwitchSync.start();
     return { ok: true };
-  } catch (e) { cloudBackend = null; cloudDek = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
+  } catch (e) { cloudBackend = null; cloudDek = null; cloudSessionInfo = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
 });
 
 /* ── Organisations (multi-shop) ───────────────────────────────────────────────
@@ -7586,7 +7636,7 @@ ipcMain.handle('hub:org-members', async (_e, { url, shopId, token } = {}) => {
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
-ipcMain.handle('hub:cloud-lock', () => { cloudBackend = null; cloudDek = null; clearOrgSession(); return { ok: true }; });
+ipcMain.handle('hub:cloud-lock', () => { networkSwitchSync.stop(); cloudBackend = null; cloudDek = null; cloudSessionInfo = null; clearOrgSession(); return { ok: true }; });
 // The push right after "make no internet calls" is turned on still goes out,
 // once, so other computers and the phone hear about it (design §1.4).
 ipcMain.handle('hub:cloud-push', async (_e, snapshot) => {

@@ -147,7 +147,7 @@ test('review of #2633: only person-started calls toast, and only the switch reas
 
 test('review of #2633: a Keep tick keeps when and by whom; storage set up means the internet; the stamp only on an answer', () => {
   const src = read('renderer/internet-use.js');
-  assert.match(src, /if \(!!next\.offline !== !!cur\.offline\) \{ next\.changedAt = new Date\(\)\.toISOString\(\); next\.changedBy = whoChanges\(\); \}/);
+  assert.match(src, /const flipped = !!next\.offline !== !!cur\.offline;\s*\n\s*if \(flipped\) \{ next\.changedAt = new Date\(\)\.toISOString\(\); next\.changedBy = whoChanges\(\); \}/);
   const iu = load({});
   const offsite = (enabled, destination, ready) => ({ offsite: { settings: { enabled, destination }, ready } });
   assert.equal(iu.setUp('storage', offsite(true, 'folder', true)), false, 'a folder backup is not an internet call');

@@ -249,6 +249,12 @@ const hubAPI = {
   activeCountGet: ()      => ipcRenderer.invoke('hub:active-count-get'),
   outboundDescribe: ()    => ipcRenderer.invoke('hub:outbound-describe'),
   outboundSetLocal: (p)   => ipcRenderer.invoke('hub:outbound-set-local', p),
+  // The switch through Khayt Cloud (lib/main/network-switch-sync.js).
+  networkSwitchState: ()       => ipcRenderer.invoke('hub:network-switch-state'),
+  networkSwitchShare: (on)     => ipcRenderer.invoke('hub:network-switch-share', on === true),
+  networkSwitchAnswer: (apply) => ipcRenderer.invoke('hub:network-switch-answer', apply === true),
+  networkSwitchPublish: (o)    => ipcRenderer.invoke('hub:network-switch-publish', o),
+  onNetworkApplied: (cb) => { ipcRenderer.on('hub:network-applied', (_e, n) => { try { cb(n && typeof n === 'object' ? n : null); } catch { /* noop */ } }); },
   activeCountSet: (on)    => ipcRenderer.invoke('hub:active-count-set', !!on),
   requestFullWipe: ()     => ipcRenderer.invoke('hub:request-full-wipe'),
   verifyOperatorPin: (opts) => ipcRenderer.invoke('hub:verify-operator-pin', opts),

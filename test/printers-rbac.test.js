@@ -429,7 +429,7 @@ test('every field writer (updateStoreOnDisk / persistLanStoreUpdate) that touche
     }
   }
   const io = fs.readFileSync(path.join(root, 'lib', 'store-io.js'), 'utf8');
-  assert.match(io, /const changed = lockFieldsChanged\(current, next\);\s*if \(changed\) throw new Error\('mutator may not change ' \+ changed\);/);
+  assert.match(io, /const changed = lockFieldsChanged\(current, next, allowed\);\s*if \(changed\) throw new Error\('mutator may not change ' \+ changed\);/);
 });
 
 /* ── #2592 release review MED-1: the shop always keeps an owner ─────────── */
