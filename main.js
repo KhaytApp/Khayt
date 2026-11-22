@@ -5121,6 +5121,38 @@ registerLanServer({
   phonePairing: require('./lib/main/phone-pairing').createPhonePairing({
     enabled: () => process.env.KHAYT_PHONE_PAIRING_BY_CODE === '1',
   }),
+  // Pairing a slicer plugin (Khayt for OrcaSlicer) and its /api/connectors/*
+  // routes (lib/main/connector-pairing.js, connector-routes.js). OFF, as the
+  // Mac's `connectorPairing` defaults switch: on only for a developer who
+  // starts Khayt with KHAYT_CONNECTOR_PAIRING=1. Read here, in main, so
+  // nothing the window sends can switch it on.
+  connectorPairing: require('./lib/main/connector-pairing').createConnectorPairing({
+    enabled: () => process.env.KHAYT_CONNECTOR_PAIRING === '1',
+  }),
+  // "Show prices in OrcaSlicer", "Accept files from slicers" and the
+  // OctoPrint key: this computer's own, in userData, never in the book.
+  connectorLocal: require('./lib/main/connector-local').createConnectorLocal({
+    fs,
+    settingsPath: path.join(app.getPath('userData'), 'khayt-slicer-settings.json'),
+    keyPath: path.join(app.getPath('userData'), 'khayt-slicer-upload.key'),
+    seal: (s) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(s) : null),
+    unseal: (b) => safeStorage.decryptString(b),
+  }),
+  // The "From slicer" inbox and a plugin's slice records beside it.
+  ...(() => {
+    const root = path.join(app.getPath('userData'), require('./lib/main/slicer-inbox').FOLDER_NAME);
+    const slicerInbox = require('./lib/main/slicer-inbox').createSlicerInbox({ fs, root });
+    return {
+      slicerInbox,
+      connectorSlices: require('./lib/main/connector-slices').createConnectorSlices({ fs, dir: slicerInbox.slices }),
+    };
+  })(),
+  // _khayt._tcp over mDNS, only while the LAN server runs bound to the network.
+  lanAdvertiser: require('./lib/main/lan-advertise').createLanAdvertiser({
+    createSocket: () => require('dgram').createSocket({ type: 'udp4', reuseAddr: true }),
+    interfaces: () => require('os').networkInterfaces(),
+    hostname: () => require('os').hostname(),
+  }),
 });
 
 /**

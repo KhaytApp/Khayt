@@ -266,7 +266,19 @@ The slicer plugin's commit-then-reveal flow (`POST /api/connectors/pair`, below)
 
 **Signing out.** A phone paired by code holds no tag of the PIN: a PIN change does not sign it out. The server still needs a LAN PIN of at least 8 characters to answer anyone: with the PIN cleared or too short, a phone paired by code is refused like everyone else until one is set. **Remove** does (`device-revoked`, signed). A phone paired with the owner PIN is still signed out by a PIN change.
 
-### `POST /api/connectors/pair` — a slicer plugin pairs without the PIN (native Mac only)
+### `POST /api/connectors/pair` — a slicer plugin pairs without the PIN (both apps)
+
+> **Served by both apps.** The native Mac (`LanConnectorPairing`, `LanServer+Connector`)
+> and `lib/lan-server.js` (Windows/Linux, not on screen yet: main exposes the window over
+> IPC, `hub:connector-pair-*`). The desktop's window is the phone's state machine
+> ([`lib/main/phone-pairing.js`](../lib/main/phone-pairing.js)) with the connector's
+> prefixes ([`lib/main/connector-pairing.js`](../lib/main/connector-pairing.js)); its
+> routes are [`lib/main/connector-routes.js`](../lib/main/connector-routes.js).
+> **Off by default on both.** On the Mac, the `connectorPairing` defaults switch; on
+> Windows/Linux, main reads `KHAYT_CONNECTOR_PAIRING=1` from the environment at launch
+> (nothing the window sends can switch it on). While it is off the desktop answers
+> every `/api/connectors/*` path, the pairing included, with the ordinary **404**; the
+> Mac answers the pairing `403 pairing-closed` and the rest 404.
 
 A **connector** (Khayt for OrcaSlicer) signs its requests exactly as a phone
 does, but its key opens `/api/connectors/*` and nothing else: any other route
@@ -330,7 +342,7 @@ and the nonce base64, standard and padded, of the raw bytes), joined with
    a change of the LAN PIN signs connectors out with the phones
    (`device-unknown`).
 
-### The connector's own routes — a paired plugin sends its slices (native Mac only)
+### The connector's own routes — a paired plugin sends its slices (both apps)
 
 All dark (the ordinary 404) while "Pair a slicer" is off. Exact paths, a
 connector's signed request only: unsigned is 401, a phone's key, the PIN or an
@@ -388,7 +400,15 @@ the grant is per device (none, `price`, `cost`), and the route passes only an
 allow-list of keys for it: the rule always works out the cost and margin, and a
 `price` device never sees them. `GET /api/connectors/self` lists `price:read`
 (and `cost:read`) only while both hold.
-Vectors: `docs/connector-routes.vectors.json`. The desktop (`lib/lan-server.js`) has none of this yet.
+Vectors: `docs/connector-routes.vectors.json`. The desktop (`lib/lan-server.js`,
+`lib/main/connector-routes.js`) answers the same routes with the same statuses; its
+inbox is `<userData>/From slicer/` ([`lib/main/slicer-inbox.js`](../lib/main/slicer-inbox.js)),
+its slice records `From slicer/.slices/` ([`lib/main/connector-slices.js`](../lib/main/connector-slices.js)),
+and "Show prices in OrcaSlicer" is this computer's own file in userData, default off
+([`lib/main/connector-local.js`](../lib/main/connector-local.js)); a grant is set over
+IPC (`hub:connector-grant-set`) by whoever may edit security, `cost` only with
+reports. The desktop reads a plain G-code's own figures into the item; a
+`.gcode.3mf` or `.bgcode` is filed without them, and no activity row is written.
 
 ### `GET /api/library`, its thumbnails, and `POST /api/library/{id}/estimate` — pricing a model from the phone
 
@@ -525,22 +545,27 @@ Active kanban orders (`pending`, `printing`, `post`, `qc`). **Requires owner PIN
 
 ### Discovery — `_khayt._tcp`
 
-The native Mac app advertises itself over Bonjour whenever its LAN API is bound
-to the network, so a client does not have to be told an address.
+Both apps advertise themselves whenever the LAN API is bound to the network, so a
+client does not have to be told an address: the native Mac over Bonjour, Windows/Linux
+over multicast DNS ([`lib/main/lan-advertise.js`](../lib/main/lan-advertise.js), the
+packet [`lib/mdns.js`](../lib/mdns.js) `encodeAdvertisement`), announced at start and
+withdrawn with a goodbye (TTL 0) when the server stops.
 
 | | |
 |---|---|
 | Service type | `_khayt._tcp` |
 | Service name | the shop's own name (`settings.shopName`), truncated to 63 **bytes** |
 | `TXT v` | the LAN API version — `1` |
-| `TXT store` | `1` when this server implements `GET /api/store`; absent means no |
+| `TXT store` | `1` when this server implements `GET /api/store`; absent means no (the desktop sends none) |
 
 **Only when bound to the LAN.** A loopback-only server is not advertised, because
 a client that found it could never connect to it.
 
 `TXT store` is the one thing worth knowing before pairing: it separates a Mac that
 can hand over the book — so the client keeps working away from the desk — from one
-that cannot. The Electron desktop does not advertise at all.
+that cannot. The Electron desktop advertises without it, because it serves no `/api/store`.
+Its host record is a name of its own (`<hostname>-khayt.local`), so it never claims the
+system's own name, and it does not probe for a clash of instance names as Bonjour does.
 
 **The PIN is deliberately not advertised.** It can change while the server is up,
 and a stale "no PIN needed" is a client confidently telling a shop something
@@ -1219,10 +1244,14 @@ Answers `{ "ok": true, "event", "advanced" }`.
 
 ### `GET /api/version` and `POST /api/files/local` — Khayt as a printer in the slicer
 
-> **Served by the native Mac app only**, and only while the shop has switched
-> on Settings → Online → "Accept files from slicers (OctoPrint upload)". Off
-> (the default), both are the ordinary **404**. `lib/lan-server.js` does not
-> implement them.
+> **Served by both apps**, and only while the shop has switched on "Accept files
+> from slicers (OctoPrint upload)": on the Mac, Settings → Online; on Windows/Linux
+> (not on screen yet) main's `hub:slicer-upload-set`, kept in userData with the key
+> ([`lib/main/connector-local.js`](../lib/main/connector-local.js), sealed with the OS
+> keychain). Off (the default), both are the ordinary **404**. The desktop's routes
+> are [`lib/main/slicer-upload.js`](../lib/main/slicer-upload.js): the body is parsed as
+> it streams and only the file part is written, into the same inbox and the same
+> SHA-256 dedupe as a paired plugin's file.
 
 The two OctoPrint routes a slicer's "Send" uses (OrcaSlicer, PrusaSlicer,
 Bambu Studio: a physical printer of host type OctoPrint, with the Mac's LAN
@@ -1250,8 +1279,8 @@ same shapes `lib/printer-upload.js` sends to a real OctoPrint.
      "refs":{"resource":"http://<host>/api/files/local/plate.gcode",
              "download":"http://<host>/downloads/files/local/plate.gcode"}}}}
   ```
-- **Where it goes:** the "From slicer" inbox beside the book
-  (`<book folder>/From slicer/<id>/`), with the slicer's own grams, time,
+- **Where it goes:** the "From slicer" inbox beside the book on the Mac
+  (`<book folder>/From slicer/<id>/`; on Windows/Linux `<userData>/From slicer/<id>/`), with the slicer's own grams, time,
   material and slicer name read off the file. The shop adds it to the library,
   or starts a job or a quote from it, in the app.
 

@@ -391,6 +391,23 @@ contextBridge.exposeInMainWorld('hubAPI', {
   phonePairApprove: (arg)  => ipcRenderer.invoke('hub:phone-pair-approve', arg),
   phonePairDeny: ()        => ipcRenderer.invoke('hub:phone-pair-deny'),
   setLanDeviceRole: (arg)  => ipcRenderer.invoke('hub:lan-device-role', arg),
+  // A paired slicer plugin, its prices, the "From slicer" inbox and the
+  // OctoPrint upload (lib/main/connector-*.js, slicer-*.js). No screen calls
+  // these yet; main decides who may, and the switches are main's.
+  connectorPairState: ()       => ipcRenderer.invoke('hub:connector-pair-state'),
+  connectorPairOpen: ()        => ipcRenderer.invoke('hub:connector-pair-open'),
+  connectorPairClose: ()       => ipcRenderer.invoke('hub:connector-pair-close'),
+  connectorPairApprove: (arg)  => ipcRenderer.invoke('hub:connector-pair-approve', arg),
+  connectorPairDeny: ()        => ipcRenderer.invoke('hub:connector-pair-deny'),
+  connectorPricesState: ()     => ipcRenderer.invoke('hub:connector-prices-state'),
+  setConnectorPrices: (arg)    => ipcRenderer.invoke('hub:connector-prices-set', arg),
+  setConnectorGrant: (arg)     => ipcRenderer.invoke('hub:connector-grant-set', arg),
+  slicerInboxList: ()          => ipcRenderer.invoke('hub:slicer-inbox-list'),
+  slicerInboxRead: (id)        => ipcRenderer.invoke('hub:slicer-inbox-read', id),
+  slicerInboxDiscard: (id)     => ipcRenderer.invoke('hub:slicer-inbox-discard', id),
+  slicerUploadState: ()        => ipcRenderer.invoke('hub:slicer-upload-state'),
+  setSlicerUpload: (arg)       => ipcRenderer.invoke('hub:slicer-upload-set', arg),
+  regenerateSlicerKey: ()      => ipcRenderer.invoke('hub:slicer-upload-regenerate'),
 
   // iOS companion: live reload when phone adds a spool or changes an order
   onLanSpoolAdded:      (() => { let _cb=null; ipcRenderer.on('lan-spool-added',      (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
