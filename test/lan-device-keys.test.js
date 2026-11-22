@@ -442,3 +442,70 @@ test('over HTTP: /api/status tells a verified phone the shop\'s switch, signed; 
   assert.equal(bad.headers.get('x-khayt-reply-mac'), null);
   store = { ...store, settings: { lanApi: { intakeToken: 'tok' } } };
 });
+
+// ── Review of #2650: what must NOT get a signed answer ────────────────────
+
+test('/api/status: no network block and no MAC for an unread book, a non-GET, a replay or a signed-out phone', async () => {
+  const target = '/api/status?format=json';
+  const dev = await enrolPhone();
+  const plainOf = async (headers, method = 'GET') => {
+    const res = await fetch(`${BASE}${target}`, { method, headers });
+    const text = await res.text();
+    return { status: res.status, json: text ? JSON.parse(text) : null, mac: res.headers.get('x-khayt-reply-mac') };
+  };
+  // An unread book ({} before the sync, or a failed decrypt): never a signed "online".
+  const kept = store;
+  store = {};
+  let r = await plainOf(sign(dev, 'GET', target));
+  assert.equal(r.json.network, undefined, 'unread book: no block');
+  assert.equal(r.mac, null);
+  store = { ...kept, settings: undefined };
+  r = await plainOf(sign(dev, 'GET', target));
+  assert.equal(r.json.network, undefined, 'no settings: no block');
+  store = kept;
+  // A replayed nonce is refused before it is answered.
+  const h = sign(dev, 'GET', target);
+  assert.ok((await plainOf(h)).json.network, 'first time: signed');
+  r = await plainOf(h);
+  assert.equal(r.json.network, undefined, 'replay: plain');
+  assert.equal(r.mac, null);
+  // Signed out: the plain counts, 200, nothing signed.
+  await handlers.get('hub:lan-device-remove')(null, dev.out.deviceId);
+  r = await plainOf(sign(dev, 'GET', target));
+  assert.deepEqual([r.status, r.json.network, r.mac], [200, undefined, null]);
+});
+
+test('/api/status: no block without a full-length PIN', async () => {
+  await handlers.get('hub:stop-lan-server')(null, {});
+  assert.ok((await start('123')).ok);
+  try {
+    await fetch(`${BASE}/api/status?format=json`).catch(() => {});
+    // A phone cannot enrol under a short PIN, so sign with a device the store
+    // never knew: whatever it is, the answer is the plain counts.
+    const ghost = { key: crypto.randomBytes(32), out: { deviceId: 'dev_shortPinGhost00' } };
+    const res = await fetch(`${BASE}/api/status?format=json`, { headers: sign(ghost, 'GET', '/api/status?format=json') });
+    assert.equal((await res.json()).network, undefined);
+    assert.equal(res.headers.get('x-khayt-reply-mac'), null);
+  } finally {
+    await handlers.get('hub:stop-lan-server')(null, {});
+    assert.ok((await start(PIN)).ok);
+  }
+});
+
+test('a signed-out key never reaches ok, on any route, and a PIN change keeps its signed refusal', () => {
+  const { devs } = enrolled();
+  devs.remove(V.deviceId);
+  for (let i = 0; i < 3; i++) assert.equal(devs.verify(patchReq()).ok, false);
+  const changed = devs.verify(patchReq({ pin: 'a-new-pin-entirely' }));
+  assert.deepEqual(changed, { ok: false, reason: 'device-revoked' });
+  assert.ok(changed.replyKey, 'still signed after a PIN change: it was signed out on purpose');
+});
+
+test('a devices file from before signed refusals loads; its signed-out phones get an unsigned refusal', () => {
+  const keyPath = path.join(tmp, `old-${crypto.randomBytes(4).toString('hex')}.key`);
+  fs.writeFileSync(keyPath, JSON.stringify({ v: 1, pinSalt: crypto.randomBytes(32).toString('base64'), pinTag: '', devices: [], revoked: { [V.deviceId]: '2026-11-01T00:00:00.000Z' } }));
+  const devs = Devices.createLanDevices({ fs, keyPath, now: () => VEC_MS });
+  const r = devs.verify(patchReq());
+  assert.deepEqual(r, { ok: false, reason: 'device-revoked' });
+  assert.equal(r.replyKey, undefined);
+});
