@@ -352,12 +352,88 @@ final class DeviceKeyTests: XCTestCase {
         let device = try XCTUnwrap(t.device)
         StubMac.revoked = true
         StubMac.revokeSignature = .forged
+        StubMac.signedRevokePaths = ["/api/devices/self"]   // set again, not inherited: the queue's refusal unsigned
         StubMac.proof = .forged
+        StubMac.seen = []
         do { _ = try await api2.lanRequest(path: "/api/queue", method: "GET"); XCTFail("answered") }
         catch { guard case .transport? = error as? KhaytAPIError else { return XCTFail("\(error)") } }
+        XCTAssertEqual(StubMac.seen.map(\.path), ["/api/queue", "/api/devices/self", "/api/proof"],
+                       "unsigned refusal, then the signed route (forged: no answer), then the proof (forged)")
+        XCTAssertTrue(StubMac.seen.allSatisfy { $0.pin == nil })
         XCTAssertEqual(t.device, device)
         XCTAssertFalse(t.needsPairAgain)
         XCTAssertFalse(t.signedOutByMac)
+    }
+
+    /// An unsigned refusal, but the Mac takes the signed /api/devices/self
+    /// (2xx): the refusal was not the Mac's word about this phone. Nothing
+    /// changes, no proof is asked, no PIN is sent.
+    func testAnUnsignedRefusalTheSignedRouteContradictsChangesNothing() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
+        _ = await api.enrolDevice(name: "Test iPhone")
+        let device = try XCTUnwrap(s.device)
+        let identity = s.macIdentityKey
+        StubMac.revoked = true
+        StubMac.revokedPaths = ["/api/queue"]       // only the queue is refused, unsigned
+        StubMac.revokeSignature = .none
+        StubMac.proof = .genuine
+        StubMac.seen = []
+        do { _ = try await api.lanRequest(path: "/api/queue", method: "GET"); XCTFail("answered") }
+        catch { guard case .transport? = error as? KhaytAPIError else { return XCTFail("\(error)") } }
+        XCTAssertEqual(StubMac.seen.map(\.path), ["/api/queue", "/api/devices/self"], "settled by the signed route: no proof")
+        XCTAssertTrue(StubMac.seen.allSatisfy { $0.pin == nil })
+        XCTAssertEqual(s.device, device)
+        XCTAssertEqual(s.macIdentityKey, identity)
+        XCTAssertFalse(s.needsPairAgain)
+        XCTAssertFalse(s.signedOutByMac)
+    }
+
+    /// An older Mac has no /api/devices/self (404). Proven, the phone asks to
+    /// pair again and keeps its PIN, enrolment and key: never a wipe on
+    /// unsigned words.
+    func testAnOlderMacWithoutTheSignedRouteOnlyAsksToPairAgain() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
+        _ = await api.enrolDevice(name: "Test iPhone")
+        let device = try XCTUnwrap(s.device)
+        let identity = s.macIdentityKey
+        StubMac.revoked = true
+        StubMac.revokedPaths = ["/api/queue"]
+        StubMac.hasSelfRoute = false                // 404 on /api/devices/self
+        StubMac.revokeSignature = .none
+        StubMac.proof = .genuine
+        StubMac.seen = []
+        do { _ = try await api.lanRequest(path: "/api/queue", method: "GET"); XCTFail("answered") }
+        catch { guard case .unauthorized? = error as? KhaytAPIError else { return XCTFail("\(error)") } }
+        XCTAssertEqual(StubMac.seen.map(\.path), ["/api/queue", "/api/devices/self", "/api/proof"])
+        XCTAssertTrue(StubMac.seen.allSatisfy { $0.pin == nil })
+        XCTAssertTrue(s.needsPairAgain, "asked to pair again")
+        XCTAssertEqual(s.device, device, "not wiped")
+        XCTAssertEqual(s.macIdentityKey, identity)
+        XCTAssertFalse(s.signedOutByMac)
+    }
+
+    /// The Mac's genuine key, but over another request's nonce (a signed
+    /// refusal replayed from elsewhere): it does not verify for THIS
+    /// request, so nothing changes and the proof is not asked to repair it.
+    func testAGenuineSignatureOverAnotherNonceSignsNothingOut() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
+        _ = await api.enrolDevice(name: "Test iPhone")
+        let device = try XCTUnwrap(s.device)
+        let identity = s.macIdentityKey
+        StubMac.revoked = true
+        StubMac.revokeSignature = .otherNonce
+        StubMac.proof = .genuine
+        StubMac.seen = []
+        do { _ = try await api.lanRequest(path: "/api/queue", method: "GET"); XCTFail("answered") }
+        catch { guard case .transport? = error as? KhaytAPIError else { return XCTFail("\(error)") } }
+        XCTAssertEqual(StubMac.seen.map(\.path), ["/api/queue"], "a present signature must verify; no proof, no signed route")
+        XCTAssertEqual(s.device, device)
+        XCTAssertEqual(s.macIdentityKey, identity)
+        XCTAssertFalse(s.needsPairAgain)
+        XCTAssertFalse(s.signedOutByMac)
     }
 
     /// A Mac with #2643 signs `device-revoked` over this request's nonce.
@@ -453,12 +529,17 @@ final class StubMac: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var proof = Proof.genuine
     /// How a `device-revoked` answer is signed (#2643): not at all (an older
     /// Mac), by the Mac under this phone's key, or by somebody else's key.
-    enum RevokeSignature { case none, genuine, forged }
+    /// `otherNonce`: the Mac's genuine key over ANOTHER request's nonce (a
+    /// signed refusal replayed from elsewhere).
+    enum RevokeSignature { case none, genuine, forged, otherNonce }
     nonisolated(unsafe) static var revokeSignature = RevokeSignature.none
     /// Only these paths get a signed refusal; others (a large upload refused
     /// from its headers) are unsigned. Empty: every path.
     nonisolated(unsafe) static var signedRevokePaths: Set<String> = []
     nonisolated(unsafe) static var hasSelfRoute = true
+    /// Only these paths are refused as revoked; others are answered as a
+    /// known device. Empty: every path.
+    nonisolated(unsafe) static var revokedPaths: Set<String> = []
     /// The name the phone gave when it enrolled.
     nonisolated(unsafe) static var enrolledName: String?
     nonisolated(unsafe) static var key: SymmetricKey?
@@ -466,7 +547,7 @@ final class StubMac: URLProtocol, @unchecked Sendable {
     static let deviceId = "dev_stubPhone0001"
 
     static func reset() {
-        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil; pairingClosed = false; pairingLocked = false; proof = .genuine; enrolledName = nil; revokeSignature = .none; signedRevokePaths = []; hasSelfRoute = true
+        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil; pairingClosed = false; pairingLocked = false; proof = .genuine; enrolledName = nil; revokeSignature = .none; signedRevokePaths = []; hasSelfRoute = true; revokedPaths = []
     }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-stub.invalid" }
@@ -503,7 +584,8 @@ final class StubMac: URLProtocol, @unchecked Sendable {
             let time = Int(request.value(forHTTPHeaderField: "x-khayt-time") ?? "") ?? 0
             let nonce = request.value(forHTTPHeaderField: "x-khayt-nonce") ?? ""
             let mac = request.value(forHTTPHeaderField: "x-khayt-mac") ?? ""
-            if Self.revoked && device == Self.deviceId {
+            if Self.revoked && device == Self.deviceId,
+               Self.revokedPaths.isEmpty || Self.revokedPaths.contains(url.path()) {
                 answer = (401, ["reason": "device-revoked"])
                 revokedNonce = nonce
             } else if !Self.knowsDevice || device != Self.deviceId || Self.key == nil {
@@ -530,9 +612,11 @@ final class StubMac: URLProtocol, @unchecked Sendable {
            Self.signedRevokePaths.isEmpty || Self.signedRevokePaths.contains(url.path()) {
             // As LanServer signs it (#2643): HMAC of replyText(nonce, 401, body)
             // under the phone's key; a forger has some other key.
-            let signer = Self.revokeSignature == .genuine ? (Self.key ?? SymmetricKey(size: .bits256)) : SymmetricKey(size: .bits256)
+            let genuineKey = Self.revokeSignature == .genuine || Self.revokeSignature == .otherNonce
+            let signer = genuineKey ? (Self.key ?? SymmetricKey(size: .bits256)) : SymmetricKey(size: .bits256)
+            let signedNonce = Self.revokeSignature == .otherNonce ? MacIdentity.nonce() : revokedNonce
             headers["x-khayt-reply-mac"] = Data(HMAC<SHA256>.authenticationCode(
-                for: DeviceKey.replyText(nonce: revokedNonce, status: 401, body: data), using: signer)).base64EncodedString()
+                for: DeviceKey.replyText(nonce: signedNonce, status: 401, body: data), using: signer)).base64EncodedString()
         }
         let response = HTTPURLResponse(url: url, statusCode: answer.0, httpVersion: "HTTP/1.1", headerFields: headers)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
