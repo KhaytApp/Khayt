@@ -149,7 +149,7 @@ struct ActiveCountSettings: View {
 
     private var toggle: some View {
         Section {
-            Toggle(isOn: $sender.enabled) {
+            Toggle(isOn: Binding(get: { sender.enabled }, set: { shop.setInstallCount($0, sender: sender) })) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(shop.words.callIt("tel.active"))
                     Text(shop.words.callIt("tel.active_hint"))
@@ -157,6 +157,24 @@ struct ActiveCountSettings: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            PrivacyProblem(shop: shop, key: "mac.priv_owner_count")
+        }
+    }
+}
+
+/// Why a privacy switch was not changed, beside it. Only the sentence for
+/// this switch (`key`), or the sign-in one.
+struct PrivacyProblem: View {
+    let shop: Shop
+    let key: String
+    /// Also shown for any other reason this switch's write gave.
+    var orAny = false
+
+    var body: some View {
+        if let said = shop.privacyProblem,
+           orAny || said == shop.words.callIt(key) || said == shop.words.callIt("mac.lock_sign_in_first") {
+            Text(said).font(.caption).foregroundStyle(Khayt.late)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

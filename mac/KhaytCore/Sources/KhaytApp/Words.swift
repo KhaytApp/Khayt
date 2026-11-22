@@ -4077,6 +4077,8 @@ final class Words {
         "mac.phones_sign_out_note": ["en": "It can no longer reach this Mac until someone enters the LAN PIN on it again. Your other phones stay signed in. If the phone was lost, also change the LAN PIN, and sign it out of Khayt Cloud if it uses it: this does not reach the cloud.", "ar": "لن يتمكن من الوصول إلى هذا الماك حتى يُدخَل رمز الشبكة المحلية عليه من جديد. جوالاتك الأخرى تبقى مسجّلة الدخول. إن كان الجوال مفقودًا فغيّر رمز الشبكة المحلية أيضًا، وسجّل خروجه من سحابة خيط إن كان يستخدمها: هذا الإجراء لا يصل إلى السحابة."],
         "mac.phones_hint": ["en": "A phone pairs once with the LAN PIN, after you click Pair a phone here, and signs its requests after that. Changing the PIN signs every phone out.", "ar": "يقترن الجوال مرة واحدة برمز الشبكة المحلية بعد أن تضغط «إقران جوال» هنا، ثم يوقّع طلباته بعد ذلك. تغيير الرمز يسجّل خروج كل الجوالات."],
         "mac.pair_open": ["en": "Pair a phone", "ar": "إقران جوال"],
+        "mac.priv_owner_telemetry": ["en": "Not saved, because it needs the owner: crash reports and usage statistics.", "ar": "لم يُحفظ، لأنه يحتاج إلى المالك: تقارير الأعطال وإحصاءات الاستخدام."],
+        "mac.priv_owner_count": ["en": "Not saved, because it needs the owner: the anonymous install count.", "ar": "لم يُحفظ، لأنه يحتاج إلى المالك: عدّاد التثبيت المجهول."],
         "mac.net_title": ["en": "Internet use", "ar": "استخدام الإنترنت"],
         "mac.net_open": ["en": "Internet use…", "ar": "استخدام الإنترنت…"],
         "mac.net_sub": ["en": "Choose what Khayt may send over the internet. Printers, cameras and phones on your shop's network always keep working.", "ar": "اختر ما يُسمح لخيط بإرساله عبر الإنترنت. الطابعات والكاميرات والجوالات على شبكة متجرك تواصل العمل دائمًا."],

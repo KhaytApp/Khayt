@@ -255,6 +255,10 @@ final class Shop {
     var feedsOutboundGate = Shop.inTheApp
     /// Settings ▸ General should open on Internet use (`OpenInternetUse`).
     var opensInternetUse = false
+    /// Why a privacy switch (the install count, crash reports, usage
+    /// statistics) was not changed, said beside the switch in Settings: the
+    /// shop window's banner is behind that window.
+    var privacyProblem: String?
     /// Moves whenever the gate is told something, so a view that asks the
     /// gate (which is not observable) is redrawn.
     var outboundRevision = 0

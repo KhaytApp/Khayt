@@ -217,6 +217,34 @@ extension Shop {
         return true
     }
 
+    // MARK: - The privacy switches are the owner's (Turki, Nov 22)
+
+    /// May whoever is here change the install count or the crash and usage
+    /// opt-ins? Under the staff lock only the owner (`security`/`edit`, as
+    /// the outbound switch asks); with the lock off, anyone, as before.
+    /// Refused with its own words, beside the switch and on the shop window.
+    func ownerAllowsPrivacy(saying key: String) -> Bool {
+        // An earlier refusal of this kind is not left on the shop window.
+        if let old = privacyProblem, moveProblem == old { moveProblem = nil }
+        privacyProblem = nil
+        if lockAllows("security", "edit") { return true }
+        let said = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : key)
+        privacyProblem = said
+        moveProblem = said
+        return false
+    }
+
+    /// Turn this Mac's anonymous install count on or off. This Mac's own
+    /// switch, not the book's, so a sample or read-only book can still flip
+    /// it; but under the lock it is the owner's, like the opt-ins beside it.
+    @discardableResult
+    func setInstallCount(_ on: Bool, sender: ActiveCountSender = .shared) -> Bool {
+        guard ownerAllowsPrivacy(saying: "mac.priv_owner_count") else { return false }
+        sender.enabled = on
+        tellOutboundGate()
+        return true
+    }
+
     // MARK: - Saying a refusal
 
     /// The purposes only a person starts (the rule's `automatic: false`): a

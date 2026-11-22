@@ -825,8 +825,15 @@ extension Shop {
     @discardableResult
     func setTelemetry(crash: Bool? = nil, usage: Bool? = nil) async -> Bool {
         writeProblem = nil
-        guard source.isReal else { writeProblem = words.callIt("mac.move_sample"); return false }
-        guard permitted("settings", "edit") else { return false }
+        // The owner's under the staff lock (`security`/`edit`, as the outbound
+        // switch), and said in its own words: this used to ask `settings`/
+        // `edit` and refuse with nothing on screen.
+        guard ownerAllowsPrivacy(saying: "mac.priv_owner_telemetry") else { return false }
+        guard source.isReal else {
+            writeProblem = words.callIt("mac.move_sample")
+            privacyProblem = writeProblem
+            return false
+        }
         guard let build = source.build else { return false }
         var was = telemetryConsent
         var chosen = was

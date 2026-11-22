@@ -1945,6 +1945,8 @@
  "mac.pair_locked_some": "Bu ağdaki bir cihaz çok fazla yanlış PIN girdi. Telefon Eşleştir'e yeniden tıklayana kadar eşleşemez. Diğer telefonlar eşleşebilir.",
  "mac.pair_loopback": "Bir telefon bu Mac'e henüz ulaşamıyor. Yukarıdaki “Tüm ağ arayüzlerinde dinle (LAN)” seçeneğini açın ve kaydedin.",
  "mac.pair_open": "Telefon Eşleştir",
+ "mac.priv_owner_telemetry": "Kaydedilmedi, çünkü işletme sahibi gerekiyor: çökme raporları ve kullanım istatistikleri.",
+ "mac.priv_owner_count": "Kaydedilmedi, çünkü işletme sahibi gerekiyor: anonim kurulum sayımı.",
  "mac.net_row_on": "“İnternete hiç bağlanma” açık.",
  "mac.net_row_off": "Khayt'ın internet üzerinden gönderdikleri ve bunu durduran bir anahtar.",
  "mac.net_title": "İnternet kullanımı",

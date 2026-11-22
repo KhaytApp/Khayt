@@ -1945,6 +1945,8 @@
  "mac.pair_locked_some": "Un appareil de ce réseau a saisi un mauvais code PIN trop de fois. Il ne peut plus s’associer tant que vous ne cliquez pas à nouveau sur Associer un téléphone. Les autres téléphones le peuvent toujours.",
  "mac.pair_loopback": "Un téléphone ne peut pas encore joindre ce Mac. Activez « Écouter sur toutes les interfaces réseau (LAN) » ci-dessus et enregistrez.",
  "mac.pair_open": "Associer un téléphone",
+ "mac.priv_owner_telemetry": "Non enregistré, car le propriétaire est requis : rapports de plantage et statistiques d'utilisation.",
+ "mac.priv_owner_count": "Non enregistré, car le propriétaire est requis : le comptage anonyme des installations.",
  "mac.net_row_on": "« Ne faire aucun appel à Internet » est activé.",
  "mac.net_row_off": "Ce que Khayt envoie sur Internet, et un interrupteur pour l'arrêter.",
  "mac.net_title": "Utilisation d'Internet",

@@ -48,7 +48,7 @@ struct WritersAreGatedTests {
     }
 
     static func asksTheLock(_ text: String) -> Bool {
-        ["permitted(", "permittedRestoring(", "lockAllows("].contains { text.contains($0) }
+        ["permitted(", "permittedRestoring(", "lockAllows(", "ownerAllowsPrivacy("].contains { text.contains($0) }
     }
 
     // MARK: - Reading the sources
