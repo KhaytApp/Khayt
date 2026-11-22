@@ -2399,6 +2399,10 @@ function startActiveCount() {
 // stricter switch, which is not in the book.
 ipcMain.handle('hub:outbound-describe', async () => ({ rows: outboundGate.describe(), local: { offline: outboundGate.local().offline === true } }));
 ipcMain.handle('hub:outbound-set-local', async (_e, patch) => {
+  // Only the owner changes the switch under the staff lock, this computer's
+  // own included (Turki, Nov 22 round 2). The book's settings.network is held
+  // by the save guard (PrinterPermission SECURITY_SETTINGS).
+  if (!PrinterPermission.mayChangeNetwork(lanServerStore)) return { ok: false, error: 'not_permitted' };
   try { return { ok: true, local: outboundGate.setLocal(patch) }; } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 
