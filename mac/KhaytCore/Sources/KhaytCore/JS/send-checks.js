@@ -16,8 +16,12 @@
  *          else (mesh dimensions, raw toolpath extents) only warn.
  *   warn   worth a look before sending: fits only rotated, sliced for
  *          another printer, a material or colour that is not what is loaded
+ *          a printer whose last print ended (finished, stopped, cancelled)
+ *          with nobody saying the bed was cleared since ('bed-not-cleared')
  *   info   a head the printer does not report (a U1 head with
- *          filament_exist:false or type NONE): never a mismatch
+ *          filament_exist:false or type NONE): never a mismatch; a bed
+ *          nobody has said is clear, on a printer with no activity to go by
+ *          ('bed-unknown')
  *
  * Every input is optional; a check whose inputs are missing says nothing (an
  * unmeasured model is not a model that does not fit). Pure; no DOM, no I/O.
@@ -28,10 +32,15 @@
  *   machine  { model, printerModel?, toolheads?, bed: {x,y,z}, printerApi: {type} }
  *   loaded   [{ slot (0-based head), hex, material }], loaded-colours shape
  *            (normalizeLoaded, or fromPrintTaskConfig for a U1)
+ *   live     the printer's poll entry ({ state, lastActivityAt, lastFinishedAt },
+ *            printer-poll-cache); `opts.lastFinishedByMachine` as plan() gives
+ *            it. Leave `live` out and the bed says nothing. The bed rule is
+ *            lib/auto-dispatch.js bedState, the dispatcher's own: a file sent
+ *            by hand and one sent by dispatch are judged the same way.
  */
 
-const CODES = ['type-unsupported', 'bed-footprint', 'bed-height', 'bed-rotate', 'sliced-for-other',
-  'material-mismatch', 'colour-far', 'head-not-reported'];
+const CODES = ['type-unsupported', 'bed-footprint', 'bed-height', 'bed-rotate', 'bed-not-cleared', 'sliced-for-other',
+  'material-mismatch', 'colour-far', 'head-not-reported', 'bed-unknown'];
 const SEVERITIES = ['block', 'warn', 'info'];
 const RANK = { block: 0, warn: 1, info: 2 };
 
@@ -143,10 +152,31 @@ function filamentChecks(file, machine, loaded, out) {
   }
 }
 
+function bedClearChecks(machine, live, opts, out) {
+  if (live === undefined) return;
+  const AD = lib('KhaytAutoDispatch', './auto-dispatch.js');
+  const PA = lib('KhaytPrinterActivity', './printer-activity.js');
+  if (!AD || typeof AD.bedState !== 'function') return;
+  const l = isObj(live) ? live : {};
+  const why = AD.bedState(machine, l, isObj(opts) ? opts : {});
+  if (!why) return;
+  const st = PA && l.state ? PA.machineStatus({ printerApi: machine.printerApi || {} }, { state: l.state }) : null;
+  const ended = !!(st && st.cls === 'finished');
+  // WARN on a print that ended with no "bed is clear" after it, or one the
+  // book says finished after the last "clear". INFO when there is nothing to
+  // go by: the printer reports no state, or it is idle and nobody ever said.
+  if (ended || why === 'ad.bed_not_clear') {
+    const at = Number(l.lastActivityAt);
+    out.push({ code: 'bed-not-cleared', severity: 'warn', since: Number.isFinite(at) ? at : null, clearedAt: machine.bedClearedAt || null });
+  } else {
+    out.push({ code: 'bed-unknown', severity: 'info' });
+  }
+}
+
 /**
  * @returns {Array<{code: string, severity: 'block'|'warn'|'info', slot?: number}>}
  */
-function sendChecks(file, machine, loaded) {
+function sendChecks(file, machine, loaded, live, opts) {
   const f = isObj(file) ? file : {};
   const m = isObj(machine) ? machine : {};
   const out = [];
@@ -154,6 +184,7 @@ function sendChecks(file, machine, loaded) {
   bedChecks(f, m, out);
   slicedForChecks(f, m, out);
   filamentChecks(f, m, loaded, out);
+  bedClearChecks(m, live, opts, out);
   return out.sort((a, b) => (RANK[a.severity] - RANK[b.severity])
     || ((a.slot || 0) - (b.slot || 0)) || (CODES.indexOf(a.code) - CODES.indexOf(b.code)));
 }

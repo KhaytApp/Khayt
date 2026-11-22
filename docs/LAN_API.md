@@ -1219,7 +1219,7 @@ Cloud, so a phone or the PWA away from the shop sees the same printers.
   `lastOkAt`: both move on every answered poll, and a healthy printer would
   otherwise mean a snapshot every poll. A printer that stops answering changes
   `error` and `errorCode`, so it is a change. Nothing is sent for a book with
-  no machines.
+  no printer Khayt polls (no machine with a printer connection).
 - **Only while** Khayt Cloud is signed in and unlocked on that computer, for the
   book's own shop, for a role that may write (a viewer's snapshot is a 403),
   and while the "make no internet calls" switch allows Khayt Cloud (purpose
