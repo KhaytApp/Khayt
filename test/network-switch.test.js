@@ -128,6 +128,7 @@ function harness(over = {}) {
     async putNetworkSwitch(url, shopId, token, body) {
       if (server.hang) return new Promise(() => {});
       server.puts.push(body);
+      if (server.onPut) await server.onPut();
       if (server.putStatus) return { status: server.putStatus, body: { reason: 'stale', changedAt: '2026-11-22T10:05:00.000Z' } };
       server.value = { changedAt: body.changedAt, receivedAt: 'x', ciphertext: body.ciphertext };
       return { status: 200, body: { ok: true, changedAt: body.changedAt } };
@@ -322,24 +323,73 @@ test('frame G: "Keep it on this computer only" after turning it ON keeps this co
   assert.equal((await harness().sync.answerConflict('keep')).why, 'none', 'no conflict, nothing to answer');
 });
 
-test('frame G: a second 409 in a row says the clock may be behind; a 200 clears it; the window is told', async () => {
+test('frame G: a second refusal of the PERSON\'s change says the clock may be behind; retries never count; a 200 clears it', async () => {
   const h = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
   h.server.putStatus = 409;
+  h.publishRemote(plain({ offline: true, changedAt: '2026-11-22T10:05:00.000Z' }));
   await h.sync.publish({ offline: false });
   assert.equal(h.sync.state().clockBehind, false);
-  const c0 = h.changes();
-  assert.ok(c0 >= 1, 'the conflict appearing tells the window');
-  await h.sync.answerConflict('adopt');
-  h.setBook({ offline: false, changedAt: '2026-11-22T10:01:00.000Z' });
+  assert.ok(h.changes() >= 1, 'the conflict appearing tells the window');
+  // H2: the next tick does not PUT the same change again, nor count it.
+  const puts = h.server.puts.length;
+  await h.sync.tick();
+  assert.equal(h.server.puts.length, puts, 'no retry while the person has not answered');
+  assert.equal(h.sync.state().clockBehind, false);
+  assert.equal((await h.sync.answerConflict('adopt')).applied, true);
+  // The person changes it again, and is refused again: now the clock line.
+  h.setBook({ offline: false, changedAt: '2026-11-22T10:06:00.000Z' });
+  h.publishRemote(plain({ offline: true, changedAt: '2026-11-22T10:07:00.000Z' }));
   await h.sync.publish({ offline: false });
   assert.equal(h.sync.state().clockBehind, true);
   h.server.putStatus = null;
-  h.setBook({ offline: false, changedAt: '2026-11-22T10:02:00.000Z' });
   await h.sync.answerConflict('adopt');
+  h.setBook({ offline: false, changedAt: '2026-11-22T10:08:00.000Z' });
   await h.sync.publish({ offline: false });
   assert.equal(h.sync.state().clockBehind, false);
   assert.equal(h.sync.state().owner, true);
   assert.equal(harness({ role: 'manager' }).sync.state().owner, false);
+});
+
+test('review H1/M1: the newer value is fetched at the 409, so both answers work after this computer went offline', async () => {
+  for (const choice of ['adopt', 'keep']) {
+    const h = harness({ mine: { share: true } });
+    const on = Object.assign({}, ON_NOW, { changedAt: new Date(NOW).toISOString() });
+    h.publishRemote(plain({ offline: false, changedAt: new Date(NOW + 60000).toISOString() }));
+    h.server.putStatus = 409;
+    assert.equal((await h.sync.publish({ offline: true, network: on })).why, 'stale');
+    assert.equal(h.sync.state().conflict.held, true, 'held at the 409, while still online');
+    h.setBook(on);                 // the window saves "on" after the answer
+    h.server.blocked = true;       // offline now: every switch-sync GET refused
+    const r = await h.sync.answerConflict(choice);
+    assert.equal(r.ok, true, choice);
+    assert.equal(r.applied, true, choice);
+    assert.equal(h.book().network.offline, false, `${choice}: the shop takes the newer setting`);
+    assert.equal(h.local.offline, choice === 'keep', `${choice}: this computer's own switch`);
+    assert.equal(h.sync.state().conflict, null);
+  }
+  // Nothing held and nothing reachable: not answered, the card stays, nothing changes.
+  const n = harness({ mine: { share: true } });
+  const on = Object.assign({}, ON_NOW, { changedAt: new Date(NOW).toISOString() });
+  n.server.putStatus = 409;
+  await n.sync.publish({ offline: true, network: on });
+  n.setBook(on);
+  n.server.blocked = true;
+  assert.deepEqual(await n.sync.answerConflict('keep'), { ok: false, why: 'not-held' });
+  assert.equal(n.local.sets, 0, 'this computer\'s switch untouched');
+  assert.ok(n.sync.state().conflict, 'the card stays');
+  assert.equal(n.book().network.offline, true);
+});
+
+test('review H2: a retry already in flight cannot open a conflict for a change the book no longer holds', async () => {
+  // "Off" owed from earlier (turned off while sharing), sent by the tick, not the person.
+  const h = harness({ mine: { share: true, highestSeen: '2026-11-22T09:00:00.000Z' }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  h.server.putStatus = 409;
+  // While that PUT is out, the person answers / changes the switch: the book moves on.
+  h.server.onPut = async () => { h.setBook({ offline: true, changedAt: '2026-11-22T10:01:00.000Z' }); };
+  await h.sync.tick();
+  assert.equal(h.server.puts.length, 1, 'the owed "off" was sent by the tick');
+  assert.equal(h.sync.state().conflict, null, 'and its refusal opened nothing');
+  assert.equal(h.sync.state().clockBehind, false);
 });
 
 test('per server and shop: another scope\'s stamps and held values never apply; the staff lock gates every answer', async () => {

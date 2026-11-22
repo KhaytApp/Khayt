@@ -113,9 +113,11 @@ try {
   ok(JSON.stringify(await buttons(w, 'conflict-off')) === JSON.stringify(['Use the newer setting']), 'turning it OFF here: only "Use the newer setting" (stricter-only, Turki Nov 22)');
   ok(/never looser/.test(await text(w)), 'and says why there is nothing to keep');
   await shot(w, 'G-409-off');
-  // Main refuses "keep" after turning it off whatever the window sends.
+  // A forged "keep" from the window: with Khayt Cloud locked here main answers
+  // 'locked' before anything else. The stricter-only refusal ('looser') needs
+  // a session and is main's unit test (test/network-switch.test.js).
   const looser = await w.evaluate(() => window.hubAPI.networkSwitchConflict('keep'));
-  ok(looser && looser.ok === false, 'main answers a forged "keep" without a conflict or a session with a refusal');
+  ok(looser && looser.ok === false && looser.why === 'locked', 'a forged "keep" from the window: refused by main ("locked")');
 
   // ── G: the clock ─────────────────────────────────────────────────────────
   await drawWith(w, { unlocked: true, share: true, owner: true, pending: null, conflict: null, clockBehind: true });
@@ -127,7 +129,8 @@ try {
   await w.click('[data-iu-g="keep"]');
   await w.waitForFunction(() => [...document.querySelectorAll('#toastContainer .toast')].some((t) => /Unlock Khayt Cloud on this computer/.test(t.textContent)), null, { timeout: 8000 });
   ok(true, 'the answer went to main, which said "locked": "Unlock Khayt Cloud on this computer to change this."');
-  ok(await w.evaluate(() => !document.querySelector('[data-iu-g-card]')), 'and the page is drawn again from main\'s own state');
+  await w.waitForFunction(() => !document.querySelector('[data-iu-g-card]'), null, { timeout: 8000 });
+  ok(true, 'and the page is drawn again from main\'s own state');
 
   // ── Arabic: the same states in the shop's language ───────────────────────
   await w.evaluate(() => { settings.lang = 'ar'; i18n.set('ar'); });
