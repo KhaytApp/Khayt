@@ -252,7 +252,7 @@
    }
   },
   {
-   "why": "offline must be exactly true: 'yes' is not offline",
+   "why": "anything present but false reads as offline: a string 'yes' fails closed (security review)",
    "settings": {
     "network": {
      "offline": "yes"
@@ -260,8 +260,8 @@
    },
    "purpose": "cloud",
    "want": {
-    "allowed": true,
-    "reason": "ok"
+    "allowed": false,
+    "reason": "offline"
    }
   },
   {
@@ -485,6 +485,334 @@
    "want": {
     "allowed": false,
     "reason": "settings-unknown"
+   }
+  },
+  {
+   "why": "a string 'true' is offline, not online",
+   "settings": {
+    "network": {
+     "offline": "true"
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "offline: false is online",
+   "settings": {
+    "network": {
+     "offline": false
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
+  },
+  {
+   "why": "this computer's switch written as 1 is offline here",
+   "settings": {},
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   },
+   "ctx": {
+    "local": {
+     "offline": 1
+    }
+   }
+  },
+  {
+   "why": "a hex IPv4 is an address, not a LAN name: 8.8.8.8",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "0x08080808"
+   }
+  },
+  {
+   "why": "a hex public address",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "0x5db8d822"
+   }
+  },
+  {
+   "why": "a name starting fc is not an IPv6 ULA",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "fcc.gov"
+   }
+  },
+  {
+   "why": "a name starting fd is not either",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "fdroid.org"
+   }
+  },
+  {
+   "why": "userinfo is refused",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "fd@evil.com"
+   }
+  },
+  {
+   "why": "an odd IPv4-mapped spelling of a public address",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "::ffff:0:808:808"
+   }
+  },
+  {
+   "why": "a host with a port, as printerApi.host holds it",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "192.168.1.40:7125"
+   }
+  },
+  {
+   "why": "a host with a scheme",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "http://192.168.1.40"
+   }
+  },
+  {
+   "why": "an mDNS name with a port",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "prusa.local:80"
+   }
+  },
+  {
+   "why": "mDNS discovery's multicast group",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "224.0.0.251"
+   }
+  },
+  {
+   "why": "IPv6 mDNS multicast",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "ff02::fb"
+   }
+  },
+  {
+   "why": "a router's .lan name",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "voron.lan"
+   }
+  },
+  {
+   "why": "the .home.arpa name",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "x.home.arpa"
+   }
+  },
+  {
+   "why": "a link-local address with a zone id",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "[fe80::1%en0]"
+   }
+  },
+  {
+   "why": "a fully-qualified trailing dot",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "printer.local."
+   }
+  },
+  {
+   "why": "an IPv4-mapped LAN address",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "::ffff:192.168.1.2"
+   }
+  },
+  {
+   "why": "a port out of range is no host",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "10.0.0.1:99999"
+   }
+  },
+  {
+   "why": "public IPv6",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "2001:4860:4860::8888"
    }
   }
  ]

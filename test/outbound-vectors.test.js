@@ -56,12 +56,20 @@ test('junk never throws and never allows more', () => {
     }
   }
   assert.equal(O.allowed({}, '__proto__').reason, 'unknown-purpose');
+  // And never allows more: with no book, nothing but a LAN address goes out;
+  // a purpose outside the closed set never does.
+  for (const s of [undefined, null, 0, 'x', []]) {
+    for (const p of O.PURPOSES) if (p !== 'lan') assert.equal(O.allowed(s, p).allowed, false, `${p} with ${JSON.stringify(s)}`);
+    assert.equal(O.allowed(s, 'lan', { host: 'example.com' }).allowed, false);
+  }
+  for (const p of ['', 'telemetry', 'LAN', 'Updates', '__proto__', 'toString']) assert.equal(O.allowed({}, p).allowed, false, p);
   assert.equal(O.allowed({ network: { offline: true, keep: ['__proto__'] } }, 'updates').allowed, false);
 });
 
-test('loads in JavaScriptCore\'s shape, reading host-ranges from the global', () => {
+test('loads in JavaScriptCore\'s shape, alone', () => {
   const ctx = {}; vm.createContext(ctx);
-  for (const f of ['printer-host', 'host-ranges', 'outbound']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'lib', f + '.js'), 'utf8'), ctx);
+  // Self-contained: it loads alone, whatever the Mac's module order.
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'lib', 'outbound.js'), 'utf8'), ctx);
   assert.equal(vm.runInContext("KhaytOutbound.allowed({network:{offline:true}}, 'lan', {host:'10.1.2.3'}).allowed", ctx), true);
   assert.equal(vm.runInContext("KhaytOutbound.allowed({network:{offline:true}}, 'lan', {host:'2130706433'}).reason", ctx), 'lan', 'numeric IPv4 loopback');
   assert.equal(vm.runInContext("KhaytOutbound.allowed({network:{offline:true}}, 'lan', {host:'example.com'}).reason", ctx), 'lan-host-public');
