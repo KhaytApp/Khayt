@@ -258,7 +258,7 @@ extension Shop {
         // set is judged against that, not against the change it beat.
         let seenBefore = NetworkSwitch.later(networkSwitchHighestSeen, networkSwitchOwnStamp)
         let sent = await Self.networkSwitchPut(value, connection: connection, token: token, dek: dek, fetch: networkSwitchFetcher)
-        afterSending(sent, turningOn: true)
+        afterSending(sent, turningOn: true, change: value.changedAt)
         if case .stale = sent { await holdPublished(connection, token: token, dek: dek, seenBefore: seenBefore) }
         return sent == .ok
     }
@@ -287,8 +287,11 @@ extension Shop {
     }
 
     /// Whether a refused PUT is worth sending again: a timeout, "too many",
-    /// or the server's own fault. Anything else it will refuse every time.
-    nonisolated static func refusalMayPass(_ status: Int) -> Bool { status == 408 || status == 429 || status >= 500 }
+    /// the server's own fault, or a session to sign in to again. Anything else
+    /// it will refuse every time.
+    /// 401 is a session that ran out between the two calls: signing in again
+    /// sends it.
+    nonisolated static func refusalMayPass(_ status: Int) -> Bool { status == 401 || status == 408 || status == 429 || status >= 500 }
 
     /// The switch was turned OFF here, by the owner: a GET first, then
     /// `offline: false` ONLY if a value is published there (Dev Hub, Nov 22;
@@ -318,60 +321,102 @@ extension Shop {
         }
         // A shop that is not on Khayt Cloud at all has published nothing.
         guard !networkSwitchShopId.isEmpty else { forgetUnsentOff(); return .nothingPublished }
+        let stamp = value.changedAt
         guard let (connection, token, dek) = await networkSwitchSession() else {
             if outboundTellsOthers { noteTold(.failed) }
-            rememberUnsentOff(value.changedAt, seenBefore: seenBefore)
+            rememberUnsentOff(stamp, seenBefore: seenBefore)
             return .unsent
         }
-        let (heard, _) = await Self.networkSwitchGet(connection, token: token, fetch: networkSwitchFetcher)
+        let (heard, published) = await Self.networkSwitchGet(connection, token: token, fetch: networkSwitchFetcher)
         // The retry waited on the network: if the switch was changed here
-        // meanwhile, this "off" is no longer the shop's word.
-        if retry, !unsentOffStillStands(value.changedAt) { forgetUnsentOff(); return .superseded }
+        // meanwhile, this "off" is no longer the shop's word. Only ITS OWN
+        // slot is touched from here on: a newer unsent "off" the owner made
+        // while this was in flight is neither forgotten nor written over.
+        if retry, !unsentOffStillStands(stamp) { forgetUnsentOff(ifStamp: stamp); return .superseded }
         switch heard {
         case .failed:
             // Not known whether a value is published there: neither sent nor
             // given up.
             if outboundTellsOthers { noteTold(.failed) }
-            rememberUnsentOff(value.changedAt, seenBefore: seenBefore)
+            rememberUnsentOff(stamp, seenBefore: seenBefore)
             return .unsent
         case .none:
             // Nothing is published: nothing to send, and nothing failed.
-            forgetUnsentOff()
+            forgetUnsentOff(ifStamp: stamp)
             outboundDefaults.set(false, forKey: Self.tellFailedKey)
             return .nothingPublished
-        case .published(let there):
-            if let thereAt = NetworkSwitch.date(there) {
-                // Already there with this very stamp: an earlier send whose
-                // answer was lost. Sending it again would be refused as
-                // stale, and read as another computer's change.
-                if thereAt == mine {
-                    forgetUnsentOff()
+        case .published:
+            // Judged on the VALUE, opened with the shop's key and checked,
+            // never on the server's outer stamp alone: a value that cannot be
+            // read supersedes nothing and proves nothing arrived.
+            if let published,
+               case .success(let there) = NetworkSwitch.read(published, shopId: connection.shopId, dek: dek,
+                                                             highestSeen: nil, purposes: outboundPurposeIds),
+               let thereAt = NetworkSwitch.date(there.changedAt) {
+                // Already there: this very change (the same stamp AND "off").
+                // An earlier send whose answer was lost; sending it again
+                // would be refused as stale and read as another computer's.
+                if thereAt == mine, !there.offline {
+                    forgetUnsentOff(ifStamp: stamp)
                     noteTold(.told(Date()))
                     outboundRevision &+= 1
                     return .sent
                 }
-                if retry, thereAt > mine { forgetUnsentOff(); return .superseded }
+                if retry, thereAt > mine, !NetworkSwitch.isAhead(there, now: Date()) {
+                    supersededUnsentOff(stamp)
+                    return .superseded
+                }
             }
         }
         let sent = await Self.networkSwitchPut(value, connection: connection, token: token, dek: dek, fetch: networkSwitchFetcher)
         switch sent {
         case .ok:
             afterSending(sent, turningOn: false, option: outboundTellsOthers)
-            forgetUnsentOff()
+            forgetUnsentOff(ifStamp: stamp)
             return .sent
-        case .stale:
-            forgetUnsentOff()
-            if retry { return .superseded }
-            afterSending(sent, turningOn: false, option: outboundTellsOthers)
+        case .stale(let at):
+            if retry {
+                // A retry never asks on its own. What the 409 says decides:
+                //   newer than this change   dropped; the newer value is heard
+                //                            and applied like any other
+                //   older, or no stamp       not understood: kept, and the
+                //                            next retry's GET decides
+                //   the very same instant    a tie only the owner can break
+                //                            (or this change, arrived late):
+                //                            read once, below
+                let atDate = at.flatMap(NetworkSwitch.date)
+                if let atDate, atDate > mine { supersededUnsentOff(stamp); return .superseded }
+                guard let atDate, atDate == mine else {
+                    rememberUnsentOff(stamp, seenBefore: seenBefore)
+                    return .unsent
+                }
+                let (_, again) = await Self.networkSwitchGet(connection, token: token, fetch: networkSwitchFetcher)
+                if let again,
+                   case .success(let there) = NetworkSwitch.read(again, shopId: connection.shopId, dek: dek,
+                                                                 highestSeen: nil, purposes: outboundPurposeIds),
+                   NetworkSwitch.date(there.changedAt) == mine {
+                    if !there.offline {
+                        forgetUnsentOff(ifStamp: stamp)
+                        noteTold(.told(Date()))
+                        outboundRevision &+= 1
+                        return .sent
+                    }
+                } else {
+                    rememberUnsentOff(stamp, seenBefore: seenBefore)
+                    return .unsent
+                }
+            }
+            forgetUnsentOff(ifStamp: stamp)
+            afterSending(sent, turningOn: false, option: outboundTellsOthers, change: stamp)
             await holdPublished(connection, token: token, dek: dek, seenBefore: seenBefore)
             return .changedElsewhere
         case .refused(let status) where !Self.refusalMayPass(status):
             afterSending(sent, turningOn: false, option: outboundTellsOthers)
-            forgetUnsentOff()
+            forgetUnsentOff(ifStamp: stamp)
             return .refused
         case .refused, .failed:
             afterSending(sent, turningOn: false, option: outboundTellsOthers)
-            rememberUnsentOff(value.changedAt, seenBefore: seenBefore)
+            rememberUnsentOff(stamp, seenBefore: seenBefore)
             return .unsent
         }
     }
@@ -384,10 +429,28 @@ extension Shop {
     /// The stamp of an "off" this Mac made and could not send, if any.
     var networkSwitchUnsentOff: String? { outboundDefaults.string(forKey: Self.unsentOffKey(networkSwitchShopId)) }
 
+    /// Remember an "off" to send again. Only while it is still the shop's
+    /// word here: a send that comes back after the owner changed the switch
+    /// again must not write its old stamp over a newer unsent one.
     private func rememberUnsentOff(_ stamp: String, seenBefore: String?) {
+        guard unsentOffStillStands(stamp) else { return }
         outboundDefaults.set(stamp, forKey: Self.unsentOffKey(networkSwitchShopId))
         let key = Self.unsentOffSeenBeforeKey(networkSwitchShopId)
         if let seenBefore { outboundDefaults.set(seenBefore, forKey: key) } else { outboundDefaults.removeObject(forKey: key) }
+    }
+
+    /// Forget THIS unsent "off", and only this one: the slot may by now hold
+    /// a newer one the owner made while the send was in flight.
+    func forgetUnsentOff(ifStamp stamp: String) {
+        if networkSwitchUnsentOff == stamp { forgetUnsentOff() }
+    }
+
+    /// A newer value replaced this "off" before it could be sent: forgotten,
+    /// and nothing is left to say failed.
+    private func supersededUnsentOff(_ stamp: String) {
+        forgetUnsentOff(ifStamp: stamp)
+        outboundDefaults.set(false, forKey: Self.tellFailedKey)
+        outboundRevision &+= 1
     }
 
     func forgetUnsentOff() {
@@ -425,7 +488,17 @@ extension Shop {
         return await tellOthersSwitchedOff(.object(networkSettings), seenBefore: seenBefore, retry: true)
     }
 
-    private func afterSending(_ sent: Sent, turningOn: Bool, option: Bool = true) {
+    /// The change a waiting "changed at another computer" question is about:
+    /// the stamp this Mac's own switch had when it was asked.
+    nonisolated static func askedAboutKey(_ shopId: String) -> String { "network.switchAskedAbout." + shopId }
+    var networkSwitchAskedAbout: String? { outboundDefaults.string(forKey: Self.askedAboutKey(networkSwitchShopId)) }
+    func noteAskedAbout(_ stamp: String?) {
+        let key = Self.askedAboutKey(networkSwitchShopId)
+        if let stamp { outboundDefaults.set(stamp, forKey: key) } else { outboundDefaults.removeObject(forKey: key) }
+    }
+
+    /// `change`: the stamp of the change that was being sent.
+    private func afterSending(_ sent: Sent, turningOn: Bool, option: Bool = true, change: String? = nil) {
         switch sent {
         case .ok:
             noteTold(.told(Date()))
@@ -438,6 +511,7 @@ extension Shop {
             outboundDefaults.set(false, forKey: Self.tellFailedKey)
             holdStamp(at)
             outboundDefaults.set(turningOn, forKey: Self.heldTurningOnKey(networkSwitchShopId))
+            noteAskedAbout(change)
             networkSwitchAsk = .changedElsewhere(at: at.flatMap(NetworkSwitch.date), turningOn: turningOn)
         case .refused, .failed:
             if option { noteTold(.failed) }
@@ -523,6 +597,7 @@ extension Shop {
         case .askChangedElsewhere(let value):
             networkSwitchHeld = value
             if networkSwitchAsk == nil {
+                noteAskedAbout(networkSwitchOwnStamp)
                 networkSwitchAsk = .changedElsewhere(at: NetworkSwitch.date(value.changedAt), turningOn: networkSwitchHeldTurningOn)
             }
         case .askOld(let value):
@@ -694,7 +769,15 @@ extension Shop {
             // this Mac's own change. Either alone lets an older value replayed
             // behind the 409 answer the question.
             if let conflict = networkSwitchHeldStamp.flatMap(NetworkSwitch.date), when < conflict { return .unreached }
-            if let own = networkSwitchOwnStamp.flatMap(NetworkSwitch.date), when < own { return .overtaken }
+            if let ownStamp = networkSwitchOwnStamp, let own = NetworkSwitch.date(ownStamp), when < own {
+                // Overtaken only when the owner CHANGED the switch here after
+                // the question was asked. If this Mac's switch is still the
+                // change the 409 refused, a value older than it contradicts
+                // the 409 (the server holds one at or after it): a replay or
+                // a stale read. Not it; the question stays.
+                if let asked = networkSwitchAskedAbout, asked != ownStamp { return .overtaken }
+                return .unreached
+            }
             return .read(value)
         }
     }
