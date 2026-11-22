@@ -32,11 +32,11 @@ final class OutboundWordsTests: XCTestCase {
 
     /// Every place that shows `error.localizedDescription` says why, never
     /// "network error" or the type's debug text.
-    func testARefusalReadsAsItsWords() {
+    func testARefusalReadsAsItsWords() throws {
         L10n.setLanguage(.en)
         let gate = OutboundGate()
         gate.update(book: .settings(.object(["network": .object(["offline": .bool(true)])])))
-        OutboundGate.$scoped.withValue(gate) {
+        try OutboundGate.$scoped.withValue(gate) {
             XCTAssertThrowsError(try OutboundGate.shared.require(.cloud)) { error in
                 XCTAssertEqual(error.localizedDescription,
                                "Khayt is set to make no internet calls. This needs Khayt Cloud.")
@@ -44,7 +44,7 @@ final class OutboundWordsTests: XCTestCase {
         }
         let starting = OutboundGate()
         starting.update(book: .unread)
-        OutboundGate.$scoped.withValue(starting) {
+        try OutboundGate.$scoped.withValue(starting) {
             XCTAssertThrowsError(try OutboundGate.shared.require(.cloud)) { error in
                 XCTAssertEqual(error.localizedDescription, "Khayt is starting. Try again in a moment.")
             }
