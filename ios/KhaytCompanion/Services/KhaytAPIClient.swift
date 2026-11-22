@@ -271,7 +271,36 @@ final class KhaytAPIClient: ObservableObject {
 
     func fetchStatus() async throws -> ShopStatus {
         if let local = await fromBook({ try await $0.status() }) { return local }
+        // A paired phone that keeps no book (a floor phone) learns the shop's
+        // "make no internet calls" switch here (#2640), from a SIGNED status
+        // request whose answer the Mac signs back.
+        if reader?.holdsAnyBook != true, let device = usableDevice,
+           let signed = try? await signedStatus(device) {
+            PhoneOutbound.statusAnswer(signed.network)
+            await CompanionCache.shared.store(signed.status, for: "/api/status?format=json")
+            servingCachedSince = nil
+            return signed.status
+        }
         return try await get("/api/status?format=json", requiresPin: false, as: ShopStatus.self)
+    }
+
+    /// `/api/status?format=json`, signed with this phone's key. The counts
+    /// are the same public ones; the `network` block is believed ONLY when the
+    /// answer carries `x-khayt-reply-mac` and it verifies under this phone's
+    /// key for this request's nonce (`PhoneOutbound.StatusNetwork.read`).
+    /// Anything else is "no answer", never "online". Nil when the Mac could
+    /// not be asked or did not answer 200 (the caller falls back to the
+    /// unsigned counts).
+    private func signedStatus(_ device: DeviceKey.Credential) async throws
+        -> (status: ShopStatus, network: PhoneOutbound.StatusNetwork)? {
+        let url = try makeURL(path: "/api/status?format=json")
+        let nonce = MacIdentity.nonce()
+        let (data, response) = try await send(url, method: "GET", body: nil, auth: .device(device), nonce: nonce)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let status = try? JSONDecoder().decode(ShopStatus.self, from: data) else { return nil }
+        let network = PhoneOutbound.StatusNetwork.read(device, nonce: nonce, status: http.statusCode, body: data,
+                                                       replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+        return (status, network)
     }
 
     func fetchQueue() async throws -> [QueueOrder] {
@@ -2346,7 +2375,8 @@ final class KhaytAPIClient: ObservableObject {
     private var clockOffset: TimeInterval = 0
 
     private func send(_ url: URL, method: String, body: Data?, auth: Auth,
-                      contentType: String = "application/json") async throws -> (Data, URLResponse) {
+                      contentType: String = "application/json",
+                      nonce: String = MacIdentity.nonce()) async throws -> (Data, URLResponse) {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -2362,7 +2392,7 @@ final class KhaytAPIClient: ObservableObject {
             if !pin.isEmpty { req.setValue(pin, forHTTPHeaderField: "x-khayt-pin") }
         case .device(let device):
             guard let h = DeviceKey.headers(device, method: method, url: url, body: body,
-                                            now: Date().addingTimeInterval(clockOffset)) else {
+                                            now: Date().addingTimeInterval(clockOffset), nonce: nonce) else {
                 throw KhaytAPIError.unauthorized
             }
             req.setValue(h.device, forHTTPHeaderField: "x-khayt-device")

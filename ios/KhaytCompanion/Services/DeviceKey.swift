@@ -107,6 +107,28 @@ enum DeviceKey {
         return Headers(device: credential.deviceId, time: String(time), nonce: nonce, mac: mac)
     }
 
+    /// What the Mac signs an answer to a SIGNED request with
+    /// (`x-khayt-reply-mac`, `LanServer.replyMac`): `HMAC(K, "khayt-reply-v1\n"
+    /// + requestNonce + "\n" + status + "\n" + sha256hex(body))`, base64.
+    static let replyPrefix = "khayt-reply-v1"
+
+    static func replyText(nonce: String, status: Int, body: Data) -> Data {
+        let hash = SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
+        return Data([replyPrefix, nonce, String(status), hash].joined(separator: "\n").utf8)
+    }
+
+    /// True only when `replyMac` is the Mac's signature over THIS answer to
+    /// the request sent with `nonce`, under this phone's own key. Compared in
+    /// constant time. A missing header, a key that is not 32 bytes or a MAC
+    /// that is not base64 is false: an answer nobody signed is not the Mac's.
+    static func verifiesReply(_ credential: Credential, nonce: String, status: Int, body: Data,
+                              replyMac: String?) -> Bool {
+        guard let replyMac, let mac = Data(base64Encoded: replyMac),
+              let raw = Data(base64Encoded: credential.key), raw.count == 32 else { return false }
+        return HMAC<SHA256>.isValidAuthenticationCode(mac, authenticating: replyText(nonce: nonce, status: status, body: body),
+                                                      using: SymmetricKey(data: raw))
+    }
+
     /// Why a signed request was refused, from a 401's `reason`.
     enum Refusal: Equatable {
         /// No such device, or its key does not match: enrol again.
