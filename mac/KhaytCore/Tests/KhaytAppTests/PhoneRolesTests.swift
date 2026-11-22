@@ -299,6 +299,49 @@ struct PhoneRolesTests {
         #expect(gone.0 == 401 && gone.1["reason"] as? String == "device-revoked")
     }
 
+    @Test("/api/status tells a paired phone the shop's switch, signed; nobody else is told anything new")
+    func statusCarriesTheSwitch() async throws {
+        let bench = try await Self.bench()
+        func network(_ json: [String: Any]) -> (offline: Bool?, keep: [String]?) {
+            let n = json["network"] as? [String: Any]
+            return (n?["offline"] as? Bool, n?["keep"] as? [String])
+        }
+        for role in ["operator", "viewer", "manager", "owner"] {
+            let phone = try Self.codePaired(bench.devices, role: role, name: "Phone \(role)")
+            let headers = phone.headers("GET", "/api/status?format=json")
+            let reply = try await bench.send("GET", "/api/status?format=json", headers: headers, timeout: 30)
+            #expect(reply.status == 200, Comment(rawValue: role))
+            #expect(network(reply.json).offline == false && network(reply.json).keep == [], Comment(rawValue: role))
+            #expect(reply.json["queued"] != nil, "the public counts are still there")
+            #expect(reply.headers["x-khayt-reply-mac"] == LanServer.replyMac(key: phone.key, nonce: headers["x-khayt-nonce"] ?? "",
+                                                                             status: 200, body: reply.body), Comment(rawValue: role))
+        }
+        // The shop turns it on and keeps updates; `lan` and a made-up id are not kept.
+        var settings: [String: JSONValue] = { if case .object(let s)? = bench.book.value["settings"] { return s }; return [:] }()
+        settings["network"] = .object(["offline": .bool(true), "keep": .array([.string("updates"), .string("lan"), .string("nonsense")])])
+        bench.book.value["settings"] = .object(settings)
+        let op = try Self.codePaired(bench.devices, role: "operator", name: "Floor")
+        var on = try await bench.send("GET", "/api/status?format=json", headers: op.headers("GET", "/api/status?format=json"), timeout: 30)
+        #expect(network(on.json).offline == true && network(on.json).keep == ["updates"])
+        // A malformed block fails closed, with nothing kept.
+        settings["network"] = .string("x")
+        bench.book.value["settings"] = .object(settings)
+        on = try await bench.send("GET", "/api/status?format=json", headers: op.headers("GET", "/api/status?format=json"), timeout: 30)
+        #expect(network(on.json).offline == true && network(on.json).keep == [])
+        // Nobody else: no headers, the PIN, and a signature that is not the phone's own.
+        let open = try await bench.get("/api/status?format=json")
+        #expect(open.status == 200 && open.json["network"] == nil && open.headers["x-khayt-reply-mac"] == nil)
+        let pin = try await bench.get("/api/status?format=json", headers: ["x-khayt-pin": Self.pin])
+        #expect(pin.status == 200 && pin.json["network"] == nil)
+        var forged = op.headers("GET", "/api/status?format=json")
+        forged["x-khayt-mac"] = Data(repeating: 1, count: 32).base64EncodedString()
+        let bad = try await bench.send("GET", "/api/status?format=json", headers: forged, timeout: 30)
+        #expect(bad.json["network"] == nil && bad.headers["x-khayt-reply-mac"] == nil)
+        // The public answer is byte for byte what it was.
+        let expected = try await bench.engine.lanStatusBody(store: .object(bench.book.value), today: LanServer.localDay(bench.box.now))
+        #expect(String(decoding: open.body, as: UTF8.self) == expected)
+    }
+
     @Test("the role answers are signed back to the phone, and only to a request that verified")
     func replyMacs() async throws {
         let bench = try await Self.bench()

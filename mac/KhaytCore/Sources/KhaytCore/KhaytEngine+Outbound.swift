@@ -11,6 +11,15 @@ extension KhaytEngine {
         try runtime.call2("KhaytOutbound.allowed(ARG0, ARG1, ARG2 === null ? undefined : ARG2)", [ruleSettings(settings), purpose, ctx], as: JSONValue.self)
     }
 
+    /// The SHOP's switch as a device with no copy of the book needs it:
+    /// `{offline, keep}`, both read by the rule (a malformed `network` is
+    /// offline with nothing kept; `keep` holds only real purpose ids, never
+    /// `lan`). This computer's own switch is not part of it.
+    public func outboundShopSwitch(settings: JSONValue) throws -> JSONValue {
+        try runtime.call2("({ offline: KhaytOutbound.isOffline(ARG0, {}), keep: KhaytOutbound.keptOf(ARG0) })",
+                          [ruleSettings(settings)], as: JSONValue.self)
+    }
+
     public func outboundPurposes() throws -> [String] {
         try runtime.call2("KhaytOutbound.PURPOSES", [], as: [String].self)
     }

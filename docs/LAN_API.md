@@ -96,6 +96,8 @@ Companion apps should call `GET /api/status` first (reachability), then `GET /ap
 
 Public aggregate counts for the active queue.
 
+**For a paired phone (Mac only).** When the request carries a paired device's signature that verifies, the answer also has `"network": {"offline": true|false, "keep": ["updates", …]}`: the shop's "make no internet calls" switch and the purposes kept while it is on, as `lib/outbound.js` reads the book (`isOffline`, `keptOf`). The answer is signed with `x-khayt-reply-mac`, as `/api/devices/self` is. A phone in a floor role has no copy of the book and learns the switch here. An unsigned request, the PIN, or a signature that does not verify gets the public counts only, with no `network` and no reply MAC. This Mac's own "Also on this Mac only" switch is not included.
+
 **Response 200**
 
 ```json

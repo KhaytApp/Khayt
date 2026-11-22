@@ -1142,6 +1142,22 @@ final class LanServer {
             // Without `?format=json` a browser gets the intake form, as on the PC.
             if request.query["format"] != "json" { return .redirect("/intake") }
             let body = (try? await engine.lanStatusBody(store: store, today: Self.localDay(host.now()))) ?? "{}"
+            // ── THE SHOP'S "MAKE NO INTERNET CALLS", FOR A PAIRED PHONE ───
+            //
+            // A phone in a floor role (operator, viewer) holds no copy of the
+            // book, so it cannot read `settings.network` and would go on
+            // calling out. Its status answer carries `network: {offline,
+            // keep}`, the rule's own reading. ONLY for a request whose device
+            // signature verified, and signed back (`signedForPhone`) so a
+            // device on the Wi-Fi cannot tell the phone the switch is off.
+            // Anyone else gets the public counts, unchanged.
+            if LanDevices.isSigned(request.headers), await pinGate(request) == nil,
+               case .object(var counts)? = try? JSONDecoder().decode(JSONValue.self, from: Data(body.utf8)),
+               case .object(let book) = store,
+               let network = try? await engine.outboundShopSwitch(settings: book["settings"] ?? .object([:])) {
+                counts["network"] = network
+                return signedForPhone(.json(200, Self.jsonText(.object(counts))), request)
+            }
             return .json(200, body)
 
         // ── WHO THIS MAC IS (see `LanIdentity`) ──────────────────────────
