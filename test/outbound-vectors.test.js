@@ -88,3 +88,24 @@ test('switch-sync (Turki, Nov 22): kept only through Khayt Cloud, shown kept in 
   // Through Khayt Cloud keeps nothing else: every other purpose but lan is still blocked.
   for (const p of O.PURPOSES) if (p !== 'lan' && p !== 'switch-sync') assert.equal(O.allowed({ network: { offline: true, via: 'cloud' } }, p).allowed, false, p);
 });
+
+test('a person\'s answer: one switch-sync call, then spent; once:true only then', () => {
+  const T = 1795000000000;
+  const off = { network: { offline: true } };
+  let tok = O.answerToken(T);
+  assert.equal(O.ANSWER_MS, 20000);
+  assert.deepEqual({ ...tok }, { purpose: 'switch-sync', at: T, until: T + 20000, spent: false });
+  assert.ok(Object.isFrozen(tok), 'the host cannot stretch it in place');
+  const r = O.allowed(off, 'switch-sync', { answer: tok, now: T + 10 });
+  assert.deepEqual(r, { allowed: true, reason: 'kept', purpose: 'switch-sync', once: true });
+  tok = O.spend(tok);
+  assert.equal(O.allowed(off, 'switch-sync', { answer: tok, now: T + 20 }).allowed, false, 'used once');
+  assert.equal(O.answerLive(tok, T + 20), false);
+  // Kept by its own rule already: no `once`, nothing to spend.
+  const kept = O.allowed({ network: { offline: true, via: 'cloud' } }, 'switch-sync', { answer: O.answerToken(T), now: T + 10 });
+  assert.equal(kept.once, undefined);
+  // Junk never makes a live token.
+  for (const bad of [null, {}, 'x', O.answerToken(NaN), O.answerToken('1'), { purpose: 'switch-sync', at: T, until: T + 1, spent: 0 }]) {
+    assert.equal(O.answerLive(bad, T), false, JSON.stringify(bad));
+  }
+});
