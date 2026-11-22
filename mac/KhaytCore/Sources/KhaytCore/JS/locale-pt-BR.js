@@ -3817,6 +3817,7 @@
   "op.enter_pin": "Digite o PIN",
   "op.wrong_pin": "PIN incorreto",
   "op.pin_elsewhere": "O PIN desta pessoa foi definido em outro computador e não chegou a este. Defina-o novamente em Configurações → Operadores.",
+  "op.pin_legacy": "O PIN desta pessoa foi salvo em um formato antigo que não pode mais ser verificado. O proprietário pode definir um novo em Configurações → Operadores.",
   "op.role_admin": "Administrador",
   "op.lock_enabled": "Bloqueio ativado",
   "op.pin_set": "PIN atualizado",

@@ -3817,6 +3817,7 @@
   "op.enter_pin": "Enter PIN",
   "op.wrong_pin": "Incorrect PIN",
   "op.pin_elsewhere": "This person's PIN was set on another computer and has not reached this one. Set it again in Settings → Operators.",
+  "op.pin_legacy": "This person's PIN was saved in an old format that can no longer be checked. The owner can set a new one in Settings → Operators.",
   "op.role_admin": "Admin",
   "op.lock_enabled": "Lock enabled",
   "op.pin_set": "PIN updated",

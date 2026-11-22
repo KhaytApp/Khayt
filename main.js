@@ -240,6 +240,7 @@ const {
   isEncryptionAvailable,
   persistLanStoreUpdate,
   updateStoreOnDisk,
+  updateStoreOnDiskAllowingLock,
   resolveStoreSecret,
   resolveStoreSecretFor,
   isStoreSecretMasked,
@@ -1801,13 +1802,36 @@ async function maybeShowKeychainExplanation(win) {
  * owner, so it changes nothing twice.
  */
 async function migrateLegacyOwnerOnDisk() {
-  const disk = readStoreDecryptedFromDisk();
-  if (!disk || !disk.settings) return false;
-  const m = PrinterPermission.migrateLegacyOwner(disk);
-  if (!m.changed) return false;
-  await writeStoreToDisk(m.store);
-  console.warn('owner migration: operator', m.operatorId, 'is the owner by roleKey now (a lock older than #2264)');
+  // Inside the write chain (lib/store-io.js updateStoreOnDiskAllowingLock).
+  let operatorId = null;
+  await updateStoreOnDiskAllowingLock((cur) => {
+    const m = PrinterPermission.migrateLegacyOwner(cur);
+    if (!m.changed) return cur;
+    operatorId = m.operatorId;
+    return m.store;
+  }, ['operators']);
+  if (!operatorId) return false;
+  console.warn('owner migration: operator', operatorId, 'is the owner by roleKey now (a lock older than #2264)');
   return true;
+}
+
+// Once per process, before the first window reads the book: under the lock,
+// nobody stays signed in across a restart (lib/main/printer-permission.js
+// signedOutAtStart, #2608 security review).
+let signedOutThisStart = false;
+async function signOutAtStartOnDisk() {
+  if (signedOutThisStart) return false;
+  signedOutThisStart = true;
+  // Inside the write chain: a write queued ahead of this (a LAN order
+  // arriving as the window loads) is kept (re-review of #2608).
+  let changed = false;
+  await updateStoreOnDiskAllowingLock((cur) => {
+    const r = PrinterPermission.signedOutAtStart(cur);
+    if (!r.changed) return cur;
+    changed = true;
+    return r.store;
+  }, ['settings.activeOperatorId']);
+  return changed;
 }
 
 ipcMain.handle('hub:load-store', async (event) => {
@@ -1849,8 +1873,11 @@ ipcMain.handle('hub:load-store', async (event) => {
     // A lock older than roleKey: its translated admin becomes the owner, once,
     // on disk and in what the window gets (#2592 data review, MED-3).
     try { await migrateLegacyOwnerOnDisk(); } catch (e) { console.error('hub:load-store: owner migration failed:', e && e.message); }
+    let signedOut = false;
+    try { signedOut = await signOutAtStartOnDisk(); } catch (e) { console.error('hub:load-store: sign-out at start failed:', e && e.message); }
     let { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
     if (normalized) normalized = PrinterPermission.migrateLegacyOwner(normalized).store;
+    if (normalized && signedOut) normalized = PrinterPermission.signedOutAtStart(normalized).store;
     if (!normalized) {
       console.error('hub:load-store: unrecoverable store shape:', errors.join('; '));
       return { __corrupt: true, error: errors[0] || 'Invalid store' };

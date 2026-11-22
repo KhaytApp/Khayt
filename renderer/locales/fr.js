@@ -3816,6 +3816,7 @@
   "op.enter_pin": "Saisir le PIN",
   "op.wrong_pin": "PIN incorrect",
   "op.pin_elsewhere": "Le code PIN de cette personne a été défini sur un autre ordinateur et n'est pas arrivé ici. Redéfinissez-le dans Réglages → Opérateurs.",
+  "op.pin_legacy": "Le code PIN de cette personne a été enregistré dans un ancien format qui ne peut plus être vérifié. Le propriétaire peut en définir un nouveau dans Réglages → Opérateurs.",
   "op.role_admin": "Administrateur",
   "op.lock_enabled": "Verrouillage activé",
   "op.pin_set": "PIN mis à jour",

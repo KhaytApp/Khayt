@@ -3816,6 +3816,7 @@
   "op.enter_pin": "PIN eingeben",
   "op.wrong_pin": "Falsche PIN",
   "op.pin_elsewhere": "Die PIN dieser Person wurde auf einem anderen Computer festgelegt und ist hier nicht angekommen. Lege sie unter Einstellungen → Bediener neu fest.",
+  "op.pin_legacy": "Die PIN dieser Person ist in einem alten Format gespeichert, das nicht mehr geprüft werden kann. Der Inhaber kann unter Einstellungen → Bediener eine neue festlegen.",
   "op.role_admin": "Administrator",
   "op.lock_enabled": "Sperre aktiviert",
   "op.pin_set": "PIN aktualisiert",
