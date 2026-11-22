@@ -24,6 +24,13 @@ enum HeadActuals {
     /// end. An older run of the same file is not this print.
     static let window: TimeInterval = 20 * 60
 
+    /// `filament_detect` out of Moonraker's `/printer/objects/query` answer.
+    nonisolated static func filamentDetect(in answer: [String: JSONValue]) -> JSONValue? {
+        guard case .object(let result)? = answer["result"], case .object(let status)? = result["status"],
+              case .object(let detect)? = status["filament_detect"] else { return nil }
+        return .object(detect)
+    }
+
     /// The history row for the print that just ended under `filename`: the
     /// newest completed run of that file that ended near `endedAt`.
     ///
