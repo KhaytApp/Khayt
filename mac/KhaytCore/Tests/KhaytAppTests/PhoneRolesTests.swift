@@ -553,6 +553,52 @@ struct PhoneRolesTests {
         }
     }
 
+    @Test("the phone cancels its own request: the Mac stops waiting on it, only its poll secret can, and an answer already given stays")
+    func phoneCancels() throws {
+        let commit = Data(repeating: 7, count: 32).base64EncodedString()
+        let window = LanConnectorPairing(enabled: true, flavor: .phone)
+        window.open()
+        let offer = try window.request(commitment: commit, name: "Phone", app: "Khayt iPhone", version: "1",
+                                       address: "192.168.1.9", identity: .init(), pollSecret: "poll")
+        // Somebody else on the Wi-Fi who saw the id cannot cancel it.
+        #expect(window.cancel(pairId: offer.pairId, secret: "guess") == .unknown)
+        #expect(window.cancel(pairId: "aaaaaaaaaaaa", secret: "poll") == .unknown)
+        #expect(window.pending?.pairId == offer.pairId)
+        #expect(window.cancel(pairId: offer.pairId, secret: "poll") == .cancelled)
+        #expect(window.pending == nil, "the owner's screen is back to waiting")
+        #expect(window.isOpen(), "the window itself stays open for the next phone")
+        #expect(window.poll(pairId: offer.pairId, secret: "poll") == .expired)
+        // Twice is harmless, and says how it ended.
+        #expect(window.cancel(pairId: offer.pairId, secret: "poll") == .answered(.expired))
+        // Nothing was enrolled, and approving now approves nothing.
+        var enrolled = 0
+        window.approve { _ in enrolled += 1 }
+        #expect(enrolled == 0)
+        // A second phone can ask in the same window.
+        let next = try window.request(commitment: commit, name: "Phone 2", app: "Khayt iPhone", version: "1",
+                                      address: "192.168.1.10", identity: .init(), pollSecret: "poll2")
+        window.deny()
+        #expect(window.cancel(pairId: next.pairId, secret: "poll2") == .answered(.denied), "a denial is not rewritten")
+    }
+
+    @Test("DELETE /api/devices/pair/<id>: 200 with the poll secret, 404 without, and 404 while the code path is off")
+    func cancelRoute() async throws {
+        let bench = try await Self.bench(code: true)
+        bench.pairing.open(); bench.phonePairing.open()
+        let ask: JSONValue = .object(["v": .number(2), "commit": .string(Data(repeating: 7, count: 32).base64EncodedString()),
+                                      "name": .string("Phone"), "app": .string("Khayt iPhone"), "version": .string("1")])
+        let offer = try await bench.send("POST", "/api/devices/pair", body: try JSONEncoder().encode(ask)).json
+        let pairId = try #require(offer["pairId"] as? String), secret = try #require(offer["pollSecret"] as? String)
+        #expect(try await bench.send("DELETE", "/api/devices/pair/\(pairId)", body: Data(), headers: ["x-khayt-poll": "guess"]).status == 404)
+        #expect(bench.phonePairing.pending?.pairId == pairId)
+        let done = try await bench.send("DELETE", "/api/devices/pair/\(pairId)", body: Data(), headers: ["x-khayt-poll": secret])
+        #expect(done.status == 200 && done.json["state"] as? String == "cancelled")
+        #expect(bench.phonePairing.pending == nil)
+        #expect(try await bench.get("/api/devices/pair/\(pairId)", headers: ["x-khayt-poll": secret]).json["state"] as? String == "expired")
+        let again = try await bench.send("DELETE", "/api/devices/pair/\(pairId)", body: Data(), headers: ["x-khayt-poll": secret])
+        #expect(again.status == 409 && again.json["state"] as? String == "expired")
+    }
+
     // MARK: - Who may give which role
 
     @Test("the owner gives any role, a manager up to manager, anyone else none; the lock off is the owner (D-P3)")

@@ -294,6 +294,33 @@ final class LanConnectorPairing {
         answer(request, .denied)
     }
 
+    /// What `cancel` found.
+    enum Cancelled: Equatable {
+        case cancelled
+        /// Already answered: nothing changes, and the caller is told how.
+        case answered(Outcome)
+        case unknown
+    }
+
+    /// The device that asked gives its request up (somebody tapped Cancel on
+    /// the phone). Proved by the poll secret, which only that device was
+    /// given: no key is shared yet, so there is nothing else to sign with.
+    /// The owner's screen goes back to waiting at once, in place of showing a
+    /// number nobody is looking at until the window ends. The offer stays
+    /// counted, as a denied one does, so cancelling cannot mint offers; and
+    /// an answer already given is never undone here.
+    func cancel(pairId: String, secret: String) -> Cancelled {
+        _ = isOpen()
+        if let request = pending, request.pairId == pairId {
+            guard LanDevices.constantTimeEqual(request.pollHash, Self.hash(secret)) else { return .unknown }
+            answer(request, .expired)
+            return .cancelled
+        }
+        guard let outcome = outcomes[pairId], let hash = answeredHashes[pairId],
+              LanDevices.constantTimeEqual(hash, Self.hash(secret)) else { return .unknown }
+        return .answered(outcome)
+    }
+
     private func answer(_ request: Request, _ outcome: Outcome) {
         outcomes[request.pairId] = outcome
         answeredHashes[request.pairId] = request.pollHash

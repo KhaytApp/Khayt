@@ -2775,6 +2775,15 @@ final class LanServer {
             guard let outcome = window.poll(pairId: pairId, secret: secret) else { return .json(404, #"{"state":"unknown"}"#) }
             return .json(200, #"{"state":"\#(outcome.rawValue)"}"#)
         }
+        // The phone gives its own request up. Its poll secret is the proof;
+        // an approval already given is not undone (409 says how it went).
+        if parts.count == 1, request.method == "DELETE" {
+            switch window.cancel(pairId: pairId, secret: secret) {
+            case .cancelled: return .json(200, #"{"state":"cancelled"}"#)
+            case .answered(let outcome): return .json(409, #"{"state":"\#(outcome.rawValue)"}"#)
+            case .unknown: return .json(404, #"{"state":"unknown"}"#)
+            }
+        }
         if parts.count == 2, parts[1] == "reveal", request.method == "POST" {
             var publicKey = "", nonce = ""
             if case .object(let shown)? = try? JSONDecoder().decode(JSONValue.self, from: request.body) {

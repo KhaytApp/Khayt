@@ -1081,6 +1081,7 @@ The slicer plugin's commit-then-reveal flow (`POST /api/connectors/pair`) with t
 - `POST /api/devices/pair` with `{v:2, commit, name, app, version}` → `{pairId, pollSecret, deviceId, publicKey, sig, identity}`. Only while a person has opened **Pair a phone** (120 s, 3 offers). 404 while the Mac has pairing by code off.
 - `POST /api/devices/pair/<pairId>/reveal` with `{publicKey, nonce}` and `x-khayt-poll` → `{"state":"waiting"}`. A mismatch expires the offer; no number is ever shown for it.
 - `GET /api/devices/pair/<pairId>` with `x-khayt-poll` → `{"state":"waiting"|"approved"|"denied"|"expired"}`.
+- `DELETE /api/devices/pair/<pairId>` with `x-khayt-poll` → `{"state":"cancelled"}`: the phone gives its own request up, and the Mac goes back to waiting. A later `GET` answers `expired`. `409 {"state":"approved"|"denied"|"expired"}` when it was already answered (an approval is not undone here), `404 {"state":"unknown"}` for a wrong id or secret. The offer stays counted.
 - Shared vectors: `docs/phone-pair.vectors.json` (the commitment, the signed offer, the check number, the derived key, and the reveals each side must refuse).
 - A person at the Mac compares the number, picks a role (Operator by default; only the owner may give Owner, a manager up to Manager) and approves. The device is enrolled with that role.
 
