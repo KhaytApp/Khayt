@@ -81,12 +81,15 @@ try {
   ok(await w.evaluate(() => document.getElementById('iuShopSwitch').getAttribute('aria-checked') === 'true'), 'the shop switch reads on');
   const order = await w.evaluate(() => [...document.querySelectorAll('[data-iu-row]')].map((r) => r.dataset.iuRow));
   ok(JSON.stringify(order) === JSON.stringify(window_order()), `rows in frame A's order (${order.length})`);
-  function window_order() { return ['updates', 'install-count', 'crash-reports', 'usage-stats', 'cloud', 'storage', 'messaging', 'webhooks', 'payments', 'storefront', 'ai', 'tax-authority', 'exchange-rates', 'makerrun', 'catalogues', 'tunnel', 'lan']; }
+  function window_order() { return ['updates', 'install-count', 'crash-reports', 'usage-stats', 'cloud', 'storage', 'messaging', 'webhooks', 'payments', 'storefront', 'ai', 'tax-authority', 'exchange-rates', 'makerrun', 'catalogues', 'tunnel', 'switch-sync', 'lan']; }
   ok((await rowState(w, 'updates')) === 'Blocked', 'Updates: Blocked');
   ok((await rowState(w, 'crash-reports')) === 'Off (its own switch)', 'Crash reports: Off (its own switch)');
   ok((await rowState(w, 'webhooks')) === 'Not set up', 'Webhooks: Not set up');
   ok((await rowState(w, 'lan')) === 'Always', 'the LAN row: Always, never a Keep tick');
   ok(await w.evaluate(() => !document.querySelector('[data-iu-row="lan"] [data-iu-keep]')), 'no Keep on the LAN row');
+  // switch-sync (Turki, Nov 22): its own row, every 15 min; this switch did not come through Khayt Cloud, so it is blocked.
+  ok((await w.evaluate(() => document.querySelector('[data-iu-row="switch-sync"] .iu-when')?.textContent.trim())) === 'Every 15 min', 'Switch updates from Khayt Cloud: every 15 min');
+  ok((await rowState(w, 'switch-sync')) === 'Blocked', 'and blocked while the switch did not come through Khayt Cloud');
   ok(await w.evaluate(() => /No security fixes will arrive/.test(document.querySelector('[data-iu-row="updates"] .iu-cons')?.textContent || '')), 'the Updates consequence line');
   ok(await w.evaluate(() => /Customers get no messages/.test(document.querySelector('[data-iu-row="messaging"] .iu-cons')?.textContent || '')), 'the Messages consequence line');
   ok(await w.evaluate(() => /Turned on by Sara Example/.test(document.getElementById('internetUseBody').textContent)), '"Turned on by Sara Example on … at …"');

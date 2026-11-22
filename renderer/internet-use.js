@@ -28,7 +28,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const STALE_DAYS = 30;
 /** Frame A's order. 'lookups' is Mac and iPhone only. */
 const ORDER = ['updates', 'install-count', 'crash-reports', 'usage-stats', 'cloud', 'storage', 'messaging', 'webhooks',
-  'payments', 'storefront', 'ai', 'tax-authority', 'exchange-rates', 'makerrun', 'catalogues', 'tunnel', 'lan'];
+  'payments', 'storefront', 'ai', 'tax-authority', 'exchange-rates', 'makerrun', 'catalogues', 'tunnel', 'switch-sync', 'lan'];
 /** Consequence lines, on these rows only (design §4.4) and only while the row is blocked. */
 const CONSEQUENCE = ['updates', 'cloud', 'storage', 'messaging', 'payments', 'storefront'];
 
@@ -211,14 +211,18 @@ function render(ctx) {
     const stale = updatesStale(row, ctx);
     const cons = consequence(row, ctx);
     const lanRow = row.purpose === 'lan';
+    // switch-sync is kept by its own rule (lib/outbound.js switchSyncKept):
+    // its tick is "not unticked", settings.network.dropSwitchSync, never `keep`.
+    const syncRow = row.purpose === 'switch-sync';
+    const ticked = syncRow ? network().dropSwitchSync !== true : keptList().indexOf(row.purpose) !== -1;
     const keepCell = showKeep && !lanRow
-      ? `<label class="iu-keep"><input type="checkbox" data-iu-keep="${esc(row.purpose)}"${keptList().indexOf(row.purpose) !== -1 ? ' checked' : ''}${can ? '' : ' disabled'}> ${esc(tr('iu.keep'))}</label>`
+      ? `<label class="iu-keep"><input type="checkbox" data-iu-keep="${esc(row.purpose)}"${ticked ? ' checked' : ''}${can ? '' : ' disabled'}> ${esc(tr('iu.keep'))}</label>`
       : (showKeep ? '<span></span>' : '');
     return `<div class="iu-row${lanRow ? ' iu-lan' : ''}${stale ? ' iu-stale' : ''}${showKeep ? '' : ' no-keep'}" data-iu-row="${esc(row.purpose)}">
       <div class="iu-what"><div class="iu-name">${esc(tr('iu.p.' + row.purpose))}</div>
         <div class="iu-desc">${esc(tr('iu.d.' + row.purpose) + (lanRow ? '' : blockedLine(row)))}</div>
         ${cons ? `<div class="iu-cons${row.purpose === 'updates' ? ' iu-red' : ''}">${esc(cons)}</div>` : ''}</div>
-      <div class="iu-when">${esc(tr(row.automatic ? 'iu.automatic' : 'iu.when_asked'))}</div>
+      <div class="iu-when">${esc(tr(syncRow ? 'iu.every_15m' : (row.automatic ? 'iu.automatic' : 'iu.when_asked')))}</div>
       <div class="iu-state"><span class="iu-dot ${st.tone}"></span>${esc(tr(st.key))}</div>
       ${keepCell}
     </div>`;
@@ -272,6 +276,7 @@ function wire(host) {
   host.querySelectorAll('[data-iu-keep]').forEach((box) => box.addEventListener('change', async () => {
     if (!mayChange()) { box.checked = !box.checked; return refuseSay('not_permitted'); }
     const p = box.getAttribute('data-iu-keep');
+    if (p === 'switch-sync') { await saveNetwork({ dropSwitchSync: !box.checked }); await refresh(); return; }
     const keep = keptList().filter((k) => k !== p);
     if (box.checked) keep.push(p);
     await saveNetwork({ keep });
