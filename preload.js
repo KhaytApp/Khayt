@@ -390,6 +390,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   phonePairClose: ()       => ipcRenderer.invoke('hub:phone-pair-close'),
   phonePairApprove: (arg)  => ipcRenderer.invoke('hub:phone-pair-approve', arg),
   phonePairDeny: ()        => ipcRenderer.invoke('hub:phone-pair-deny'),
+  setLanDeviceRole: (arg)  => ipcRenderer.invoke('hub:lan-device-role', arg),
 
   // iOS companion: live reload when phone adds a spool or changes an order
   onLanSpoolAdded:      (() => { let _cb=null; ipcRenderer.on('lan-spool-added',      (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),

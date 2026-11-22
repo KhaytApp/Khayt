@@ -4448,11 +4448,18 @@ async function renderLanPairedPhones() {
   if (!box) return;
   const res = await window.hubAPI?.listLanDevices?.().catch(() => null);
   const devices = res?.devices || [];
+  const day = (iso) => { try { return new Date(iso).toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return ''; } };
+  // Each phone's role, Pair a phone, and who may (renderer/phone-pairing.js,
+  // frames P5/P6 signed off Nov 22). Main decides; this draws its answer.
+  if (window.KhaytPhonePairing) {
+    await window.KhaytPhonePairing.renderList(box, document.getElementById('lanPairedPhonesFoot'), devices,
+      { day, canSignOut: canSignOutPhones(), refresh: renderLanPairedPhones });
+    return;
+  }
   if (!devices.length) {
     box.innerHTML = `<div style="color:var(--text-muted);">${escapeHtml(t('lan.phones_none'))}</div>`;
     return;
   }
-  const day = (iso) => { try { return new Date(iso).toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return ''; } };
   const canSignOut = canSignOutPhones();
   box.innerHTML = devices.map((d) => `
     <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">
@@ -4591,6 +4598,7 @@ function renderLanApiSettings() {
     <div style="margin:12px 0;">
       <label>${escapeHtml(t('lan.phones_title'))}</label>
       <div id="lanPairedPhones" style="font-size:13px;"></div>
+      <div id="lanPairedPhonesFoot"></div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${escapeHtml(t('lan.phones_hint'))}</div>
     </div>
     <div id="lanWebhookSection" style="display:${lan.enabled && lan.webhookToken ? 'block' : 'none'};margin:10px 0;">

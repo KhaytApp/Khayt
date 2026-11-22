@@ -6012,3 +6012,30 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .pp-row .pp-fields { flex: 1; min-width: 0; }
 .pp-row.is-paid { background: var(--bg-elev); }
 .pp-summary.is-refused { color: var(--st-late-ink, var(--danger)); }
+
+/* ── Pairing a phone by code, with a role (frames P1–P6, signed off Nov 22) ── */
+.pp-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.pp-who { flex: 1; min-width: 0; }
+.pp-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-how, .pp-note, .pp-sub { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+.pp-note { margin-top: 8px; }
+.pp-role-text { font-weight: 600; font-size: 13px; }
+.pp-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+.pp-ask { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 12px 14px; background: var(--bg-elev); border-radius: 10px; font-size: 13px; }
+.pp-dialog .modal-body { display: flex; flex-direction: column; gap: 12px; }
+.pp-dialog .modal-footer { display: flex; align-items: center; gap: 10px; }
+.pp-wait { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pp-left { font-size: 12px; color: var(--text-muted); }
+.pp-addr { display: flex; gap: 8px; }
+.pp-addr input { flex: 1; }
+.pp-asks { font-size: 15px; font-weight: 600; }
+.pp-check { font-size: 40px; font-weight: 700; letter-spacing: 4px; text-align: center; font-variant-numeric: tabular-nums; }
+.pp-center { text-align: center; }
+.pp-may { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.pp-roles { display: flex; flex-direction: column; gap: 8px; }
+.pp-role-opt { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.pp-role-opt.on { border: 1.5px solid var(--primary); background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.pp-role-opt input { margin-top: 3px; }
+.pp-role-opt span { display: flex; flex-direction: column; gap: 2px; }
+.pp-role-opt small { font-size: 12px; color: var(--text-muted); }
+.pp-end { font-size: 14px; line-height: 1.5; }
