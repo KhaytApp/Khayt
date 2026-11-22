@@ -320,6 +320,38 @@ final class DeviceKeyTests: XCTestCase {
         XCTAssertTrue(s.signedOutByMac)
     }
 
+    /// A Mac with #2643 signs `device-revoked` over this request's nonce.
+    /// Verified: the phone is signed out with no /api/proof round trip. A
+    /// signature under any other key changes nothing, and the proof never
+    /// "repairs" it, even when the real Mac would prove its key.
+    func testASignedDeviceRevokedIsBelievedOnlyWhenItVerifies() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
+        _ = await api.enrolDevice(name: "Test iPhone")
+        let device = try XCTUnwrap(s.device)
+        StubMac.revoked = true
+
+        StubMac.revokeSignature = .forged
+        StubMac.proof = .genuine
+        StubMac.seen = []
+        do { _ = try await api.lanRequest(path: "/api/queue", method: "GET"); XCTFail("answered") }
+        catch { guard case .transport? = error as? KhaytAPIError else { return XCTFail("\(error)") } }
+        XCTAssertFalse(StubMac.seen.contains { $0.path == "/api/proof" }, "a bad signature is not repaired by the proof")
+        XCTAssertEqual(s.device, device, "a forged signature signs nothing out")
+        XCTAssertFalse(s.signedOutByMac)
+
+        StubMac.revokeSignature = .genuine
+        StubMac.proof = .missing
+        StubMac.seen = []
+        do { _ = try await api.lanRequest(path: "/api/queue", method: "GET"); XCTFail("a revoked phone was let in") }
+        catch { guard case .server? = error as? KhaytAPIError else { return XCTFail("\(error)") } }
+        XCTAssertEqual(StubMac.seen.map(\.path), ["/api/queue"], "signed: no proof needed")
+        XCTAssertTrue(StubMac.seen.allSatisfy { $0.pin == nil })
+        XCTAssertNil(s.device)
+        XCTAssertEqual(s.macIdentityKey, "")
+        XCTAssertTrue(s.signedOutByMac)
+    }
+
     func testAMacWithAnotherClockIsBelievedOnce() async throws {
         let s = pairedSettings()
         let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
@@ -379,6 +411,10 @@ final class StubMac: URLProtocol, @unchecked Sendable {
     /// What answers `/api/proof`: the pinned Mac, an impostor, or nothing.
     enum Proof { case genuine, forged, missing }
     nonisolated(unsafe) static var proof = Proof.genuine
+    /// How a `device-revoked` answer is signed (#2643): not at all (an older
+    /// Mac), by the Mac under this phone's key, or by somebody else's key.
+    enum RevokeSignature { case none, genuine, forged }
+    nonisolated(unsafe) static var revokeSignature = RevokeSignature.none
     /// The name the phone gave when it enrolled.
     nonisolated(unsafe) static var enrolledName: String?
     nonisolated(unsafe) static var key: SymmetricKey?
@@ -386,7 +422,7 @@ final class StubMac: URLProtocol, @unchecked Sendable {
     static let deviceId = "dev_stubPhone0001"
 
     static func reset() {
-        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil; pairingClosed = false; pairingLocked = false; proof = .genuine; enrolledName = nil
+        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil; pairingClosed = false; pairingLocked = false; proof = .genuine; enrolledName = nil; revokeSignature = .none
     }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-stub.invalid" }
@@ -400,6 +436,7 @@ final class StubMac: URLProtocol, @unchecked Sendable {
         let now = Date().timeIntervalSince1970 + Self.clockAhead
         var signedOK = false
         var answer: (Int, Any) = (404, ["error": "not found"])
+        var revokedNonce: String?
 
         if Self.pairingLocked {
             let body = Data(#"{"reason":"pairing-locked","error":"Too many wrong PINs from this device. Try again in the next pairing window"}"#.utf8)
@@ -424,6 +461,7 @@ final class StubMac: URLProtocol, @unchecked Sendable {
             let mac = request.value(forHTTPHeaderField: "x-khayt-mac") ?? ""
             if Self.revoked && device == Self.deviceId {
                 answer = (401, ["reason": "device-revoked"])
+                revokedNonce = nonce
             } else if !Self.knowsDevice || device != Self.deviceId || Self.key == nil {
                 answer = (401, ["reason": "device-unknown"])
             } else if abs(now - TimeInterval(time)) > 120 {
@@ -443,8 +481,15 @@ final class StubMac: URLProtocol, @unchecked Sendable {
         Self.seen.append(Seen(path: url.path(), pin: pin, signedOK: signedOK))
 
         let data = try! JSONSerialization.data(withJSONObject: answer.1)
-        let response = HTTPURLResponse(url: url, statusCode: answer.0, httpVersion: "HTTP/1.1",
-                                       headerFields: ["Content-Type": "application/json"])!
+        var headers = ["Content-Type": "application/json"]
+        if let revokedNonce, Self.revokeSignature != .none {
+            // As LanServer signs it (#2643): HMAC of replyText(nonce, 401, body)
+            // under the phone's key; a forger has some other key.
+            let signer = Self.revokeSignature == .genuine ? (Self.key ?? SymmetricKey(size: .bits256)) : SymmetricKey(size: .bits256)
+            headers["x-khayt-reply-mac"] = Data(HMAC<SHA256>.authenticationCode(
+                for: DeviceKey.replyText(nonce: revokedNonce, status: 401, body: data), using: signer)).base64EncodedString()
+        }
+        let response = HTTPURLResponse(url: url, statusCode: answer.0, httpVersion: "HTTP/1.1", headerFields: headers)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)

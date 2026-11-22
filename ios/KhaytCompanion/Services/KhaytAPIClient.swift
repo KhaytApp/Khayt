@@ -2329,7 +2329,10 @@ final class KhaytAPIClient: ObservableObject {
         guard requiresPin else { return try await send(url, method: method, body: body, auth: .none, contentType: contentType) }
         guard let device = usableDevice else { return try await send(url, method: method, body: body, auth: .pin, contentType: contentType) }
 
-        let (data, response) = try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
+        // This request's nonce, kept: a signed refusal (#2643) is signed over it.
+        let nonce = MacIdentity.nonce()
+        let (data, response) = try await send(url, method: method, body: body, auth: .device(device),
+                                              contentType: contentType, nonce: nonce)
         let status = (response as? HTTPURLResponse)?.statusCode
         if let status, (200...299).contains(status), settings.needsPairAgain {
             // A signed request went through: whatever said this phone was
@@ -2376,16 +2379,27 @@ final class KhaytAPIClient: ObservableObject {
             // Mac really signed this phone out. Not proven, or no answer:
             // nothing changes and the request fails as a network fault.
             //
-            // LIMIT (Opus review): the proof shows the real Mac is reachable,
-            // not that it sent THIS refusal. An attacker already on-path can
-            // forge the 401 and relay the phone's /api/proof to the real Mac.
-            // That stops impostors that cannot relay (a device on the Mac's
-            // old address, a spoofer), not a man in the middle. The full fix
-            // is the Mac signing the refusal itself, over the device id and
-            // this request's nonce (Mac lane). No PIN goes anywhere either way.
-            let key = settings.macIdentityKey
-            guard !key.isEmpty, await proves(host: settings.host, port: settings.port, key: key) else {
-                throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+            // SIGNED BY THE MAC (#2643): a Mac that has it signs the refusal
+            // with `x-khayt-reply-mac` over THIS request's nonce, the status
+            // and the body, under this phone's key, as /api/devices/self does.
+            // That closes what the proof alone leaves open (an attacker in the
+            // middle relaying /api/proof to the real Mac). A signature that is
+            // present is believed only when it verifies; it is never "repaired"
+            // by the proof. No signature (an older Mac, a sign-out over 256
+            // ago): the /api/proof check below, as before.
+            //
+            // The proof alone shows the real Mac is reachable, not that it sent
+            // this refusal (Opus review), which is why the signature wins.
+            let replyMac = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "x-khayt-reply-mac")
+            if let replyMac {
+                guard DeviceKey.verifiesReply(device, nonce: nonce, status: 401, body: data, replyMac: replyMac) else {
+                    throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+                }
+            } else {
+                let key = settings.macIdentityKey
+                guard !key.isEmpty, await proves(host: settings.host, port: settings.port, key: key) else {
+                    throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+                }
             }
             settings.forgetMac(keepShop: cloud != nil)
             enrolNotBefore = nil
