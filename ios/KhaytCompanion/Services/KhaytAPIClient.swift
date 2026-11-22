@@ -2684,6 +2684,44 @@ extension KhaytAPIClient {
         return status == 200 ? (Self.pairState(data) ?? .unknown) : .unknown
     }
 
+    /// What giving a number up told the Mac (`DELETE /api/devices/pair/<pairId>`, #2631).
+    enum CodePairCancel: Equatable {
+        /// The Mac dropped the request and went back to waiting.
+        case cancelled
+        /// Too late: someone at the Mac had already approved this phone. An
+        /// approval is not undone by a cancel, so the phone finishes it.
+        case approved
+        /// Already denied or run out: nothing to give up.
+        case denied, expired
+        /// A wrong id or secret (404), or an answer that is not the route's.
+        case unknown
+        case unreachable
+    }
+
+    /// Gives this phone's own pairing request up, so the Mac stops showing
+    /// the number (Cancel, Use the PIN, or the screen going away). Unsigned,
+    /// like the poll: the poll secret is what says the request is this phone's.
+    func cancelCodePairing(_ ticket: CodePairTicket) async -> CodePairCancel {
+        guard let url = try? makeURL(path: "/api/devices/pair/\(ticket.offer.pairId)"),
+              let (data, response) = try? await send(url, method: "DELETE", body: nil, auth: .none,
+                                                     headers: ["x-khayt-poll": ticket.offer.pollSecret]),
+              let status = (response as? HTTPURLResponse)?.statusCode else { return .unreachable }
+        return Self.cancelAnswer(status: status, body: data)
+    }
+
+    nonisolated static func cancelAnswer(status: Int, body: Data) -> CodePairCancel {
+        var state: String?
+        if case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body),
+           case .string(let s)? = o["state"] { state = s }
+        switch (status, state) {
+        case (200, "cancelled"?): return .cancelled
+        case (409, "approved"?): return .approved
+        case (409, "denied"?): return .denied
+        case (409, "expired"?): return .expired
+        default: return .unknown
+        }
+    }
+
     /// Step 5, after `.approved`. The poll is unsigned, so the approval is
     /// PROVED first, with one request signed by the new key (`GET
     /// /api/devices/self`): only a Mac that enrolled this exact key answers it.

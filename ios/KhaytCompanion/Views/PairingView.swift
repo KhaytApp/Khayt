@@ -37,6 +37,10 @@ struct PairingView: View {
     @State private var olderMac = false
     /// Each attempt, so an old attempt's poll can never finish a new one.
     @State private var attempt = 0
+    /// Whether this screen is still up, read by a cancel that comes back
+    /// after it went away (a reference, so the answer sees the truth).
+    @State private var presence = Presence()
+    final class Presence { var shown = false }
 
     var body: some View {
         ZStack {
@@ -58,6 +62,8 @@ struct PairingView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: step)
         .sheet(isPresented: $showCloudSignIn) { CloudSignInSheet() }
+        .onAppear { presence.shown = true }
+        .onDisappear { presence.shown = false; giveUpTheNumber() }
         // Approved on the Mac, then the app was closed before Continue: the
         // enrolment is live, so pick up at the approved screen, not Find.
         .onAppear {
@@ -321,11 +327,36 @@ struct PairingView: View {
                 guard !Task.isCancelled, mine == attempt, step == .code else { return }
                 if done {
                     CompanionHaptics.success()
+                    ticket = nil            // used: leaving the number now cancels nothing
                     step = .approved
                 } else {
                     stop(.refused)
                 }
                 return
+            }
+        }
+    }
+
+    // ── GIVING THE NUMBER UP (#2631) ───────────────────────────────────────
+    //
+    // Cancel, Use the PIN or leaving the screen tells the Mac, so it stops
+    // showing a number nobody is looking at. The ticket is taken first, so the
+    // poll and a second call find nothing to give up. If the Mac had ALREADY
+    // approved (409 "approved"), the approval stands (the Mac does not undo
+    // it): the phone finishes it, as the poll would have a moment later, and
+    // shows it when the screen is still up.
+    private func giveUpTheNumber() {
+        guard let t = ticket else { return }
+        ticket = nil
+        attempt += 1
+        let presence = presence
+        Task { @MainActor in
+            guard await api.cancelCodePairing(t) == .approved else { return }
+            let shown = presence.shown
+            let done = await api.finishCodePairing(t, markPaired: !shown)
+            if done, shown, presence.shown {
+                CompanionHaptics.success()
+                step = .approved
             }
         }
     }
@@ -382,12 +413,15 @@ struct PairingView: View {
             .padding(.top, 16)
             foot(L10n.tr("pair.code.foot")).padding(.top, 8)
             Spacer(minLength: 18)
-            centredLink(L10n.tr("pair.code.use_pin")) { attempt += 1; ticket = nil; olderMac = false; goToPin() }
-            tonal(L10n.tr("pair.code.cancel")) { attempt += 1; ticket = nil; step = .find }
+            centredLink(L10n.tr("pair.code.use_pin")) { giveUpTheNumber(); attempt += 1; olderMac = false; goToPin() }
+            tonal(L10n.tr("pair.code.cancel")) { giveUpTheNumber(); attempt += 1; step = .find }
         }
         .task(id: ticket?.offer.pairId) {
             if let t = ticket { await waitForTheMac(t, attempt) }
         }
+        // Any other way off the number (the cloud sign-in, the sample shop,
+        // the app taking the screen away) gives it up too.
+        .onDisappear { giveUpTheNumber() }
     }
 
     private var role: String { sampleRole ?? settings.effectiveRole }
