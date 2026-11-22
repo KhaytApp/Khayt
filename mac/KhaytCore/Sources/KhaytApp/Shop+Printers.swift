@@ -386,7 +386,7 @@ extension Shop {
             Telemetry.feature(.printSent, in: self)
             if let jobId, !jobId.isEmpty {
                 await recordPrintRun(jobId: jobId, machineId: machine.id, started: sent.started,
-                                     file: file.lastPathComponent)
+                                     file: file.lastPathComponent, sentAs: sent.remoteName)
             }
             await printers.refresh(machine, shop: self)
         } catch {
@@ -400,14 +400,18 @@ extension Shop {
     /// decides the fields, against the record AS IT IS ON DISK, inside the
     /// write chain: a machine the shop picked since the sheet opened is read,
     /// kept as the plan, and never silently overwritten.
-    func recordPrintRun(jobId: String, machineId: String, started: Bool, file: String,
+    ///
+    /// `sentAs` is the name the file has ON THE PRINTER (`khayt-<time>.gcode`):
+    /// the only name the printer says back when the print ends, and so what
+    /// ties that print's filament figures to this job (`HeadActuals`).
+    func recordPrintRun(jobId: String, machineId: String, started: Bool, file: String, sentAs: String = "",
                         now: Date = Date()) async {
         guard let engine, let build = source.build else { return }
         do {
             // lock: callers — sendToPrinter
             try await StoreWriter.updateAsync(build) { root in
                 _ = try await Self.applyPrintRun(to: &root, jobId: jobId, machineId: machineId,
-                                                 started: started, file: file,
+                                                 started: started, file: file, sentAs: sentAs,
                                                  at: StoreWriter.iso(now), engine: engine)
             }
             await load(source)
@@ -421,13 +425,13 @@ extension Shop {
     /// The same, on a book handed in — pure, for the tests. Returns whether
     /// the job was changed (false: no such job, or one already finished).
     static func applyPrintRun(to root: inout [String: JSONValue], jobId: String, machineId: String,
-                              started: Bool, file: String, at: String,
+                              started: Bool, file: String, sentAs: String = "", at: String,
                               engine: KhaytEngine) async throws -> Bool {
         guard case .array(var rows)? = root["printLog"],
               let index = rows.firstIndex(where: { recordId($0) == jobId }),
               case .object(var record) = rows[index],
               let fields = try await engine.printRunFields(order: .object(record), machineId: machineId,
-                                                           at: at, started: started, file: file)
+                                                           at: at, started: started, file: file, sentAs: sentAs)
         else { return false }
         for (key, value) in fields {
             if value == .null { record.removeValue(forKey: key) } else { record[key] = value }
