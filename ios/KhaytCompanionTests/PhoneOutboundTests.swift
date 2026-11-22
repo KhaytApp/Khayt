@@ -113,10 +113,10 @@ final class PhoneOutboundTests: XCTestCase {
     /// A Khayt Cloud request is refused where it is built (CloudReader.request,
     /// #2637), so the phone's sync, live channel, push registration and photo
     /// calls never leave the phone while the shop is offline.
-    func testACloudRequestIsNeverBuiltWhileOffline() {
+    func testACloudRequestIsNeverBuiltWhileOffline() throws {
         let gate = OutboundGate()
         gate.update(book: .settings(offline))
-        OutboundGate.$scoped.withValue(gate) {
+        try OutboundGate.$scoped.withValue(gate) {
             XCTAssertThrowsError(try CloudReader.request(
                 CloudReader.Connection(url: "https://cloud.khaytapp.com", shopId: "shop_x", storedToken: ""),
                 token: "t", method: "GET", tail: "/live")) { error in
@@ -142,6 +142,7 @@ final class PhoneOutboundTests: XCTestCase {
 
     /// The install count: refused while the shop is offline (dropped, the
     /// dates kept), and the phone's own switch tells the gate too.
+    @MainActor
     func testTheInstallCountAsksTheGate() async {
         let defaults = UserDefaults(suiteName: "outbound-count-\(UUID().uuidString)")!
         let settings = ConnectionSettings()
