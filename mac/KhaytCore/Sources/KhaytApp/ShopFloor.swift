@@ -1958,7 +1958,11 @@ private struct Live: View {
         let step = shop.printStep(machine, paused: isPaused(status.state))
         let canStep = step != nil
         let canCancel = PrinterControl.offers(.cancel, known)
-        let canDrop = type == "moonraker"
+        // What this MODEL cannot do is left out (`lib/printer-capabilities.js`):
+        // a resin printer has no object to skip, a Bambu P1P has no light
+        // without its kit. A model nobody has said anything about is shown.
+        let hidden = shop.machineHiddenControls[machine.id] ?? []
+        let canDrop = type == "moonraker" && !hidden.contains("exclude-object")
         VStack(alignment: .leading, spacing: 6) {
             if canStep || canCancel || canDrop {
                 HStack(spacing: 8) {
@@ -1982,7 +1986,7 @@ private struct Live: View {
                     }
                     // A Bambu's speed preset (confirmed — it changes a running print)
                     // and its chamber light (straight through — it changes nothing).
-                    if type == "bambu" {
+                    if type == "bambu", !hidden.contains("speed") {
                         Menu(shop.words.callIt("mac.printer_speed")) {
                             ForEach(1...4, id: \.self) { level in
                                 Button(shop.words.callIt("mac.printer_speed_\(level)")) {
@@ -1991,6 +1995,8 @@ private struct Live: View {
                             }
                         }
                         .fixedSize()
+                    }
+                    if type == "bambu", !hidden.contains("light") {
                         Menu(shop.words.callIt("mac.printer_light")) {
                             Button(shop.words.callIt("mac.printer_light_on")) {
                                 Task { await shop.control(machine, .light(true)) }

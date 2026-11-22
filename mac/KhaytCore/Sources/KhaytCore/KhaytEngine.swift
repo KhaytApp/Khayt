@@ -371,6 +371,14 @@ public actor KhaytEngine {
         // `printerCompletions`, which is how this app can offer a measured
         // figure without polling a printer itself.
         "printer-poll-cache",
+        // The background poll steps aside while a person's command is on
+        // its way to a printer (C6): one instance, held in the runtime.
+        "poll-yield",
+        // One result per print run (P4), and which controls a model has on
+        // top of what its protocol can send (C5). printer-capabilities reads
+        // printer-commands at call time.
+        "run-result",
+        "printer-capabilities",
         // A printer that changed address is not a printer that went away. Reads
         // the cache above to decide which machines have actually gone quiet.
         "printer-relocate",
@@ -1001,6 +1009,18 @@ public actor KhaytEngine {
         // The report itself is read by `BambuReport` (a Swift port); the
         // faults are a table, and a table is not worth porting twice.
         "bambu-faults",
+        // What is wrong with a printer and what to do (C3), a U1's own
+        // exceptions and power loss (U1 idea 5), and whether it waits for a
+        // person (C4). printer-problems reads bambu-faults, moonraker-problems
+        // and printer-activity at call time.
+        "moonraker-problems",
+        "printer-problems",
+        "waiting-at-machine",
+        // A U1's RFID spool tags (U1 idea 2) and a time-lapse kept as the
+        // customer's proof (U1 idea 3): bundled for the phone and for the
+        // screens that follow their frames. Nothing on the Mac calls them yet.
+        "rfid-tray",
+        "timelapse-attach",
         "report-records",
         // A report a shop named, kept in one shape for both apps.
         // What the machine itself remembers. The nozzle-wear counter reads
@@ -11791,6 +11811,11 @@ public actor KhaytEngine {
         (function () {
           var s = KhaytMoonraker.readStatus(ARG0, ARG1, ARG2, ARG4, ARG3);
           s.actuals = KhaytPrinterActuals.extractActuals('moonraker', ARG0, {});
+          // What the printer says is wrong (lib/printer-problems.js), from the
+          // same reply: a U1's exceptions and power loss when they were asked
+          // for, else the print's own state and message.
+          var st = (ARG0 && ARG0.result && ARG0.result.status) || {};
+          s.problems = KhaytPrinterProblems.problemsFor('moonraker', st);
           return s;
         })()
         """#,
@@ -12271,6 +12296,10 @@ public actor KhaytEngine {
         /// What is loaded, head by head, when the machine reports it (a
         /// Snapmaker U1 does). Nil or empty means it cannot say.
         public let loaded: [LoadedSlot]?
+        /// What the printer says is wrong, as `lib/printer-problems.js`
+        /// findings, when the poll worked them out (Moonraker). Nil for a
+        /// protocol whose problems are read from its state word instead.
+        public var problems: [JSONValue]? = nil
         /// What the printer says is wrong, in words, with the code to look it
         /// up by — a Bambu's `print_error` / HMS notices (`lib/bambu-faults.js`).
         /// Nil when nothing is, and for every protocol that does not say.

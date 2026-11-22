@@ -168,9 +168,14 @@ extension Shop {
         }
         FinishCamera.lastOutcome[machine.id] = photo
         await printFinished(ended)
+        // How the run ended, on the run itself, once (`RunResults`).
+        await noteRunResult(ended)
         // The printer's timelapse, written a little after the end — looked
         // for on its own, so the event above is not held for minutes.
         Task { await self.noteTimelapse(ended, machine: machine) }
+        // And how much filament each head used, from the printer's history
+        // (a Snapmaker U1): one record per print (`HeadActuals`).
+        Task { await self.noteHeadActuals(ended, machine: machine) }
     }
 
     /// ── THE FINISH SEAM ───────────────────────────────────────────────────
