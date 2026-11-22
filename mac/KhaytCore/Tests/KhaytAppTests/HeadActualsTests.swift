@@ -83,6 +83,15 @@ struct HeadActualsTests {
         #expect(try await Self.engine.perHeadPatch(order: other, historyJob: job) == .null)
     }
 
+    @Test("the write is the printer's own record: asked of the lock as a system write, never as a person's edit")
+    func gate() throws {
+        let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let source = try String(contentsOf: app.appending(path: "HeadActuals.swift"), encoding: .utf8)
+        #expect(source.contains(#"permitted(.system("the printer's own record"))"#))
+        #expect(!source.contains(#"permitted("orders", "edit")"#), "an overnight print's figures are dropped when nobody is signed in")
+    }
+
     @Test("on the sample book nothing is written, and a row with no per-head figures writes nothing anywhere")
     func writesNothingWhereItCannot() async throws {
         let shop = await OperatorLockTests.shop(on: false)
@@ -93,5 +102,32 @@ struct HeadActualsTests {
         #expect(await shop.writeHeadActuals(historyJob: job, jobId: jobId) == false, "the sample has nowhere to write")
         #expect(try await Self.engine.perHeadPatch(order: .object([:]), historyJob: .object(["job_id": .string("X"), "filament_used": .number(100)])) == .null)
         #expect(Shop.headActualKeys == ["actualHeads", "actualHeadsJobId", "actualHeadsBasis"])
+    }
+}
+
+/// On a real temporary book (the perf suite owns `supportFolderForTests`).
+extension LibraryEditPerfTests {
+    @Test("the lock is on, nobody is signed in, a print finishes: its per-head figures are on the job afterwards")
+    func headActualsWithNobodySignedIn() async throws {
+        var root = Self.shopBook(models: 10)
+        root["operators"] = .array(OperatorLockTests.staff())
+        var settings = HeadActualsTests.obj(root["settings"])
+        settings["operatorLockEnabled"] = .bool(true)
+        root["settings"] = .object(settings)
+        try await withPerfBook(root) { shop, url in
+            #expect(shop.lockInForce, "the fixture's lock is not in force, so this proves nothing")
+            #expect(shop.needsSignIn && shop.signedIn == nil)
+            #expect(!shop.permitted("orders", "edit"), "a person's edit IS refused here")
+            let history = HeadActualsTests.obj(try HeadActualsTests.json("u1-history-around-timelapse.json"))
+            let job = try #require(HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
+                                                   endedAt: Date(timeIntervalSince1970: 1785823749)))
+            #expect(await shop.writeHeadActuals(historyJob: job, jobId: "JPERF1"))
+            let onDisk = try #require(try Self.onDisk(url, "printLog", "JPERF1"))
+            #expect(onDisk["actualHeadsJobId"] == .string("00004F"))
+            guard case .array(let heads)? = onDisk["actualHeads"] else { Issue.record("no heads on the job"); return }
+            #expect(heads.count == 2)
+            // And once only: a second look writes nothing.
+            #expect(await shop.writeHeadActuals(historyJob: job, jobId: "JPERF1") == false)
+        }
     }
 }
