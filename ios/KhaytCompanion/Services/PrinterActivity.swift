@@ -117,3 +117,14 @@ extension MachineLiveStatus {
     /// "Connecting", Duet "off"), read as the shared rule reads it.
     var saysUnlinked: Bool { status?.cls == "unlinked" }
 }
+
+extension ISO8601DateFormatter {
+    /// The Mac's stamp, with or without fractional seconds.
+    static func khaytLenient(_ text: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: text) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: text)
+    }
+}
