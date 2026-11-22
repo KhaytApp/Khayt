@@ -3816,6 +3816,7 @@
   "op.enter_pin": "PIN girin",
   "op.wrong_pin": "Yanlış PIN",
   "op.pin_elsewhere": "Bu kişinin PIN'i başka bir bilgisayarda ayarlandı ve buraya ulaşmadı. Ayarlar → Operatörler'den yeniden ayarlayın.",
+  "op.pin_legacy": "Bu kişinin PIN'i artık doğrulanamayan eski bir biçimde kaydedilmiş. Sahip, Ayarlar → Operatörler'den yeni bir PIN ayarlayabilir.",
   "op.role_admin": "Yönetici",
   "op.lock_enabled": "Kilit etkinleştirildi",
   "op.pin_set": "PIN güncellendi",
