@@ -32,15 +32,9 @@ struct MoveBanners: View {
         // (`Shop+NetworkSwitch`). Never applied on its own: an old "off" met
         // by a new install, or a change made at another computer at the
         // moment the switch was changed here.
+        // Drawn as page 27's frames G1 and G2, with the way to Internet use.
         if let ask = shop.networkSwitchAsk {
-            Banner(text: NetworkSwitchWords.sentence(ask, words: shop.words), symbol: "wifi.exclamationmark", tint: Khayt.attention) {
-                HStack(spacing: 8) {
-                    ForEach(ask.choices, id: \.key) { choice in
-                        Button(shop.words.callIt(choice.key)) { Task { await shop.answerNetworkSwitch(apply: choice.apply) } }
-                    }
-                }
-                .disabled(!shop.lockAllows("security", "edit"))
-            }
+            NetworkSwitchQuestion(shop: shop, ask: ask)
         }
         // ORDERS THIS APP DRAFTED BY ITSELF, because the shop asked it to.
         //

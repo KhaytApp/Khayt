@@ -21,6 +21,23 @@ enum InternetUse {
     /// The purposes whose row says what the shop loses while it is blocked.
     static let consequences: Set<OutboundPurpose> = [.updates, .cloud, .messaging, .storefront, .payments]
 
+    /// Whether the line under the switch says "Only this Mac follows it": the
+    /// owner was turning the switch ON and another computer's change was kept.
+    static func onlyHere(_ ask: NetworkSwitchAsk?) -> Bool {
+        if case .changedElsewhere(_, true)? = ask { return true }
+        return false
+    }
+
+    /// Whether a blocked row says what to do meanwhile. The switch-updates row
+    /// says it only where its tick is offered (the switch came through Khayt
+    /// Cloud and the row was unticked): on a Mac offline by its own switch
+    /// there is no call to keep and nothing to advise (frame G3).
+    static func saysConsequence(_ line: Line) -> Bool {
+        guard line.state == .blocked else { return false }
+        if line.purpose == .switchSync { return line.keepShown }
+        return consequences.contains(line.purpose)
+    }
+
     enum State: Equatable {
         case allowed, blocked, kept, ownSwitch, notSetUp, always
 
@@ -99,11 +116,18 @@ enum InternetUse {
         var by: String?
         var at: Date?
         var told: Shop.ToldOthers?
+        /// The switch was turned on here and Khayt Cloud kept another
+        /// computer's change instead (the question of frame G2 is waiting):
+        /// only this Mac follows it, and the others were not told.
+        var onlyHere = false
     }
 
     @MainActor static func sentence(_ line: ShopLine, words: Words) -> String {
         var parts = [words.callIt(line.tellsOthers ? "mac.net_who_shop" : "mac.net_who_mac")]
         guard line.offline else { return (parts + [words.callIt("mac.net_off_tail")]).joined(separator: " ") }
+        // Khayt Cloud was reached and this change was not the one it kept:
+        // neither "were told" nor "could not be reached" is claimed (G2).
+        if line.onlyHere { parts = [words.callIt("mac.net_who_only_mac")] }
         if let at = line.at {
             let fields: [String: JSONValue] = ["date": .string(words.say(at, .dateTime.day().month(.abbreviated))),
                                                "time": .string(words.say(at, .dateTime.hour().minute())),
@@ -111,6 +135,7 @@ enum InternetUse {
             parts.append(words.callIt(line.by == nil ? "mac.net_on_anon" : "mac.net_on_by", fields))
         }
         parts.append(words.callIt("mac.net_stopped"))
+        if line.onlyHere { return (parts + [words.callIt("mac.net_not_told")]).joined(separator: " ") }
         guard line.tellsOthers else { return (parts + [words.callIt("mac.net_not_told")]).joined(separator: " ") }
         switch line.told {
         case .told(let when)?:
@@ -269,6 +294,11 @@ struct InternetUsePage: View {
             Text(words.callIt("mac.net_title")).font(.system(size: 20, weight: .semibold))
             Text(words.callIt("mac.net_sub")).font(.system(size: 12)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            // The question waiting for the owner, here too: the every-screen
+            // notice's link leads to this page (frames G1 and G2).
+            if let ask = pretendAsk ?? (pretend == nil ? shop.networkSwitchAsk : nil) {
+                NetworkSwitchQuestion(shop: shop, ask: ask, link: false, rounded: true, pretendMayAnswer: pretendMayChange)
+            }
             switches
             Text(words.callIt("mac.net_list")).font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary).padding(.top, 4)
@@ -314,8 +344,11 @@ struct InternetUsePage: View {
     private var shopLine: InternetUse.ShopLine {
         pretendShopLine ?? .init(offline: shopOffline, tellsOthers: shop.outboundTellsOthers,
                                  by: InternetUse.switchedBy(shop.networkSettings),
-                                 at: InternetUse.switchedAt(shop.networkSettings), told: shop.outboundToldOthers)
+                                 at: InternetUse.switchedAt(shop.networkSettings), told: shop.outboundToldOthers,
+                                 onlyHere: InternetUse.onlyHere(shop.networkSwitchAsk))
     }
+    /// A capture's stand-in for the question waiting, and for who may answer.
+    var pretendAsk: NetworkSwitchAsk?
     var pretendShopLine: InternetUse.ShopLine?
     var pretendHere: Bool?
     var pretendMayChange: Bool?
@@ -372,7 +405,7 @@ struct InternetUsePage: View {
                 Text(InternetUse.title(line.purpose, words)).font(.system(size: 13, weight: .medium))
                 Text(description(line)).font(.system(size: 12)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                if line.state == .blocked, InternetUse.consequences.contains(line.purpose) {
+                if InternetUse.saysConsequence(line) {
                     Text(consequence(line.purpose)).font(.system(size: 12))
                         .foregroundStyle(updatesOverdue(line) ? Khayt.late : Khayt.attention)
                         .fixedSize(horizontal: false, vertical: true)

@@ -87,5 +87,45 @@ extension Snapshot {
         shot("F3-off-offered", page(off, .init(), telling: true))
         var failed = told; failed.told = .failed
         shot("F2b-tell-failed", page(on, failed, telling: true))
+
+        // ── G1–G3 (signed off Nov 22): the two questions and the new row ──
+        var early = DateComponents(); early.year = 2026; early.month = 11; early.day = 12; early.hour = 9
+        let oldOff = Calendar.book.date(from: early) ?? switched
+        let there = switched.addingTimeInterval(5 * 60)   // 14:07, as the frames have it
+        func question(_ ask: NetworkSwitchAsk, owner: Bool = true) -> some View {
+            NetworkSwitchQuestion(shop: shop, ask: ask, pretendMayAnswer: owner)
+        }
+        // G1: an old "off" met by a Mac with no switch history, for the owner
+        // and for anybody else (the same question, buttons off).
+        shot("G1-old-switch", width: 640, VStack(spacing: 12) {
+            question(.oldSwitch(at: oldOff))
+            question(.oldSwitch(at: oldOff), owner: false)
+        }.padding(.vertical, 12))
+        // G2: changed at another computer, each way, and with no time known.
+        shot("G2-changed-elsewhere", width: 640, VStack(spacing: 12) {
+            question(.changedElsewhere(at: there, turningOn: true))
+            question(.changedElsewhere(at: there, turningOn: false))
+            question(.changedElsewhere(at: nil, turningOn: true))
+            question(.changedElsewhere(at: nil, turningOn: false))
+        }.padding(.vertical, 12))
+        // G2, on the Internet use page: the question at the top, and under the
+        // switch "Only this Mac follows it … have not been told".
+        var only = InternetUse.ShopLine(offline: true, tellsOthers: true, by: "Sara Example", at: there, told: nil)
+        only.onlyHere = true
+        var asking = page(on, only, telling: true)
+        asking.pretendAsk = .changedElsewhere(at: there, turningOn: true)
+        shot("G2-page-only-this-mac", asking)
+        // G3: the switch-updates row in its five states.
+        func hearing(_ state: InternetUse.State, tick: Bool, kept: Bool) -> InternetUse.Line {
+            .init(purpose: .switchSync, state: state, automatic: true, keepShown: tick, kept: kept, blocked: nil)
+        }
+        for (name, line) in [("1-kept", hearing(.kept, tick: true, kept: true)),
+                             ("2-unticked", hearing(.blocked, tick: true, kept: false)),
+                             ("3-this-mac-only", hearing(.blocked, tick: false, kept: false)),
+                             ("4-switch-off", hearing(.allowed, tick: false, kept: false)),
+                             ("5-not-signed-in", hearing(.notSetUp, tick: false, kept: false))] {
+            let offline = name != "4-switch-off"
+            shot("G3-row-\(name)", page([line], offline ? by : .init()))
+        }
     }
 }
