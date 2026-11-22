@@ -214,4 +214,44 @@ extension LibraryEditPerfTests {
             #expect(try #require(try Self.onDisk(url, "printLog", "JPERF2"))["actualHeadsJobId"] == nil)
         }
     }
+
+    @Test("a print Khayt itself sent, named khayt-<time>.gcode on the printer, gets its per-head figures written")
+    func khaytSentPrintGetsItsFigures() async throws {
+        var root = Self.shopBook(models: 10)
+        // JPERF1 is printing on MPERF1 and its part is the library's file, not the name on the printer.
+        root["printLog"] = .array(Shop.rows(root, "printLog").map { row in
+            guard case .object(var o) = row, Shop.recordId(row) == "JPERF1" else { return row }
+            o["parts"] = .array([.object(["fileRef": .string("Models/td-swatch.3mf")])])
+            return .object(o)
+        })
+        try await withPerfBook(root) { shop, url in
+            let engine = try #require(shop.engine)
+            let remote = "khayt-mb1x2y3.gcode"
+            // Before the send is recorded, nothing ties the printer's name to the job.
+            #expect(try await engine.headActualsJob(printLog: shop.orderRows, machineId: "MPERF1", filename: remote) == nil)
+            // The send, as `sendToPrinter` records it.
+            await shop.recordPrintRun(jobId: "JPERF1", machineId: "MPERF1", started: true, file: "td-swatch.3mf", sentAs: remote)
+            #expect(shop.moveProblem == nil)
+            // The print ends: the printer says its own name for the file.
+            let figuresJob = try await engine.headActualsJob(printLog: shop.orderRows, machineId: "MPERF1", filename: remote)
+            #expect(figuresJob == "JPERF1")
+            // Its history row, under that same name, a few seconds before Khayt saw the end.
+            let end = Date(timeIntervalSince1970: 1_795_000_000)
+            let history: [String: JSONValue] = ["result": .object(["jobs": .array([.object([
+                "job_id": .string("0000A1"), "filename": .string(remote), "status": .string("completed"),
+                "end_time": .number(end.timeIntervalSince1970 - 4), "filament_used": .number(2238.6),
+                "metadata": .object(["filament_weight": .array([.number(4.38), .number(2.27)]), "filament_total": .number(2232.6)]),
+            ])])])]
+            let found = await HeadActuals.job(in: history, filename: remote, endedAt: end,
+                                              taken: HeadActuals.taken(shop.orderRows), engine: engine)
+            let run = try #require(found)
+            #expect(await shop.writeHeadActuals(historyJob: run, jobId: try #require(figuresJob)))
+            let onDisk = try #require(try Self.onDisk(url, "printLog", "JPERF1"))
+            #expect(onDisk["actualHeadsJobId"] == .string("0000A1"))
+            guard case .array(let heads)? = onDisk["actualHeads"] else { Issue.record("no figures on the job"); return }
+            #expect(heads.count == 2)
+            // And the other job, which was never sent there, is not offered.
+            #expect(try await engine.headActualsJob(printLog: shop.orderRows, machineId: "MPERF1", filename: "khayt-other.gcode") == nil)
+        }
+    }
 }
