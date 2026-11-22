@@ -5526,6 +5526,7 @@ registerLanServer({
   })(),
   // _khayt._tcp over mDNS, only while the LAN server runs bound to the network.
   lanAdvertiser: require('./lib/main/lan-advertise').createLanAdvertiser({
+    // outbound-exempt: inbound-server — announces this computer's own LAN server over mDNS (224.0.0.251), never off the network
     createSocket: () => require('dgram').createSocket({ type: 'udp4', reuseAddr: true }),
     interfaces: () => require('os').networkInterfaces(),
     hostname: () => require('os').hostname(),

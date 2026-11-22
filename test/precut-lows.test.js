@@ -68,7 +68,8 @@ test('LOW 3: an unsaved printer address is "connection_unsaved", and the saved o
 test('LOW 3: every printer call that fills secrets refuses an unsaved address first, and the window says it in words', () => {
   const main = read('main.js');
   const fills = main.split("machine = machineSecrets.fill(machine);").length - 1;
-  const guarded = (main.match(/machine = machineSecrets\.fill\(machine\);[^\n]*\n\s*if \(machineSecrets\.unsaved\(machine\)\) return \{ ok: false, error: 'connection_unsaved' \};/g) || []).length;
+  // Returned, or thrown where the caller turns a throw into { ok: false, error } (moonrakerRead, #2662).
+  const guarded = (main.match(/machine = machineSecrets\.fill\(machine\);[^\n]*\n\s*if \(machineSecrets\.unsaved\(machine\)\) (?:return \{ ok: false, error: 'connection_unsaved' \}|throw new Error\('connection_unsaved'\));/g) || []).length;
   assert.ok(fills >= 6, `${fills} printer calls fill secrets`);
   assert.equal(guarded, fills, 'each one checks unsaved straight after');
   assert.match(read('renderer/app-state.js'), /c === 'connection_unsaved'\) return t\('err\.connection_unsaved'\)/);
