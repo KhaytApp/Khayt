@@ -31,6 +31,15 @@ test('colour: the real U1 reading (two tagged heads, two empty) through rfid-tra
   assert.equal(P.headColour(2, { trays }), null, 'an empty head reports white and is not a colour');
   assert.equal(P.headColour(3, { trays }), null);
 });
+for (const c of V.actualsJob) test('job: ' + c.why, () => assert.equal(P.actualsJob(c.printLog, c.machineId, c.filename), c.want));
+for (const c of V.historyRun) test('run: ' + c.why, () => {
+  const got = P.historyRun(c.jobs, c.filename, c.endedAt, { taken: c.taken });
+  assert.equal(got ? got.job_id : null, c.want);
+});
+test('figures that are not finite write nothing', () => {
+  const big = { job_id: 'A', filament_used: 1e308, metadata: { filament_weight: [1e308, 1e308], filament_total: 1e-300 } };
+  assert.equal(P.perHeadActuals(big), null);
+});
 
 test('the heads add up to the total (to rounding), and no head is called measured on its own', () => {
   for (const c of V.cases.filter((x) => x.want)) {

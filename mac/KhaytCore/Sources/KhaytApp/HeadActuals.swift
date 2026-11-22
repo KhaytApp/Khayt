@@ -33,12 +33,24 @@ enum HeadActuals {
 
     /// The history row for the print that just ended under `filename`: the
     /// newest completed run of that file that ended near `endedAt`.
-    static func job(in history: [String: JSONValue], filename: String, endedAt: Date) -> JSONValue? {
-        guard case .object(let result)? = history["result"], case .array(let jobs)? = result["jobs"] else { return nil }
-        return jobs.first { row in
-            guard case .object(let o) = row, o["filename"] == .string(filename), o["status"] == .string("completed"),
-                  case .number(let end)? = o["end_time"] else { return false }
-            return abs(end - endedAt.timeIntervalSince1970) <= window
+    ///
+    /// The CLOSEST such run that no job already holds (`taken`), by the
+    /// shared rule (`lib/printer-actuals.js historyRun`): the first row in
+    /// the window could be an earlier run of the same file, which put one
+    /// print on two jobs and refused the second job's real figures for good.
+    static func job(in history: [String: JSONValue], filename: String, endedAt: Date,
+                    taken: [String] = [], engine: KhaytEngine) async -> JSONValue? {
+        guard case .object(let result)? = history["result"], let jobs = result["jobs"],
+              let row = try? await engine.headActualsRun(jobs: jobs, filename: filename, endedAt: endedAt, taken: taken),
+              case .object = row else { return nil }
+        return row
+    }
+
+    /// The run ids jobs already hold, other than `except`'s own.
+    nonisolated static func taken(_ rows: [JSONValue], except jobId: String? = nil) -> [String] {
+        rows.compactMap { row in
+            guard case .object(let o) = row, Shop.recordId(row) != jobId, case .string(let id)? = o["actualHeadsJobId"] else { return nil }
+            return id
         }
     }
 }
@@ -48,8 +60,14 @@ extension Shop {
     /// After a finished Moonraker print on a job the book names: read how
     /// much each head used and note it on the job. Best-effort and silent: a
     /// printer whose history does not say per head simply has none.
-    func noteHeadActuals(_ ended: FinishCamera.Ended, machine: Machine) async {
-        guard ended.outcome == "finished", let jobId = ended.orderId, !ended.filename.isEmpty,
+    ///
+    /// `jobId` is NOT `ended.orderId`. That one is the finish photo's pick,
+    /// which falls back to "the only printing job" and to a job already
+    /// moved on; a calibration print started at the printer's own screen
+    /// would put its grams on a shop job. This is `headActualsJob`, asked at
+    /// the moment the print ended: printing, on this machine, naming the file.
+    func noteHeadActuals(_ ended: FinishCamera.Ended, machine: Machine, jobId: String?) async {
+        guard ended.outcome == "finished", let jobId, !ended.filename.isEmpty,
               machine.printerApi?.type == "moonraker", let engine else { return }
         let endedAt = ended.finishedAt ?? Date()
         for wait in HeadActuals.tries {
@@ -66,7 +84,8 @@ extension Shop {
             }
             guard let history = try? await PrinterWatch.get(base, path: "/server/history/list?limit=\(HeadActuals.historyLimit)",
                                                             key: key, type: "moonraker", timeout: 10),
-                  let job = HeadActuals.job(in: history, filename: ended.filename, endedAt: endedAt) else { continue }
+                  let job = await HeadActuals.job(in: history, filename: ended.filename, endedAt: endedAt,
+                                                  taken: HeadActuals.taken(orderRows), engine: engine) else { continue }
             // What is in each head, for the colour stamp: one more read-only
             // GET. Best-effort: a printer that does not answer it leaves the
             // machine's own `loaded` list to say, and failing that nothing.
@@ -109,6 +128,10 @@ extension Shop {
               case .object(let patch)? = try? await engine.perHeadPatch(order: row, historyJob: historyJob,
                                                                         filamentDetect: filamentDetect,
                                                                         machineLoaded: loaded) else { return false }
+        // One print, one job: a run another job already holds is not written
+        // on a second (the row picker skips those; this is the same promise
+        // kept at the write, whoever picked the row).
+        if case .string(let run)? = patch["actualHeadsJobId"], HeadActuals.taken(orderRows, except: jobId).contains(run) { return false }
         let wrote = (try? await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: jobId) { job -> Bool in
             // Asked again on the record as it is on disk: the other app may
             // have written this print's split since the rule was asked.

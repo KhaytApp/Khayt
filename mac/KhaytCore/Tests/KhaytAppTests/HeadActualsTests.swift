@@ -46,24 +46,83 @@ struct HeadActualsTests {
         #expect(written >= 3)
     }
 
-    @Test("this print's history row: the newest completed run of the file that ended near when Khayt saw it end")
-    func whichRow() throws {
+    @Test("this print's history row: the closest completed run of the file near when Khayt saw it end, that no job already holds")
+    func whichRow() async throws {
+        let engine = OperatorLockTests.sharedEngine
         let history = Self.obj(try Self.json("u1-history-around-timelapse.json"))
         let end = Date(timeIntervalSince1970: 1785823749)
-        let job = try #require(HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode", endedAt: end.addingTimeInterval(40)))
-        #expect(Self.obj(job)["job_id"] == .string("00004F"))
+        let file = "td-swatch_PLA_17m25s.gcode"
+        let found = await HeadActuals.job(in: history, filename: file, endedAt: end.addingTimeInterval(40), engine: engine)
+        #expect(Self.obj(try #require(found))["job_id"] == .string("00004F"))
         // The same file's row from long before is not this print.
-        #expect(HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode", endedAt: end.addingTimeInterval(3 * 3600)) == nil)
+        #expect(await HeadActuals.job(in: history, filename: file, endedAt: end.addingTimeInterval(3 * 3600), engine: engine) == nil)
         // Another file, or a history that is not one.
-        #expect(HeadActuals.job(in: history, filename: "other.gcode", endedAt: end) == nil)
-        #expect(HeadActuals.job(in: [:], filename: "td-swatch_PLA_17m25s.gcode", endedAt: end) == nil)
+        #expect(await HeadActuals.job(in: history, filename: "other.gcode", endedAt: end, engine: engine) == nil)
+        #expect(await HeadActuals.job(in: [:], filename: file, endedAt: end, engine: engine) == nil)
+        // A run some job already holds is not this print's: nothing else is near, so nothing.
+        #expect(await HeadActuals.job(in: history, filename: file, endedAt: end, taken: ["00004F"], engine: engine) == nil)
+
+        // Two runs of one file inside the window: the closest, and never the one already taken.
+        func run(_ id: String, _ at: Double) -> JSONValue {
+            .object(["job_id": .string(id), "filename": .string("cube.gcode"), "status": .string("completed"), "end_time": .number(at)])
+        }
+        let two: [String: JSONValue] = ["result": .object(["jobs": .array([run("B2", 2000), run("B1", 1500)])])]
+        let near = Date(timeIntervalSince1970: 1990)
+        #expect(Self.obj(await HeadActuals.job(in: two, filename: "cube.gcode", endedAt: near, engine: engine))["job_id"] == .string("B2"))
+        #expect(Self.obj(await HeadActuals.job(in: two, filename: "cube.gcode", endedAt: Date(timeIntervalSince1970: 1600), engine: engine))["job_id"] == .string("B1"),
+                "the first row in the window was taken, not the closest")
+        #expect(Self.obj(await HeadActuals.job(in: two, filename: "cube.gcode", endedAt: near, taken: ["B2"], engine: engine))["job_id"] == .string("B1"))
+        #expect(HeadActuals.taken([.object(["id": .string("J1"), "actualHeadsJobId": .string("B2")]), .object(["id": .string("J2")])]) == ["B2"])
+        #expect(HeadActuals.taken([.object(["id": .string("J1"), "actualHeadsJobId": .string("B2")])], except: "J1").isEmpty)
+    }
+
+    @Test("the shared vectors for which job and which run, through the bundled rule")
+    func pickVectors() async throws {
+        let engine = OperatorLockTests.sharedEngine
+        let v = Self.obj(try Self.json("per-head-actuals-vectors.json"))
+        guard case .array(let jobs)? = v["actualsJob"], case .array(let runs)? = v["historyRun"] else { Issue.record("no vectors"); return }
+        #expect(jobs.count >= 6 && runs.count >= 6)
+        for c in jobs.map({ Self.obj($0) }) {
+            guard case .array(let log)? = c["printLog"], case .string(let machine)? = c["machineId"], case .string(let file)? = c["filename"] else { continue }
+            let got = try await engine.headActualsJob(printLog: log, machineId: machine, filename: file)
+            let want: String? = { if case .string(let s)? = c["want"] { return s }; return nil }()
+            #expect(got == want, Comment(rawValue: "\(c["why"] ?? .null)"))
+        }
+        for c in runs.map({ Self.obj($0) }) {
+            guard case .string(let file)? = c["filename"], case .number(let at)? = c["endedAt"], case .array(let taken)? = c["taken"] else { continue }
+            let got = try await engine.headActualsRun(jobs: c["jobs"] ?? .null, filename: file, endedAt: Date(timeIntervalSince1970: at),
+                                                      taken: taken.compactMap { if case .string(let s) = $0 { return s }; return nil })
+            let gotId: JSONValue = Self.obj(got)["job_id"] ?? JSONValue.null
+            let wantId: JSONValue = c["want"] ?? JSONValue.null
+            #expect(gotId == wantId, Comment(rawValue: "\(c["why"] ?? .null)"))
+        }
+    }
+
+    @Test("a print that is not a job's does not land on one: the figures take only a job printing here and naming the file")
+    func notTheFallbackJob() async throws {
+        let engine = OperatorLockTests.sharedEngine
+        // One job printing on M1. A calibration print started at the printer's own screen ends.
+        let log: [JSONValue] = [.object(["id": .string("J1"), "machineId": .string("M1"), "status": .string("printing"),
+                                         "parts": .array([.object(["fileRef": .string("bracket.gcode")])])])]
+        // The photo's rule falls back to the only printing job...
+        #expect(try await engine.printFinishJob(printLog: log, machineId: "M1", filename: "calibration.gcode") == "J1")
+        // ...the figures' rule does not.
+        #expect(try await engine.headActualsJob(printLog: log, machineId: "M1", filename: "calibration.gcode") == nil)
+        #expect(try await engine.headActualsJob(printLog: log, machineId: "M1", filename: "bracket.gcode") == "J1")
+        let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let photos = try String(contentsOf: app.appending(path: "Shop+Photos.swift"), encoding: .utf8)
+        #expect(photos.contains("noteHeadActuals(ended, machine: machine, jobId: figuresJob)"))
+        let heads = try String(contentsOf: app.appending(path: "HeadActuals.swift"), encoding: .utf8)
+        #expect(!heads.contains("ended.orderId,"), "the photo's job is used for the figures again")
     }
 
     @Test("the U1's own history: two heads used, split in proportion, and never written twice")
     func realHistory() async throws {
         let history = Self.obj(try Self.json("u1-history-around-timelapse.json"))
-        let job = try #require(HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
-                                               endedAt: Date(timeIntervalSince1970: 1785823749)))
+        let found = await HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
+                                              endedAt: Date(timeIntervalSince1970: 1785823749), engine: OperatorLockTests.sharedEngine)
+        let job = try #require(found)
         let patch = Self.obj(try await Self.engine.perHeadPatch(order: .object(["id": .string("J1")]), historyJob: job))
         #expect(patch["actualHeadsJobId"] == .string("00004F"))
         #expect(patch["actualHeadsBasis"] == .string("proportional"))
@@ -86,8 +145,9 @@ struct HeadActualsTests {
     @Test("each head keeps the colour and material that were in it: the tag if read, else what the machine is recorded as holding")
     func colourStamp() async throws {
         let history = Self.obj(try Self.json("u1-history-around-timelapse.json"))
-        let job = try #require(HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
-                                               endedAt: Date(timeIntervalSince1970: 1785823749)))
+        let found = await HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
+                                              endedAt: Date(timeIntervalSince1970: 1785823749), engine: OperatorLockTests.sharedEngine)
+        let job = try #require(found)
         // The shop's own U1 reading: heads 1 and 2 tagged, 3 and 4 empty.
         let detect = try #require(HeadActuals.filamentDetect(in: Self.obj(try Self.json("u1-filament-detect.json"))))
         let loaded: JSONValue = .array([.object(["slot": .number(0), "hex": .string("#FF0000"), "material": .string("PETG")]),
@@ -147,8 +207,9 @@ struct HeadActualsTests {
         let shop = await OperatorLockTests.shop(on: false)
         let jobId = shop.orders.first?.id ?? ""
         let history = Self.obj(try Self.json("u1-history-around-timelapse.json"))
-        let job = try #require(HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
-                                               endedAt: Date(timeIntervalSince1970: 1785823749)))
+        let found = await HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
+                                              endedAt: Date(timeIntervalSince1970: 1785823749), engine: OperatorLockTests.sharedEngine)
+        let job = try #require(found)
         #expect(await shop.writeHeadActuals(historyJob: job, jobId: jobId) == false, "the sample has nowhere to write")
         #expect(try await Self.engine.perHeadPatch(order: .object([:]), historyJob: .object(["job_id": .string("X"), "filament_used": .number(100)])) == .null)
         #expect(Shop.headActualKeys == ["actualHeads", "actualHeadsJobId", "actualHeadsBasis"])
@@ -169,8 +230,9 @@ extension LibraryEditPerfTests {
             #expect(shop.needsSignIn && shop.signedIn == nil)
             #expect(!shop.permitted("orders", "edit"), "a person's edit IS refused here")
             let history = HeadActualsTests.obj(try HeadActualsTests.json("u1-history-around-timelapse.json"))
-            let job = try #require(HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
-                                                   endedAt: Date(timeIntervalSince1970: 1785823749)))
+            let found = await HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
+                                                  endedAt: Date(timeIntervalSince1970: 1785823749), engine: OperatorLockTests.sharedEngine)
+            let job = try #require(found)
             #expect(await shop.writeHeadActuals(historyJob: job, jobId: "JPERF1"))
             let onDisk = try #require(try Self.onDisk(url, "printLog", "JPERF1"))
             #expect(onDisk["actualHeadsJobId"] == .string("00004F"))
@@ -178,6 +240,9 @@ extension LibraryEditPerfTests {
             #expect(heads.count == 2)
             // And once only: a second look writes nothing.
             #expect(await shop.writeHeadActuals(historyJob: job, jobId: "JPERF1") == false)
+            // One print, one job: the same run is refused on another job.
+            #expect(await shop.writeHeadActuals(historyJob: job, jobId: "JPERF2") == false)
+            #expect(try #require(try Self.onDisk(url, "printLog", "JPERF2"))["actualHeadsJobId"] == nil)
         }
     }
 }
