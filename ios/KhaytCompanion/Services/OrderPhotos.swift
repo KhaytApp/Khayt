@@ -149,7 +149,10 @@ extension KhaytAPIClient {
 
     /// Where a listed photo is fetched from: the cloud's address plus its path.
     func photoURL(_ photo: OrderPhoto) -> URL? {
-        guard let cloud else { return nil }
+        // Loaded by AsyncImage, outside CloudReader: the switch is asked here
+        // (P8), so a shop that went offline shows no picture rather than
+        // fetching one.
+        guard let cloud, OutboundGate.shared.verdict(.cloud).allowed else { return nil }
         return Self.cloudURL(cloud.url, path: photo.url)
     }
 

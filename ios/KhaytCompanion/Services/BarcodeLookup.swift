@@ -46,7 +46,8 @@ struct BarcodeLookup {
     }
 
     /// Asks the shop's internet switch first (P8, `lookups`): a refused
-    /// lookup throws `OutboundBlocked` and the code is treated as not found.
+    /// lookup throws `OutboundBlocked`, which reads as "couldn't reach the
+    /// lookup" (the same note as no connection), never as "not found".
     var fetch: Fetch = { request in
         try OutboundGate.shared.require(.lookups)
         return try await URLSession.shared.data(for: request)

@@ -21,10 +21,9 @@ final class PhoneOutboundTests: XCTestCase {
             let why: String; let settings: JSONValue?; let purpose: String; let ctx: Ctx?
             let want: Want
             struct Want: Decodable { let allowed: Bool; let reason: String }
-            struct Ctx: Decodable {
-                let local: Local?; let host: String?
-                struct Local: Decodable { let offline: Bool?; let installCountOff: Bool? }
-            }
+            /// `local` as written: the fixture also holds a switch written as
+            /// 1 or "yes", which the gate's `Local` (two Bools) cannot be told.
+            struct Ctx: Decodable { let local: JSONValue?; let host: String? }
         }
         struct Vectors: Decodable { let cases: [Case] }
         let v = try JSONDecoder().decode(Vectors.self,
@@ -33,20 +32,52 @@ final class PhoneOutboundTests: XCTestCase {
         var checked = 0
         for c in v.cases {
             guard let purpose = OutboundPurpose(rawValue: c.purpose) else { continue }   // a typo case: the rule's own
+            var offlineHere = false, countOff = false
+            if case .object(let l)? = c.ctx?.local {
+                func flag(_ k: String) -> Bool?? {
+                    switch l[k] { case nil: return .some(nil); case .bool(let b)?: return .some(b); default: return nil }
+                }
+                guard let o = flag("offline"), let n = flag("installCountOff") else { continue }   // not a Bool: not sayable here
+                offlineHere = o ?? false; countOff = n ?? false
+            }
             let gate = OutboundGate()
             switch c.settings {
             case nil, .null?: gate.update(book: .unread)
             case .object(let o)?: gate.update(book: .settings(.object(o)))
             case let other?: gate.update(book: .settings(other))
             }
-            gate.update(local: .init(offline: c.ctx?.local?.offline ?? false,
-                                     installCountOff: c.ctx?.local?.installCountOff ?? false))
+            gate.update(local: .init(offline: offlineHere, installCountOff: countOff))
             let got = gate.verdict(purpose, host: c.ctx?.host)
             XCTAssertEqual(got.allowed, c.want.allowed, c.why)
             XCTAssertEqual(got.reason, c.want.reason, c.why)
             checked += 1
         }
         XCTAssertGreaterThanOrEqual(checked, 40)
+    }
+
+    override func setUp() {
+        PhoneOutbound.defaults = UserDefaults(suiteName: "outbound-\(UUID().uuidString)")!
+    }
+
+    override func tearDown() { PhoneOutbound.defaults = .standard }
+
+    /// A whole pull from Khayt Cloud can bring settings with no `network`
+    /// block (the Mac never syncs settings to the cloud): the switch the Mac
+    /// set stays on. A block that is present always wins, so turning it off
+    /// at the Mac (`offline: false`) turns it off here.
+    func testACopyWithoutTheSwitchKeepsTheLastOneSeen() {
+        OutboundGate.$scoped.withValue(OutboundGate()) { remembered() }
+    }
+
+    private func remembered() {
+        PhoneOutbound.changed(["settings": offline])
+        XCTAssertEqual(PhoneOutbound.effective(.object(["currency": .string("SAR")])),
+                       .object(["currency": .string("SAR"), "network": .object(["offline": .bool(true)])]))
+        let off: JSONValue = .object(["network": .object(["offline": .bool(false)])])
+        XCTAssertEqual(PhoneOutbound.effective(off), off)
+        XCTAssertEqual(PhoneOutbound.effective(.object([:])), off, "the newer block is the one remembered")
+        PhoneOutbound.forgotten()
+        XCTAssertEqual(PhoneOutbound.effective(.object([:])), .object([:]), "unpaired: nothing remembered")
     }
 
     func testTheBookTheGateIsTold() {
