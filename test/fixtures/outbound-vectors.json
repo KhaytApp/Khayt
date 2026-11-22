@@ -1,5 +1,5 @@
 {
- "about": "lib/outbound.js allowed(settings, purpose, ctx). Master switch in settings.network (book), stricter-only local override in ctx.local, each purpose's own opt-in after. lan is never blocked but must be a private address or LAN name while offline (or while the book is unread). Decided Nov 22 (D1-D6 as recommended). Mac and iPhone run this file through JSC. Round 2 (Nov 22): storefront, the shop's online store (Medusa, Salla, Zid; the desktop's Khayt Cloud storefront routes), a purpose of its own, keepable.",
+ "about": "lib/outbound.js allowed(settings, purpose, ctx). Master switch in settings.network (book), stricter-only local override in ctx.local, each purpose's own opt-in after. lan is never blocked but must be a private address or LAN name while offline (or while the book is unread). Decided Nov 22 (D1-D6 as recommended). Mac and iPhone run this file through JSC. Round 2 (Nov 22): storefront, the shop's online store (Medusa, Salla, Zid; the desktop's Khayt Cloud storefront routes), a purpose of its own, keepable. ctx.answer is a person's one-call token (answerToken), live for ANSWER_MS (20 s) from `at` by ctx.now; an allowed answer also returns once:true, and the host keeps spend(token).",
  "purposes": [
   "updates",
   "install-count",
@@ -1173,6 +1173,265 @@
     "reason": "settings-unknown"
    },
    "settings": null
+  },
+  {
+   "why": "a person's answer: one switch-sync call while the shop is offline and nothing keeps it",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000005000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "a person's answer with switch-sync unticked (via cloud, dropped): the one call goes",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000019999
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud",
+     "dropSwitchSync": true
+    }
+   }
+  },
+  {
+   "why": "an answer expired at ANSWER_MS: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000020000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer from the future (clock set back): blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1794999999999
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer stretched past ANSWER_MS: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795003600000,
+     "spent": false
+    },
+    "now": 1795000060000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "a spent answer: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": true
+    },
+    "now": 1795000001000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer with no clock: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    }
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer never opens another purpose",
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000001000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer made for another purpose: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "cloud",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000001000
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer never overrides this computer's own switch",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000001000,
+    "local": {
+     "offline": true
+    }
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "an answer never overrides an unread book",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000001000
+   }
+  },
+  {
+   "why": "online, an answer changes nothing",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   },
+   "ctx": {
+    "answer": {
+     "purpose": "switch-sync",
+     "at": 1795000000000,
+     "until": 1795000020000,
+     "spent": false
+    },
+    "now": 1795000001000
+   },
+   "settings": {}
   }
  ]
 }
