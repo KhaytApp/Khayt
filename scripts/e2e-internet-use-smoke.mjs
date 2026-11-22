@@ -101,6 +101,18 @@ try {
   await shot(w, 'D-refusal-toast', '#toastContainer .toast');
   await w.evaluate(() => window.KhaytInternetUse.refresh());
   ok(await w.evaluate(() => /Blocked 1 time, last at/.test(document.querySelector('[data-iu-row="exchange-rates"] .iu-desc')?.textContent || '')), 'counted on its row: "Blocked 1 time, last at …"');
+  // A refusal from an automatic call is never toasted, even right after a
+  // click (review of #2633: a save's cloud push landed inside the 8 s window).
+  await w.evaluate(() => { document.getElementById('toastContainer').innerHTML = ''; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' })); });
+  // The refusal arrives exactly as the preload reports a refused cloud push
+  // (this profile has no Cloud session, so the push itself answers "locked").
+  await w.evaluate(() => window.dispatchEvent(new CustomEvent('khayt:outbound-blocked', { detail: JSON.stringify({ purpose: 'cloud', reason: 'offline', method: 'cloudPush' }) })));
+  await w.waitForTimeout(600);
+  ok(await w.evaluate(() => ![...document.querySelectorAll('#toastContainer .toast')].some((t) => /Khayt Cloud/.test(t.textContent))), 'a refused cloud push right after a key press is not toasted');
+  await w.evaluate(() => window.dispatchEvent(new CustomEvent('khayt:outbound-blocked', { detail: JSON.stringify({ purpose: 'cloud', reason: 'offline', method: 'cloudLogin' }) })));
+  await w.waitForFunction(() => [...document.querySelectorAll('#toastContainer .toast')].some((t) => /This needs Khayt Cloud/.test(t.textContent)), null, { timeout: 3000 });
+  ok(true, 'the same refusal from a person-started sign-in is said');
+  ok((await w.evaluate(() => window.KhaytInternetUse.sayBlocked({ purpose: 'cloud', reason: 'offline' }, 'cloudPush'))) === false, 'cloudPush is not a person-started call');
   // An automatic call (no person a moment before) is counted, never toasted.
   await w.waitForTimeout(8500);
   ok((await w.evaluate(() => window.KhaytInternetUse.sayBlocked({ purpose: 'cloud', reason: 'offline' }))) === false, 'a refusal with no person behind it is not toasted');

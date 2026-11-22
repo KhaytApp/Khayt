@@ -47,12 +47,18 @@ function network() {
   const n = S().network;
   return n && typeof n === 'object' && !Array.isArray(n) ? n : {};
 }
-/** The book's switch, read as lib/outbound.js reads it: anything but false-ish missing is ON. */
-function shopOffline() {
-  const v = network().offline;
-  return v !== undefined && v !== null && v !== false;
+/* The shop's switch as MAIN reads it from the saved book (hub:outbound-describe
+ * `shop`), so the page never shows a change that a refused or failed save did
+ * not keep (review of #2633). Before the first answer, the window's copy, read
+ * as lib/outbound.js reads it: anything present but false is ON. */
+function shopView() {
+  if (_last && _last.shop) return _last.shop;
+  const n = network();
+  return { offline: n.offline !== undefined && n.offline !== null && n.offline !== false,
+    keep: Array.isArray(n.keep) ? n.keep.filter((k) => typeof k === 'string') : [], changedAt: n.changedAt || null, changedBy: n.changedBy || null };
 }
-function keptList() { return Array.isArray(network().keep) ? network().keep.filter((k) => typeof k === 'string') : []; }
+function shopOffline() { return !!shopView().offline; }
+function keptList() { return Array.isArray(shopView().keep) ? shopView().keep.slice() : []; }
 
 /** Who may change it: the owner, or anyone while the staff lock is off (main decides; this only greys the controls). */
 function mayChange() {
@@ -70,19 +76,33 @@ function whoChanges() {
 function setUp(purpose, ctx) {
   const s = S();
   switch (purpose) {
-    case 'webhooks': { const w = s.webhooks || {}; return !!(w.enabled && Object.values(w.events || {}).some((u) => String(u || '').trim())); }
+    case 'webhooks': {
+      const w = s.webhooks || {};
+      const ev = s.eventWebhooks || {};
+      return !!((w.enabled && Object.values(w.events || {}).some((u) => String(u || '').trim()))
+        || (ev.enabled && Object.values(ev).some((u) => /^https:\/\//i.test(String(u || '')))));
+    }
     case 'tax-authority': return !!(s.zatcaPhase2 && s.zatcaPhase2.enabled);
     case 'ai': return !!(s.ai && s.ai.enabled);
     case 'payments': { const b = s.bnpl || {}; return !!((b.tabby && b.tabby.enabled) || (b.tamara && b.tamara.enabled) || (b.stripe && b.stripe.enabled)); }
     case 'messaging': {
       const email = s.emailConfig && s.emailConfig.provider && s.emailConfig.provider !== 'none';
       const sms = s.smsConfig && s.smsConfig.provider && s.smsConfig.provider !== 'none';
-      return !!(email || sms || (s.ntfy && s.ntfy.enabled) || (s.telegram && s.telegram.enabled) || (s.customSmtp && s.customSmtp.host));
+      return !!(email || sms || (s.ntfy && s.ntfy.enabled) || (s.telegram && s.telegram.botToken && s.telegram.chatId) || (s.customSmtp && s.customSmtp.host));
     }
-    case 'storage': return ctx && ctx.offsite ? !!ctx.offsite.ready : true;
+    // The library's own bucket or Drive, or off-site backups to one. A folder
+    // (a USB disk, a NAS) is never an internet call (review of #2633).
+    case 'storage': return !!((ctx && ctx.setup && ctx.setup.storageLibrary) || cloudBackups(ctx));
     case 'tunnel': return !!(s.lanApi && s.lanApi.enabled);
     default: return true;
   }
+}
+
+/** Off-site backups that go over the internet: on, to the bucket or Drive, and able to run. */
+function cloudBackups(ctx) {
+  const o = ctx && ctx.offsite;
+  const st = o && o.settings;
+  return !!(st && st.enabled === true && (st.destination === 'bucket' || st.destination === 'drive') && o.ready);
 }
 
 /** { key, tone } of a row's state: tone 'ok' green, 'off' grey, 'bad' red. */
@@ -107,7 +127,10 @@ function stateOf(row, ctx) {
 /** Days since updates last reached the feed, or since the switch went on when they never have. */
 function updatesStale(row, ctx) {
   if (!row || row.purpose !== 'updates' || row.allowed) return null;
-  const since = ms(ctx && ctx.updatesLastCheckedAt) || ms(network().changedAt);
+  // The last check; else when the switch first refused one here; else when the
+  // switch that blocks it (the shop's, or this computer's own) went on.
+  const switchAt = row.reason === 'offline-here' ? (ctx && ctx.local && ctx.local.changedAt) : shopView().changedAt;
+  const since = ms(ctx && ctx.updatesLastCheckedAt) || ms(ctx && ctx.updatesBlockedSince) || ms(switchAt);
   if (since === null) return null;
   const days = Math.floor((Date.now() - since) / DAY);
   return days >= STALE_DAYS ? days : null;
@@ -122,6 +145,7 @@ function consequence(row, ctx) {
     return days ? tr('iu.c.updates_days', { date: fmtDate(at), n: days }) : tr('iu.c.updates', { date: fmtDate(at) });
   }
   if (row.purpose === 'storage') {
+    if (!cloudBackups(ctx)) return '';
     const last = ctx && ctx.offsite && ctx.offsite.status && ctx.offsite.status.lastAt;
     return last ? tr('iu.c.storage', { date: fmtDate(last) }) : tr('iu.c.storage_never');
   }
@@ -156,7 +180,7 @@ function render(ctx) {
   const on = shopOffline();
   const here = !!(ctx.local && ctx.local.offline);
   const can = mayChange();
-  const n = network();
+  const n = shopView();
   let shopNote = tr('iu.shop_hint');
   if (on) {
     const when = ms(n.changedAt) !== null ? tr(n.changedBy ? 'iu.turned_on_by' : 'iu.turned_on', { who: n.changedBy || '', day: fmtDay(n.changedAt), time: fmtTime(n.changedAt) }) : '';
@@ -192,7 +216,7 @@ function render(ctx) {
       : (showKeep ? '<span></span>' : '');
     return `<div class="iu-row${lanRow ? ' iu-lan' : ''}${stale ? ' iu-stale' : ''}${showKeep ? '' : ' no-keep'}" data-iu-row="${esc(row.purpose)}">
       <div class="iu-what"><div class="iu-name">${esc(tr('iu.p.' + row.purpose))}</div>
-        <div class="iu-desc">${esc(tr('iu.d.' + row.purpose) + blockedLine(row))}</div>
+        <div class="iu-desc">${esc(tr('iu.d.' + row.purpose) + (lanRow ? '' : blockedLine(row)))}</div>
         ${cons ? `<div class="iu-cons${row.purpose === 'updates' ? ' iu-red' : ''}">${esc(cons)}</div>` : ''}</div>
       <div class="iu-when">${esc(tr(row.automatic ? 'iu.automatic' : 'iu.when_asked'))}</div>
       <div class="iu-state"><span class="iu-dot ${st.tone}"></span>${esc(tr(st.key))}</div>
@@ -210,10 +234,23 @@ function refuseSay(error) {
 
 /** Save the shop's switch through the window's ordinary save; main's guard decides. */
 async function saveNetwork(patch) {
-  const next = Object.assign({}, network(), patch, { changedAt: new Date().toISOString(), changedBy: whoChanges() });
+  const cur = shopView();
+  const next = Object.assign({}, network(), { offline: !!cur.offline, keep: keptList() }, patch);
+  // When and by whom are the SWITCH's: a Keep tick changes neither (review of
+  // #2633: it re-dated "Turned on by" and reset the 30-day clock).
+  if (!!next.offline !== !!cur.offline) { next.changedAt = new Date().toISOString(); next.changedBy = whoChanges(); }
+  else { next.changedAt = cur.changedAt || null; next.changedBy = cur.changedBy || null; }
   settings.network = next;
   if (typeof saveAll === 'function') saveAll();
   if (typeof flushSave === 'function') { try { await flushSave(); } catch (_) { /* the refusal toast says it */ } }
+  // What main kept is what the window holds: a save that failed or was put
+  // back must not wait in memory for the next save to carry it.
+  const ctx = await load();
+  if (ctx && ctx.shop) {
+    const kept = ctx.shop;
+    const same = !!kept.offline === !!next.offline && JSON.stringify((kept.keep || []).slice().sort()) === JSON.stringify((next.keep || []).slice().sort());
+    if (!same) settings.network = Object.assign({}, network(), { offline: !!kept.offline, keep: kept.keep || [], changedAt: kept.changedAt, changedBy: kept.changedBy });
+  }
 }
 
 function wire(host) {
@@ -258,6 +295,7 @@ function renderBanner(ctx) {
   el.style.display = '';
   const k = el.querySelector('[data-iu-banner="keep"]');
   if (k) k.addEventListener('click', async () => {
+    if (!mayChange()) return refuseSay('not_permitted');
     const keep = keptList().filter((x) => x !== 'updates');
     keep.push('updates');
     await saveNetwork({ keep });
@@ -279,6 +317,18 @@ async function refresh() {
   renderBanner(ctx);
   renderEntry();
 }
+/** After a refusal: at most once a second, and the list only while it is on screen. */
+let _soon = null;
+function refreshSoon() {
+  if (_soon) return;
+  _soon = setTimeout(async () => {
+    _soon = null;
+    const panel = document.getElementById('settings-panel-internet');
+    const ctx = await load();
+    if (panel && panel.classList.contains('active')) render(ctx);
+    renderBanner(ctx);
+  }, 1000);
+}
 
 function open() {
   const go = typeof openSettingsSection === 'function' ? openSettingsSection : (global.KhaytShell && global.KhaytShell.openSettingsSection);
@@ -288,13 +338,21 @@ function open() {
 
 // ── Refusals (frame D) ───────────────────────────────────────────────────
 
-const PURPOSE_IN_SENTENCE = (p) => tr('iu.in.' + p);
+const PURPOSE_IN_SENTENCE = (p) => {
+  const k = 'iu.in.' + p;
+  const s = tr(k);
+  return s && s !== k ? s : tr('iu.in.unrouted');   // the belt's 'unrouted', or anything new
+};
 
 /** The words for one refusal, or '' for a shape that is not one. */
 function refusalText(blocked) {
   if (!blocked || typeof blocked !== 'object') return '';
   const reason = String(blocked.reason || 'offline');
   const purpose = String(blocked.purpose || '');
+  // Only the switch's own refusals are said as the switch: a purpose's own
+  // opt-out, or an unknown purpose, is not "Khayt is set to make no internet
+  // calls" (review of #2633).
+  if (['offline', 'offline-here', 'lan-host-public', 'lan-host-missing', 'settings-unknown'].indexOf(reason) === -1) return '';
   if (reason === 'settings-unknown') return tr('outbound.blocked.settings-unknown');
   if (reason === 'offline-here') return tr('outbound.blocked.offline-here', { purpose: PURPOSE_IN_SENTENCE(purpose) });
   if (reason === 'lan-host-public' || reason === 'lan-host-missing') {
@@ -303,14 +361,33 @@ function refusalText(blocked) {
   return tr('outbound.blocked.offline', { purpose: PURPOSE_IN_SENTENCE(purpose) });
 }
 
+/* Only these hubAPI calls are a person's (a button they pressed). Everything
+ * else that a refusal comes back from (a cloud push after a save, the email
+ * digest, printer alerts, auto-submitted invoices) is automatic: counted on its
+ * row, never toasted (design §4.5; review of #2633: "a person acted in the
+ * last 8 s" alone toasted the cloud push every save triggers). */
+const PERSON_STARTED = new Set([
+  'fetchExchangeRates', 'aiExtract', 'checkForUpdates', 'startUpdateDownload',
+  'makerrunBrowse', 'makerrunDesign', 'makerrunDownloadToLib', 'makerrunPublishCreate', 'makerrunPublishFile',
+  'makerrunPublishImages', 'makerrunFindRecent', 'makerrunDelete',
+  'orcaFilaManifest', 'orcaFilaInstall', 'connectorUpdate',
+  'offsiteRun', 'printLibS3Test', 'gdriveConnect', 'vaultShare',
+  'cloudCreateKeyset', 'cloudSignup', 'cloudLogin', 'cloudAcceptInvite', 'cloudMemberInvite', 'cloudMemberRemove',
+  'cloudSetSlug', 'cloudPayLink', 'cloudCatalogPublish', 'cloudDeleteReview', 'cloudRequestReset', 'cloudResetPassword',
+  'cloudRequestVerify', 'cloudVerifyEmail', 'cloudPublish', 'cloudUnpublish', 'cloudIntakeTakeFile', 'cloudPortalReply',
+  'cloudSetPlan', 'cloudUnlock', 'cloudSnapshotGet', 'cloudAcceptRollback',
+  'startTunnel', 'zatcaCompliance', 'zatcaProductionCsid',
+  'bnplTabby', 'bnplTamara', 'bnplStripe', 'bnplCapture', 'sendWhatsappTemplate', 'webhookPost',
+]);
 /** A person acted a moment ago: a refusal now answers them. Automatic calls are counted, not toasted. */
 let _lastInput = 0;
 const PERSON_MS = 8000;
 ['pointerdown', 'keydown'].forEach((ev) => { try { global.addEventListener(ev, () => { _lastInput = Date.now(); }, true); } catch (_) { /* no window */ } });
 const _saidAt = Object.create(null);
 
-function sayBlocked(blocked) {
+function sayBlocked(blocked, method) {
   if (!blocked || Date.now() - _lastInput > PERSON_MS) return false;
+  if (method !== undefined && !PERSON_STARTED.has(String(method))) return false;
   const key = `${blocked.purpose}|${blocked.reason}`;
   if (_saidAt[key] && Date.now() - _saidAt[key] < 3000) return true;   // one press, one message
   _saidAt[key] = Date.now();
@@ -326,7 +403,7 @@ try {
   global.addEventListener('khayt:outbound-blocked', (e) => {
     let b = null;
     try { b = JSON.parse(String(e && e.detail)); } catch (_) { b = null; }
-    if (b && typeof b.purpose === 'string') { sayBlocked(b); if (_last) refresh(); }
+    if (b && typeof b.purpose === 'string') { sayBlocked(b, typeof b.method === 'string' ? b.method : ''); refreshSoon(); }
   });
 } catch (_) { /* no window */ }
 
@@ -339,6 +416,8 @@ function boot() {
     const go = typeof openSettingsSection === 'function' ? openSettingsSection : (global.KhaytShell && global.KhaytShell.openSettingsSection);
     if (go) go('general');
   });
+  // The page, the entry line and the banner follow a language change.
+  document.addEventListener('languagechange', () => { refresh().catch(() => {}); });
   // Hourly, so the 30-day banner appears on a computer left running.
   setInterval(() => { refresh().catch(() => {}); }, 60 * 60 * 1000);
 }

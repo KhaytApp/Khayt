@@ -106,6 +106,10 @@ test('the preload reports every refused reply, in each shape main gives, unchang
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.blockedOf({ ok: false, error: 'outbound blocked: messaging (offline)' }))), { purpose: 'messaging', reason: 'offline' });
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.blockedOf(new Error("Error invoking remote method 'hub:makerrun': Error: outbound blocked: makerrun (offline)")))), { purpose: 'makerrun', reason: 'offline' });
   for (const v of [null, { ok: true }, { ok: false, error: 'timeout' }, 'x', 42]) assert.equal(ctx.blockedOf(v), null);
+  // Anchored: the same words inside some other text (a server's reply) are not a refusal.
+  assert.equal(ctx.blockedOf({ ok: false, error: 'Server said: outbound blocked: cloud (offline)' }), null);
+  // And the method's name travels with it, so the window toasts only a person's call.
+  assert.match(pre, /reportBlocked\(b, k\)/);
 });
 
 test('wiring: the page under General, the banner, the refusal words, the last update check', () => {
@@ -119,6 +123,45 @@ test('wiring: the page under General, the banner, the refusal words, the last up
   const upd = read('lib/updater.js');
   assert.match(upd, /autoUpdater\.on\('update-available', \(info\) => \{\s*noteChecked\(\);/);
   assert.match(upd, /autoUpdater\.on\('update-not-available', \(info\) => \{\s*noteChecked\(\);/);
-  assert.match(read('main.js'), /updatesLastCheckedAt: \(\(\) => \{ try \{ return require\('\.\/lib\/updater'\)\.lastUpdateCheckAt\(\); \}/);
+  const main = read('main.js');
+  assert.match(main, /lastChecked = U\.lastUpdateCheckAt\(\); blockedSince = U\.updatesBlockedSince\(\);/);
+  assert.match(main, /updatesLastCheckedAt: lastChecked,\s*\n\s*updatesBlockedSince: blockedSince,/);
+  assert.match(main, /shop: \{\s*\n\s*offline: require\('\.\/lib\/outbound\.js'\)\.isOffline\(st, \{ local: \{\} \}\),/);
   assert.match(read('.github/workflows/ci.yml'), /test:e2e:internetuse/);
+});
+
+test('review of #2633: only person-started calls toast, and only the switch reasons', () => {
+  const iu = load({});
+  assert.equal(iu.refusalText({ purpose: 'crash-reports', reason: 'opted-out' }), '', 'a purpose\'s own opt-out is not the switch');
+  assert.equal(iu.refusalText({ purpose: 'x', reason: 'unknown-purpose' }), '');
+  assert.equal(iu.refusalText({ purpose: 'unrouted', reason: 'offline' }), 'Khayt is set to make no internet calls. This needs an address outside your shop’s network.');
+  const src = read('renderer/internet-use.js');
+  for (const auto of ['cloudPush', 'cloudPull', 'zatcaSubmit', 'sendNtfy', 'sendTelegram', 'cloudDigest', 'fireWebhook']) {
+    assert.doesNotMatch(src.slice(src.indexOf('const PERSON_STARTED'), src.indexOf(']);', src.indexOf('const PERSON_STARTED'))), new RegExp(`'${auto}'`), auto + ' is automatic');
+  }
+  // Every name in the list is a real hubAPI method.
+  const list = src.slice(src.indexOf('const PERSON_STARTED'), src.indexOf(']);', src.indexOf('const PERSON_STARTED'))).match(/'([A-Za-z0-9]+)'/g).map((x) => x.slice(1, -1));
+  const pre = read('preload.js');
+  for (const m of list) assert.match(pre, new RegExp(`\\b${m}:`), m);
+});
+
+test('review of #2633: a Keep tick keeps when and by whom; storage set up means the internet; the stamp only on an answer', () => {
+  const src = read('renderer/internet-use.js');
+  assert.match(src, /if \(!!next\.offline !== !!cur\.offline\) \{ next\.changedAt = new Date\(\)\.toISOString\(\); next\.changedBy = whoChanges\(\); \}/);
+  const iu = load({});
+  const offsite = (enabled, destination, ready) => ({ offsite: { settings: { enabled, destination }, ready } });
+  assert.equal(iu.setUp('storage', offsite(true, 'folder', true)), false, 'a folder backup is not an internet call');
+  assert.equal(iu.setUp('storage', offsite(false, 'bucket', true)), false, 'off is not set up');
+  assert.equal(iu.setUp('storage', offsite(true, 'bucket', true)), true);
+  assert.equal(iu.setUp('storage', { setup: { storageLibrary: true } }), true, 'the library\'s own bucket or Drive');
+  assert.equal(load({ telegram: { botToken: 'x', chatId: '1' } }).setUp('messaging', {}), true, 'Telegram has no enabled flag');
+  assert.equal(load({ eventWebhooks: { enabled: true, order_created: 'https://h.example/x' } }).setUp('webhooks', {}), true);
+  const upd = read('lib/updater.js');
+  assert.match(upd, /if \(result && result\.updateInfo && \(interpreted\.status === 'available'/);
+  assert.match(upd, /fs\.renameSync\(tmp, checkFile\(\)\)/);
+  assert.match(upd, /noteRefused = \(\) => \{/);
+  // The 30-day clock: this computer's own switch time for offline-here, and the first refusal when nothing else.
+  const row = { purpose: 'updates', allowed: false, reason: 'offline-here' };
+  assert.equal(iu.updatesStale(row, { local: { changedAt: new Date(Date.now() - 31 * 864e5).toISOString() } }), 31);
+  assert.equal(iu.updatesStale({ purpose: 'updates', allowed: false, reason: 'offline' }, { updatesBlockedSince: new Date(Date.now() - 45 * 864e5).toISOString() }), 45);
 });

@@ -6185,5 +6185,6 @@
   "outbound.blocked.lan-host-missing": "Khayt 已设置为不进行任何联网请求，而此操作所需的地址不在你的商店网络中。",
   "outbound.blocked.settings-unknown": "Khayt 正在启动。请稍后重试。",
   "err.refused_network": "互联网使用（“不进行任何联网请求”）",
+  "iu.in.unrouted": "你商店网络之外的地址",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

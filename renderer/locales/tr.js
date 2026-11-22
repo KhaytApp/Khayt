@@ -6185,5 +6185,6 @@
   "outbound.blocked.lan-host-missing": "Khayt internet bağlantısı yapmayacak şekilde ayarlı ve bunun için gereken adres mağazanızın ağında değil.",
   "outbound.blocked.settings-unknown": "Khayt başlatılıyor. Birazdan tekrar deneyin.",
   "err.refused_network": "İnternet kullanımı (“İnternet bağlantısı yapma”)",
+  "iu.in.unrouted": "mağazanızın ağı dışındaki bir adres",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

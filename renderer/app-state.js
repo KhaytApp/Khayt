@@ -791,6 +791,8 @@ function _saveRefused(refused) {
   Promise.resolve(window.hubAPI && window.hubAPI.loadStore ? window.hubAPI.loadStore() : null).then((data) => {
     if (data && !data.__corrupt && typeof replaceStoreFromSnapshot === 'function' && replaceStoreFromSnapshot(data)) {
       if (typeof initialRender === 'function') initialRender();
+      // Internet use draws what main kept, not the edit it put back.
+      try { window.KhaytInternetUse?.refresh?.(); } catch (_) { /* not loaded (Bed Ready) */ }
       if (typeof applyOperatorPermissions === 'function') applyOperatorPermissions();
     }
   }).catch((e) => console.error('reload after a refused save failed:', e))

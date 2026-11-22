@@ -470,7 +470,10 @@ const hubAPI = {
  * (renderer/internet-use.js), which says it only when a person acted a moment
  * before: automatic calls are counted on their row, never toasted. The reply
  * itself is returned unchanged. */
-const BLOCKED_TEXT = /outbound blocked: ([a-z-]+) \(([a-z-]+)\)/;
+// Anchored: only OutboundBlocked's own message (as main passed it on, or as
+// Electron wraps a rejected invoke), never the same words inside some other
+// text a remote server sent back (review of #2633).
+const BLOCKED_TEXT = /^(?:Error invoking remote method '[^']{1,80}': (?:[A-Za-z]*Error: )?)?outbound blocked: ([a-z-]{1,40}) \(([a-z-]{1,40})\)/;
 function blockedOf(v) {
   try {
     if (!v) return null;
@@ -482,7 +485,8 @@ function blockedOf(v) {
     return m ? { purpose: m[1], reason: m[2] } : null;
   } catch (_) { return null; }
 }
-function reportBlocked(b) {
+function reportBlocked(b, method) {
+  b = Object.assign({}, b, { method: String(method) });
   try { window.dispatchEvent(new CustomEvent('khayt:outbound-blocked', { detail: JSON.stringify(b) })); } catch (_) { /* no window */ }
 }
 for (const k of Object.keys(hubAPI)) {
@@ -491,8 +495,9 @@ for (const k of Object.keys(hubAPI)) {
   hubAPI[k] = function (...args) {
     const r = fn.apply(this, args);
     if (!r || typeof r.then !== 'function') return r;
-    return r.then((v) => { const b = blockedOf(v); if (b) reportBlocked(b); return v; },
-      (e) => { const b = blockedOf(e); if (b) reportBlocked(b); throw e; });
+    // The method's name goes with it: the window toasts only a person's call.
+    return r.then((v) => { const b = blockedOf(v); if (b) reportBlocked(b, k); return v; },
+      (e) => { const b = blockedOf(e); if (b) reportBlocked(b, k); throw e; });
   };
 }
 

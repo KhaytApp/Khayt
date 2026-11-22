@@ -6185,5 +6185,6 @@
   "outbound.blocked.lan-host-missing": "Khayt はインターネット通信をしない設定で、必要なアドレスがショップのネットワーク上にありません。",
   "outbound.blocked.settings-unknown": "Khayt を起動中です。しばらくしてからもう一度お試しください。",
   "err.refused_network": "インターネット利用（「インターネット通信をしない」）",
+  "iu.in.unrouted": "ショップのネットワーク外のアドレス",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
