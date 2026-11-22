@@ -46,6 +46,7 @@ enum Telegram {
         guard let url = URL(string: "https://api.telegram.org/bot\(escaped)/sendMessage") else {
             throw Failure.badToken
         }
+        try OutboundGate.shared.require(.messaging)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

@@ -472,6 +472,26 @@ final class Telemetry {
     @discardableResult
     func flush(consent: TelemetryConsent, engine: KhaytEngine, file: TelemetryQueueFile) async -> String {
         guard sendsFromThisBuild else { return "development-build" }
+        // "Make no internet calls" only takes away: each kind is sent when the
+        // shop opted in AND the switch allows it. A kind the switch refuses is
+        // planned as not consented, so its events are dropped, never queued
+        // for later (D5). With both refused nothing is asked of the network.
+        //
+        // The opt-in itself is the caller's `consent`, read from the same
+        // settings the gate holds; the gate is asked here only for what the
+        // switch adds, so its own "opted-out" answer is not a second veto.
+        func switchAllows(_ purpose: OutboundPurpose) -> Bool {
+            let verdict = OutboundGate.shared.verdict(purpose)
+            if verdict.allowed || verdict.reason == "opted-out" { return true }
+            return OutboundGate.shared.allows(purpose)   // refused: counted on its row
+        }
+        let crashOk = consent.crash && switchAllows(.crashReports)
+        let usageOk = consent.usage && switchAllows(.usageStats)
+        guard crashOk || usageOk || !(consent.crash || consent.usage) else { return "blocked" }
+        var allowed = consent
+        allowed.crash = crashOk
+        allowed.usage = usageOk
+        let consent = allowed
         let nowMs = now().timeIntervalSince1970 * 1000
         guard let plan = try? await engine.telemetryPlan(queue: file.read(), crash: consent.crash,
                                                          usage: consent.usage, nowMs: nowMs,

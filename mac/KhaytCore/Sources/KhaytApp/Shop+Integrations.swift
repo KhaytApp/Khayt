@@ -312,7 +312,7 @@ extension Shop {
         var headers: [(String, String)] = [("Content-Type", req.contentType ?? "application/json")]
         for (k, v) in (req.headers ?? [:]).sorted(by: { $0.key < $1.key }) { headers.append((k, v)) }
         do {
-            let status = try await WebhookClient.post(Data(body.utf8), to: url, headers: headers, engine: engine)
+            let status = try await WebhookClient.post(Data(body.utf8), to: url, headers: headers, engine: engine, purpose: .messaging)
             let read = try await engine.smsResult(status: status, text: "")
             return read.ok ? nil : (read.error ?? "HTTP \(status)")
         } catch let failure as WebhookClient.Failure {
@@ -439,7 +439,7 @@ extension Shop {
             let secret = try await Secrets.open(Self.plainString(cfg["secret"]) ?? "", for: source)
             let req = try await engine.accountingRequest(payload: payload, secret: secret)
             let headers = req.headers.sorted(by: { $0.key < $1.key }).map { ($0.key, $0.value) }
-            let status = try await WebhookClient.post(Data(req.body.utf8), to: url, headers: headers, engine: engine)
+            let status = try await WebhookClient.post(Data(req.body.utf8), to: url, headers: headers, engine: engine, purpose: .webhooks)
             return (200..<300).contains(status) ? nil : "HTTP \(status)"
         } catch let failure as WebhookClient.Failure {
             return failure.errorDescription ?? "failed"

@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: every call the app makes to the internet now asks one switch first (no screen yet).** The rule is the shared `lib/outbound.js`; the Mac asks it where each request is built, by what the call is for.
+  - **What asks.** Updates (Sparkle, through its own hook, so a refused check fetches no feed), the install count, crash reports and usage statistics, Khayt Cloud, MakerRun, catalogues, off-site storage, messages and alerts, webhooks and connectors, pay-later links, the online store routes, AI assist, exchange rates and model covers.
+  - **The shop's own network is never blocked.** Printers, cameras, smart plugs and Spoolman keep working. While the switch is on, an address that leads outside the shop's network is refused.
+  - **At launch.** Nothing but the shop's own network is called until the book is read, so a shop that turned the switch on does not leak one call at each start. A launch update check that had to wait is made once the settings are known.
+  - **Turning it on.** Only the owner can, under the staff lock. One sync goes out first so the other computers and the phone learn of it.
+  - **A guard.** A test fails if a Swift file builds a request or opens a socket without asking.
+  - Nothing changes for a shop that has not turned the switch on. The Settings page for it comes next.
+
 - **Shared rule (not yet wired): one switch for every internet call Khayt makes.** `lib/outbound.js` answers whether a call may go out, for 18 named purposes: updates, the install count, crash reports, usage statistics, Khayt Cloud, MakerRun, catalogues, and the shop's own storage, messages, webhooks, payments, online store (Medusa, Salla, Zid), AI, ZATCA, exchange rates, lookups and remote tunnel. A shop that turns on "make no internet calls" (kept in the shop's data, so every computer and the phone follow it) can still keep chosen purposes. A computer can be set stricter than the shop, never looser. Printers, cameras and phones on the shop's own network always keep working, but only at a private address or a local name. Crash reports and usage statistics stay opt-in either way. Nothing calls it yet. Tests: `test/outbound-vectors.test.js`, with vectors in `test/fixtures/outbound-vectors.json` for the Mac and iPhone.
 
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.

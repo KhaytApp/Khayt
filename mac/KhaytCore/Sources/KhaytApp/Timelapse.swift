@@ -358,6 +358,12 @@ final class PinnedVideoLoader: NSObject, AVAssetResourceLoaderDelegate, @uncheck
             offset = 0; end = 1
         }
         let (from, to) = Self.range(offset: offset, end: end, total: total)
+        // `real` is the address `PrinterWatch.pinned` checked; asked again
+        // here because this is where the request is made.
+        guard OutboundGate.shared.allows(.lan, host: real.host()) else {
+            r.finishLoading(with: OutboundBlocked(purpose: .lan, reason: "lan-host-public", host: real.host()))
+            return
+        }
         var q = URLRequest(url: real)
         q.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         q.setValue("bytes=\(from)-\(to)", forHTTPHeaderField: "Range")

@@ -93,6 +93,9 @@ final class ActiveCountSender {
         guard state.due(now: at) else { return "done" }
         guard at >= notBefore, !sending else { return "waiting" }
         guard ActiveCount.accepts(version: appVersion) else { return "version" }
+        // "Make no internet calls": not sent, and counted on its row. Not
+        // owed tomorrow either: the day's ping is simply not made.
+        guard OutboundGate.shared.allows(.installCount) else { return "blocked" }
         sending = true
         defer { sending = false }
 

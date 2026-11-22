@@ -783,6 +783,7 @@ public actor MakerRunClient {
     }
 
     private func doRefresh(_ used: String, nowSecs: Double) async throws -> String {
+        try OutboundGate.shared.require(.makerrun)
         var req = URLRequest(url: base.appendingPathComponent("api/app-token"), timeoutInterval: MakerRun.readTimeout)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "content-type")
@@ -852,6 +853,7 @@ public actor MakerRunClient {
         guard let url = URL(string: base.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/api/v1" + pathAndQuery) else {
             throw MakerRun.Failure("bad_request", "MakerRun could not read that request.")
         }
+        try OutboundGate.shared.require(.makerrun)
         var req = URLRequest(url: url, timeoutInterval: timeout ?? (parts == nil ? MakerRun.readTimeout : MakerRun.uploadTimeoutBase))
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "accept")
@@ -943,6 +945,7 @@ public actor MakerRunClient {
         }
         guard firstOK else { throw MakerRun.Failure("refused", "Refusing a download from a private or non-HTTPS address.") }
         let delegate = RedirectGuard(check: check)
+        try OutboundGate.shared.require(.makerrun)
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "GET"
         let (tmp, response): (URL, URLResponse)

@@ -30,6 +30,8 @@ enum Ntfy {
         // A TOKEN ONLY OVER HTTPS. On plain HTTP the Bearer token crosses
         // every hop readable. Sep 2026 scan.
         if !token.isEmpty, url.scheme?.lowercased() != "https" { throw Failure.tokenNeedsHTTPS }
+        // A self-hosted ntfy on the shop's own network still works while the switch is on.
+        try OutboundGate.shared.require(.messaging, orLan: url)
         var r = URLRequest(url: url)
         r.httpMethod = "POST"
         r.timeoutInterval = 10

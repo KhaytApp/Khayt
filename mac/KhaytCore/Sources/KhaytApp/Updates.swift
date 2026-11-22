@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytCore
 import Sparkle
 
 /// Keeping the app up to date, which it could not do at all.
@@ -96,6 +97,19 @@ final class Updates {
     /// so a local build says so by being greyed out rather than by failing.
     var isAvailable: Bool { controller != nil }
 
+    /// When Sparkle last checked, for the Internet use pane's "Last checked".
+    var lastChecked: Date? { controller?.updater.lastUpdateCheckDate }
+
+    /// The shop's book has been read. A launch check that the switch held
+    /// back while the settings were unknown is made now, if they allow it.
+    func bookWasRead() {
+        guard let controller, launchProbe.waitsForBook else { return }
+        launchProbe.waitsForBook = false
+        guard controller.updater.automaticallyChecksForUpdates, OutboundGate.shared.verdict(.updates).allowed else { return }
+        launchProbe.armed = true
+        controller.updater.checkForUpdateInformation()
+    }
+
     func checkForUpdates() { controller?.updater.checkForUpdates() }
 
     /// Whether this Mac looks for updates by itself — Sparkle's own setting,
@@ -158,6 +172,36 @@ final class LaunchProbe: NSObject, SPUUpdaterDelegate {
     /// checks keep their own behaviour.
     @MainActor var armed = false
     @MainActor private var found = false
+    /// A check was refused because the shop's book had not been read yet.
+    @MainActor var waitsForBook = false
+
+    /// Sparkle asks before EVERY check, scheduled or by hand (its documented
+    /// hook: `-updater:mayPerformUpdateCheck:error:`, which in Swift throws to
+    /// refuse). "Make no internet calls" refuses here, so no feed is fetched.
+    /// A check somebody asked for by hand shows the reason in Sparkle's own
+    /// alert, in the shop's words; a scheduled one is counted on its row.
+    nonisolated func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
+        try mayCheck()
+    }
+
+    /// The hook's own answer, apart from Sparkle's types so it can be tested.
+    nonisolated func mayCheck() throws {
+        do { try OutboundGate.shared.require(.updates) }
+        catch let blocked as OutboundBlocked {
+            if blocked.reason == "settings-unknown" {
+                DispatchQueue.main.async { MainActor.assumeIsolated { self.waitsForBook = true } }
+            }
+            throw NSError(domain: "app.khayt.outbound", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: Self.reason(blocked)])
+        }
+    }
+
+    /// The sentence Sparkle shows. This can be asked off the main thread, so
+    /// the words are fetched on it.
+    nonisolated static func reason(_ blocked: OutboundBlocked) -> String {
+        if Thread.isMainThread { return blocked.errorDescription ?? blocked.description }
+        return DispatchQueue.main.sync { blocked.errorDescription ?? blocked.description }
+    }
 
     nonisolated func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
         MainActor.assumeIsolated { if armed { found = true } }

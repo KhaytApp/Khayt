@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 import CryptoKit
 import Security
 import Network
@@ -536,6 +537,10 @@ actor BambuConversation {
 
     private func run(ask: @escaping @Sendable () -> [UInt8],
                      take: @escaping @Sendable (String) -> String?) async throws -> String {
+        // The printer's own address, on the shop's network (`lan`). The held
+        // session (`BambuSession`) takes its address from `PrinterWatch`'s
+        // `bambuConfig`, which is built from the gated `baseURL`.
+        try OutboundGate.shared.require(.lan, host: host)
         let verdict = PinVerdict()
         let connection = BambuMqtt.connection(host: host, port: port, serial: serial, verdict: verdict)
 

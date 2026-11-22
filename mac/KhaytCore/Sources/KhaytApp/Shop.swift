@@ -247,7 +247,16 @@ final class Shop {
     /// The tax's name in the app's language — "VAT", «ضريبة القيمة المضافة» —
     /// for a line that labels a figure with it. Nil for an unregistered shop.
     private(set) var taxName: String?
-    var settingsValue: JSONValue = .object([:]) { didSet { refreshLibraryRemote() } }
+    var settingsValue: JSONValue = .object([:]) { didSet { refreshLibraryRemote(); tellOutboundGate() } }
+    /// Whether this Shop tells the app's one outbound gate its settings
+    /// (`Shop+Outbound`). The app's shop does. A test's does not unless it
+    /// says so: a suite that turned the switch on would otherwise block every
+    /// other suite's requests through the shared gate.
+    var feedsOutboundGate = Shop.inTheApp
+    /// The gate this shop tells and asks; the app's, unless a test hands one in.
+    var outboundGate: OutboundGate = .app
+    /// Where this Mac keeps its own "make no internet calls" switch.
+    var outboundDefaults: UserDefaults = .standard
 
     /// Give a shop a mail provider, for a test. The book on disk is not
     /// touched — `pretendMode`'s sibling, and there for the same reason.

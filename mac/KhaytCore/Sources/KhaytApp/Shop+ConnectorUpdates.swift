@@ -208,6 +208,7 @@ extension Shop {
     /// HTTPS only, no redirects, a size cap and a 15-second limit.
     nonisolated static func fetchConnectorBytes(_ url: URL, _ maxBytes: Int) async throws -> Data {
         guard url.scheme == "https" else { throw URLError(.unsupportedURL) }
+        try OutboundGate.shared.require(.catalogues)
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
         request.httpMethod = "GET"
         // A redirect is refused, not followed (`RefuseRedirects`, Camera.swift):

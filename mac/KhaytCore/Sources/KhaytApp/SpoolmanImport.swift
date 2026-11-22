@@ -56,6 +56,7 @@ enum SpoolmanImport {
         for n in 0..<20 {
             let path = try await engine.spoolmanListPath(offset: n * page, limit: page)
             guard let url = URL(string: base.absoluteString + path) else { throw Problem.noAddress }
+            try OutboundGate.shared.require(.lan, url: url)
             var request = URLRequest(url: url)
             request.timeoutInterval = 20
             let (data, response) = try await (fetch ?? { try await session.data(for: $0) })(request)

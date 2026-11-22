@@ -294,7 +294,7 @@ extension Shop {
         { post in
             try await WebhookClient.postReading(post.body, to: post.url, headers: post.headers.map { ($0.name, $0.value) },
                                                 engine: engine, timeout: connectorTimeout, keep: connectorReplyMax,
-                                                method: post.method)
+                                                method: post.method, purpose: .webhooks)
         }
     }
 

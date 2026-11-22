@@ -322,6 +322,7 @@ extension Shop {
         let base = currency
         guard let url = Self.ratesURL(base: base) else { return words.callIt("xr.fetch_failed") }
         guard let engine else { return words.callIt("mac.move_no_engine") }
+        do { try OutboundGate.shared.require(.exchangeRates) } catch { return self.said(error) }
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let body: JSONValue

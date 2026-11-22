@@ -233,6 +233,7 @@ enum SmtpClient {
                 parameters.defaultProtocolStack.applicationProtocols.insert(options, at: 0)
             }
             let port = NWEndpoint.Port(rawValue: relay.port) ?? 587
+            try OutboundGate.shared.require(.messaging, orLanHost: relay.host)
             let connection = NWConnection(host: .init(relay.host), port: port, using: parameters)
             let wire = Wire(connection)
 

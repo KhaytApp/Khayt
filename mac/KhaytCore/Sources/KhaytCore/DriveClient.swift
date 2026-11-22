@@ -135,6 +135,7 @@ public actor DriveClient {
     }
 
     static func postForm(_ url: String, _ form: [String: String], fetch: S3.Fetch) async throws -> [String: Any] {
+        try OutboundGate.shared.require(.storage)
         var r = URLRequest(url: URL(string: url)!, timeoutInterval: 30)
         r.httpMethod = "POST"
         r.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -166,6 +167,7 @@ public actor DriveClient {
 
     func request(_ url: String, method: String = "GET", json: Any? = nil,
                  timeout: TimeInterval = 120) async throws -> URLRequest {
+        try OutboundGate.shared.require(.storage)
         var r = URLRequest(url: URL(string: url)!, timeoutInterval: timeout)
         r.httpMethod = method
         r.setValue("Bearer \(try await token())", forHTTPHeaderField: "Authorization")
@@ -250,6 +252,7 @@ public actor DriveClient {
         }
         guard let location = (startResponse as? HTTPURLResponse)?.value(forHTTPHeaderField: "Location"),
               let url = URL(string: location) else { throw Failure.noUploadURL }
+        try OutboundGate.shared.require(.storage)
         var body = URLRequest(url: url, timeoutInterval: 600)
         body.httpMethod = "PUT"
         body.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")

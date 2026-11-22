@@ -801,6 +801,9 @@ final class PrinterWatch {
     nonisolated static func pinned(_ url: URL, engine: KhaytEngine,
                                    lookUp: @escaping @Sendable (String) async -> [String] = { await WebhookClient.addresses(of: $0) })
     async -> URL? {
+        // The switch never blocks the shop's own network, but while it is on
+        // an address that leads outside is refused here too (`lan`).
+        guard OutboundGate.shared.allows(.lan, host: url.host(percentEncoded: false)) else { return nil }
         guard let raw = url.host(percentEncoded: false), !raw.isEmpty,
               let host = try? await engine.printerHost(raw), !host.isEmpty,
               (try? await engine.printerHostAllowed(host)) == true,
@@ -1201,6 +1204,7 @@ final class PrinterWatch {
         let raw = machine.printerApi?.host ?? ""
         let host = try await engine.printerHost(raw)
         guard !host.isEmpty else { throw Refusal.noHost }
+        try OutboundGate.shared.require(.lan, host: host)
         guard try await engine.printerHostAllowed(host) else { throw Refusal.notALanAddress(host) }
         let port = machine.printerApi?.port ?? defaultPort(machine.printerApi?.type ?? "")
         guard port > 0, port <= 65535 else { throw Refusal.badPort(port) }
@@ -1223,6 +1227,7 @@ final class PrinterWatch {
                     fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil)
         async throws -> [String: JSONValue] {
         guard let url = URL(string: base.absoluteString + path) else { throw Refusal.noHost }
+        try OutboundGate.shared.require(.lan, url: url)
         var request = URLRequest(url: url)
         request.timeoutInterval = seconds
         request.httpMethod = "GET"
@@ -1270,6 +1275,7 @@ final class PrinterWatch {
                      fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil)
         async throws -> [String: JSONValue] {
         guard let url = URL(string: base.absoluteString + path) else { throw Refusal.noHost }
+        try OutboundGate.shared.require(.lan, url: url)
         var request = URLRequest(url: url)
         request.timeoutInterval = seconds
         request.httpMethod = method
@@ -1313,6 +1319,7 @@ final class PrinterWatch {
                        body: Data, fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil)
         async throws {
         guard let url = URL(string: base.absoluteString + path) else { throw Refusal.noHost }
+        try OutboundGate.shared.require(.lan, url: url)
         var request = URLRequest(url: url)
         request.timeoutInterval = uploadTimeout
         request.httpMethod = method
