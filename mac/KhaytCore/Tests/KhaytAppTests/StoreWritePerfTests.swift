@@ -140,6 +140,33 @@ extension LibraryEditPerfTests {
         }
     }
 
+    /// The phone's "Bed is clear" / "Taken off" writes what the Mac's own
+    /// button writes: the stamp on the machine, and nothing else on it.
+    @Test("a phone's bed-clear stamps the machine in the book, as the Mac's button does, and answers with the stamp")
+    func phoneBedClearWrites() async throws {
+        try await withPerfBook(Self.shopBook()) { shop, url in
+            let at = Date(timeIntervalSince1970: 1_795_000_000.25)
+            let (status, body) = await shop.phoneBedClear("MPERF1", now: at)
+            #expect(status == 200, Comment(rawValue: body))
+            let stamp = StoreWriter.iso(at)
+            #expect(body.contains(#""bedClearedAt":"\#(stamp)""#) && body.contains(#""ok":true"#))
+            let machine = try #require(try Self.onDisk(url, "machines", "MPERF1"))
+            #expect(machine["bedClearedAt"] == .string(stamp))
+            #expect(machine["name"] == .string("Perf Printer"))
+            #expect(shop.bedClearedAt("MPERF1") != nil, "the window did not read the stamp back")
+            // The Mac's own button, later: the same field, a newer stamp.
+            let mine = try #require(shop.machines.first)
+            await shop.markBedClear(mine)
+            let after = try #require(try Self.onDisk(url, "machines", "MPERF1"))
+            guard case .string(let later)? = after["bedClearedAt"] else { Issue.record("no stamp"); return }
+            #expect(later > stamp)
+            // A machine the book does not have is not written, and said.
+            let (missing, _) = await shop.phoneBedClear("NOPE", now: at)
+            #expect(missing == 404)
+            #expect(try Self.onDisk(url, "machines", "NOPE") == nil)
+        }
+    }
+
     /// The shop floor's most common click, while a scan's write is already on
     /// the chain: it used to wait on the main thread for that write to end.
     @Test("marking a bed clear behind a scan's write does not hold the window")

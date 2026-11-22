@@ -40,6 +40,8 @@ struct LanServerTests {
         /// What `/api/orders/{id}/photos` handed the stubbed photo hook: the
         /// job and the byte count, in order.
         let photoCalls = PrinterCalls()
+        /// What `/api/printer/{id}/bed-clear` handed the stubbed hook, in order.
+        let bedCalls = PrinterCalls()
         /// What reached the expense hook: the body's size, once per call.
         let expenseCalls = PrinterCalls()
         /// Files a slicer plugin announced again while the same bytes waited
@@ -51,6 +53,7 @@ struct LanServerTests {
         let pairing: LanPairingWindow
         /// The "Pair a slicer" window, on the same clock.
         let connectorPairing: LanConnectorPairing
+        let phonePairing: LanConnectorPairing
 
         init(pin: String = "24682468", intakeToken: String = "", recordFails: Bool = false,
              calendarToken: String = "", measures: Bool = true, sliced: Bool = false,
@@ -60,7 +63,8 @@ struct LanServerTests {
              port wanted: UInt16 = 0, libraryAsBeforeFilters: Bool = false,
              slicerRoot: URL? = nil, slicerMaxBytes: Int = LanServer.maxInflate,
              connectorsEnabled: Bool = true,
-             connectorPrices: Bool = false, priceContext: JSONValue? = nil) async throws {
+             connectorPrices: Bool = false, priceContext: JSONValue? = nil,
+             phoneCodePairing: Bool = false) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -93,6 +97,11 @@ struct LanServerTests {
             host.pairing = pairing
             // Off in beta.38; these tests exercise it, on this window only.
             let connectorPairing = LanConnectorPairing(clock: { box.now.timeIntervalSince1970 }, enabled: connectorsEnabled)
+            // Pairing a phone by code: off unless a test asks, as in the app.
+            let phonePairing = LanConnectorPairing(clock: { box.now.timeIntervalSince1970 }, enabled: phoneCodePairing,
+                                                   flavor: .phone)
+            self.phonePairing = phonePairing
+            host.phonePairing = phonePairing
             self.connectorPairing = connectorPairing
             host.connectorPairing = connectorPairing
             host.library = { [shop] q, folder, offset, limit, filter in
@@ -165,6 +174,11 @@ struct LanServerTests {
             host.printerCommand = { id, verb in
                 printerCalls.calls.append("\(id) \(verb.rawValue)")
                 return (200, #"{"ok":true,"state":"paused"}"#)
+            }
+            let bedCalls = self.bedCalls
+            host.bedClear = { id in
+                bedCalls.calls.append(id)
+                return (200, #"{"ok":true,"bedClearedAt":"2026-11-22T10:00:00.000Z"}"#)
             }
             let photoCalls = self.photoCalls
             host.addJobPhoto = { id, data in

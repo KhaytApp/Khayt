@@ -1140,6 +1140,9 @@ public actor KhaytEngine {
         "slicers",
         "slicer-presets",
         "rbac",
+        // What a paired PHONE's role opens on the LAN server (C9): role →
+        // scopes, and the scope each route needs. Unknown is owner-only.
+        "device-roles",
         // When this shop could have a new order printed, finished and posted —
         // and the snapshot a storefront quotes that from.
         //

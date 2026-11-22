@@ -22,14 +22,41 @@ extension Shop {
         pairedPhones = lanDeviceStore.list().filter { $0.kind == nil }
     }
 
+    /// The roles that may open Pair a phone under the staff lock: whoever may
+    /// give a phone a role at all (`lib/device-roles.js grantable`: the owner,
+    /// and a manager up to Manager; Turki, Nov 22). Held equal to the rule by
+    /// `PhoneRolesTests.whoMayOpenPairing`, because a button's `disabled`
+    /// cannot await the engine.
+    nonisolated static let pairingOpeners: Set<String> = ["owner", "manager"]
+
+    /// May whoever is at this Mac open the window a phone pairs in? The owner
+    /// (who may change settings) and a manager. A manager could already
+    /// approve inside the window and could not open it, so in practice only
+    /// the owner could pair a phone. Opening gives a manager nothing more:
+    /// what they may approve is still `grantable`, and pairing with the PIN
+    /// still needs the owner PIN. Asks, says nothing.
+    var mayOpenPairing: Bool {
+        if lockAllows("settings", "edit") { return true }
+        guard lockInForce, let op = signedIn else { return false }
+        return Self.pairingOpeners.contains(lockRole(op.id))
+    }
+
     /// Open the window a new phone may pair in, for `LanPairingWindow.length`.
     func openPairing() {
-        guard permitted("settings", "edit") else { return }
+        // lock: the owner or a manager (`mayOpenPairing`); refused and said otherwise.
+        guard mayOpenPairing else {
+            moveProblem = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
+            return
+        }
         lanPairing.open()
+        // The code path shares the window the person opened; it stays shut
+        // unless this Mac has pairing by code on (`phoneCodeEnabled`).
+        lanPhonePairing.open()
     }
 
     func closePairing() {
         lanPairing.close()
+        lanPhonePairing.close()
     }
 
     func signOutPhone(_ id: String) {
@@ -133,8 +160,9 @@ struct PairAPhone: View {
             } else {
                 HStack {
                     Button(shop.words.callIt("mac.pair_open")) { shop.openPairing() }
-                        // `lockAllows`, not `permitted`: see the sign-out button.
-                        .disabled(!shop.lockAllows("settings", "edit") || !reachable)
+                        // Asks without saying, like the sign-out button's
+                        // `lockAllows`: drawing must not set a problem.
+                        .disabled(!shop.mayOpenPairing || !reachable)
                         .accessibilityIdentifier("pair-open")
                     Spacer(minLength: 0)
                 }
