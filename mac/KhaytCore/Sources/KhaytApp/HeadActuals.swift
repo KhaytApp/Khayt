@@ -24,6 +24,13 @@ enum HeadActuals {
     /// end. An older run of the same file is not this print.
     static let window: TimeInterval = 20 * 60
 
+    /// `filament_detect` out of Moonraker's `/printer/objects/query` answer.
+    nonisolated static func filamentDetect(in answer: [String: JSONValue]) -> JSONValue? {
+        guard case .object(let result)? = answer["result"], case .object(let status)? = result["status"],
+              case .object(let detect)? = status["filament_detect"] else { return nil }
+        return .object(detect)
+    }
+
     /// The history row for the print that just ended under `filename`: the
     /// newest completed run of that file that ended near `endedAt`.
     static func job(in history: [String: JSONValue], filename: String, endedAt: Date) -> JSONValue? {
@@ -60,7 +67,13 @@ extension Shop {
             guard let history = try? await PrinterWatch.get(base, path: "/server/history/list?limit=\(HeadActuals.historyLimit)",
                                                             key: key, type: "moonraker", timeout: 10),
                   let job = HeadActuals.job(in: history, filename: ended.filename, endedAt: endedAt) else { continue }
-            _ = await writeHeadActuals(historyJob: job, jobId: jobId)
+            // What is in each head, for the colour stamp: one more read-only
+            // GET. Best-effort: a printer that does not answer it leaves the
+            // machine's own `loaded` list to say, and failing that nothing.
+            let detect = (try? await PrinterWatch.get(base, path: "/printer/objects/query?filament_detect",
+                                                      key: key, type: "moonraker", timeout: 10))
+                .flatMap(HeadActuals.filamentDetect(in:)) ?? .null
+            _ = await writeHeadActuals(historyJob: job, jobId: jobId, filamentDetect: detect, machineId: machine.id)
             return
         }
     }
@@ -69,10 +82,20 @@ extension Shop {
     /// nothing was written: the history says nothing per head, the job
     /// already holds a split, or this Mac may not write.
     @discardableResult
-    func writeHeadActuals(historyJob: JSONValue, jobId: String) async -> Bool {
+    ///
+    /// `filamentDetect` and the machine's `loaded` list say what was in each
+    /// head, so the split keeps each head's colour and material as they were
+    /// at this print (`lib/printer-actuals.js headColour`).
+    func writeHeadActuals(historyJob: JSONValue, jobId: String,
+                          filamentDetect: JSONValue = .null, machineId: String? = nil) async -> Bool {
+        var loaded: JSONValue = .null
+        if let machineId, case .object(let m)? = machineRows.first(where: { Self.recordId($0) == machineId }),
+           let list = m["loaded"] { loaded = list }
         guard let engine, let build = source.build, canWrite, permitted("orders", "edit"),
               let row = orderRows.first(where: { Self.recordId($0) == jobId }),
-              case .object(let patch)? = try? await engine.perHeadPatch(order: row, historyJob: historyJob) else { return false }
+              case .object(let patch)? = try? await engine.perHeadPatch(order: row, historyJob: historyJob,
+                                                                        filamentDetect: filamentDetect,
+                                                                        machineLoaded: loaded) else { return false }
         let wrote = (try? await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: jobId) { job -> Bool in
             // Asked again on the record as it is on disk: the other app may
             // have written this print's split since the rule was asked.

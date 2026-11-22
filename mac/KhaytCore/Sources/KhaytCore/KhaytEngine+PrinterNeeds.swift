@@ -88,14 +88,29 @@ extension KhaytEngine {
     /// What to write on a job for a finished print's filament per head
     /// (`perHeadActuals` then `perHeadPatch`), or `.null` when the printer's
     /// history row says nothing per head or the job already holds a split.
-    public func perHeadPatch(order: JSONValue, historyJob: JSONValue) throws -> JSONValue {
+    ///
+    /// `filamentDetect` (the U1's own object, tags per head) and
+    /// `machineLoaded` (the machine's `loaded` list) are what was in each
+    /// head when the print ran: the rule stamps a head's colour and material
+    /// from the tag if one was read, else from the list (`headColour`).
+    /// `.null` for either is "not known", and that head carries no colour.
+    public func perHeadPatch(order: JSONValue, historyJob: JSONValue,
+                             filamentDetect: JSONValue = .null, machineLoaded: JSONValue = .null) throws -> JSONValue {
         try runtime.call2("""
-            (function (order, job) {
+            (function (order, job, detect, loaded) {
               var A = globalThis.KhaytPrinterActuals;
               var split = A.perHeadActuals(job, {});
-              return split ? A.perHeadPatch(order, split) : null;
-            })(ARG0, ARG1)
-            """, [order, historyJob], as: JSONValue.self)
+              if (!split) return null;
+              var at = { trays: detect ? globalThis.KhaytRfidTray.trays(detect) : [], loaded: Array.isArray(loaded) ? loaded : [] };
+              return A.perHeadPatch(order, split, at);
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, historyJob, filamentDetect, machineLoaded], as: JSONValue.self)
+    }
+
+    /// One head's colour and material at print time, or `.null`
+    /// (`lib/printer-actuals.js headColour`).
+    public func headColour(head: JSONValue, at: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPrinterActuals.headColour(ARG0, ARG1)", [head, at], as: JSONValue.self)
     }
 
     /// machine id → the card controls its MODEL or protocol cannot do
