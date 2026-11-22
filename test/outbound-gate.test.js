@@ -98,24 +98,45 @@ test('offlineAtStartup: the store or this computer says offline; unreadable fail
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('cloud: the push right after the switch turns on goes out once, then cloud is blocked (design §1.4)', async () => {
+test('cloud: the last sync after this computer turns the switch on, and only it (design §1.4; reviews of #2628)', async () => {
   const { g, set, tick } = gate({ settings: {} });
   assert.equal(g.check('cloud').allowed, true);
-  set({ network: { offline: true } });
-  g.observe();
-  let pushed = 0;
-  const push = () => g.lastPush(async () => { g.gate('cloud'); pushed += 1; return { ok: 1 }; });
-  assert.deepEqual(await push(), { ok: 1 }, 'the last push carries the switch');
-  await assert.rejects(push(), (e) => isBlocked(e), 'only once');
-  assert.equal(pushed, 1);
-  assert.equal(g.check('cloud').allowed, false, 'and nothing else of cloud meanwhile');
-  // Turned on, but no push within 10 s: none later.
-  set({}); g.observe(); set({ network: { offline: true } }); g.observe();
-  for (let i = 0; i < 11; i++) tick();
-  await assert.rejects(push(), (e) => isBlocked(e));
-  // This computer's own switch is not the shop's: no last push for it.
-  set({}); g.observe(); g.setLocal({ offline: true });
-  await assert.rejects(push(), (e) => isBlocked(e) && e.reason === 'offline-here');
+  // A change that arrives from elsewhere (a pull, the LAN) opens nothing.
+  set({ network: { offline: true } }); g.observe();
+  await assert.rejects(g.lastPush(async () => g.gate('cloud')), (e) => isBlocked(e));
+  // This computer's window saves it: the window opens.
+  set({}); g.observe({ fromSave: true }); set({ network: { offline: true } }); g.observe({ fromSave: true });
+  // Only the sync's own chain passes; another cloud call meanwhile is refused.
+  let other = null;
+  const push1 = g.lastPush(async () => {
+    g.gate('cloud');
+    try { g.gate('cloud'); } catch (_) { /* same chain: fine */ }
+    return { conflict: true };   // a 409: someone pushed since
+  });
+  try { g.gate('cloud'); other = 'passed'; } catch (e) { other = e.reason; }
+  assert.deepEqual(await push1, { conflict: true });
+  assert.equal(other, 'offline', 'a vault upload or the lead-time publisher is not the sync');
+  // The 409 did not spend it: pull and push again go through.
+  assert.deepEqual(await g.lastPull(async () => { g.gate('cloud'); return { pulled: 1 }; }), { pulled: 1 });
+  assert.deepEqual(await g.lastPush(async () => { g.gate('cloud'); return { ok: 1 }; }), { ok: 1 });
+  // Landed: closed.
+  await assert.rejects(g.lastPush(async () => g.gate('cloud')), (e) => isBlocked(e));
+  // Opened and never used for 30 s: none later.
+  set({}); g.observe({ fromSave: true }); set({ network: { offline: true } }); g.observe({ fromSave: true });
+  for (let i = 0; i < 31; i++) tick();
+  await assert.rejects(g.lastPush(async () => g.gate('cloud')), (e) => isBlocked(e));
+  // This computer's own switch is not the shop's: no window for it.
+  set({}); g.observe({ fromSave: true }); g.setLocal({ offline: true });
+  await assert.rejects(g.lastPush(async () => g.gate('cloud')), (e) => isBlocked(e) && e.reason === 'offline-here');
+});
+
+test('cloud with a book on disk that cannot be read: not held back (it is how such a shop restores)', () => {
+  let unreadable = true;
+  const g = createOutboundGate({ getSettings: () => null, readLocal: () => ({}), bookUnreadable: () => unreadable });
+  assert.equal(g.check('cloud').allowed, true);
+  assert.equal(g.check('updates').reason, 'settings-unknown', 'only cloud');
+  unreadable = false;
+  assert.equal(g.check('cloud').reason, 'settings-unknown');
 });
 
 test('PR 3 wiring: every cloud request asks the gate', () => {
@@ -127,6 +148,8 @@ test('PR 3 wiring: every cloud request asks the gate', () => {
   assert.match(main, /cloudClient\.setOutboundGate\(\(purpose\) => outboundGate\.gate\(purpose\)\);/);
   assert.equal((main.match(/outboundFetch: outboundGate\.for\('cloud'\),/g) || []).length, 2, 'both vault clients');
   assert.match(main, /outboundGate\.lastPush\(\(\) => cloudBackend\.push\(snapshot\)\)/);
+  assert.match(main, /outboundGate\.lastPull\(\(\) => cloudBackend\.pull\(\)\)/);
+  assert.match(main, /outboundGate\.observe\(\{ fromSave: true \}\)/);
   for (const f of ['lib/main/vault-backup.js', 'lib/main/vault-links.js']) assert.match(read(f), /fetch: cloudFetch\(\)/, f);
   // The gate throws before any fetch: no gate set means no change (tests, other callers).
   const C = require('../lib/cloud-client.js');
