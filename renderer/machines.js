@@ -448,7 +448,11 @@ async function renderMachineNeeds(given) {
 function machineNeedsHtml(m, need) {
   if (!m || !need) return '';
   const problems = Array.isArray(need.problems) ? need.problems : [];
-  const waiting = (Array.isArray(need.waiting) ? need.waiting : []).filter((w) => w && (w.reason === 'print-to-take-off' || w.reason === 'bed-to-clear'));
+  // A bed the window has already said is clear is not drawn again while main
+  // catches up with the save (a poll can redraw from main's older book).
+  const cleared = Date.parse(String(m.bedClearedAt || ''));
+  const waiting = (Array.isArray(need.waiting) ? need.waiting : []).filter((w) => w && (w.reason === 'print-to-take-off' || w.reason === 'bed-to-clear')
+    && !(Number.isFinite(cleared) && Number(w.since) < cleared));
   if (!problems.length && !waiting.length) return '';
   const rows = problems.slice(0, 6).map((p) => {
     const tone = p.severity === 'info' ? 'info' : (p.severity === 'common' ? 'warn' : 'bad');
@@ -456,7 +460,7 @@ function machineNeedsHtml(m, need) {
     // The printer's own words keep their own direction (<bdi>): an English
     // message inside an Arabic sentence otherwise pulls the quote marks round.
     let title;
-    if (own) title = escapeHtml(t('needs.printer_says', { message: '\u0001' })).replace('\u0001', `<bdi>${escapeHtml(String(p.message))}</bdi>`);
+    if (own) title = escapeHtml(t('needs.printer_says', { message: '\u0001' })).replace('\u0001', () => `<bdi>${escapeHtml(String(p.message))}</bdi>`);
     else {
       title = t('needs.problem.' + p.code) || p.code;
       if (Number.isInteger(p.head)) title = t('needs.on_tool', { what: title, n: String(p.head + 1) });

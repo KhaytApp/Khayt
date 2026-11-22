@@ -2308,7 +2308,12 @@ function renderMachinePL() {
   // range, by lib/printer-success.js (the Mac's rule). Cancelled runs are
   // counted but left out of the rate; under five decided runs, no rate.
   const runsInRange = printLog.filter((o) => o && !o.deleted).map((o) => ({
-    printRuns: (Array.isArray(o.printRuns) ? o.printRuns : []).filter((r) => r && inRange(String(r.at || '').slice(0, 10), analyticsRange, 'analytics')),
+    // The run's LOCAL day, as every other date in this table: `at` is UTC, so
+    // slicing it put an early-morning print in a UTC+3 shop on the day before.
+    printRuns: (Array.isArray(o.printRuns) ? o.printRuns : []).filter((r) => {
+      const d = r && new Date(r.at);
+      return !!d && Number.isFinite(d.getTime()) && inRange(localDateStr(d), analyticsRange, 'analytics');
+    }),
   }));
   const success = (typeof KhaytPrinterSuccess !== 'undefined')
     ? new Map(KhaytPrinterSuccess.successRates({ orders: runsInRange, machines }).map((x) => [x.machineId, x]))
