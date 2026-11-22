@@ -15,8 +15,9 @@ import Testing
     func vectors() async throws {
         let v = Self.obj(try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: Self.root.appending(path: "test/fixtures/outbound-vectors.json"))))
         guard case .array(let cases)? = v["cases"] else { Issue.record("no cases"); return }
-        #expect(cases.count >= 60)
+        #expect(cases.count >= 92)
         let engine = try KhaytEngine()
+        var answered = 0, once = 0
         for value in cases {
             let c = Self.obj(value)
             let why: Comment = { if case .string(let s)? = c["why"] { return Comment(rawValue: s) }; return "?" }()
@@ -25,7 +26,17 @@ import Testing
             let want = Self.obj(c["want"])
             #expect(got["allowed"] == want["allowed"], why)
             #expect(got["reason"] == want["reason"], why)
+            // A person's answer (`ctx.answer`): `once` is said only for an
+            // allowed switch-sync call, and never without an answer.
+            let hasAnswer = Self.obj(c["ctx"])["answer"] != nil
+            if hasAnswer { answered += 1 }
+            if got["once"] == .bool(true) {
+                once += 1
+                #expect(hasAnswer && got["allowed"] == .bool(true) && c["purpose"] == .string("switch-sync"), why)
+            }
         }
+        #expect(answered >= 12, "the answer-token cases are in the shared file")
+        #expect(once >= 1 && once < answered, "some answers let the one call through, and the dead ones do not")
         guard case .array(let purposes)? = v["purposes"] else { Issue.record("no purposes"); return }
         #expect(purposes == (try await engine.outboundPurposes()).map(JSONValue.string))
     }

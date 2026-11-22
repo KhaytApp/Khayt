@@ -146,12 +146,10 @@ import Testing
         #expect(hear(own: "2026-11-01T00:00:00.000Z", at: NetworkSwitch.date("2026-11-22T07:50:01Z")!) == .apply(Self.value()))
     }
 
-    @Test("turning the switch off: sent when a value is published there, even with this computer's option off")
+    @Test("turning the switch off: sent only when a value is published there")
     func turningOff() {
-        #expect(NetworkSwitch.sendsOff(publishedThere: true, optionOn: false))
-        #expect(NetworkSwitch.sendsOff(publishedThere: true, optionOn: true))
-        #expect(NetworkSwitch.sendsOff(publishedThere: false, optionOn: true))
-        #expect(!NetworkSwitch.sendsOff(publishedThere: false, optionOn: false), "a shop that never shared sends nothing")
+        #expect(NetworkSwitch.sendsOff(publishedThere: true))
+        #expect(!NetworkSwitch.sendsOff(publishedThere: false), "nothing published: nothing is sent, whatever the option says")
     }
 
     @Test("the book: a value applied as it travelled and marked as from Khayt Cloud; the highest stamp only goes up")

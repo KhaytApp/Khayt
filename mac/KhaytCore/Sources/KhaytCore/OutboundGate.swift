@@ -83,15 +83,49 @@ public final class OutboundGate: @unchecked Sendable {
 
     /// ── THE OWNER'S ANSWER READS THE SWITCH ONCE ─────────────────────────────
     ///
-    /// Set only around the ONE `switch-sync` GET the owner's own answer makes
-    /// ("Use the newer setting", when the other computer's value is not held:
-    /// Dev Hub, Nov 22, inside the 15-minute switch-sync exception Turki
-    /// accepted). The shop's switch may be on and not shared, so the rule
-    /// would refuse the call and the Mac could never hear the setting its
-    /// owner just asked for. A person pressed a button; this is that press's
-    /// call and no other: only `switch-sync`, only with a book read, and
-    /// NEVER under this Mac's own switch, which stays stricter than anything.
-    @TaskLocal public static var ownersSwitchAnswer = false
+    /// A person's answer ("Use the newer setting", when the other computer's
+    /// value is not held) makes ONE `switch-sync` call even while the shop's
+    /// switch is on here. The rule for that is the shared one
+    /// (`lib/outbound.js` `answerToken` / `spend`, the same on the desktop):
+    /// the gate makes a token when the person answers, hands it to the rule
+    /// with the clock, and on the rule's `once: true` keeps the spent token in
+    /// its place. So it opens only `switch-sync`, only against the SHOP's
+    /// switch (never this Mac's own, never an unread book), once, and for
+    /// `ANSWER_MS` at most.
+    ///
+    /// A token is made HERE, by `answerToken()`, from the code that handles
+    /// the press. It has no initialiser a caller can reach and is never read
+    /// from a request, a file or another process.
+    public final class Answer: @unchecked Sendable {
+        private let lock = NSLock()
+        private var token: JSONValue
+        fileprivate init(_ token: JSONValue) { self.token = token }
+        fileprivate var current: JSONValue {
+            get { lock.lock(); defer { lock.unlock() }; return token }
+            set { lock.lock(); token = newValue; lock.unlock() }
+        }
+    }
+
+    /// The answer this task's ONE `switch-sync` call carries, if a person
+    /// just gave one. Set only around that call.
+    @TaskLocal public static var answer: Answer?
+
+    /// A token for the answer a person gave just now.
+    public func answerToken() -> Answer? {
+        lock.lock(); defer { lock.unlock() }
+        guard let rule = rule(),
+              let token = try? rule.call2("KhaytOutbound.answerToken(ARG0)", [nowMs], as: JSONValue.self) else { return nil }
+        return Answer(token)
+    }
+
+    /// Whether an answer would still let one call through now: for a test.
+    public func answerLive(_ answer: Answer) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let rule = rule() else { return false }
+        return (try? rule.call2("KhaytOutbound.answerLive(ARG0, ARG1)", [answer.current, nowMs], as: Bool.self)) ?? false
+    }
+
+    private var nowMs: JSONValue { .number((clock().timeIntervalSince1970 * 1000).rounded()) }
 
     /// The gate a call site asks: the task's own when a test gave it one,
     /// else the app's.
@@ -120,6 +154,13 @@ public final class OutboundGate: @unchecked Sendable {
     public struct Verdict: Decodable, Sendable, Equatable {
         public let allowed: Bool
         public let reason: String
+        /// The rule let this one call through on a person's answer, and the
+        /// answer is now used: only ever set by `require`.
+        public var once: Bool? = nil
+        public init(allowed: Bool, reason: String, once: Bool? = nil) {
+            self.allowed = allowed; self.reason = reason; self.once = once
+        }
+        public static func == (a: Verdict, b: Verdict) -> Bool { a.allowed == b.allowed && a.reason == b.reason }
     }
 
     /// One row of the Settings list (`describe`).
@@ -200,10 +241,14 @@ public final class OutboundGate: @unchecked Sendable {
         }
     }
 
-    private func context(host: String?) -> JSONValue {
+    private func context(host: String?, answer: Answer? = nil) -> JSONValue {
         var ctx: [String: JSONValue] = ["local": .object(["offline": .bool(local.offline),
                                                          "installCountOff": .bool(local.installCountOff)])]
         if let host { ctx["host"] = .string(host) }
+        if let answer {
+            ctx["answer"] = answer.current
+            ctx["now"] = nowMs
+        }
         return .object(ctx)
     }
 
@@ -213,14 +258,25 @@ public final class OutboundGate: @unchecked Sendable {
         return unlockedVerdict(purpose, host: host)
     }
 
-    private func unlockedVerdict(_ purpose: OutboundPurpose, host: String?) -> Verdict {
+    /// `answer`: a person's token, handed to the rule only by `require` and
+    /// only for `switch-sync`. When the rule says `once`, the token is spent
+    /// here, before the lock is given up, so a second call cannot use it.
+    private func unlockedVerdict(_ purpose: OutboundPurpose, host: String?, answer: Answer? = nil) -> Verdict {
         guard let rule = rule(),
-              let answer = try? rule.call2("KhaytOutbound.allowed(ARG0, ARG1, ARG2)",
-                                           [settingsArgument, .string(purpose.rawValue), context(host: host)],
-                                           as: Verdict.self) else {
+              let verdict = try? rule.call2("KhaytOutbound.allowed(ARG0, ARG1, ARG2)",
+                                            [settingsArgument, .string(purpose.rawValue), context(host: host, answer: answer)],
+                                            as: Verdict.self) else {
             return Verdict(allowed: false, reason: "settings-unknown")
         }
-        return answer
+        if let answer, verdict.allowed, verdict.once == true {
+            // If the token cannot be marked used, the call is refused: an
+            // answer that could be used twice is worse than one not used.
+            guard let spent = try? rule.call2("KhaytOutbound.spend(ARG0)", [answer.current], as: JSONValue.self) else {
+                return Verdict(allowed: false, reason: "settings-unknown")
+            }
+            answer.current = spent
+        }
+        return verdict
     }
 
     /// Ask before a call. Throws `OutboundBlocked` when the switch refuses it,
@@ -228,11 +284,7 @@ public final class OutboundGate: @unchecked Sendable {
     /// goes (a name or address, with or without a scheme and port).
     public func require(_ purpose: OutboundPurpose, host: String? = nil) throws {
         lock.lock()
-        if purpose == .switchSync, Self.ownersSwitchAnswer, !local.offline, case .settings = book {
-            lock.unlock()
-            return
-        }
-        let answer = unlockedVerdict(purpose, host: host)
+        let answer = unlockedVerdict(purpose, host: host, answer: purpose == .switchSync ? Self.answer : nil)
         if !answer.allowed {
             var entry = counts[purpose] ?? Blocked(count: 0, last: clock())
             entry.count += 1

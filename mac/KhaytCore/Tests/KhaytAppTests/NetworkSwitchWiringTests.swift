@@ -25,10 +25,14 @@ struct NetworkSwitchWiringTests {
         var get: (Int, Data) = (404, Data(#"{"reason":"none"}"#.utf8))
         var put: (Int, Data) = (200, Data(#"{"ok":true}"#.utf8))
         func answerGet(_ status: Int, _ body: Data) { get = (status, body) }
+        /// Answers for the next GETs, in order, before `get` is used again.
+        var nextGets: [(Int, Data)] = []
+        func answerNextGet(_ status: Int, _ body: Data) { nextGets.append((status, body)) }
         func answerPut(_ status: Int, _ body: Data) { put = (status, body) }
         func forget() { asked = [] }
         func handle(method: String, path: String, body: Data?) -> (Int, Data) {
             asked.append(.init(method: method, path: path, body: body))
+            if method != "PUT", !nextGets.isEmpty { return nextGets.removeFirst() }
             return method == "PUT" ? put : get
         }
     }
@@ -161,10 +165,13 @@ struct NetworkSwitchWiringTests {
         asked = await server.asked
         #expect(asked.map(\.method) == ["GET"], "nothing is sent")
         #expect(shop.outboundToldOthers == nil)
-        // The option on and nothing published yet: offline:false is sent so the others come back.
+        // The option on and nothing published (the owner stopped sharing, or
+        // never shared): nothing is sent either. Turning a switch off
+        // publishes nothing new (Dev Hub, Nov 22).
         (shop, server, book) = await Self.shop(option: true, network: on)
         #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
-        #expect(await server.asked.map(\.method) == ["GET", "PUT"])
+        #expect(await server.asked.map(\.method) == ["GET"], "after the route's 404 nothing is sent")
+        #expect(shop.networkSwitchUnsentOff == nil, "and nothing is left to retry")
         // This Mac's own switch on: it makes no call at all, even to say "off".
         (shop, server, book) = await Self.shop(option: true, network: on)
         shop.outboundDefaults.set(true, forKey: Shop.offlineHereKey)
@@ -247,7 +254,9 @@ struct NetworkSwitchWiringTests {
         let on: JSONValue = .object(["offline": .bool(true), "via": .string("cloud"), "changedAt": .string(Self.stamp(3600))])
         let (shop, server, book) = await Self.shop(option: true, network: on)
         let theirs = Self.stamp(-2)
-        // The GET that would read the other value fails at first.
+        // A value is published there, so the "off" is sent; it is beaten (409),
+        // and the GET that would read the other value fails at first.
+        await server.answerNextGet(200, try Self.published(.init(offline: true, keep: [], changedAt: Self.stamp(3600), changedBy: nil)))
         await server.answerGet(500, Data())
         await server.answerPut(409, Data(#"{"reason":"stale","changedAt":"\#(theirs)"}"#.utf8))
         #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
@@ -526,26 +535,147 @@ struct NetworkSwitchWiringTests {
         #expect(await server2.asked.isEmpty && Self.obj(book2.network)["offline"] == .bool(false))
     }
 
-    @Test("the gate lets through only the owner's one switch-sync read: no other purpose, never under this Mac's own switch")
-    func gateException() throws {
+    @Test("the owner's answer is the shared rule's token: one switch-sync call, then spent; no other purpose, never under this Mac's own switch")
+    func answerToken() throws {
+        let off: JSONValue = .object(["network": .object(["offline": .bool(true), "changedAt": .string(Self.stamp(60))])])
         let gate = OutboundGate()
-        gate.update(book: .settings(.object(["network": .object(["offline": .bool(true), "changedAt": .string(Self.stamp(60))])])))
+        gate.update(book: .settings(off))
         #expect(throws: (any Error).self) { try gate.require(.switchSync) }
-        try OutboundGate.$ownersSwitchAnswer.withValue(true) {
-            try gate.require(.switchSync)
+        let answer = try #require(gate.answerToken())
+        #expect(gate.answerLive(answer))
+        try OutboundGate.$answer.withValue(answer) {
+            // Asking without calling does not use it.
+            #expect(!gate.verdict(.switchSync).allowed, "a screen that only asks is not the person's call")
+            #expect(gate.answerLive(answer))
+            // No other purpose is opened by it.
             #expect(throws: (any Error).self) { try gate.require(.cloud) }
             #expect(!gate.allows(.updates))
-            var local = gate.currentLocal
-            local.offline = true
-            gate.update(local: local)
+            #expect(gate.answerLive(answer), "a refused call for another purpose does not use it")
+            // The one call.
+            try gate.require(.switchSync)
+            #expect(!gate.answerLive(answer), "spent by the gate when the rule said once")
             #expect(throws: (any Error).self) { try gate.require(.switchSync) }
         }
+        // Never under this Mac's own switch, and it is not used up by the refusal.
+        let here = OutboundGate()
+        here.update(book: .settings(off))
+        here.update(local: .init(offline: true))
+        let unused = try #require(here.answerToken())
+        OutboundGate.$answer.withValue(unused) {
+            #expect(throws: (any Error).self) { try here.require(.switchSync) }
+        }
+        #expect(here.answerLive(unused))
         // A book not read yet waits, with or without the answer.
         let unread = OutboundGate()
         unread.update(book: .unread)
-        OutboundGate.$ownersSwitchAnswer.withValue(true) {
+        let waiting = try #require(unread.answerToken())
+        OutboundGate.$answer.withValue(waiting) {
             #expect(throws: (any Error).self) { try unread.require(.switchSync) }
         }
+        // Live for the rule's 20 seconds, by the gate's clock, and no longer.
+        let clock = Clock()
+        let timed = OutboundGate(clock: { clock.now })
+        timed.update(book: .settings(off))
+        let old = try #require(timed.answerToken())
+        clock.now = clock.now.addingTimeInterval(19)
+        #expect(timed.answerLive(old))
+        clock.now = clock.now.addingTimeInterval(2)
+        #expect(!timed.answerLive(old))
+        OutboundGate.$answer.withValue(old) {
+            #expect(throws: (any Error).self) { try timed.require(.switchSync) }
+        }
+        // With the shop online the call is allowed anyway, and the token is kept.
+        let online = OutboundGate()
+        online.update(book: .settings(.object([:])))
+        let spare = try #require(online.answerToken())
+        try OutboundGate.$answer.withValue(spare) { try online.require(.switchSync) }
+        #expect(online.answerLive(spare), "nothing to spend when the rule allowed it without the answer")
+        // Nothing in the app sets the old local exception any more.
+        let gateSource = try String(contentsOf: Self.sources.deletingLastPathComponent().appending(path: "KhaytCore/OutboundGate.swift"), encoding: .utf8)
+        #expect(!gateSource.contains("ownersSwitchAnswer"))
+        #expect(gateSource.contains("KhaytOutbound.answerToken(ARG0)") && gateSource.contains("KhaytOutbound.spend(ARG0)"))
+    }
+
+    final class Clock: @unchecked Sendable { var now = Date(timeIntervalSince1970: 1_795_000_000) }
+
+    @Test("an \"off\" that could not be sent is sent again with the same stamp, until sent or superseded")
+    func unsentOffIsRetried() async throws {
+        let on: JSONValue = .object(["offline": .bool(true), "changedAt": .string(Self.stamp(3600)), "via": .string("cloud")])
+        let there = try Self.published(.init(offline: true, keep: [], changedAt: Self.stamp(3600), changedBy: nil))
+
+        // The PUT is refused (Khayt Cloud is down): remembered, with the change's own stamp.
+        var (shop, server, book) = await Self.shop(option: true, network: on)
+        await server.answerGet(200, there)
+        await server.answerPut(503, Data())
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+        let stamp = try #require(shop.networkSwitchUnsentOff)
+        #expect(JSONValue.string(stamp) == Self.obj(book.network)["changedAt"])
+        #expect(Self.obj(book.network)["offline"] == .bool(false), "this Mac is online; only the telling failed")
+        // Still down at the next check: still remembered.
+        await server.forget()
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .unsent)
+        #expect(shop.networkSwitchUnsentOff == stamp)
+        // Back: the SAME change goes, with the same stamp, and is forgotten.
+        await server.answerPut(200, Data(#"{"ok":true}"#.utf8))
+        await server.forget()
+        await Self.gated(shop) { await shop.checkNetworkSwitch() }
+        let asked = await server.asked
+        #expect(asked.prefix(2).map(\.method) == ["GET", "PUT"], "the check sends it before it listens")
+        let resent = try Self.sent(asked[1].body, shop)
+        #expect(resent.offline == false && resent.changedAt == stamp, "never a fresh stamp")
+        #expect(shop.networkSwitchUnsentOff == nil)
+        await server.forget()
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == nil, "sent once, not again")
+        #expect(await server.asked.isEmpty)
+
+        // The GET fails (not known whether anything is published): also remembered.
+        (shop, server, book) = await Self.shop(option: false, network: on)
+        await server.answerGet(500, Data())
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+        #expect(shop.networkSwitchUnsentOff != nil)
+        #expect(await server.asked.map(\.method) == ["GET"], "nothing is sent on a guess")
+        // The owner stopped sharing meanwhile: the route's 404 ends it, nothing is sent.
+        await server.answerGet(404, Data(#"{"reason":"none"}"#.utf8))
+        await server.forget()
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .nothingPublished)
+        #expect(shop.networkSwitchUnsentOff == nil)
+        #expect(await server.asked.map(\.method) == ["GET"])
+
+        // Superseded by turning the switch on again here: the old "off" is dropped, never sent late.
+        (shop, server, book) = await Self.shop(option: true, network: on)
+        await server.answerGet(200, there)
+        await server.answerPut(503, Data())
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+        #expect(shop.networkSwitchUnsentOff != nil)
+        await server.answerPut(200, Data(#"{"ok":true}"#.utf8))
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(true) })
+        #expect(shop.networkSwitchUnsentOff == nil)
+        await server.forget()
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == nil)
+        #expect(await server.asked.isEmpty, "an off the shop has since undone is not sent")
+
+        // Superseded by a newer value seen from Khayt Cloud.
+        (shop, server, book) = await Self.shop(option: true, network: on)
+        await server.answerGet(200, there)
+        await server.answerPut(503, Data())
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+        let waiting = try #require(shop.networkSwitchUnsentOff)
+        shop.sawNetworkSwitchStamp(StoreWriter.iso(Date().addingTimeInterval(30)))
+        #expect(!shop.unsentOffStillStands(waiting))
+        await server.forget()
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == nil)
+        #expect(shop.networkSwitchUnsentOff == nil)
+        #expect(await server.asked.isEmpty)
+
+        // A 409 on the retry asks the owner, as it would have at the time, and stops retrying.
+        (shop, server, book) = await Self.shop(option: true, network: on)
+        await server.answerGet(200, there)
+        await server.answerPut(503, Data())
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+        await server.answerPut(409, Data(#"{"changedAt":"\#(StoreWriter.iso(Date().addingTimeInterval(5)))"}"#.utf8))
+        #expect(await Self.gated(shop) { await shop.retryUnsentOff() } == .changedElsewhere)
+        #expect(shop.networkSwitchUnsentOff == nil)
+        #expect(shop.networkSwitchAsk != nil)
     }
 
     @Test("the three sentences are said in words, and the question's buttons wait while the answer reads")

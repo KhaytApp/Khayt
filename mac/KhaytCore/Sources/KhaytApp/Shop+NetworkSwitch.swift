@@ -248,6 +248,8 @@ extension Shop {
     @discardableResult
     func tellOthersSwitchedOn(_ network: JSONValue) async -> Bool {
         // lock: callers — setOutboundOffline
+        // Turned on again: an "off" still waiting to be sent is superseded.
+        forgetUnsentOff()
         guard outboundTellsOthers, let value = NetworkSwitch.value(of: network, purposes: outboundPurposeIds) else { return false }
         guard let (connection, token, dek) = await networkSwitchSession() else { noteTold(.failed); return false }
         // What this Mac had seen BEFORE this change: what the other computer
@@ -259,25 +261,121 @@ extension Shop {
         return sent == .ok
     }
 
+    /// What became of saying "off".
+    enum ToldOff: Equatable {
+        /// Sent and accepted.
+        case sent
+        /// Nothing is published there (the shop never shared the switch, or
+        /// its owner stopped sharing): nothing to send.
+        case nothingPublished
+        /// Another computer changed the switch at or after this moment: asked.
+        case changedElsewhere
+        /// Not signed in, Khayt Cloud not reached, or the PUT refused or
+        /// failed: the others may still be offline. Tried again.
+        case unsent
+        /// This Mac's book holds no switch to send.
+        case nothingToSend
+    }
+
     /// The switch was turned OFF here, by the owner: a GET first, then
-    /// `offline: false` if a value is published there or this Mac's option is
-    /// on. This Mac is online again by now, so these are its first calls.
+    /// `offline: false` ONLY if a value is published there (Dev Hub, Nov 22;
+    /// whatever this Mac's option says). After the route's own 404 nothing is
+    /// sent. This Mac is online again by now, so these are its first calls.
     /// `seenBefore` is the newest stamp this Mac had seen before the change.
-    func tellOthersSwitchedOff(_ network: JSONValue, seenBefore: String?) async {
-        // lock: callers — setOutboundOffline
-        guard let value = NetworkSwitch.value(of: network, purposes: outboundPurposeIds) else { return }
+    ///
+    /// AN "OFF" THAT COULD NOT BE SENT IS TRIED AGAIN (Cloud lane's review):
+    /// the other computers may be offline because of the value this shop
+    /// published, and this Mac is the one that knows it was turned off. The
+    /// stamp is remembered and `retryUnsentOff` sends the SAME change, with
+    /// the same stamp, at each check until it is sent or superseded.
+    @discardableResult
+    func tellOthersSwitchedOff(_ network: JSONValue, seenBefore: String?) async -> ToldOff {
+        // lock: callers — setOutboundOffline, retryUnsentOff
+        guard let value = NetworkSwitch.value(of: network, purposes: outboundPurposeIds), !value.offline else {
+            forgetUnsentOff()
+            return .nothingToSend
+        }
+        // A shop that is not on Khayt Cloud at all has published nothing.
+        guard !networkSwitchShopId.isEmpty else { forgetUnsentOff(); return .nothingPublished }
         guard let (connection, token, dek) = await networkSwitchSession() else {
             if outboundTellsOthers { noteTold(.failed) }
-            return
+            rememberUnsentOff(value.changedAt, seenBefore: seenBefore)
+            return .unsent
         }
         let (heard, _) = await Self.networkSwitchGet(connection, token: token, fetch: networkSwitchFetcher)
-        let publishedThere: Bool = { if case .published = heard { return true }; return false }()
-        // Nothing published and the option off here: the shop does not share
-        // the switch, and this Mac sends nothing.
-        guard NetworkSwitch.sendsOff(publishedThere: publishedThere, optionOn: outboundTellsOthers) else { return }
+        switch heard {
+        case .failed:
+            // Not known whether a value is published there: neither sent nor
+            // given up.
+            if outboundTellsOthers { noteTold(.failed) }
+            rememberUnsentOff(value.changedAt, seenBefore: seenBefore)
+            return .unsent
+        case .none:
+            forgetUnsentOff()
+            return .nothingPublished
+        case .published:
+            break
+        }
+        guard NetworkSwitch.sendsOff(publishedThere: true) else { return .nothingPublished }
         let sent = await Self.networkSwitchPut(value, connection: connection, token: token, dek: dek, fetch: networkSwitchFetcher)
         afterSending(sent, turningOn: false, option: outboundTellsOthers)
-        if case .stale = sent { await holdPublished(connection, token: token, dek: dek, seenBefore: seenBefore) }
+        switch sent {
+        case .ok:
+            forgetUnsentOff()
+            return .sent
+        case .stale:
+            forgetUnsentOff()
+            await holdPublished(connection, token: token, dek: dek, seenBefore: seenBefore)
+            return .changedElsewhere
+        case .refused, .failed:
+            rememberUnsentOff(value.changedAt, seenBefore: seenBefore)
+            return .unsent
+        }
+    }
+
+    // MARK: - An "off" that could not be sent
+
+    nonisolated static func unsentOffKey(_ shopId: String) -> String { "network.switchOffUnsent." + shopId }
+    nonisolated static func unsentOffSeenBeforeKey(_ shopId: String) -> String { "network.switchOffUnsentSeenBefore." + shopId }
+
+    /// The stamp of an "off" this Mac made and could not send, if any.
+    var networkSwitchUnsentOff: String? { outboundDefaults.string(forKey: Self.unsentOffKey(networkSwitchShopId)) }
+
+    private func rememberUnsentOff(_ stamp: String, seenBefore: String?) {
+        outboundDefaults.set(stamp, forKey: Self.unsentOffKey(networkSwitchShopId))
+        let key = Self.unsentOffSeenBeforeKey(networkSwitchShopId)
+        if let seenBefore { outboundDefaults.set(seenBefore, forKey: key) } else { outboundDefaults.removeObject(forKey: key) }
+    }
+
+    func forgetUnsentOff() {
+        outboundDefaults.removeObject(forKey: Self.unsentOffKey(networkSwitchShopId))
+        outboundDefaults.removeObject(forKey: Self.unsentOffSeenBeforeKey(networkSwitchShopId))
+    }
+
+    /// Whether the unsent "off" is still this shop's current word: the book
+    /// still holds that very change (same stamp, still off), and nothing
+    /// newer has been seen from Khayt Cloud. Anything else supersedes it: the
+    /// switch was changed here again, or another computer's newer value was
+    /// applied.
+    func unsentOffStillStands(_ stamp: String) -> Bool {
+        guard networkSwitchOwnStamp == stamp, !Self.offlineOf(.object(networkSettings)),
+              let when = NetworkSwitch.date(stamp) else { return false }
+        if let seen = networkSwitchHighestSeen.flatMap(NetworkSwitch.date), seen > when { return false }
+        return true
+    }
+
+    /// Send an "off" that could not be sent before: the same change, with
+    /// its own stamp, never a fresh one. Called by each check. Dropped when
+    /// superseded; kept when it still cannot be sent.
+    @discardableResult
+    func retryUnsentOff() async -> ToldOff? {
+        guard let stamp = networkSwitchUnsentOff else { return nil }
+        guard unsentOffStillStands(stamp) else { forgetUnsentOff(); return nil }
+        // Only the owner's own change is ever sent, and only where this Mac
+        // may make the call at all.
+        guard !outboundOfflineHere, lockAllows("security", "edit") else { return .unsent }
+        let seenBefore = outboundDefaults.string(forKey: Self.unsentOffSeenBeforeKey(networkSwitchShopId))
+        return await tellOthersSwitchedOff(.object(networkSettings), seenBefore: seenBefore)
     }
 
     private func afterSending(_ sent: Sent, turningOn: Bool, option: Bool = true) {
@@ -342,7 +440,14 @@ extension Shop {
     /// every fifteen minutes (`NetworkSwitch.checkEvery`). Not while the
     /// owner is changing the switch here: that change says its own piece.
     func checkNetworkSwitch(now: Date = Date()) async {
-        guard !outboundChanging, hearsNetworkSwitch, let (connection, token, dek) = await networkSwitchSession() else { return }
+        guard !outboundChanging, hearsNetworkSwitch else { return }
+        // An "off" made here that could not be sent goes first: the same
+        // change, the same stamp. A 409 there asks the owner, as at the time.
+        if networkSwitchUnsentOff != nil {
+            _ = await retryUnsentOff()
+            guard !outboundChanging else { return }
+        }
+        guard let (connection, token, dek) = await networkSwitchSession() else { return }
         let asked = (source, networkSwitchShopId)
         let (heard, published) = await Self.networkSwitchGet(connection, token: token, fetch: networkSwitchFetcher)
         // The answer belongs to the book and shop it was asked for, and is
@@ -507,7 +612,11 @@ extension Shop {
         guard !outboundOfflineHere, let (connection, token, dek) = await networkSwitchSession(),
               connection.shopId == networkSwitchShopId else { return .unreached }
         let fetch = networkSwitchFetcher
-        let (heard, published) = await OutboundGate.$ownersSwitchAnswer.withValue(true) {
+        // The owner pressed the button: the gate makes the token here, at
+        // the press, and the shared rule lets this ONE call through on it
+        // (`lib/outbound.js` answerToken; spent by the gate when used).
+        let answer = outboundGate.answerToken()
+        let (heard, published) = await OutboundGate.$answer.withValue(answer) {
             await Self.networkSwitchGet(connection, token: token, fetch: fetch)
         }
         switch heard {

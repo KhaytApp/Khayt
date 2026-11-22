@@ -39,6 +39,22 @@
  *        install-count: ctx.local.installCountOff must not be true (D3: per computer)
  *   7. otherwise allowed, 'kept' while offline, else 'ok'
  *
+ * ONE switch-sync call a PERSON started (answering "Use the newer setting"
+ * while nothing keeps switch-sync): the host makes a token when the person
+ * answers, `answerToken(now)`, and passes it as `ctx.answer` with `ctx.now`.
+ * At step 5 a LIVE token turns a 'switch-sync' 'offline' into allowed,
+ * 'kept', `once: true`; the host must then keep `spend(token)` in its place,
+ * so it is used once. It never opens anything else:
+ *   - only 'switch-sync' (any other purpose ignores it);
+ *   - only against the SHOP's switch: step 4 ('offline-here', this
+ *     computer's own switch) comes first, so a computer offline by its own
+ *     switch makes no call; nor 'settings-unknown';
+ *   - live for ANSWER_MS from `at`, by the clock the host hands in: a token
+ *     from the future, one stretched past ANSWER_MS, or one already spent is
+ *     dead.
+ * The desktop's main process and the Mac's gate hold the token; it is never
+ * an IPC or a request field, so a window or a phone cannot make one.
+ *
  * The switch only takes away: keeping a purpose does not opt the shop in to
  * it. Whether an integration is SET UP (an SMTP host, an S3 key) stays at the
  * call site. Blocked telemetry is dropped, not queued (D5): that is the
@@ -51,6 +67,9 @@
 const PURPOSES = Object.freeze(['updates', 'install-count', 'crash-reports', 'usage-stats', 'cloud', 'makerrun',
   'catalogues', 'storage', 'messaging', 'webhooks', 'payments', 'storefront', 'ai', 'tax-authority', 'exchange-rates',
   'lookups', 'tunnel', 'switch-sync', 'lan']);
+
+/** How long a person's answer lets one switch-sync call through (ms). */
+const ANSWER_MS = 20000;
 
 const REASONS = Object.freeze(['ok', 'kept', 'lan', 'offline', 'offline-here', 'opted-out', 'settings-unknown',
   'unknown-purpose', 'lan-host-public', 'lan-host-missing']);
@@ -254,12 +273,36 @@ function allowed(settings, purpose, ctx) {
   if (!isPlain(settings)) return out(false, 'settings-unknown');
   if (offlineHere) return out(false, 'offline-here');
   const offline = shopOffline(settings);
-  if (offline && keptOf(settings).indexOf(purpose) === -1) return out(false, 'offline');
+  if (offline && keptOf(settings).indexOf(purpose) === -1) {
+    if (purpose === 'switch-sync' && answerLive(c.answer, c.now)) return Object.assign(out(true, 'kept'), { once: true });
+    return out(false, 'offline');
+  }
   const tel = isPlain(settings.telemetry) ? settings.telemetry : {};
   if (purpose === 'crash-reports' && tel.crashOptIn !== true) return out(false, 'opted-out');
   if (purpose === 'usage-stats' && tel.usageOptIn !== true) return out(false, 'opted-out');
   if (purpose === 'install-count' && local.installCountOff === true) return out(false, 'opted-out');
   return out(true, offline ? 'kept' : 'ok');
+}
+
+/** A person's answer, made by the host when they answer (see the header). */
+function answerToken(now) {
+  const t = typeof now === 'number' && Number.isFinite(now) ? now : NaN;
+  return Object.freeze({ purpose: 'switch-sync', at: t, until: t + ANSWER_MS, spent: false });
+}
+
+/** The same token, used: what the host keeps after an allowed `once`. */
+function spend(token) {
+  return Object.freeze(Object.assign({}, isPlain(token) ? token : {}, { spent: true }));
+}
+
+/** Whether `token` still lets one switch-sync call through at `now`. */
+function answerLive(token, now) {
+  if (!isPlain(token) || token.purpose !== 'switch-sync' || token.spent !== false) return false;
+  const at = token.at, until = token.until;
+  if (typeof now !== 'number' || !Number.isFinite(now)) return false;
+  if (typeof at !== 'number' || typeof until !== 'number' || !Number.isFinite(at) || !Number.isFinite(until)) return false;
+  if (until - at > ANSWER_MS || until <= at) return false;   // stretched or empty
+  return now >= at && now < until;                            // not from the future, not expired
 }
 
 /** One row per purpose, in order: what the Settings list draws. */
@@ -278,7 +321,8 @@ function isOffline(settings, ctx) {
   return onSwitch(local.offline) || shopOffline(settings);
 }
 
-const api = Object.freeze({ PURPOSES, REASONS, INFO, allowed, describe, isOffline, isLanHost, keptOf, switchSyncKept });
+const api = Object.freeze({ PURPOSES, REASONS, INFO, ANSWER_MS, allowed, describe, isOffline, isLanHost, keptOf, switchSyncKept,
+  answerToken, spend, answerLive });
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (root) root.KhaytOutbound = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
