@@ -308,6 +308,7 @@ public struct VaultClient: Sendable {
     /// bytes, no Authorization.
     public func put(_ part: Part, body: Data) async throws {
         guard body.count == part.size else { throw Failure.transfer(method: "PUT", index: part.index, status: 0) }
+        try OutboundGate.shared.require(.cloud)
         var r = URLRequest(url: try presigned(part.url))
         r.httpMethod = "PUT"
         r.httpBody = body
@@ -354,6 +355,7 @@ public struct VaultClient: Sendable {
     /// Fetch one chunk from its presigned URL, into memory: one chunk is
     /// 4 MiB + 16 at most, and the caller holds one at a time.
     public func getChunk(_ chunk: ChunkURL) async throws -> Data {
+        try OutboundGate.shared.require(.cloud)
         var r = URLRequest(url: try presigned(chunk.url))
         r.httpMethod = "GET"
         r.timeoutInterval = 300

@@ -57,6 +57,7 @@ actor SdcpSocket {
     /// RequestID. A non-zero Ack or an error frame is the printer refusing, in
     /// its words; no Ack is `unconfirmed`, not "failed".
     func command(frame: String, cmd: Int, requestId: String, engine: KhaytEngine) async throws {
+        try OutboundGate.shared.require(.lan, url: url)
         let session = URLSession(configuration: .ephemeral)
         let task = session.webSocketTask(with: url)
         task.resume()
@@ -101,6 +102,7 @@ actor SdcpSocket {
     func status(engine: KhaytEngine) async throws -> KhaytEngine.PrinterStatus {
         let request = try await engine.sdcpStatusRequest(mainboardId: mainboardId)
 
+        try OutboundGate.shared.require(.lan, url: url)
         let session = URLSession(configuration: .ephemeral)
         let task = session.webSocketTask(with: url)
         task.resume()

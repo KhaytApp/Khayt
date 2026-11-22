@@ -331,6 +331,7 @@ struct OrcaFilamentProfiles: View {
     /// GET with a size cap, as `getJson` does: refuse a declared length over
     /// it, and refuse a body over it.
     static func fetch<T: Decodable>(_ url: URL, cap: Int, as: T.Type) async throws -> T {
+        try OutboundGate.shared.require(.catalogues)
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let (data, response) = try await URLSession.shared.data(for: request)

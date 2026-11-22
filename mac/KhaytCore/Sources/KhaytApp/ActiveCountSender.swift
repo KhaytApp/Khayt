@@ -49,7 +49,15 @@ final class ActiveCountSender {
 
     /// The Settings switch. Stored as "off" so a Mac that never chose is on.
     var enabled: Bool {
-        didSet { defaults.set(!enabled, forKey: Self.offKey) }
+        didSet {
+            defaults.set(!enabled, forKey: Self.offKey)
+            // The gate reads this switch for the install-count row.
+            if defaults === UserDefaults.standard {
+                var local = OutboundGate.app.currentLocal
+                local.installCountOff = !enabled
+                OutboundGate.app.update(local: local)
+            }
+        }
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -93,6 +101,13 @@ final class ActiveCountSender {
         guard state.due(now: at) else { return "done" }
         guard at >= notBefore, !sending else { return "waiting" }
         guard ActiveCount.accepts(version: appVersion) else { return "version" }
+        // "Make no internet calls": not sent, and counted on its row once,
+        // not at every tick: it waits as a failed send does, and asks again
+        // then (the switch may be off by that time).
+        guard OutboundGate.shared.allows(.installCount) else {
+            notBefore = at.addingTimeInterval(Self.retryAfter)
+            return "blocked"
+        }
         sending = true
         defer { sending = false }
 

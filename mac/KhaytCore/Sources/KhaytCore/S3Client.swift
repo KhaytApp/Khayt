@@ -148,6 +148,7 @@ public enum S3 {
         let auth = sign(method: method, url: url, headers: headers, payloadHash: payloadHash,
                         region: c.region, service: "s3", accessKeyId: c.accessKeyId,
                         secretAccessKey: c.secretAccessKey, amzDate: stamp)
+        try OutboundGate.shared.require(.storage)
         var r = URLRequest(url: url, timeoutInterval: 120)
         r.httpMethod = method
         for (k, v) in headers where k != "host" { r.setValue(v, forHTTPHeaderField: k) }

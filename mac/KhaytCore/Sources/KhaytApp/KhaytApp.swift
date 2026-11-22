@@ -143,7 +143,14 @@ struct KhaytApp: App {
                     // there is not. Reading is safe, the source is named in the
                     // toolbar, and an app that opens on invented data when real
                     // data exists is answering a question nobody asked.
+                    // A refused internet call says why in this shop's words.
+                    OutboundBlocked.speaker = { [weak shop] blocked in
+                        shop.map { $0.outboundSentence(blocked) } ?? blocked.description
+                    }
                     await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
+                    // The book is read: a launch check for updates that waited
+                    // for it is made now, if the shop's switch allows one.
+                    Updates.shared.bookWasRead()
                     // A new shop — an empty book, or no book on this Mac at
                     // all — is offered the setup, once. See `ShopSetup.offers`.
                     shop.offerSetupIfNew()

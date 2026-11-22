@@ -1050,6 +1050,10 @@ public actor KhaytEngine {
         // one can still resolve to an internal address, so the caller must also
         // resolve and check every answer. `WebhookClient` does.
         "host-ranges",
+        // May Khayt make this internet call? The "make no internet calls"
+        // switch (P8, `lib/outbound.js`). Self-contained; `OutboundGate` also
+        // loads it alone, to answer a call site without waiting on the engine.
+        "outbound",
         // Who the shop's best customers are and what it is asked for most.
         // ORDER-MONEY, CONTENT-LANGUAGES, BUSINESS-SCOPE AND DATE-RANGE ARE ALL
         // ALREADY ABOVE and must be: it reaches every one of them through a

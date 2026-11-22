@@ -56,6 +56,7 @@ enum WhatsAppCloud {
               url.scheme == "https", url.host == "graph.facebook.com" else {
             throw Unreachable(detail: req.reason ?? "bad_request")
         }
+        try OutboundGate.shared.require(.messaging)
         var request = URLRequest(url: url)
         request.httpMethod = req.method ?? "POST"
         // Fifteen seconds, the other app's figure for its SMS providers. A
