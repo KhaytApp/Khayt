@@ -105,7 +105,7 @@ test('the split written by someone else meanwhile is kept (re-checked inside the
   assert.equal(r.told.length, 0);
 });
 
-test('recorded whoever is signed in: the printer's own record, not a person's edit (overnight, nobody signed in since #2608)', async () => {
+test(`recorded whoever is signed in: the printer's own record, not a person's edit (overnight, nobody signed in since #2608)`, async () => {
   // The print finishes with the lock on and nobody signed in: the figures are on the job afterwards.
   const n = rig({ settings: { operatorLockEnabled: true } });
   assert.equal(await n.h.noteEdge(U1M, printing, complete, ENDED), true);
