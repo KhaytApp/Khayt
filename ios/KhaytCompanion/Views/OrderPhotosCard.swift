@@ -23,6 +23,7 @@ struct OrderPhotosCard: View {
 
     init(access: KhaytAPIClient.PhotoAccess) { self.access = access }
 
+    #if DEBUG
     /// A card already showing photos and a refused tap: how the screenshot
     /// test draws frame B. The app uses the init above.
     init(access: KhaytAPIClient.PhotoAccess, photos: [KhaytAPIClient.OrderPhoto], refusedTap: OutboundBlocked?) {
@@ -31,6 +32,7 @@ struct OrderPhotosCard: View {
         _loaded = State(initialValue: true)
         _refusedTap = State(initialValue: refusedTap)
     }
+    #endif
 
     private var token: String? {
         switch access {
@@ -47,9 +49,16 @@ struct OrderPhotosCard: View {
     /// The shop's "Make no internet calls" switch, as it stands for Khayt
     /// Cloud (P8). Asked, not counted: only a refused tap counts.
     private var switchRefusal: OutboundGate.Verdict? {
+        _ = gateSeen   // read so the body redraws when the gate changes
         let v = OutboundGate.shared.verdict(.cloud)
         return v.allowed ? nil : v
     }
+
+    /// Bumped on each change the phone tells the gate (review of #2654): the
+    /// card redraws and loads again when the switch lets it, so "Khayt is
+    /// starting." moves on by itself.
+    @State private var gateSeen = 0
+    private struct LoadKey: Equatable { let token: String?; let refused: String? }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -97,7 +106,11 @@ struct OrderPhotosCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .card()
         }
-        .task(id: token) { await load() }
+        .task(id: LoadKey(token: token, refused: switchRefusal?.reason)) { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: PhoneOutbound.changedNotification)) { _ in
+            gateSeen &+= 1
+            if switchRefusal == nil { refusedTap = nil }
+        }
         .sheet(isPresented: $showCamera) { LabelCameraPicker(image: $shot) }
         .onChange(of: shot) { _, image in
             guard let image else { return }
@@ -112,6 +125,7 @@ struct OrderPhotosCard: View {
                     await add(image)
                 } else {
                     problem = KhaytAPIClient.PhotoFailure.notAnImage.errorDescription
+                    refusedTap = nil
                 }
             }
         }
@@ -164,13 +178,20 @@ struct OrderPhotosCard: View {
 
     private func load() async {
         guard let token else { return }
-        // Switched off: no call at all, and no failure to show (frame A).
-        if switchRefusal != nil { loaded = true; return }
+        // Switched off: no call at all and no failure to show (frame A), and
+        // not "loaded": an empty list here is unknown, not "no photos yet".
+        if switchRefusal != nil { return }
         do {
             photos = try await api.orderPhotos(token: token)
             problem = nil
+            refusedTap = nil
+        } catch let blocked as OutboundBlocked {
+            refusedTap = blocked
+            problem = nil
+            return
         } catch {
             problem = error.localizedDescription
+            refusedTap = nil
         }
         loaded = true
     }
@@ -181,6 +202,7 @@ struct OrderPhotosCard: View {
         busy = true
         defer { busy = false }
         guard let bytes = OrderPhotoPrep.upright(image) else {
+            refusedTap = nil
             problem = KhaytAPIClient.PhotoFailure.tooLarge.errorDescription
             return
         }
@@ -193,6 +215,7 @@ struct OrderPhotosCard: View {
             problem = nil
             CompanionHaptics.warning()
         } catch {
+            refusedTap = nil
             problem = error.localizedDescription
             CompanionHaptics.warning()
         }
@@ -225,6 +248,7 @@ struct OrderPhotosCard: View {
             photos.removeAll { $0.id == photo.id }
             problem = nil
         } catch {
+            refusedTap = nil
             problem = error.localizedDescription
         }
     }

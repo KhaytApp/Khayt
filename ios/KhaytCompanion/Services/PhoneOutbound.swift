@@ -190,10 +190,22 @@ enum PhoneOutbound {
     /// counting itself (Settings › Count this install), which is per device.
     static func local(countInstall: Bool) {
         OutboundGate.shared.update(local: .init(offline: false, installCountOff: !countInstall))
+        announce()
     }
 
     private static func tell(_ book: OutboundGate.Book) {
         OutboundGate.shared.update(book: book)
+        announce()
+    }
+
+    /// Posted whenever the phone tells the gate something, so a screen that
+    /// shows the switch (the photo card's "Khayt is starting.") moves on by
+    /// itself instead of waiting for an unrelated redraw (review of #2654).
+    static let changedNotification = Notification.Name("khayt.outbound.changed")
+
+    private static func announce() {
+        if Thread.isMainThread { NotificationCenter.default.post(name: changedNotification, object: nil) }
+        else { DispatchQueue.main.async { NotificationCenter.default.post(name: changedNotification, object: nil) } }
     }
 }
 
@@ -209,8 +221,19 @@ extension PhoneOutbound {
     /// reading the switch; every other reason the phone can meet means the
     /// shop's switch is on.
     static func words(purpose: OutboundPurpose, reason: String) -> String {
-        if reason == "settings-unknown" { return L10n.tr("outbound.blocked.settings-unknown") }
-        return L10n.format("outbound.blocked.offline", purposeName(purpose))
+        switch reason {
+        case "settings-unknown":
+            return L10n.tr("outbound.blocked.settings-unknown")
+        case "offline", "offline-here", "lan-host-public", "lan-host-missing":
+            // The phone has no switch of its own (`offline-here` cannot
+            // happen here) and asks `lan` only with a host the shop typed;
+            // each still means "the shop makes no internet calls".
+            return L10n.format("outbound.blocked.offline", purposeName(purpose))
+        default:
+            // A reason the rule may add later: the sentence that is true for
+            // any refusal, naming no purpose it might get wrong.
+            return L10n.format("outbound.blocked.offline", L10n.tr("outbound.purpose.internet"))
+        }
     }
 
     /// What a purpose is called in the sentence: the desktop's `iu.in.*`
@@ -220,7 +243,7 @@ extension PhoneOutbound {
         case .cloud: return L10n.tr("outbound.purpose.cloud")
         case .lookups: return L10n.tr("outbound.purpose.lookups")
         case .webhooks: return L10n.tr("outbound.purpose.webhooks")
-        default: return L10n.tr("outbound.purpose.cloud")
+        default: return L10n.tr("outbound.purpose.internet")
         }
     }
 }

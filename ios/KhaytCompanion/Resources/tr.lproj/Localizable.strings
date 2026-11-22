@@ -1452,6 +1452,7 @@
 "outbound.blocked.settings-unknown" = "Khayt başlatılıyor. Birazdan tekrar deneyin.";
 "outbound.purpose.cloud" = "Khayt Cloud";
 "outbound.purpose.lookups" = "sorgular";
+"outbound.purpose.internet" = "internet";
 "outbound.purpose.webhooks" = "webhook’lar";
 "photos.blocked.detail" = "Fotoğraflar bu telefondan gösterilemez veya eklenemez. Sahip, Mac’teki İnternet kullanımı bölümünde Khayt Cloud’u koruyabilir.";
 "photos.blocked.nothing_sent" = "Hiçbir şey gönderilmedi.";

@@ -22,6 +22,12 @@ final class OutboundWordsTests: XCTestCase {
                        "Photos can’t be shown or added from this phone. The owner can keep Khayt Cloud in Internet use on the Mac.")
         XCTAssertEqual(PhoneOutbound.words(purpose: .lookups, reason: "offline"),
                        "Khayt is set to make no internet calls. This needs lookups.")
+        // A purpose the phone does not name, or a reason the rule adds later,
+        // never says "Khayt Cloud" by mistake (review of #2654).
+        XCTAssertEqual(PhoneOutbound.words(purpose: .ai, reason: "offline"),
+                       "Khayt is set to make no internet calls. This needs the internet.")
+        XCTAssertEqual(PhoneOutbound.words(purpose: .cloud, reason: "some-new-reason"),
+                       "Khayt is set to make no internet calls. This needs the internet.")
     }
 
     /// Every place that shows `error.localizedDescription` says why, never
@@ -55,11 +61,11 @@ final class OutboundWordsTests: XCTestCase {
                        "خيط قيد التشغيل. حاول مرة أخرى بعد لحظة.")
     }
 
-    /// The seven keys are in all nine languages, and the sentence takes the
+    /// The eight keys are in all nine languages, and the sentence takes the
     /// purpose exactly once.
     func testEveryLanguageHasTheWords() throws {
         let keys = ["outbound.blocked.offline", "outbound.blocked.settings-unknown", "outbound.purpose.cloud",
-                    "outbound.purpose.lookups", "outbound.purpose.webhooks", "photos.blocked.detail",
+                    "outbound.purpose.lookups", "outbound.purpose.webhooks", "outbound.purpose.internet", "photos.blocked.detail",
                     "photos.blocked.nothing_sent"]
         for lang in ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
             let path = try XCTUnwrap(Bundle.main.path(forResource: "Localizable", ofType: "strings",

@@ -1452,6 +1452,7 @@
 "outbound.blocked.settings-unknown" = "Khayt se está iniciando. Inténtalo de nuevo en un momento.";
 "outbound.purpose.cloud" = "Khayt Cloud";
 "outbound.purpose.lookups" = "búsquedas";
+"outbound.purpose.internet" = "internet";
 "outbound.purpose.webhooks" = "los webhooks";
 "photos.blocked.detail" = "Las fotos no se pueden ver ni añadir desde este teléfono. El propietario puede mantener Khayt Cloud en Uso de internet en el Mac.";
 "photos.blocked.nothing_sent" = "No se envió nada.";

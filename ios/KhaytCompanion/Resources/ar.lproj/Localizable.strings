@@ -1452,6 +1452,7 @@
 "outbound.blocked.settings-unknown" = "خيط قيد التشغيل. حاول مرة أخرى بعد لحظة.";
 "outbound.purpose.cloud" = "سحابة خيط";
 "outbound.purpose.lookups" = "عمليات البحث";
+"outbound.purpose.internet" = "الإنترنت";
 "outbound.purpose.webhooks" = "Webhooks";
 "photos.blocked.detail" = "لا يمكن عرض الصور أو إضافتها من هذا الهاتف. يمكن للمالك إبقاء سحابة خيط في «استخدام الإنترنت» على الماك.";
 "photos.blocked.nothing_sent" = "لم يُرسَل شيء.";

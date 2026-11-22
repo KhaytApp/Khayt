@@ -1452,6 +1452,7 @@
 "outbound.blocked.settings-unknown" = "Khayt 正在启动。请稍后重试。";
 "outbound.purpose.cloud" = "Khayt Cloud";
 "outbound.purpose.lookups" = "查询";
+"outbound.purpose.internet" = "互联网";
 "outbound.purpose.webhooks" = "Webhooks";
 "photos.blocked.detail" = "无法在此手机上显示或添加照片。店主可以在 Mac 的“互联网使用”中保留 Khayt Cloud。";
 "photos.blocked.nothing_sent" = "未发送任何内容。";

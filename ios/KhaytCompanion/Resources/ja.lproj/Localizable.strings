@@ -1452,6 +1452,7 @@
 "outbound.blocked.settings-unknown" = "Khayt を起動中です。しばらくしてからもう一度お試しください。";
 "outbound.purpose.cloud" = "Khayt Cloud";
 "outbound.purpose.lookups" = "照会";
+"outbound.purpose.internet" = "インターネット";
 "outbound.purpose.webhooks" = "Webhook";
 "photos.blocked.detail" = "この iPhone では写真を表示・追加できません。オーナーは Mac の「インターネット利用」で Khayt Cloud を維持できます。";
 "photos.blocked.nothing_sent" = "何も送信されていません。";
