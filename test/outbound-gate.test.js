@@ -350,4 +350,9 @@ test('switch-sync: ONE person-started GET through the shop\'s switch, set by mai
   const pre = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
   assert.doesNotMatch(pre, /allowSwitchSyncOnce/);
   assert.equal((main.match(/allowSwitchSyncOnce/g) || []).length, 2, 'only handed to network-switch-sync');
+  // One rule with the Mac's gate: the shared token, not a timer of our own.
+  const gate = fs.readFileSync(path.join(__dirname, '..', 'lib', 'main', 'outbound-fetch.js'), 'utf8');
+  assert.match(gate, /personAnswer = Outbound\.answerToken\(now\(\)\)/);
+  assert.match(gate, /if \(r\.once\) \{ personAnswer = Outbound\.spend\(personAnswer\);/);
+  assert.doesNotMatch(gate, /personSyncUntil/);
 });
