@@ -193,6 +193,8 @@ struct HeadActualsTests {
             let got = try await Self.engine.headColour(head: c["head"] ?? .null, at: c["at"] ?? .null)
             #expect(got == (c["want"] ?? .null), Comment(rawValue: "\(c["why"] ?? .null)"))
         }
+    }
+
     @Test("the write is the printer's own record: asked of the lock as a system write, never as a person's edit")
     func gate() throws {
         let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
