@@ -504,21 +504,63 @@ enum NetworkSwitchAsk: Equatable {
 }
 
 /// The two questions, in the shop's words.
+///
+/// ── WHICH WAY THE OTHER COMPUTER TURNED IT IS READ, NEVER ASSUMED ─────────
+///
+/// A 409 says only that another computer changed the switch at or after this
+/// moment, not to what. On a Mac whose clock runs behind, both may have turned
+/// it ON. So the sentence names a direction only when the other computer's
+/// value was read (`there`, its `offline`) and is the opposite of what was
+/// done here. Unread, or the same way, it says the switch was changed at
+/// another computer and nothing it cannot know (review of the frames, Nov 22).
 @MainActor
 enum NetworkSwitchWords {
-    static func sentence(_ ask: NetworkSwitchAsk, words: Words) -> String {
+    static func sentence(_ ask: NetworkSwitchAsk, there: Bool?, words: Words) -> String {
         switch ask {
         case .oldSwitch(let at):
             let date = at.map { words.say($0, .dateTime.day().month(.abbreviated).year()) } ?? ""
             return words.callIt("mac.net_ask_old", ["date": .string(date)])
         case .changedElsewhere(let at, let turningOn):
             // Which way each computer turned it (page 27, frame G2). With no
-            // time from Khayt Cloud, the general sentence and the clock hint.
-            guard let at else { return words.callIt("mac.net_ask_elsewhere_anon") }
+            // time from Khayt Cloud, or no known opposite value, the general
+            // sentence and the clock hint.
+            guard let at, ask.opposite(there: there) else { return words.callIt("mac.net_ask_elsewhere_anon") }
             return words.callIt(turningOn ? "mac.net_ask_off_there" : "mac.net_ask_on_there",
                                 ["time": .string(words.say(at, .dateTime.hour().minute()))])
         }
     }
+}
+
+extension NetworkSwitchAsk {
+    /// The other computer's value was read and is the opposite of what was
+    /// done here: turned OFF there while turning ON here, or the reverse.
+    func opposite(there: Bool?) -> Bool {
+        guard case .changedElsewhere(_, let turningOn) = self, let there else { return false }
+        return there != turningOn
+    }
+
+    /// Whether this Mac alone follows the switch while the question waits:
+    /// it was turned ON here, and the other computer did not turn it on too.
+    /// Unread counts: this Mac is offline and nothing says the others are.
+    func onlyThisMac(there: Bool?) -> Bool {
+        guard case .changedElsewhere(_, true) = self else { return false }
+        return there != true
+    }
+
+    /// The buttons a question offers, as (word key, the answer it gives).
+    /// "Keep it on this Mac only" is offered only when the switch was being
+    /// turned ON here and the other computer did not turn it on as well: then
+    /// there is nothing to keep, the shop is offline everywhere.
+    func choices(there: Bool?) -> [(key: String, apply: Bool)] {
+        switch self {
+        case .oldSwitch: [("mac.net_ask_apply", true), ("mac.net_ask_leave", false)]
+        case .changedElsewhere:
+            onlyThisMac(there: there) ? [("mac.net_ask_newer", true), ("mac.net_ask_here_only", false)] : [("mac.net_ask_newer", true)]
+        }
+    }
+
+    /// The buttons when the other computer's value is not known.
+    var choices: [(key: String, apply: Bool)] { choices(there: nil) }
 }
 
 /// One of the two questions, as page 27 draws it (frames G1 and G2): the
@@ -539,20 +581,23 @@ struct NetworkSwitchQuestion: View {
     var pretendMayAnswer: Bool?
 
     private var mayAnswer: Bool { pretendMayAnswer ?? shop.lockAllows("security", "edit") }
+    /// What the other computer set, when it was read (`networkSwitchHeld`).
+    var pretendThere: Bool??
+    private var there: Bool? { pretendThere ?? shop.networkSwitchHeld?.offline }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 13)).foregroundStyle(Khayt.attention).accessibilityHidden(true)
-                Text(NetworkSwitchWords.sentence(ask, words: shop.words))
+                Text(NetworkSwitchWords.sentence(ask, there: there, words: shop.words))
                     .font(.system(size: 13, weight: .medium))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack(spacing: 8) {
-                ForEach(Array(ask.choices.enumerated()), id: \.element.key) { index, choice in
+                ForEach(Array(ask.choices(there: there).enumerated()), id: \.element.key) { index, choice in
                     if index == 0 {
                         Button(shop.words.callIt(choice.key)) { Task { await shop.answerNetworkSwitch(apply: choice.apply) } }
                             .buttonStyle(.borderedProminent)
@@ -576,13 +621,3 @@ struct NetworkSwitchQuestion: View {
     }
 }
 
-extension NetworkSwitchAsk {
-    /// The buttons a question offers, as (word key, the answer it gives).
-    var choices: [(key: String, apply: Bool)] {
-        switch self {
-        case .oldSwitch: [("mac.net_ask_apply", true), ("mac.net_ask_leave", false)]
-        case .changedElsewhere(_, let turningOn):
-            turningOn ? [("mac.net_ask_newer", true), ("mac.net_ask_here_only", false)] : [("mac.net_ask_newer", true)]
-        }
-    }
-}

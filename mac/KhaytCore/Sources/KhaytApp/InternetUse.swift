@@ -22,10 +22,10 @@ enum InternetUse {
     static let consequences: Set<OutboundPurpose> = [.updates, .cloud, .messaging, .storefront, .payments]
 
     /// Whether the line under the switch says "Only this Mac follows it": the
-    /// owner was turning the switch ON and another computer's change was kept.
-    static func onlyHere(_ ask: NetworkSwitchAsk?) -> Bool {
-        if case .changedElsewhere(_, true)? = ask { return true }
-        return false
+    /// owner was turning the switch ON, another computer's change was kept,
+    /// and that change was not also "on" (`there`, when it was read).
+    static func onlyHere(_ ask: NetworkSwitchAsk?, there: Bool?) -> Bool {
+        ask?.onlyThisMac(there: there) ?? false
     }
 
     /// Whether a blocked row says what to do meanwhile. The switch-updates row
@@ -297,7 +297,8 @@ struct InternetUsePage: View {
             // The question waiting for the owner, here too: the every-screen
             // notice's link leads to this page (frames G1 and G2).
             if let ask = pretendAsk ?? (pretend == nil ? shop.networkSwitchAsk : nil) {
-                NetworkSwitchQuestion(shop: shop, ask: ask, link: false, rounded: true, pretendMayAnswer: pretendMayChange)
+                NetworkSwitchQuestion(shop: shop, ask: ask, link: false, rounded: true, pretendMayAnswer: pretendMayChange,
+                                      pretendThere: pretendThere)
             }
             switches
             Text(words.callIt("mac.net_list")).font(.system(size: 11, weight: .semibold))
@@ -345,10 +346,11 @@ struct InternetUsePage: View {
         pretendShopLine ?? .init(offline: shopOffline, tellsOthers: shop.outboundTellsOthers,
                                  by: InternetUse.switchedBy(shop.networkSettings),
                                  at: InternetUse.switchedAt(shop.networkSettings), told: shop.outboundToldOthers,
-                                 onlyHere: InternetUse.onlyHere(shop.networkSwitchAsk))
+                                 onlyHere: InternetUse.onlyHere(shop.networkSwitchAsk, there: shop.networkSwitchHeld?.offline))
     }
     /// A capture's stand-in for the question waiting, and for who may answer.
     var pretendAsk: NetworkSwitchAsk?
+    var pretendThere: Bool??
     var pretendShopLine: InternetUse.ShopLine?
     var pretendHere: Bool?
     var pretendMayChange: Bool?

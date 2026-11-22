@@ -92,8 +92,9 @@ extension Snapshot {
         var early = DateComponents(); early.year = 2026; early.month = 11; early.day = 12; early.hour = 9
         let oldOff = Calendar.book.date(from: early) ?? switched
         let there = switched.addingTimeInterval(5 * 60)   // 14:07, as the frames have it
-        func question(_ ask: NetworkSwitchAsk, owner: Bool = true) -> some View {
-            NetworkSwitchQuestion(shop: shop, ask: ask, pretendMayAnswer: owner)
+        // `there`: what the other computer set, as read after the 409.
+        func question(_ ask: NetworkSwitchAsk, owner: Bool = true, there: Bool? = nil) -> some View {
+            NetworkSwitchQuestion(shop: shop, ask: ask, pretendMayAnswer: owner, pretendThere: .some(there))
         }
         // G1: an old "off" met by a Mac with no switch history, for the owner
         // and for anybody else (the same question, buttons off).
@@ -103,8 +104,8 @@ extension Snapshot {
         }.padding(.vertical, 12))
         // G2: changed at another computer, each way, and with no time known.
         shot("G2-changed-elsewhere", width: 640, VStack(spacing: 12) {
-            question(.changedElsewhere(at: there, turningOn: true))
-            question(.changedElsewhere(at: there, turningOn: false))
+            question(.changedElsewhere(at: there, turningOn: true), there: false)
+            question(.changedElsewhere(at: there, turningOn: false), there: true)
             question(.changedElsewhere(at: nil, turningOn: true))
             question(.changedElsewhere(at: nil, turningOn: false))
         }.padding(.vertical, 12))
@@ -114,6 +115,7 @@ extension Snapshot {
         only.onlyHere = true
         var asking = page(on, only, telling: true)
         asking.pretendAsk = .changedElsewhere(at: there, turningOn: true)
+        asking.pretendThere = .some(false)
         shot("G2-page-only-this-mac", asking)
         // G3: the switch-updates row in its five states.
         func hearing(_ state: InternetUse.State, tick: Bool, kept: Bool) -> InternetUse.Line {

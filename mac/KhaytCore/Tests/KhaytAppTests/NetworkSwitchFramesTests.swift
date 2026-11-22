@@ -20,42 +20,69 @@ struct NetworkSwitchFramesTests {
     func oldSwitch() async {
         let shop = await OperatorLockTests.shop(on: false)
         let ask = NetworkSwitchAsk.oldSwitch(at: Self.at(9, 0, day: 12))
-        let said = NetworkSwitchWords.sentence(ask, words: shop.words)
-        #expect(said.hasPrefix("Your shop turned off internet use on "))
-        #expect(said.contains("12") && said.contains("2026") && said.hasSuffix("Apply it here?"))
+        let said = NetworkSwitchWords.sentence(ask, there: true, words: shop.words)
+        let date = shop.words.say(Self.at(9, 0, day: 12), .dateTime.day().month(.abbreviated).year())
+        #expect(said == "Your shop turned off internet use on \(date). Apply it here?")
         #expect(ask.choices.map { shop.words.callIt($0.key) } == ["Apply it here", "Leave this Mac as it is"])
         #expect(ask.choices.map(\.apply) == [true, false])
     }
+
+    static let anon = "The switch was changed at another computer. If this happens every time you change it, check this Mac's clock."
 
     @Test("G2: the sentence says which way each computer turned it, and only turning ON offers Keep it on this Mac only")
     func changedElsewhere() async {
         let shop = await OperatorLockTests.shop(on: false)
         let w = shop.words
         let time = w.say(Self.at(14, 7), .dateTime.hour().minute())
+        // Turned ON here; the other computer's value was read, and it is OFF.
         let on = NetworkSwitchAsk.changedElsewhere(at: Self.at(14, 7), turningOn: true)
-        #expect(NetworkSwitchWords.sentence(on, words: w)
+        #expect(NetworkSwitchWords.sentence(on, there: false, words: w)
                 == "The switch was turned off at another computer at \(time), just as you turned it on here. Use the newer setting, or keep this Mac offline on its own?")
-        #expect(on.choices.map { w.callIt($0.key) } == ["Use the newer setting", "Keep it on this Mac only"])
+        #expect(on.choices(there: false).map { w.callIt($0.key) } == ["Use the newer setting", "Keep it on this Mac only"])
+        // Turned OFF here; the other computer's value is ON.
         let off = NetworkSwitchAsk.changedElsewhere(at: Self.at(14, 7), turningOn: false)
-        #expect(NetworkSwitchWords.sentence(off, words: w)
+        #expect(NetworkSwitchWords.sentence(off, there: true, words: w)
                 == "The switch was turned on at another computer at \(time), just as you turned it off here. Your shop has turned off internet use.")
-        #expect(off.choices.map { w.callIt($0.key) } == ["Use the newer setting"], "no second choice: it would loosen the shop's switch")
+        #expect(off.choices(there: true).map { w.callIt($0.key) } == ["Use the newer setting"], "no second choice: it would loosen the shop's switch")
         // No time known: the general sentence and the clock hint, with the buttons of whichever case it is.
         for turningOn in [true, false] {
             let anon = NetworkSwitchAsk.changedElsewhere(at: nil, turningOn: turningOn)
-            #expect(NetworkSwitchWords.sentence(anon, words: w)
-                    == "The switch was changed at another computer. If this happens every time you change it, check this Mac's clock.")
-            #expect(anon.choices.count == (turningOn ? 2 : 1))
+            #expect(NetworkSwitchWords.sentence(anon, there: !turningOn, words: w) == Self.anon)
+            #expect(anon.choices(there: !turningOn).count == (turningOn ? 2 : 1))
         }
+    }
+
+    @Test("a direction is stated only when the other computer's value was read and is the opposite (a 409 does not say which way)")
+    func neverAnAssumedDirection() async {
+        let shop = await OperatorLockTests.shop(on: false)
+        let w = shop.words
+        let on = NetworkSwitchAsk.changedElsewhere(at: Self.at(14, 7), turningOn: true)
+        let off = NetworkSwitchAsk.changedElsewhere(at: Self.at(14, 7), turningOn: false)
+        // A clock behind: both computers turned it ON. Nothing is "turned off at another computer".
+        #expect(NetworkSwitchWords.sentence(on, there: true, words: w) == Self.anon)
+        #expect(on.choices(there: true).map(\.key) == ["mac.net_ask_newer"], "the shop is offline everywhere: nothing to keep on this Mac only")
+        #expect(!InternetUse.onlyHere(on, there: true), "not only this Mac: the other computer turned it on too")
+        // Both turned it OFF.
+        #expect(NetworkSwitchWords.sentence(off, there: false, words: w) == Self.anon)
+        #expect(off.choices(there: false).map(\.key) == ["mac.net_ask_newer"])
+        // The value could not be read (the read after the 409 failed, or the app restarted).
+        #expect(NetworkSwitchWords.sentence(on, there: nil, words: w) == Self.anon)
+        #expect(NetworkSwitchWords.sentence(off, there: nil, words: w) == Self.anon)
+        #expect(on.choices(there: nil).map(\.key) == ["mac.net_ask_newer", "mac.net_ask_here_only"], "this Mac is offline and may stay so on its own")
+        #expect(off.choices(there: nil).map(\.key) == ["mac.net_ask_newer"])
+        #expect(on.opposite(there: false) && off.opposite(there: true))
+        #expect(!on.opposite(there: true) && !off.opposite(there: false) && !on.opposite(there: nil))
+        #expect(!NetworkSwitchAsk.oldSwitch(at: nil).opposite(there: true))
     }
 
     @Test("G2, under the switch: only this Mac follows it, and neither told nor unreachable is claimed")
     func onlyThisMac() async {
         let shop = await OperatorLockTests.shop(on: false)
         let w = shop.words
-        #expect(InternetUse.onlyHere(.changedElsewhere(at: nil, turningOn: true)))
-        #expect(!InternetUse.onlyHere(.changedElsewhere(at: Date(), turningOn: false)), "turned off here: this Mac is not offline on its own")
-        #expect(!InternetUse.onlyHere(.oldSwitch(at: nil)) && !InternetUse.onlyHere(nil))
+        #expect(InternetUse.onlyHere(.changedElsewhere(at: nil, turningOn: true), there: false))
+        #expect(InternetUse.onlyHere(.changedElsewhere(at: nil, turningOn: true), there: nil), "unread: this Mac is offline and nothing says the others are")
+        #expect(!InternetUse.onlyHere(.changedElsewhere(at: Date(), turningOn: false), there: true), "turned off here: this Mac is not offline on its own")
+        #expect(!InternetUse.onlyHere(.oldSwitch(at: nil), there: true) && !InternetUse.onlyHere(nil, there: nil))
         var line = InternetUse.ShopLine(offline: true, tellsOthers: true, by: "Sara", at: Self.at(14, 7), told: .told(Self.at(14, 7)))
         line.onlyHere = true
         let said = InternetUse.sentence(line, words: w)
@@ -89,6 +116,18 @@ struct NetworkSwitchFramesTests {
         #expect(!InternetUse.saysConsequence(line(.allowed, tick: false, kept: false)))
         #expect(!InternetUse.saysConsequence(line(.notSetUp, tick: false, kept: false)))
         #expect([InternetUse.State.kept, .blocked, .allowed, .notSetUp].map { w.callIt($0.wordKey) } == ["Kept", "Blocked", "Allowed", "Not set up"])
+        // And through the page's own rule for the tick: shared through Khayt Cloud and unticked says it;
+        // on a Mac offline by a switch that was not shared, no tick is offered and nothing is advised.
+        let gate = OutboundGate()
+        gate.update(book: .settings(.object(["network": .object(["offline": .bool(true), "dropSwitchSync": .bool(true),
+                                                                  "via": .string("cloud")])])))
+        for (viaCloud, says) in [(true, true), (false, false)] {
+            let lines = InternetUse.lines(rows: gate.rows(), offline: true, shopOffline: true, notSetUp: [], viaCloud: viaCloud, blocked: [:])
+            let row = lines.first { $0.purpose == .switchSync }
+            #expect(row?.state == .blocked, "unticked: blocked")
+            #expect(row?.keepShown == viaCloud)
+            #expect(row.map(InternetUse.saysConsequence) == says, Comment(rawValue: "viaCloud \(viaCloud)"))
+        }
         // The other rows that said what is lost while blocked still do.
         let updates = InternetUse.Line(purpose: .updates, state: .blocked, automatic: true, keepShown: true, kept: false, blocked: nil)
         #expect(InternetUse.saysConsequence(updates))

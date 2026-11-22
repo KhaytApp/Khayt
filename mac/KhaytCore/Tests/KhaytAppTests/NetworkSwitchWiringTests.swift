@@ -368,7 +368,7 @@ struct NetworkSwitchWiringTests {
         await Self.gated(shop) { await shop.checkNetworkSwitch() }
         #expect(shop.networkSwitchAsk == .oldSwitch(at: NetworkSwitch.date(old)))
         #expect(book.network == nil, "nothing is applied on its own")
-        let said = NetworkSwitchWords.sentence(try #require(shop.networkSwitchAsk), words: shop.words)
+        let said = NetworkSwitchWords.sentence(try #require(shop.networkSwitchAsk), there: shop.networkSwitchHeld?.offline, words: shop.words)
         #expect(said.hasPrefix("Your shop turned off internet use on ") && said.hasSuffix("Apply it here?"))
         await shop.answerNetworkSwitch(apply: true)
         #expect(Self.obj(book.network)["offline"] == .bool(true) && Self.obj(book.network)["via"] == .string("cloud"))
@@ -442,7 +442,11 @@ struct NetworkSwitchWiringTests {
         #expect(locked.networkSwitchAsk != nil && LockReviewTests.refused(locked), "a manager's answer is refused and the question stays")
         for ask in [NetworkSwitchAsk.oldSwitch(at: Date()), .oldSwitch(at: nil), .changedElsewhere(at: Date(), turningOn: true),
                     .changedElsewhere(at: nil, turningOn: false)] {
-            let said = NetworkSwitchWords.sentence(ask, words: locked.words)
+            for there in [Bool?.none, true, false] {
+                let said = NetworkSwitchWords.sentence(ask, there: there, words: locked.words)
+                #expect(!said.contains("mac.net_") && !said.contains("{"), Comment(rawValue: said))
+            }
+            let said = NetworkSwitchWords.sentence(ask, there: nil, words: locked.words)
             #expect(!said.contains("mac.net_") && !said.contains("{"), Comment(rawValue: said))
         }
         for key in ["mac.net_ask_apply", "mac.net_ask_leave", "mac.net_ask_newer", "mac.net_ask_here_only", "mac.net_t_switch-sync", "mac.net_d_switch-sync", "mac.net_need_switch-sync"] {
