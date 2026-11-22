@@ -135,3 +135,17 @@ test('round 2 (Nov 22): only the owner changes the switch under the staff lock, 
   const h = main.slice(main.indexOf("ipcMain.handle('hub:outbound-set-local'"));
   assert.match(h.slice(0, 400), /if \(!PrinterPermission\.mayChangeNetwork\(lanServerStore\)\) return \{ ok: false, error: 'not_permitted' \};/);
 });
+
+test('review: main\'s own writers may not change the outbound switch either (store-io LOCK_SETTINGS)', async () => {
+  const fs2 = require('node:fs'); const os = require('node:os');
+  const { createStoreIo } = require('../lib/store-io.js');
+  const dir = fs2.mkdtempSync(path.join(os.tmpdir(), 'khayt-netlock-'));
+  let held = {};
+  const io = createStoreIo({ app: { getPath: () => dir }, fs: fs2, safeStorage: { isEncryptionAvailable: () => false },
+    safeJsonParse: require('../lib/safe-json.js').safeJsonParse, crypto: require('node:crypto'),
+    onStoreUpdated: (d) => { held = d; }, getStore: () => held });
+  await io.persistLanStoreUpdate({ settings: { network: { offline: true } }, printLog: [] });
+  await assert.rejects(io.updateStoreOnDisk((cur) => ({ ...cur, settings: { ...cur.settings, network: { offline: false } } })), /settings\.network/);
+  await io.updateStoreOnDisk((cur) => ({ ...cur, printLog: [{ id: 'a' }] }));
+  fs2.rmSync(dir, { recursive: true, force: true });
+});

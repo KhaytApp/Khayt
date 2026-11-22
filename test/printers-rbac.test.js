@@ -425,7 +425,7 @@ test('every field writer (updateStoreOnDisk / persistLanStoreUpdate) that touche
       if (!/\bsettings\b|\boperators\b/.test(body)) continue;
       const ok = (LISTED[file] || []).some((k) => body.includes(k));
       assert.ok(ok, `${file}: an unlisted writer touches settings/operators at line ${src.slice(0, m.index).split('\n').length}`);
-      assert.doesNotMatch(body, /\boperators\b|operatorLockEnabled|activeOperatorId|roleLimits/, `${file}: a field writer names the lock or operators`);
+      assert.doesNotMatch(body, /\boperators\b|operatorLockEnabled|activeOperatorId|roleLimits|\.network\b/, `${file}: a field writer names the lock, operators or the outbound switch`);
     }
   }
   const io = fs.readFileSync(path.join(root, 'lib', 'store-io.js'), 'utf8');
