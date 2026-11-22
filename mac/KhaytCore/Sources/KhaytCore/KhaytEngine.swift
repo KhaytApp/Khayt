@@ -1009,6 +1009,10 @@ public actor KhaytEngine {
         "mdns",
         "printer-discovery",
         "printer-sweep",
+        // Printers a scan found, remembered for a few days so a printer that
+        // was asleep during one scan is still in the list. The rule only; the
+        // file is this computer's, outside the book (`FoundPrintersStore`).
+        "found-printers",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
         // Swift's, because `lib/sdcp-client.js` cannot leave Node.

@@ -11,7 +11,11 @@ extension Shop {
     /// Ask the network what is on it. Owner-initiated, time-boxed, never a timer.
     func findPrinters() async -> [KhaytEngine.FoundPrinter] {
         guard let engine else { return [] }
-        return await finder.find(engine: engine)
+        let found = await finder.find(engine: engine)
+        // Remembered on this computer for a few days, so a printer that was
+        // asleep during the next scan is still known (`FoundPrintersStore`).
+        await rememberFound(found)
+        return found
     }
 
     // MARK: - A printer that changed address
