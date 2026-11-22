@@ -4082,7 +4082,7 @@
  "mac.apps_unnamed": "Trancheur",
  "mac.apps_hint": "Trancheurs pouvant envoyer des fichiers dans votre boîte « Du trancheur ». Ils ne peuvent lire ni votre registre, ni vos clients, ni vos prix. Changer le code PIN du réseau local les déconnecte aussi.",
  "mac.apps_remove": "Déconnecter",
- "mac.apps_remove_q": "Déconnecter « {name} » ?",
+ "mac.apps_remove_q": "Déconnecter « {name} » ?",
  "mac.apps_remove_note": "Il cesse aussitôt d’envoyer à ce Mac. Pour le réutiliser, associez-le à nouveau.",
  "mac.apps_pair": "Associer un trancheur",
  "mac.apps_pair_hint": "Dans OrcaSlicer, ouvrez l'onglet Khayt, saisissez cette adresse et cliquez sur Pair :",

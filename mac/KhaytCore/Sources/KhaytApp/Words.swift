@@ -4079,7 +4079,7 @@ final class Words {
         "mac.pair_open": ["en": "Pair a phone", "ar": "إقران جوال"],
         "mac.ppair_waiting": ["en": "Waiting for a phone…", "ar": "بانتظار جوال…"],
         "mac.ppair_left": ["en": "{time} left", "ar": "بقي {time}"],
-        "mac.ppair_how": ["en": "On the phone, open Khayt, choose Pair with this Mac, and enter the address below. Nobody types the shop's PIN on the phone.", "ar": "على الجوال، افتح Khayt واختر «الاقتران بهذا الـMac» وأدخل العنوان أدناه. لا أحد يكتب رمز المتجر على الجوال."],
+        "mac.ppair_how": ["en": "On the phone, open Khayt, choose Pair with this Mac, and enter the address below. Nobody types the shop's PIN on the phone.", "ar": "على الجوال، افتح تطبيق خيط واختر «الاقتران بهذا الـMac» وأدخل العنوان أدناه. لا أحد يكتب رمز المتجر على الجوال."],
         "mac.ppair_note": ["en": "A phone that asks will show a 6-digit number. The same number appears here, and you approve it. An older phone can still pair with the owner PIN.", "ar": "الجوال الذي يطلب الاقتران يعرض رقمًا من 6 خانات. يظهر الرقم نفسه هنا، وأنت توافق عليه. الجوال الأقدم ما زال يقترن برمز المالك."],
         "mac.ppair_stop": ["en": "Stop", "ar": "إيقاف"],
         "mac.ppair_asks": ["en": "{name} wants to pair", "ar": "{name} يطلب الاقتران"],
