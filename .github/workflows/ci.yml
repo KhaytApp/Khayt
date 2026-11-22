@@ -442,6 +442,9 @@ jobs:
       - name: E2E smoke (Internet use settings)
         run: xvfb-run -a npm run test:e2e:internetuse
 
+      - name: E2E smoke (the switch through Khayt Cloud, frames F1–F3 and G)
+        run: xvfb-run -a npm run test:e2e:netswitchcloud
+
       - name: E2E smoke (quit flushes pending save)
         run: xvfb-run -a npm run test:e2e:quitflush
 

@@ -18,7 +18,15 @@
  *     days without a check while updates are blocked (D2: no one-time
  *     override; "Keep updates" is one tick away).
  *   - A person-started call the switch refuses is said in the shop's language
- *     with a way here (frame D). The preload reports every refused reply; it is
+ *     with a way here (frame D).
+ *   - Through Khayt Cloud (frames F1–F3 and G, signed off Nov 22): the row
+ *     "Also tell my other computers through Khayt Cloud" (THIS computer's
+ *     choice, main's network-switch-cloud.json; only the cloud owner turns it
+ *     on), the switch's line saying whether the others were told, and above
+ *     the switches the 7-day question, a newer change elsewhere (409) and a
+ *     clock that may be behind. The 409's "Keep it on this computer only" is
+ *     offered only when the person was turning the switch ON: this computer's
+ *     own switch may be stricter than the shop, never looser (Turki, Nov 22). The preload reports every refused reply; it is
  *     said only when a person acted a moment before, so automatic calls never
  *     toast: they are counted on their row.
  */
@@ -162,11 +170,16 @@ let _last = null;   // the last describe() answer, for the banner
 
 async function load() {
   const api = global.hubAPI || {};
-  let d = null, offsite = null, activeCount = null;
+  let d = null, offsite = null, activeCount = null, ns = null;
   try { d = api.outboundDescribe ? await api.outboundDescribe() : null; } catch (_) { d = null; }
   try { offsite = api.offsiteGet ? await api.offsiteGet() : null; } catch (_) { offsite = null; }
   try { activeCount = api.activeCountGet ? await api.activeCountGet() : null; } catch (_) { activeCount = null; }
-  _last = d && Array.isArray(d.rows) ? Object.assign({}, d, { offsite, activeCount }) : null;
+  try { ns = api.networkSwitchState ? await api.networkSwitchState() : null; } catch (_) { ns = null; }
+  const nsOk = ns && typeof ns === 'object' ? ns : null;
+  // A question from Khayt Cloud is still pointed to when the list of calls
+  // could not be read (review of the banner): the banner reads `ns` alone.
+  _last = d && Array.isArray(d.rows) ? Object.assign({}, d, { offsite, activeCount, ns: nsOk })
+    : (nsOk ? { rows: [], ns: nsOk, partial: true } : null);
   return _last;
 }
 
@@ -174,29 +187,101 @@ function switchHtml(id, on, disabled, labelId) {
   return `<button type="button" class="iu-switch${on ? ' on' : ''}" id="${id}" role="switch" aria-checked="${on}" aria-labelledby="${labelId}"${disabled ? ' disabled' : ''}><span class="iu-knob"></span></button>`;
 }
 
+/* Frame G: what Khayt Cloud asks of this computer, in the shop's words.
+ * Nothing here is applied, retried or undone without the person choosing;
+ * the buttons are main's answerPending / answerConflict. */
+function gCards(ns, can) {
+  if (!ns || typeof ns !== 'object') return '';
+  const out = [];
+  const btn = (act, label, primary) => `<button type="button" class="btn${primary ? ' primary' : ''}" data-iu-g="${act}"${can ? '' : ' disabled'}>${esc(label)}</button>`;
+  const p = ns.pending;
+  if (p && p.offline === true) {
+    const title = tr(p.changedBy ? 'iu.g.ask_title_by' : 'iu.g.ask_title', { date: fmtDate(p.changedAt), who: p.changedBy || '' });
+    out.push(`<div class="card iu-g" data-iu-g-card="ask"><div class="iu-g-title">${esc(title)}</div>
+      <div class="iu-sub">${esc(tr('iu.g.ask_body'))}</div>
+      <div class="iu-g-btns">${btn('apply', tr('iu.g.apply'), true)}${btn('not-now', tr('iu.g.not_now'))}</div></div>`);
+  }
+  const c = ns.conflict;
+  if (c) {
+    const title = ms(c.at) !== null && ms(c.mine) !== null
+      ? tr('iu.g.conflict_title', { theirs: fmtTime(c.at), mine: fmtTime(c.mine) })
+      : tr('iu.g.conflict_title_plain');
+    // A 409 alone does not say which way the other computer turned the
+    // switch: with a clock behind, both may have turned it ON (Dev Hub, Nov
+    // 22). A direction is named only when main READ the other value
+    // (`theirs`) and it is the opposite of the person's; otherwise the general
+    // sentence, with the clock hint. "Keep it on this computer only" only when
+    // it really keeps this computer stricter: the person turned it ON here and
+    // the other computer turned it OFF (Turki, Nov 22). Main refuses it otherwise.
+    const turningOn = c.offline === true;
+    const known = typeof c.theirs === 'boolean' && c.theirs !== turningOn;
+    const kind = !known ? 'conflict' : (turningOn ? 'conflict-on' : 'conflict-off');
+    const body = !known ? 'iu.g.conflict_general_body' : (turningOn ? 'iu.g.conflict_on_body' : 'iu.g.conflict_off_body');
+    const keep = known && turningOn;
+    out.push(`<div class="card iu-g" data-iu-g-card="${kind}"><div class="iu-g-title">${esc(title)}</div>
+      <div class="iu-sub">${esc(tr(body))}</div>
+      <div class="iu-g-btns">${btn('adopt', tr('iu.g.use_newer'), true)}${keep ? btn('keep', tr('iu.g.keep_here')) : ''}</div></div>`);
+  }
+  if (ns.clockBehind) {
+    out.push(`<div class="card iu-g" data-iu-g-card="clock"><div class="iu-g-title">${esc(tr('iu.g.clock'))}</div></div>`);
+  }
+  return out.join('');
+}
+
+/** What main said no to, in words: the staff lock, Khayt Cloud locked, the cloud owner, or anything else. */
+function answerSay(r) {
+  if (!r || r.ok) return;
+  if (r.why === 'not_permitted') return refuseSay('not_permitted');
+  if (r.why === 'locked') return toast('⚠ ' + tr('iu.share_locked'), 'error', 6000);
+  if (r.why === 'role') return toast('⚠ ' + tr('iu.share_role'), 'error', 6000);
+  // "Use the newer setting" with nothing held made its one GET and could not
+  // read it: the question stays, and says why (Dev Hub, Nov 22).
+  if (r.why === 'unreachable') return toast('⚠ ' + tr('iu.g.unreachable'), 'error', 8000);
+  toast('⚠ ' + tr('iu.g.failed'), 'error', 6000);
+}
+
 function render(ctx) {
   const host = document.getElementById('internetUseBody');
   if (!host) return;
-  if (!ctx) { host.innerHTML = `<p class="iu-muted">${esc(tr('iu.unavailable'))}</p>`; return; }
+  // `partial`: only Khayt Cloud's state was read; the page still says it could not load.
+  if (!ctx || ctx.partial) { host.innerHTML = `<p class="iu-muted">${esc(tr('iu.unavailable'))}</p>`; return; }
   const on = shopOffline();
   const here = !!(ctx.local && ctx.local.offline);
   const can = mayChange();
   const n = shopView();
-  let shopNote = tr('iu.shop_hint');
+  const ns = ctx.ns || null;
+  // Told through Khayt Cloud: the switch the book holds came or went through
+  // the cloud (main writes `via: 'cloud'` only for a value the cloud took).
+  const told = on && network().via === 'cloud';
+  let shopNote = tr(told ? 'iu.shop_hint_short' : 'iu.shop_hint');
   if (on) {
     const when = ms(n.changedAt) !== null ? tr(n.changedBy ? 'iu.turned_on_by' : 'iu.turned_on', { who: n.changedBy || '', day: fmtDay(n.changedAt), time: fmtTime(n.changedAt) }) : '';
-    shopNote += ' ' + [when, tr('iu.turned_on_tail')].filter(Boolean).join(' ');
+    // F1: the others were not told; F2: told through Khayt Cloud at the switch's time.
+    const tail = told ? tr('iu.tail_told', { time: fmtTime(n.changedAt) }) : tr('iu.tail_not_told');
+    shopNote += ' ' + [when, tr('iu.tail_stopped'), tail].filter(Boolean).join(' ');
   } else {
     shopNote += ' ' + tr('iu.off_tail');
   }
+  // "Also tell my other computers": this computer's choice. Turning it ON is
+  // the cloud owner's; turning it off, anyone who may change the switch.
+  const share = !!(ns && ns.share);
+  const shareCan = can && !!(ns && ns.unlocked) && (share || !!ns.owner);
+  let shareNote = tr(share ? 'iu.share_on_hint' : 'iu.share_off_hint');
+  if (can && !(ns && ns.unlocked)) shareNote += ' ' + tr('iu.share_locked');
+  else if (can && !share && ns && !ns.owner) shareNote += ' ' + tr('iu.share_role');
   const rows = ORDER.map((p) => ctx.rows.find((r) => r.purpose === p)).filter(Boolean);
   const showKeep = on;
-  const head = `
+  const head = gCards(ns, can) + `
     <div class="card iu-switches">
       <div class="iu-switch-row">
         ${switchHtml('iuShopSwitch', on, !can, 'iuShopLabel')}
         <div><div class="iu-label" id="iuShopLabel">${esc(tr('iu.shop_switch'))}</div>
         <div class="iu-sub">${esc(shopNote)}</div></div>
+      </div>
+      <div class="iu-switch-row" data-iu-share-row>
+        ${switchHtml('iuShareSwitch', share, !shareCan, 'iuShareLabel')}
+        <div><div class="iu-label" id="iuShareLabel">${esc(tr('iu.share_switch'))}</div>
+        <div class="iu-sub">${esc(shareNote)}</div></div>
       </div>
       <div class="iu-switch-row">
         ${switchHtml('iuHereSwitch', here, !can, 'iuHereLabel')}
@@ -237,6 +322,13 @@ function refuseSay(error) {
   else if (error) toast('⚠ ' + String(error), 'error', 6000);
 }
 
+/** lib/network-switch.js stampAfter: max(now, newest seen + 1 ms). */
+function stampNow(seen) {
+  const NS = global.KhaytNetworkSwitch;
+  const s = NS && typeof NS.stampAfter === 'function' ? NS.stampAfter(Date.now(), seen) : null;
+  return s || new Date().toISOString();
+}
+
 /** Save the shop's switch through the window's ordinary save; main's guard decides. */
 async function saveNetwork(patch) {
   const cur = shopView();
@@ -244,7 +336,9 @@ async function saveNetwork(patch) {
   // When and by whom are the SWITCH's: a Keep tick changes neither (review of
   // #2633: it re-dated "Turned on by" and reset the 30-day clock).
   const flipped = !!next.offline !== !!cur.offline;
-  if (flipped) { next.changedAt = new Date().toISOString(); next.changedBy = whoChanges(); }
+  // Monotonic (decision A): never before a stamp this computer has seen, the
+  // book's own or one heard from Khayt Cloud, whatever this clock says.
+  if (flipped) { next.changedAt = stampNow([cur.changedAt, _last && _last.ns && _last.ns.highestSeen]); next.changedBy = whoChanges(); }
   else { next.changedAt = cur.changedAt || null; next.changedBy = cur.changedBy || null; }
   // Through Khayt Cloud (lib/main/network-switch-sync.js): turning it ON
   // tells the cloud FIRST, while this computer is still online (the last
@@ -284,6 +378,29 @@ function wire(host) {
     await saveNetwork({ offline: turnOn, keep: keptList() });
     await refresh();
   });
+  const shareSw = host.querySelector('#iuShareSwitch');
+  if (shareSw) shareSw.addEventListener('click', async () => {
+    if (!mayChange()) return refuseSay('not_permitted');
+    const turnOn = shareSw.getAttribute('aria-checked') !== 'true';
+    let r = null;
+    try { r = await global.hubAPI.networkSwitchShare(turnOn); } catch (_) { r = { ok: false, why: 'error' }; }
+    answerSay(r);
+    await refresh();
+  });
+  host.querySelectorAll('[data-iu-g]').forEach((b) => b.addEventListener('click', async () => {
+    if (!mayChange()) return refuseSay('not_permitted');
+    const act = b.getAttribute('data-iu-g');
+    host.querySelectorAll('[data-iu-g]').forEach((x) => { x.disabled = true; });   // one answer per press
+    let r = null;
+    try {
+      if (act === 'apply' || act === 'not-now') r = await global.hubAPI.networkSwitchAnswer(act === 'apply');
+      else r = await global.hubAPI.networkSwitchConflict(act === 'keep' ? 'keep' : 'adopt');
+    } catch (_) { r = { ok: false, why: 'error' }; }
+    answerSay(r);
+    // What main applied reaches the window through hub:network-applied; the
+    // page is drawn again from main's state either way.
+    await refresh();
+  }));
   const here = host.querySelector('#iuHereSwitch');
   if (here) here.addEventListener('click', async () => {
     const turnOn = here.getAttribute('aria-checked') !== 'true';
@@ -303,19 +420,52 @@ function wire(host) {
   }));
 }
 
-/** The banner on every screen (frame C): updates blocked and not checked for 30+ days. */
+/** What Khayt Cloud is waiting on, for the banner: 'ask' (the 7-day question), 'conflict' (a 409), or ''. */
+function gWaiting(ctx) {
+  const ns = ctx && ctx.ns;
+  if (!ns || typeof ns !== 'object') return '';
+  if (ns.conflict) return 'conflict';
+  if (ns.pending && ns.pending.offline === true) return 'ask';
+  return '';
+}
+
+/**
+ * The banner on every screen. Frame C: updates blocked and not checked for
+ * 30+ days. And (Turki, Nov 22) a question from Khayt Cloud or a clash that
+ * is waiting on the Internet use page (frame G), pointed to from here with a
+ * link to Settings › General › Internet use, no new screen: a question that
+ * arrived while the person was elsewhere used to wait unseen. The answer is
+ * only ever given on the page itself.
+ */
 function renderBanner(ctx) {
   const el = document.getElementById('updatesOffBanner');
   if (!el) return;
   const row = ctx && Array.isArray(ctx.rows) ? ctx.rows.find((r) => r.purpose === 'updates') : null;
   const days = updatesStale(row, ctx);
-  if (!days) { el.style.display = 'none'; el.innerHTML = ''; return; }
-  const why = row.reason === 'offline-here' ? tr('iu.banner_here') : tr('iu.banner_shop');
-  el.innerHTML = `<div class="iu-banner-text">${esc(tr('iu.banner', { n: days }) + ' ' + why)}</div>
+  const g = gWaiting(ctx);
+  if (!days && !g) { el.style.display = 'none'; el.innerHTML = ''; el.dataset.iuHtml = ''; el.classList.remove('iu-banner-ask'); return; }
+  const where = [tr('nav.settings'), tr('set.pane_general'), tr('iu.title')].join(' › ');
+  const lines = [];
+  if (g) {
+    lines.push(`<div class="iu-banner-text" data-iu-banner-g="${g}">${esc(tr(g === 'ask' ? 'iu.banner_g_ask' : 'iu.banner_g_conflict'))}
+      <a href="#" class="iu-banner-link" data-iu-banner="where">${esc(where)}</a></div>`);
+  }
+  if (days) {
+    const why = row.reason === 'offline-here' ? tr('iu.banner_here') : tr('iu.banner_shop');
+    lines.push(`<div class="iu-banner-text">${esc(tr('iu.banner', { n: days }) + ' ' + why)}</div>
     <div class="iu-banner-btns">
       ${row.reason === 'offline' && mayChange() ? `<button type="button" class="btn primary small" data-iu-banner="keep">${esc(tr('iu.keep_updates'))}</button>` : ''}
       <button type="button" class="btn small" data-iu-banner="open">${esc(tr('iu.open'))}</button>
-    </div>`;
+    </div>`);
+  }
+  const html = lines.join('');
+  // The same notice again is left as it is: it is role="alert", and writing
+  // it anew made a screen reader read it out after every save (review).
+  if (el.style.display !== 'none' && el.dataset.iuHtml === html) return;
+  el.dataset.iuHtml = html;
+  el.innerHTML = html;
+  // A question alone is not a fault: the warning colours, not the red.
+  el.classList.toggle('iu-banner-ask', !days);
   el.style.display = '';
   const k = el.querySelector('[data-iu-banner="keep"]');
   if (k) k.addEventListener('click', async () => {
@@ -325,7 +475,10 @@ function renderBanner(ctx) {
     await saveNetwork({ keep });
     await refresh();
   });
-  el.querySelector('[data-iu-banner="open"]').addEventListener('click', open);
+  const o = el.querySelector('[data-iu-banner="open"]');
+  if (o) o.addEventListener('click', open);
+  const w = el.querySelector('[data-iu-banner="where"]');
+  if (w) w.addEventListener('click', (e) => { e.preventDefault(); open(); });
 }
 
 /** The one line on the General pane that leads here. */
@@ -451,6 +604,10 @@ function boot() {
       refresh().catch(() => {});
     });
   }
+  // A question, a conflict or the clock line appeared or went (frame G).
+  if (global.hubAPI && typeof global.hubAPI.onNetworkSwitchChanged === 'function') {
+    global.hubAPI.onNetworkSwitchChanged(() => { refreshSoon(); });
+  }
   // Hourly, so the 30-day banner appears on a computer left running.
   setInterval(() => { refresh().catch(() => {}); }, 60 * 60 * 1000);
 }
@@ -459,7 +616,7 @@ try {
   else boot();
 } catch (_) { /* no document */ }
 
-const api = { ORDER, STALE_DAYS, ownSwitchOff, refresh, render, renderBanner, open, refusalText, sayBlocked, stateOf, updatesStale, setUp };
+const api = { ORDER, STALE_DAYS, ownSwitchOff, refresh, render, renderBanner, gWaiting, open, refusalText, sayBlocked, stateOf, updatesStale, setUp, load, gCards };
 global.KhaytInternetUse = api;
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 

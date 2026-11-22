@@ -325,3 +325,66 @@ test('review: main\'s own writers may not change the outbound switch either (sto
   await io.updateStoreOnDisk((cur) => ({ ...cur, printLog: [{ id: 'a' }] }));
   fs2.rmSync(dir, { recursive: true, force: true });
 });
+
+test('switch-sync: ONE person-started GET through the shop\'s switch, set by main only, never through this computer\'s own', () => {
+  let t = 1000;
+  const settings = { network: { offline: true, changedAt: '2026-11-22T10:00:00.000Z' } };   // set here: not via cloud
+  let local = {};
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => local, writeLocal: (v) => { local = v; }, now: () => t });
+  assert.equal(g.check('switch-sync').allowed, false, 'the shop is offline and the switch did not come through Khayt Cloud');
+  g.allowSwitchSyncOnce();
+  const r = g.check('switch-sync');
+  assert.equal(r.allowed, true);
+  assert.equal(r.person, true);
+  assert.equal(g.check('switch-sync').allowed, false, 'once');
+  g.allowSwitchSyncOnce();
+  assert.equal(g.check('cloud').allowed, false, 'only switch-sync, never the rest of Khayt Cloud');
+  t += 21000;
+  assert.equal(g.check('switch-sync').allowed, false, 'it lapses within seconds of the answer');
+  // This computer's own switch: a computer offline by its own switch makes no call.
+  g.setLocal({ offline: true });
+  g.allowSwitchSyncOnce();
+  assert.equal(g.check('switch-sync').allowed, false);
+  // Not reachable from the window: no IPC names it.
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const pre = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
+  assert.doesNotMatch(pre, /allowSwitchSyncOnce/);
+  assert.equal((main.match(/allowSwitchSyncOnce/g) || []).length, 2, 'only handed to network-switch-sync');
+  // One rule with the Mac's gate: the shared token, not a timer of our own.
+  const gate = fs.readFileSync(path.join(__dirname, '..', 'lib', 'main', 'outbound-fetch.js'), 'utf8');
+  assert.match(gate, /const mine = Outbound\.answerToken\(now\(\)\);/);
+  assert.doesNotMatch(gate, /personSyncUntil/);
+});
+
+test('review of the shared token: the person\'s call spends it whatever it decides; a poll after it, or a cancelled one, cannot use it', () => {
+  let t = 1000;
+  const settings = { network: { offline: false } };   // the shop still online at the answer
+  let local = {};
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => local, writeLocal: (v) => { local = v; }, now: () => t });
+  // (a) The person's GET goes while online ('ok'); the shop then goes offline;
+  // the next automatic poll inside 20 s must not ride the person's answer.
+  g.allowSwitchSyncOnce();
+  assert.equal(g.check('switch-sync').reason, 'ok');
+  settings.network = { offline: true };
+  t += 1000;
+  assert.equal(g.check('switch-sync').allowed, false, 'the poll after it is refused');
+  // (b) The person's call never reached the gate: its cancel ends the token.
+  const cancel = g.allowSwitchSyncOnce();
+  cancel();
+  assert.equal(g.check('switch-sync').allowed, false, 'cancelled');
+  // A cancel from an older answer does not end a newer one.
+  const old = g.allowSwitchSyncOnce();
+  g.allowSwitchSyncOnce();
+  old();
+  assert.equal(g.check('switch-sync').allowed, true, 'the newer answer still lets its one call through');
+  // (c) Refused at this computer's own switch: that was the person's call; it is spent.
+  g.allowSwitchSyncOnce();
+  g.setLocal({ offline: true });
+  assert.equal(g.check('switch-sync').reason, 'offline-here');
+  g.setLocal({});
+  assert.equal(g.check('switch-sync').allowed, false, 'spent by the refused call');
+  // (d) The clock set back inside the window: the token is dead.
+  g.allowSwitchSyncOnce();
+  t -= 5000;
+  assert.equal(g.check('switch-sync').allowed, false);
+});

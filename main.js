@@ -6963,6 +6963,12 @@ const networkSwitchSync = require('./lib/main/network-switch-sync.js').createNet
     return Object.assign({}, cur, { settings: Object.assign({}, cur.settings, { network: next }) });
   }, ['settings.network']),
   notify: (network) => BrowserWindow.getAllWindows().forEach((w) => { try { w.webContents.send('hub:network-applied', network); } catch (_) { /* gone */ } }),
+  // A question or a conflict appeared or went: the window asks state() again (frame G).
+  changed: () => BrowserWindow.getAllWindows().forEach((w) => { try { w.webContents.send('hub:network-switch-changed'); } catch (_) { /* gone */ } }),
+  // "Keep it on this computer only" (frame G, turning ON only): this computer's own switch, stricter-only.
+  setLocalOffline: () => outboundGate.setLocal({ offline: true }),
+  // The one person-started switch-sync GET of "Use the newer setting" (Dev Hub, Nov 22).
+  allowSwitchSyncOnce: () => outboundGate.allowSwitchSyncOnce(),
   readMine: () => { try { return JSON.parse(fs.readFileSync(NETWORK_SWITCH_FILE(), 'utf8')); } catch (_) { return {}; } },
   writeMine: (v) => { const f = NETWORK_SWITCH_FILE(); fs.writeFileSync(f + '.tmp', JSON.stringify(v)); fs.renameSync(f + '.tmp', f); },
 });
