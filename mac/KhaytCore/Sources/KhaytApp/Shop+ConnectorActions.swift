@@ -511,6 +511,9 @@ extension Shop {
     /// Send every queued connector event whose time has come.
     func retryDueConnectorEvents() async {
         guard ConnectorsSwitch.isOn(), let engine, let build = source.build, StoreLock.weOwnIt(build) else { return }
+        // "Make no internet calls": the queue waits and loses no tries
+        // (`retryDueWebhooks`).
+        guard outboundGate.verdict(.webhooks).allowed else { return }
         let due = (try? await engine.pluginDue(settingsDict["pluginOutbox"] ?? .array([]),
                                                nowMs: Date().timeIntervalSince1970 * 1000)) ?? []
         for item in due.compactMap(ConnectorQueued.init) where !connectorInFlight.contains(item.delivery) {

@@ -1612,6 +1612,7 @@ final class Shop {
             // is putting that up, and blanking the screen over it would show
             // an open book as one that would not open.
             if overtaken() { return }
+            outboundLoadFailed()
             siteScope = nil
             orders = []
             printHistory = [:]

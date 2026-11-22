@@ -159,6 +159,10 @@ extension Shop {
     /// since removed or switched off is dropped, never sent.
     func retryDueWebhooks() async {
         guard let engine, let build = source.build, StoreLock.weOwnIt(build) else { return }
+        // "Make no internet calls": what is queued WAITS. A retry made now
+        // would only be refused, and each refusal would use up one of the
+        // delivery's tries until it was dropped unsent.
+        guard outboundGate.verdict(.webhooks).allowed else { return }
         let nowMs = Date().timeIntervalSince1970 * 1000
         let at = ISO8601DateFormatter().string(from: Date())
         guard let due = try? await engine.webhookDue(settingsDict["webhooks"] ?? .null, nowMs: nowMs),
