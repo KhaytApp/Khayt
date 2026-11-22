@@ -1069,6 +1069,23 @@ still lists it, and the phone hides it either way:
 
 `progress`, `timeRemaining` (seconds) and the temperatures are rounded integers. A machine never heard from has its `id`, `name` and `hasPrinterApi`, and `null` for the rest.
 
+**When it last answered, and why it is not answering** (native Mac, Nov 2026, draft; the desktop is to match these names):
+
+- `lastOkAt`: when the printer last ANSWERED, ISO 8601, or `null` if it has not since the app started watching it. `lastUpdated` is the last time it was ASKED and moves on a failed poll too, so it cannot say how old the picture is; `lastOkAt` can.
+- `errorCode`: `null` while the printer answers. Otherwise one word that no language changes, to match on instead of `error` (which is a sentence in the shop's language: an Arabic or German shop's "access refused" does not match an English pattern):
+
+  | `errorCode` | Meaning |
+  |---|---|
+  | `access-refused` | the printer answered and said no: HTTP 401 or 403, a handshake or an access code turned down |
+  | `http` | any other HTTP status; `httpStatus` says which |
+  | `not-set-up` | no address, a bad port or a missing serial: nothing was asked |
+  | `certificate` | a Bambu's certificate is not the one expected |
+  | `unreadable` | it answered with something that is not its protocol |
+  | `unreachable` | no answer: off, asleep, on another network, or it hung up |
+
+  A client must treat a word it does not know as `unreachable`.
+- `httpStatus`: the HTTP status of the failed poll when there was one (`401`, `503`), else `null`. Always `null` while the printer answers.
+
 **The native Mac adds two lists to every entry** (Nov 2026, draft), worked out there by the shared rules so a phone never works them out itself:
 
 - `problems`: what the printer says is wrong, worst first (`lib/printer-problems.js problemsFor`): `[{ code, severity, action, source, head?, message?, ref? }]`. For a Snapmaker U1 this includes its exceptions (a filament runout names the head) and "power was lost during a print" (information only: Khayt never sends resume or discard).

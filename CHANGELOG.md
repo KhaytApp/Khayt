@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a phone can tell how old a printer's picture is, and why it stopped answering, in any language (draft).** `/api/machines/live` rows gain `lastOkAt` (when the printer last ANSWERED; `lastUpdated` moves on a failed poll too), `errorCode` (one word no language changes: `access-refused`, `http`, `not-set-up`, `certificate`, `unreadable`, `unreachable`) and `httpStatus`. `error` stays the sentence in the shop's language. Documented in `docs/LAN_API.md` for the desktop to match.
+
 - **A finished print remembers what was in each head (shared rule, Mac; draft, stacked on the per-head filament work).** When Khayt notes how much filament each head used, it now also stamps that head's colour and material as they were at that print: from the spool's RFID tag when the printer read one, otherwise from what the machine is recorded as holding (`colourFrom: "rfid"` or `"loaded"`). The job keeps saying "black PLA" after the spool is changed. A head nobody can name gets no colour, nothing is guessed, and jobs already written are left as they are. The rule is `lib/printer-actuals.js headColour`; the Mac reads the tags with one more read-only request after the print ends.
 
 - **Mac: the rest of printer batches 2 and 3, with no new screens (draft, stacked on the problems and waiting draft).**
