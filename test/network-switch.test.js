@@ -273,6 +273,7 @@ test('review M2: an off that could not go is sent again with the same stamp at t
 
 test('rule 3: a 409 is held for the person, never applied by the timer, never retried', async () => {
   const h = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  h.publishRemote(plain());              // "off" goes only over a published value (GET first)
   h.server.putStatus = 409;
   const r = await h.sync.publish({ offline: false });
   assert.equal(r.why, 'stale');
@@ -285,6 +286,7 @@ test('rule 3: a 409 is held for the person, never applied by the timer, never re
   assert.equal((await h.sync.answerConflict('adopt')).applied, true);
   assert.equal(h.book().network.offline, true);
   const k = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  k.publishRemote(plain());
   k.server.putStatus = 409;
   await k.sync.publish({ offline: false });
   k.server.putStatus = null;
@@ -336,4 +338,52 @@ test('security review LOW-1: no cloud role recorded is not the owner; the share 
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
   assert.doesNotMatch(main, /role: cloud\.role \|\| 'owner'/);
   assert.match(main, /role: typeof cloud\.role === 'string' && cloud\.role \? cloud\.role : null, scope/);
+});
+
+// ── Cloud lane review of #2645 / #2646 ─────────────────────────────────────
+
+async function conflicted() {
+  const h = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  h.publishRemote(plain());                 // published, so "off" is sent
+  h.server.putStatus = 409;                 // the server names 10:05 as its stamp
+  await h.sync.publish({ offline: false });
+  h.server.putStatus = null;
+  return h;
+}
+
+test('security: "Use the newer setting" never applies a value older than the stamp the 409 named', async () => {
+  const h = await conflicted();
+  // A replayed value stamped between this computer's change (10:00) and the 409's (10:05).
+  h.publishRemote(plain({ changedAt: '2026-11-22T10:02:00.000Z' }));
+  const r = await h.sync.answerConflict('adopt');
+  assert.deepEqual(r, { ok: false, why: 'unreachable' });
+  assert.equal(h.book().network.offline, false, 'nothing applied');
+  assert.equal(h.sync.state().conflict.at, '2026-11-22T10:05:00.000Z', 'the question stays, with its stamp');
+  // The real newer value: applied.
+  h.publishRemote(plain({ changedAt: '2026-11-22T10:05:00.000Z' }));
+  assert.deepEqual(await h.sync.answerConflict('adopt'), { ok: true, applied: true });
+  assert.equal(h.book().network.offline, true);
+  assert.equal(h.sync.state().conflict, null);
+});
+
+test('nothing held: the answer keeps the conflict and its stamp until a value is applied', async () => {
+  const h = await conflicted();
+  h.server.getFail = true;
+  assert.deepEqual(await h.sync.answerConflict('adopt'), { ok: false, why: 'unreachable' });
+  assert.equal(h.sync.state().conflict.at, '2026-11-22T10:05:00.000Z');
+  assert.equal(h.book().network.offline, false);
+  h.server.getFail = false;
+  h.publishRemote(plain({ changedAt: '2026-11-22T10:06:00.000Z' }));
+  assert.equal((await h.sync.answerConflict('adopt')).applied, true);
+  assert.equal(h.sync.state().conflict, null);
+});
+
+test('Dev Hub: turning it off at a sharing computer PUTs offline:false only over a published value; after a 404, nothing', async () => {
+  const h = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  assert.deepEqual(await h.sync.publish({ offline: false }), { ok: true, sent: false });
+  assert.equal(h.server.gets, 1, 'asked first');
+  assert.equal(h.server.puts.length, 0, 'nothing published: nothing sent, so the switch is not published again');
+  h.publishRemote(plain());
+  assert.equal((await h.sync.publish({ offline: false })).sent, true);
+  assert.equal(h.server.puts.length, 1);
 });
