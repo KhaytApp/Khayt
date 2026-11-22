@@ -382,6 +382,10 @@ contextBridge.exposeInMainWorld('hubAPI', {
   // Connector updates: the check (off unless KHAYT_CONNECTOR_UPDATES=1) and the shop's answers.
   connectorUpdatesCheck: () => ipcRenderer.invoke('hub:connector-updates-check'),
   connectorUpdate: (req) => ipcRenderer.invoke('hub:connector-update', req),
+  // khayt://plugin/install?id=…&version=…: main says a link arrived; the window
+  // takes it once its book is loaded, as a manifest for the consent sheet or a refusal.
+  pluginInstallLinkTake: () => ipcRenderer.invoke('hub:plugin-install-link-take'),
+  onPluginInstallLink: (cb) => { ipcRenderer.on('plugin-install-link', () => { try { cb(); } catch { /* noop */ } }); },
 
   // Round 12: Embedded LAN REST API
   startLanServer: (config) => ipcRenderer.invoke('hub:start-lan-server', config),
