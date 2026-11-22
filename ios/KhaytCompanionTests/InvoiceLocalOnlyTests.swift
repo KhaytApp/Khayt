@@ -68,22 +68,12 @@ final class InvoiceLocalOnlyTests: XCTestCase {
         XCTAssertTrue(bare.hasPrefix("<!doctype html><html><head><meta http-equiv=\"Content-Security-Policy\""))
     }
 
-    func testAShopsDocumentNeverReachesTheNetwork() async throws {
-        let server = try Listener()
-        let port = try await server.start()
-        defer { server.listener.cancel() }
-
-        // The listener hears a plain request: a silent count below is the
-        // paper's doing, not a deaf listener.
-        var probe = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/probe")!)
-        probe.timeoutInterval = 2
-        _ = try? await URLSession.shared.data(for: probe)
-        await waitUntil(3) { server.count > 0 }
-        XCTAssertGreaterThan(server.count, 0, "the listener hears a request")
-        let before = server.count
-
-        let base = "http://127.0.0.1:\(port)"
-        let html = """
+    /// A document full of remote loads: an image, a CSS `url()`, an
+    /// `@import`, a stylesheet link, a preconnect and a DNS prefetch.
+    private func remote(_ base: String) -> String {
+        """
+        <link rel="preconnect" href="\(base)/">
+        <link rel="dns-prefetch" href="\(base)/">
         <p>INV-1</p>
         <img src="\(base)/pixel.png" alt="">
         <div style="background-image:url('\(base)/bg.png')">x</div>
@@ -91,15 +81,64 @@ final class InvoiceLocalOnlyTests: XCTestCase {
         <link rel="stylesheet" href="\(base)/sheet.css">
         <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="local">
         """
-        for whole in [false, true] {
+    }
+
+    /// A web view sized like the sheet's and in a window, so WebKit lays the
+    /// page out and fetches what it names.
+    private func host(_ view: WKWebView) -> UIWindow {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        view.frame = window.bounds
+        window.addSubview(view)
+        window.isHidden = false
+        return window
+    }
+
+    func testAShopsDocumentNeverReachesTheNetwork() async throws {
+        let server = try Listener()
+        let port = try await server.start()
+        defer { server.listener.cancel() }
+        let base = "http://127.0.0.1:\(port)"
+        let html = remote(base)
+
+        // Positive control: the same document in a plain web view, with no
+        // blocker and no policy, IS heard. A silent count below is then the
+        // paper's doing, not a WebKit that fetched nothing.
+        let config = WKWebViewConfiguration()
+        config.defaultWebpagePreferences.allowsContentJavaScript = false
+        config.websiteDataStore = .nonPersistent()
+        let plain = WKWebView(frame: .zero, configuration: config)
+        let w0 = host(plain)
+        plain.loadHTMLString(html, baseURL: nil)
+        await waitUntil(10) { server.count > 0 }
+        XCTAssertGreaterThan(server.count, 0, "an unguarded web view fetches the remote parts")
+        _ = w0
+        try? await Task.sleep(for: .seconds(1))
+        var before = server.count
+
+        // The blocker alone: the html loaded straight into the paper's web
+        // view, with no CSP, is silent.
+        let bare = InvoicePaper()
+        let w1 = host(bare.webView)
+        await waitUntil(5) { bare.rulesSettled }
+        XCTAssertTrue(bare.rulesInstalled, "the content blocker is attached")
+        bare.webView.loadHTMLString(html, baseURL: nil)
+        try? await Task.sleep(for: .seconds(2))
+        XCTAssertEqual(server.count, before, "the content blocker alone blocks every remote load")
+        _ = w1
+
+        // The paper as the app uses it: wrapped, and as a whole page with a head of its own.
+        before = server.count
+        let wholePage = "<!doctype html><html><head lang=\"en\"><title>Slip</title></head><body>" + html + "</body></html>"
+        for (doc, whole) in [(html, false), (wholePage, true)] {
             let paper = InvoicePaper()
-            await waitUntil(5) { paper.rulesInstalled }
-            XCTAssertTrue(paper.rulesInstalled)
-            paper.show(InvoiceDocument(html: html, arabicNumerals: false, selector: "p"), filename: "x.pdf", wholePage: whole)
+            let w = host(paper.webView)
+            paper.show(InvoiceDocument(html: doc, arabicNumerals: false, selector: "p"), filename: "x.pdf", wholePage: whole)
             await waitUntil(10) { paper.drawn }
             XCTAssertTrue(paper.drawn, "the paper is drawn")
             try? await Task.sleep(for: .seconds(1))
             XCTAssertEqual(server.count, before, "nothing left the phone (whole page: \(whole))")
+            _ = w
         }
+        XCTAssertTrue(InvoicePaper.withPolicy(wholePage).contains("<head lang=\"en\"><meta http-equiv=\"Content-Security-Policy\""))
     }
 }

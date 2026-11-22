@@ -153,6 +153,10 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     private var pending: String?
     /// Whether `localOnly` is attached to this web view.
     private(set) var rulesInstalled = false
+    /// Whether the attempt to attach it is over, worked or not: a page waits
+    /// for this, never for success, so a blocker that fails to compile still
+    /// leaves a drawn page (carrying its CSP) rather than a sheet that spins.
+    private(set) var rulesSettled = false
 
     override init() {
         let config = WKWebViewConfiguration()
@@ -184,6 +188,9 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     [{"trigger":{"url-filter":".*"},"action":{"type":"block"}},
      {"trigger":{"url-filter":"^(data|blob|about):"},"action":{"type":"ignore-previous-rules"}}]
     """
+    /// Compiled lists outlive app updates in WebKit's store, so the rules are
+    /// compiled again for each paper (which replaces the stored list under
+    /// this name) rather than looked up: a later version's rules always apply.
     nonisolated static let localOnlyIdentifier = "khayt.invoice.local-only"
 
     /// The page's own policy, for the document Khayt wraps.
@@ -191,10 +198,8 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'"
 
     static func localOnlyList() async -> WKContentRuleList? {
-        let store = WKContentRuleListStore.default()
-        if let list = try? await store?.contentRuleList(forIdentifier: localOnlyIdentifier) { return list }
-        return try? await store?.compileContentRuleList(forIdentifier: localOnlyIdentifier,
-                                                         encodedContentRuleList: localOnlyRules)
+        try? await WKContentRuleListStore.default()?.compileContentRuleList(
+            forIdentifier: localOnlyIdentifier, encodedContentRuleList: localOnlyRules)
     }
 
     private func installRules() async {
@@ -202,6 +207,7 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
             webView.configuration.userContentController.add(list)
             rulesInstalled = true
         }
+        rulesSettled = true
         // Should the blocker fail to compile, every page still carries the
         // local-only CSP (`page` and `withPolicy`), so the paper is drawn and
         // still loads nothing remote.
@@ -220,14 +226,14 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         self.filename = filename
         drawn = false
         let html = wholePage ? Self.withPolicy(doc.html) : Self.page(doc)
-        if rulesInstalled { load(html) } else { pending = html }
+        if rulesSettled { load(html) } else { pending = html }
     }
 
     /// A whole-page document with the local-only policy as the first thing
     /// in its head, so it holds before any resource is named.
     nonisolated static func withPolicy(_ html: String) -> String {
         let meta = "<meta http-equiv=\"Content-Security-Policy\" content=\"\(localOnlyCSP)\">"
-        if let head = html.range(of: "<head>", options: .caseInsensitive) {
+        if let head = html.range(of: "<head(\\s[^>]*)?>", options: [.regularExpression, .caseInsensitive]) {
             var out = html
             out.insert(contentsOf: meta, at: head.upperBound)
             return out
