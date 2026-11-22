@@ -271,8 +271,9 @@ final class DeviceKeyTests: XCTestCase {
         let before = StubMac.seen.count
         let fetched = await api.fetchIdentityKey()
         XCTAssertNil(fetched)
-        XCTAssertEqual(StubMac.seen.count, before + 1, "no second try with the PIN")
-        XCTAssertNil(StubMac.seen.last?.pin)
+        XCTAssertEqual(StubMac.seen.count, before + 2, "the refusal is proven, and no second try with the PIN")
+        XCTAssertEqual(StubMac.seen.last?.path, "/api/proof", "checked against the pinned key first")
+        XCTAssertTrue(StubMac.seen.suffix(2).allSatisfy { $0.pin == nil })
         XCTAssertEqual(s.pin, "")
         XCTAssertNil(s.device)
         XCTAssertEqual(s.macIdentityKey, "")
@@ -282,6 +283,42 @@ final class DeviceKeyTests: XCTestCase {
         XCTAssertFalse(api.wantsEnrolment(), "nothing enrols without a PIN")
         s.pin = "12345678"
         XCTAssertFalse(s.signedOutByMac, "typing the PIN again clears the note")
+    }
+
+    /// `device-revoked` is an unsigned 401: anything on the Wi-Fi can send
+    /// it. Unless whatever sent it proves the pinned Mac key, the phone keeps
+    /// its PIN, its enrolment and its pinned key, and sends no PIN.
+    func testAnUnprovenDeviceRevokedSignsNothingOut() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
+        _ = await api.enrolDevice(name: "Test iPhone")
+        let device = try XCTUnwrap(s.device)
+        let identity = s.macIdentityKey
+        let pin = s.pin
+        StubMac.revoked = true
+        for proof in [StubMac.Proof.forged, .missing] {
+            StubMac.proof = proof
+            StubMac.seen = []
+            do { _ = try await api.lanRequest(path: "/api/queue", method: "GET"); XCTFail("\(proof): answered") }
+            catch {
+                guard case .transport? = error as? KhaytAPIError else { return XCTFail("\(proof): \(error)") }
+            }
+            XCTAssertEqual(StubMac.seen.last?.path, "/api/proof", "\(proof): the refusal was checked")
+            XCTAssertTrue(StubMac.seen.allSatisfy { $0.pin == nil }, "\(proof): no PIN sent")
+            XCTAssertEqual(s.device, device, "\(proof): the enrolment is kept")
+            XCTAssertEqual(s.macIdentityKey, identity, "\(proof): the pinned key is kept")
+            XCTAssertEqual(s.pin, pin, "\(proof): the PIN (if any is still held) is kept")
+            XCTAssertFalse(s.signedOutByMac, "\(proof): not signed out")
+            XCTAssertTrue(s.isPaired, "\(proof): still paired")
+        }
+        // The real Mac, proving its key: now the phone is signed out.
+        StubMac.proof = .genuine
+        do { _ = try await api.lanRequest(path: "/api/queue", method: "GET"); XCTFail("a revoked phone was let in") }
+        catch {
+            guard case .server? = error as? KhaytAPIError else { return XCTFail("\(error)") }
+        }
+        XCTAssertNil(s.device)
+        XCTAssertTrue(s.signedOutByMac)
     }
 
     func testAMacWithAnotherClockIsBelievedOnce() async throws {

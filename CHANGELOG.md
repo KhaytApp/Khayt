@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone (security, draft): an unsigned "signed out" reply no longer signs the phone out.** A `device-revoked` 401 is unsigned, so anything on the shop's Wi-Fi could send it, and the phone acted on it by forgetting its PIN, its enrolment and the pinned Mac key. It now asks whatever answered to prove it holds the pinned Mac key (`/api/proof`, as a `device-unknown` reply already did). Only then is the phone signed out. A forged or missing proof changes nothing and sends no PIN. Tests: a forged and a missing proof keep everything; the real Mac, proven, signs the phone out.
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
   - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.
   - **Recalculate.**

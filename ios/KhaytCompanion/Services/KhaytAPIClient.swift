@@ -2325,6 +2325,20 @@ final class KhaytAPIClient: ObservableObject {
             return try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
         case .revoked?:
             // Signed out on the Mac: never back to the PIN, never enrol.
+            //
+            // ── BUT ONLY WHEN THE MAC SAYS SO ────────────────────────────
+            //
+            // A 401 is unsigned: anything on the shop's Wi-Fi can send
+            // `device-revoked`, and acting on it forgot the PIN, the
+            // enrolment and the pinned key, so one forged reply signed the
+            // phone out for good. As with `.unknown`, the answerer first
+            // proves it holds the PINNED Mac key (`/api/proof`). Proven: the
+            // Mac really signed this phone out. Not proven, or no answer:
+            // nothing changes and the request fails as a network fault.
+            let key = settings.macIdentityKey
+            guard !key.isEmpty, await proves(host: settings.host, port: settings.port, key: key) else {
+                throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+            }
             settings.forgetMac(keepShop: cloud != nil)
             enrolNotBefore = nil
             throw KhaytAPIError.server(L10n.tr("pair.signed_out"))
