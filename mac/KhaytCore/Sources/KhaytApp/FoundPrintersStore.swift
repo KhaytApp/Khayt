@@ -27,14 +27,29 @@ enum FoundPrintersStore {
         build.supportFolder.appending(path: "\(build.rawValue)/\(fileName)")
     }
 
-    static func read(_ build: StoreReader.Build) -> JSONValue {
+    static func read(_ build: StoreReader.Build) -> JSONValue { readWithBytes(build).list }
+
+    /// The list, and the bytes it was read from: what `rememberFound` compares
+    /// just before it writes, to see whether the other app wrote meanwhile.
+    static func readWithBytes(_ build: StoreReader.Build) -> (list: JSONValue, bytes: Data?) {
         let file = url(build)
         guard let size = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize, size <= maxBytes,
-              let data = try? Data(contentsOf: file),
+              let data = try? Data(contentsOf: file) else { return (.array([]), nil) }
+        return (list(in: data), data)
+    }
+
+    private static func list(in data: Data) -> JSONValue {
+        guard
               case .object(let file)? = try? JSONDecoder().decode(JSONValue.self, from: data),
               case .array(let printers)? = file["printers"] else { return .array([]) }
         return .array(printers)
     }
+
+    /// TESTS ONLY: runs between the merge and the write, where the other
+    /// app's write can land.
+    nonisolated(unsafe) static var beforeWriteForTests: (() -> Void)?
+    /// How many times a write that found the file changed starts again.
+    static let tries = 4
 
     /// Whole-file, atomic: a reader never sees half a list.
     static func write(_ list: [JSONValue], _ build: StoreReader.Build) throws {
@@ -61,10 +76,26 @@ extension Shop {
             guard let data = try? JSONEncoder().encode(printer) else { return nil }
             return try? JSONDecoder().decode(JSONValue.self, from: data)
         }
-        guard let list = try? await engine.rememberFound(list: FoundPrintersStore.read(build), found: rows,
-                                                         nowMs: (now.timeIntervalSince1970 * 1000).rounded(),
-                                                         source: source) else { return }
-        try? FoundPrintersStore.write(list, build)
+        // ── TWO APPS WRITE THIS FILE ──────────────────────────────────────
+        //
+        // The Windows/Linux app keeps the same list in the same file. Read,
+        // merge, and then look again just before writing: if the file is not
+        // the bytes that were merged, the other app wrote meanwhile, and the
+        // merge is done again on what is there now. Never "mine is newer, so
+        // mine replaces yours". The write is a temp file renamed into place,
+        // so neither app ever reads half a list. After `tries` rounds of
+        // being overtaken this scan is simply not remembered: the next one is.
+        let nowMs = (now.timeIntervalSince1970 * 1000).rounded()
+        for _ in 0..<FoundPrintersStore.tries {
+            let (was, bytes) = FoundPrintersStore.readWithBytes(build)
+            guard let list = try? await engine.rememberFound(list: was, found: rows, nowMs: nowMs,
+                                                             source: source) else { return }
+            FoundPrintersStore.beforeWriteForTests?()
+            // No suspension between this check and the write.
+            guard FoundPrintersStore.readWithBytes(build).bytes == bytes else { continue }
+            try? FoundPrintersStore.write(list, build)
+            return
+        }
     }
 
     /// What this computer's scans found in the last few days, most recently

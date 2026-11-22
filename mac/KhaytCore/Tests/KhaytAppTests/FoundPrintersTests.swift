@@ -110,6 +110,33 @@ extension LibraryEditPerfTests {
             #expect(await shop.rememberedPrinters(now: later).isEmpty)
             await shop.rememberFound(found, now: later)
             #expect(await shop.rememberedPrinters(now: later).count == 2)
+            // THE OTHER APP WRITES BETWEEN OUR READ AND OUR WRITE: its printer
+            // is kept, and so is ours. Once, as a real overlap is.
+            let theirs = Data(#"{"version":1,"printers":[{"name":"Theirs","host":"192.168.1.99","port":80,"source":"mdns","firstSeen":\#(Int(later.timeIntervalSince1970 * 1000)),"lastSeen":\#(Int(later.timeIntervalSince1970 * 1000)),"seenCount":1}]}"#.utf8)
+            var landed = 0
+            FoundPrintersStore.beforeWriteForTests = {
+                if landed == 0 { try? theirs.write(to: file, options: .atomic) }
+                landed += 1
+            }
+            await shop.rememberFound(found, now: later)
+            FoundPrintersStore.beforeWriteForTests = nil
+            #expect(landed == 2, "the write was not started again on the new file: \(landed)")
+            let merged = await shop.rememberedPrinters(now: later)
+            let names = Set(merged.compactMap { v -> String? in
+                if case .string(let n)? = FoundPrintersTests.obj(v)["name"] { return n }; return nil })
+            #expect(names == ["Theirs", "U1", "Mini"], "one app's write replaced the other's: \(names)")
+            // Overtaken every time: this scan gives up, and what the other app wrote stands.
+            var round = 0
+            FoundPrintersStore.beforeWriteForTests = {
+                round += 1
+                try? Data(#"{"version":1,"printers":[],"round":\#(round)}"#.utf8).write(to: file, options: .atomic)
+            }
+            await shop.rememberFound(found, now: later)
+            FoundPrintersStore.beforeWriteForTests = nil
+            #expect(round == FoundPrintersStore.tries)
+            #expect(try String(contentsOf: file, encoding: .utf8).contains(#""round":\#(round)"#), "a clobber after giving up")
+            await shop.rememberFound(found, now: later)
+
             // Forget.
             shop.forgetFoundPrinters()
             #expect(!FileManager.default.fileExists(atPath: file.path))
