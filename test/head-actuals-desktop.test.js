@@ -241,3 +241,38 @@ test('main reads the printer with a size cap', () => {
   assert.match(src, /if \(size > MOONRAKER_READ_MAX\) throw/);
   assert.match(src, /stopped: \(\) => _quittingNow \|\| _flushedForQuit \|\| !printerPollInterval/);
 });
+
+// Mac b7222e951: a print Khayt sent itself is named khayt-<time>.gcode on the
+// printer, which no part's fileRef is. The send records that name on the run
+// (printRuns[].sentAs), and both the shared actualsJob and the desktop's
+// re-check inside the write must find the job by it.
+test('a print Khayt itself sent is found by the name it was given on the printer (printRuns[].sentAs)', async () => {
+  const SENT = 'khayt-1795420800000.gcode';
+  const r = rig({
+    job: { parts: [{ fileRef: 'bracket.3mf' }], printRuns: [{ machineId: 'M1', at: '2026-11-22T11:00:00Z', started: true, file: 'bracket.3mf', sentAs: SENT }] },
+    history: { result: { jobs: [row({ filename: SENT })] } },
+  });
+  const p = { state: 'printing', progress: 0.97, filename: SENT };
+  const c = { state: 'complete', progress: 1, filename: SENT };
+  assert.equal(await r.h.noteEdge(U1M, p, c, ENDED), true);
+  assert.equal(r.book.printLog[0].actualHeadsJobId, '0000A7');
+  // A sentAs on ANOTHER machine's run does not tie this machine's print to the job.
+  const other = rig({
+    job: { parts: [{ fileRef: 'bracket.3mf' }], printRuns: [{ machineId: 'M9', at: '2026-11-22T11:00:00Z', sentAs: SENT }] },
+    history: { result: { jobs: [row({ filename: SENT })] } },
+  });
+  assert.equal(await other.h.noteEdge(U1M, p, c, ENDED), null);
+});
+
+test('the desktop send records the printer-side name on the run (sentAs), through the shared rule', () => {
+  const PR = require('../lib/print-runs.js');
+  const f = PR.fields({ id: 'J1', printRuns: [] }, { machineId: 'M1', at: '2026-11-22T11:00:00Z', started: true, file: 'bracket.3mf', sentAs: 'khayt-1.gcode' });
+  assert.equal(f.printRuns[0].sentAs, 'khayt-1.gcode');
+  const kanban = fs.readFileSync(path.join(ROOT, 'renderer', 'kanban.js'), 'utf8');
+  assert.match(kanban, /recordPrintRun\(order\.id, machine\.id, !!r\.started, file\.originalName \|\| file\.filename, r\.filename\)/);
+  assert.match(kanban, /KhaytPrintRuns\.fields\(order, \{ machineId, at: new Date\(\)\.toISOString\(\), started, file: fileName, sentAs \}\)/);
+  // The upload answers with that name on every path.
+  const main = fs.readFileSync(path.join(ROOT, 'main.js'), 'utf8');
+  const up = main.slice(main.indexOf('async function uploadGcodeToPrinter('), main.indexOf('\n}\n', main.indexOf('async function uploadGcodeToPrinter(')));
+  assert.equal((up.match(/ok: true, started: !!startPrint, filename: name/g) || []).length, 2);
+});
