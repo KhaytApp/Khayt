@@ -212,6 +212,51 @@ extension Shop {
 
     // MARK: - Saying a refusal
 
+    /// The purposes only a person starts (the rule's `automatic: false`): a
+    /// refusal of one is somebody's action being refused, so it is also said
+    /// with "Open Internet use". The automatic ones are counted on their row
+    /// and announce nothing (frame D).
+    nonisolated static let askedFor: Set<OutboundPurpose> = [.ai, .taxAuthority, .exchangeRates, .makerrun, .catalogues]
+
+    /// Called as a refusal is put into words. Set on the next turn of the
+    /// main queue: this runs inside whatever is drawing the sentence.
+    func noteOutboundRefusal(_ blocked: OutboundBlocked, sentence: String) {
+        guard Self.askedFor.contains(blocked.purpose), blocked.reason != "settings-unknown" else { return }
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated { if self?.outboundNotice != sentence { self?.outboundNotice = sentence } }
+        }
+    }
+
+    // MARK: - Telling the other computers (page 27, frames F1–F3)
+
+    /// "Also tell my other computers through Khayt Cloud". This Mac's own
+    /// choice, off unless the owner turns it on.
+    nonisolated static let tellOthersKey = "network.tellOthers"
+    /// Whether the row is offered at all. Off until the one call it makes is
+    /// wired to Khayt Cloud's route: a switch that sends nothing must not be
+    /// on screen saying it does.
+    nonisolated(unsafe) static var tellOthersOffered = false
+
+    var outboundTellsOthers: Bool { Self.tellOthersOffered && outboundDefaults.bool(forKey: Self.tellOthersKey) }
+
+    /// The owner's alone, like the two switches.
+    @discardableResult
+    func setOutboundTellsOthers(_ on: Bool) -> Bool {
+        moveProblem = nil
+        guard permitted("security", "edit") else { return false }
+        outboundDefaults.set(on, forKey: Self.tellOthersKey)
+        return true
+    }
+
+    /// What became of the last telling: nil when none was tried.
+    enum ToldOthers: Equatable { case told(Date), failed }
+    nonisolated static let toldAtKey = "network.toldOthersAt"
+    nonisolated static let tellFailedKey = "network.tellOthersFailed"
+    var outboundToldOthers: ToldOthers? {
+        if outboundDefaults.bool(forKey: Self.tellFailedKey) { return .failed }
+        return (outboundDefaults.object(forKey: Self.toldAtKey) as? Date).map(ToldOthers.told)
+    }
+
     /// A refused call, in the shop's words (page 27, frame D): never a network
     /// error and never silent for something a person asked for.
     func outboundSentence(_ blocked: OutboundBlocked) -> String {

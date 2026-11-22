@@ -120,6 +120,7 @@ public final class OutboundGate: @unchecked Sendable {
     public struct Blocked: Sendable, Equatable {
         public var count: Int
         public var last: Date
+        public init(count: Int, last: Date) { self.count = count; self.last = last }
     }
 
     private let lock = NSLock()

@@ -145,7 +145,10 @@ struct KhaytApp: App {
                     // data exists is answering a question nobody asked.
                     // A refused internet call says why in this shop's words.
                     OutboundBlocked.speaker = { [weak shop] blocked in
-                        shop.map { $0.outboundSentence(blocked) } ?? blocked.description
+                        guard let shop else { return blocked.description }
+                        let sentence = shop.outboundSentence(blocked)
+                        shop.noteOutboundRefusal(blocked, sentence: sentence)
+                        return sentence
                     }
                     await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
                     // The book is read: a launch check for updates that waited
@@ -957,6 +960,12 @@ final class Activator: NSObject, NSApplicationDelegate {
             // deleting, on the sample, in memory (`SnapshotVaultLapse.swift`).
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_VAULTLAPSE"] == "1", let shop = subject {
                 await captureVaultLapse(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // The Internet use page, page 27's frames (`SnapshotInternetUse.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_INTERNETUSE"] == "1", let shop = subject {
+                await captureInternetUse(shop, into: dir, dark: dark)
                 NSApp.terminate(nil)
                 return
             }

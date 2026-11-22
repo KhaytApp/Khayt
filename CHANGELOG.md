@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: Settings ▸ General ▸ Internet use.** The page for the switch that stops Khayt calling the internet (Figma page 27).
+  - **Two switches.** "Make no internet calls", and "Also on this Mac only", which can only be stricter. Only the owner can change them; a manager sees the page and is told so.
+  - **One row for each kind of call**, from the shared rule: what it sends and where, whether it is automatic, and whether it is Allowed, Blocked, Kept, Off by its own switch or Not set up. While the switch is on, each row has a Keep tick.
+  - **What is lost while blocked** is said on the rows where it matters (updates, Khayt Cloud, messages, the online store, pay-later links), with how often a call was refused and when.
+  - **No update check for 30 days** turns the updates row red and puts a banner on every screen, with "Keep updates" and "Open Internet use".
+  - **A refusal of something you asked for** (exchange rates, AI assist, MakerRun, catalogues) is also said on every screen with "Open Internet use".
+  - **Who follows the switch** is said truthfully: this Mac and phones on its Wi-Fi. The option to tell the other computers through Khayt Cloud is drawn and worded, and stays hidden until its one call is wired.
+
 - **Mac: every call the app makes to the internet now asks one switch first (no screen yet).** The rule is the shared `lib/outbound.js`; the Mac asks it where each request is built, by what the call is for.
   - **What asks.** Updates (Sparkle, through its own hook, so a refused check fetches no feed), the install count, crash reports and usage statistics, Khayt Cloud, MakerRun, catalogues, off-site storage, messages and alerts, webhooks and connectors, pay-later links, the online store routes, AI assist, exchange rates and model covers.
   - **The shop's own network is never blocked.** Printers, cameras, smart plugs and Spoolman keep working. While the switch is on, an address that leads outside the shop's network is refused.

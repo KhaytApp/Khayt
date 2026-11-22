@@ -253,6 +253,11 @@ final class Shop {
     /// says so: a suite that turned the switch on would otherwise block every
     /// other suite's requests through the shared gate.
     var feedsOutboundGate = Shop.inTheApp
+    /// Settings ▸ General should open on Internet use (`OpenInternetUse`).
+    var opensInternetUse = false
+    /// A refusal of something a person asked for, said on every screen with
+    /// a way to the setting (page 27, frame D). Nil when closed.
+    var outboundNotice: String?
     /// The gate this shop tells and asks; the app's, unless a test hands one in.
     var outboundGate: OutboundGate = .app
     /// Where this Mac keeps its own "make no internet calls" switch.
