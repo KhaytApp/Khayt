@@ -1491,7 +1491,7 @@
 "problem.action.resume-on-printer" = "Am Drucker fortsetzen";
 "problem.action.check-printer" = "Drucker prüfen";
 "problem.severity.fatal" = "Kritisch";
-"problem.severity.serious" = "Ernst";
+"problem.severity.serious" = "Schwerwiegend";
 "problem.severity.common" = "Ansehen";
 "problem.severity.info" = "Information";
 "waiting.machine.title" = "%@ · wartet auf dich";

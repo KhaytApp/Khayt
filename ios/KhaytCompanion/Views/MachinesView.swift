@@ -311,17 +311,13 @@ struct MachineCard: View {
         case .printing, .paused, .needsYou: return live.filename.flatMap { $0.isEmpty ? nil : $0 }
         case .idle: return live.hasPrinterApi ? L10n.tr("machines.ready") : L10n.tr("machines.no_live")
         case .error: return live.error.flatMap { $0.isEmpty ? nil : $0 } ?? live.state
-        case .reconnecting: return lastHeard
+        // Not "last heard": the Mac stamps `lastUpdated` on a failed poll too,
+        // so it would read "just now" for a printer gone for hours (review of
+        // #2657). Shown again once the Mac sends when it last answered.
+        case .reconnecting: return nil
         case .refused: return L10n.tr("machines.refused.sub")
         case .offline: return L10n.tr("machines.offline.sub")
         }
-    }
-
-    /// "Last heard 2 min ago", from when the Mac last heard the printer.
-    private var lastHeard: String? {
-        guard let text = live.lastUpdated, let at = ISO8601DateFormatter.khaytLenient(text) else { return nil }
-        return L10n.format("machines.last_heard",
-                           at.formatted(.relative(presentation: .named).locale(L10n.locale)))
     }
 
     /// The message the card shows in place of the progress (frames: Needs

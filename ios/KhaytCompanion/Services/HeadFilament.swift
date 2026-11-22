@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 
 /// What each head of a multi-head printer used on a job (U1, #2611
 /// `perHeadPatch`): `order.actualHeads` as the Mac or the desktop wrote it,
@@ -33,11 +34,15 @@ extension KhaytAPIClient {
                 guard case .object(let h) = item, case .number(let n)? = h["head"], n >= 0, n < 64, n == n.rounded(),
                       case .number(let g)? = h["grams"], g.isFinite, g >= 0 else { return nil }
                 return HeadFilament.Head(head: Int(n), grams: g)
-            }.sorted { $0.head < $1.head }
-            guard !heads.isEmpty else { return nil }
+            }
+            // One row per head (review of #2657): a duplicate keeps the first,
+            // so ids stay unique and the list is at most 64 rows.
+            var seen = Set<Int>()
+            let unique = heads.filter { seen.insert($0.head).inserted }.sorted { $0.head < $1.head }
+            guard !unique.isEmpty else { return nil }
             var basis: String?
             if case .string(let b)? = job["actualHeadsBasis"] { basis = b }
-            return HeadFilament(heads: heads, basis: basis)
+            return HeadFilament(heads: unique, basis: basis)
         }
         return nil
     }

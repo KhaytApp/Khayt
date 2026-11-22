@@ -60,6 +60,10 @@ final class PrinterScreensTests: XCTestCase {
         keys += try list("KhaytPrinterProblems.SEVERITIES").map { "problem.severity." + $0 }
         keys += try list("KhaytWaitingAtMachine.REASONS").map { "waiting.reason." + $0 }
         XCTAssertGreaterThan(keys.count, 30)
+        // The panel looks words up only for these, so they must be the rules' sets.
+        XCTAssertEqual(PrinterNeedsPanel.codes, Set(try list("KhaytPrinterProblems.CODES")))
+        XCTAssertEqual(PrinterNeedsPanel.actions, Set(try list("KhaytPrinterProblems.ACTIONS")))
+        XCTAssertEqual(Set(PrinterProblem.severities), Set(try list("KhaytPrinterProblems.SEVERITIES")))
         keys += ["machines.state.paused", "machines.state.needs_you", "machines.state.reconnecting", "machines.state.refused",
                  "machines.needs_you.title", "machines.reconnecting.title", "machines.refused.title", "heads.title", "heads.note"]
         for lang in ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
@@ -86,6 +90,15 @@ final class PrinterScreensTests: XCTestCase {
         XCTAssertEqual(PrinterNeedsPanel.problemSub(odd), "Information · E42")
         XCTAssertEqual(PrinterNeedsPanel.reasonWords(WaitingReason(reason: "bed-to-clear", since: nil)), "Bed to clear")
         XCTAssertNil(PrinterNeedsPanel.since(WaitingReason(reason: "filament-runout", since: nil)))
+        // A head from the wire outside a printer's range is not shown, never overflows.
+        let wild = PrinterProblem(code: "filament-runout", severity: "serious", action: nil, source: nil,
+                                  head: Int.max, message: nil, ref: nil)
+        XCTAssertEqual(PrinterNeedsPanel.title(wild), "Filament ran out")
+        let negative = PrinterProblem(code: "head", severity: "severity.fatal", action: "head", source: nil,
+                                      head: -3, message: nil, ref: nil)
+        XCTAssertEqual(PrinterNeedsPanel.title(negative), "Printer error", "a code that is another key's name")
+        XCTAssertEqual(PrinterNeedsPanel.problemSub(negative), "Information")
+        XCTAssertNil(PrinterNeedsPanel.actionWords("head"))
     }
 
     func testFilamentPerHeadFromTheBook() {
@@ -96,6 +109,7 @@ final class PrinterScreensTests: XCTestCase {
                         .object(["head": .number(0), "grams": .number(42.3)]),
                         .object(["head": .number(2.5), "grams": .number(1)]),       // not a whole head
                         .object(["head": .number(3), "grams": .number(-1)]),        // not a weight
+                        .object(["head": .number(1), "grams": .number(99)]),        // a duplicate head
                         .string("junk")])]),
             .object(["id": .string("J2")]),
         ])]

@@ -73,6 +73,22 @@ struct PrinterNeedsPanel: View {
 
     // ── Words (closed sets from the shared rules) ───────────────────────
 
+    /// The rules' closed sets (`lib/printer-problems.js`, tested equal). A
+    /// value from the wire is looked up only when it is one of these, so a
+    /// hostile code can never pick some other key's words (review of #2657).
+    static let codes: Set<String> = ["filament-runout", "nozzle-clog", "temperature", "door-open", "first-layer", "spaghetti",
+                                     "bed-plate", "storage", "file-rejected", "power-lost", "paused-by-user", "print-cancelled",
+                                     "printer-exception", "printer-attention", "printer-error"]
+    static let actions: Set<String> = ["load-filament", "clear-nozzle", "check-heater", "close-door", "check-print", "check-plate",
+                                       "check-storage", "reslice", "resend-file", "resume-on-printer", "check-printer", "none"]
+
+    /// A head the printer named, shown 1-based; anything outside a real
+    /// printer's heads is not shown (and never overflows).
+    static func headLabel(_ words: String, _ head: Int?) -> String {
+        guard let head, (0..<64).contains(head) else { return words }
+        return L10n.format("problem.head", words, head + 1)
+    }
+
     static func tone(_ severity: String) -> Color {
         switch severity {
         case "fatal", "serious": return KhaytDesign.late
@@ -84,32 +100,26 @@ struct PrinterNeedsPanel: View {
     /// `problem.<code>`, "· head N" when the printer said which; an unknown
     /// code reads as a printer error, never as nothing.
     static func title(_ p: PrinterProblem) -> String {
-        let key = "problem." + p.code
-        let words = L10n.tr(key) == key ? L10n.tr("problem.printer-error") : L10n.tr(key)
-        guard let head = p.head else { return words }
-        return L10n.format("problem.head", words, head + 1)
+        let words = L10n.tr("problem." + (codes.contains(p.code) ? p.code : "printer-error"))
+        return headLabel(words, p.head)
     }
 
     /// Severity, then the printer's own message or the note a code carries.
     static func problemSub(_ p: PrinterProblem) -> String? {
-        let key = "problem.severity." + p.severity
-        var parts = [L10n.tr(key) == key ? L10n.tr("problem.severity.info") : L10n.tr(key)]
+        var parts = [L10n.tr("problem.severity." + (PrinterProblem.severities.contains(p.severity) ? p.severity : "info"))]
         if p.code == "power-lost" { parts.append(L10n.tr("problem.power-lost.note")) }
         else if let m = p.message, !m.isEmpty { parts.append(m) }
         return parts.joined(separator: " · ")
     }
 
     static func actionWords(_ action: String) -> String? {
-        guard action != "none" else { return nil }
-        let key = "problem.action." + action
-        return L10n.tr(key) == key ? nil : L10n.tr(key)
+        guard action != "none", actions.contains(action) else { return nil }
+        return L10n.tr("problem.action." + action)
     }
 
     static func reasonWords(_ w: WaitingReason) -> String {
-        let key = "waiting.reason." + w.reason
-        let words = L10n.tr(key) == key ? L10n.tr("waiting.reason.printer-attention") : L10n.tr(key)
-        guard let head = w.head else { return words }
-        return L10n.format("problem.head", words, head + 1)
+        let words = L10n.tr("waiting.reason." + (WaitingReason.reasons.contains(w.reason) ? w.reason : "printer-attention"))
+        return headLabel(words, w.head)
     }
 
     static func since(_ w: WaitingReason) -> String? {
