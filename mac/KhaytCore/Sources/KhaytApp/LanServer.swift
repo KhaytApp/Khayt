@@ -4001,7 +4001,8 @@ extension LanServer {
     /// One machine as `/api/machines/live` answers it — `lib/lan-server.js`,
     /// field for field, integers rounded as it rounds them.
     nonisolated static func liveRow(id: String, name: String, apiType: String?,
-                                    reading: PrinterWatch.Reading?) -> JSONValue {
+                                    reading: PrinterWatch.Reading?,
+                                    needs: KhaytEngine.PrinterNeeds = .none) -> JSONValue {
         let type = (apiType ?? "").trimmingCharacters(in: .whitespaces)
         let s = reading?.status
         func int(_ v: Double?) -> JSONValue { v.map { .number(($0).rounded()) } ?? .null }
@@ -4019,6 +4020,12 @@ extension LanServer {
             "lastUpdated": reading.map { .string(StoreWriter.iso($0.at)) } ?? .null,
             // The printer's own word for itself, else the type the shop set.
             "apiType": text((s?.type ?? "").isEmpty ? type : s?.type),
+            // What it needs from a person, worked out HERE by the shared rules
+            // (`lib/printer-problems.js`, `lib/waiting-at-machine.js`) so the
+            // phone never works them out itself. Always lists: empty means
+            // "nothing needed", which an older Mac says by leaving them out.
+            "problems": .array(needs.problems),
+            "waiting": .array(needs.waiting),
         ])
     }
 }
@@ -4029,7 +4036,7 @@ extension Shop {
     func machinesLive() -> [JSONValue] {
         machinesInUse.map { m in
             LanServer.liveRow(id: m.id, name: m.name, apiType: m.printerApi?.type,
-                              reading: printers.readings[m.id])
+                              reading: printers.readings[m.id], needs: machineNeeds[m.id] ?? .none)
         }
     }
 }

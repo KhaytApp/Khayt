@@ -1634,6 +1634,9 @@ final class Shop {
     /// wear, and doing that every ten seconds to move one tile from 0/1 to 1/1
     /// would be paying for the wrong thing.
     func printersAnswered() async {
+        // Before anything is published: the phone and the cloud read each
+        // printer's problems and waiting reasons from this sweep, not the last.
+        await refreshMachineNeeds()
         await publishLivePrinters()
         // A phone away from the shop's Wi-Fi asking to pause or stop a print:
         // read on the same sweep that publishes what the printers said.
@@ -1651,6 +1654,20 @@ final class Shop {
         // (`MenuBarProgress.lines`), and it was only as fresh as the last time
         // that screen had been looked at.
         await planDispatch()
+    }
+
+    /// Each printer's problems and waiting reasons, from the shared rules.
+    /// A rule that cannot be asked leaves none, never the last sweep's.
+    func refreshMachineNeeds() async {
+        guard let engine, !machineRows.isEmpty else { machineNeeds = [:]; return }
+        let fleet = Self.fleetForDashboard(machineRows, cache: printers.statusCache)
+        var polled: [String: [JSONValue]] = [:]
+        for (id, reading) in printers.readings {
+            if let problems = reading.status?.problems { polled[id] = problems }
+        }
+        machineHiddenControls = ((try? await engine.printerHiddenControls(machines: machineRows)) ?? [:]).mapValues(Set.init)
+        machineNeeds = (try? await engine.printerNeeds(machines: fleet.machines, cache: fleet.cache, polled: polled,
+                                                       completions: printerCompletions, orders: orderRows)) ?? [:]
     }
 
     /// Ask the shared rule what every job still owes, and put it on the rows.
@@ -1989,6 +2006,12 @@ final class Shop {
     var lanPhonePairing = LanConnectorPairing(flavor: .phone)
     /// Slicer plugins paired with this Mac (`Shop+ConnectedApps`), as last read.
     var connectedApps: [LanDevices.Listed] = []
+    /// What each polled printer needs from a person (`KhaytEngine.printerNeeds`),
+    /// as of the last sweep: its problems and why it waits at the machine.
+    var machineNeeds: [String: KhaytEngine.PrinterNeeds] = [:]
+    /// The card controls each machine's model or protocol cannot do
+    /// (`KhaytEngine.printerHiddenControls`): the card leaves them out.
+    var machineHiddenControls: [String: Set<String>] = [:]
     /// A test's own device store; the app uses the Keychain's (`.shared`).
     var lanDevicesForTests: LanDevices?
     /// Hands a linked file the app fetched back to its cloud drive, so its

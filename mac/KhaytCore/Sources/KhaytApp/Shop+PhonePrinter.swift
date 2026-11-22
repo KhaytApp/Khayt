@@ -39,7 +39,9 @@ extension Shop {
         printerBusy.insert(machine.id)
         defer { printerBusy.remove(machine.id) }
         do {
-            try await PrinterControl.send(verb, to: machine, engine: engine, build: source.build)
+            try await printers.commanding(machine, shop: self) {
+                try await PrinterControl.send(verb, to: machine, engine: engine, build: source.build)
+            }
         } catch PrinterControl.Failure.noJob {
             return refuse(409, "no-job")
         } catch PrinterControl.Failure.unsupported(let why) {

@@ -1,0 +1,119 @@
+import Foundation
+import KhaytCore
+
+/// Filament used per head, for a print a Snapmaker U1 just finished (U1 idea
+/// 4; `lib/printer-actuals.js perHeadActuals` and `perHeadPatch`).
+///
+/// The printer's history holds the slicer's grams per head and the measured
+/// total. The shared rule splits the measured total across the heads in
+/// proportion to their estimates and says so (`basis: proportional`): no head's
+/// figure is called measured on its own. The Mac only fetches the history (a
+/// read) and writes what the rule returns.
+///
+/// ── ONE RECORD PER PRINT ─────────────────────────────────────────────────
+///
+/// The printer's own job id is the key (`actualHeadsJobId`). A job that
+/// already holds a split is left alone, whether this Mac, the desktop or a
+/// second look wrote it, so a print is never counted twice.
+@MainActor
+enum HeadActuals {
+    /// When to look after a print finishes: history is written as it ends.
+    static let tries: [Duration] = [.seconds(20), .seconds(90)]
+    static let historyLimit = 5
+    /// How far the history row's end may be from when Khayt saw the print
+    /// end. An older run of the same file is not this print.
+    static let window: TimeInterval = 20 * 60
+
+    /// The history row for the print that just ended under `filename`: the
+    /// newest completed run of that file that ended near `endedAt`.
+    ///
+    /// The CLOSEST such run that no job already holds (`taken`), by the
+    /// shared rule (`lib/printer-actuals.js historyRun`): the first row in
+    /// the window could be an earlier run of the same file, which put one
+    /// print on two jobs and refused the second job's real figures for good.
+    static func job(in history: [String: JSONValue], filename: String, endedAt: Date,
+                    taken: [String] = [], engine: KhaytEngine) async -> JSONValue? {
+        guard case .object(let result)? = history["result"], let jobs = result["jobs"],
+              let row = try? await engine.headActualsRun(jobs: jobs, filename: filename, endedAt: endedAt, taken: taken),
+              case .object = row else { return nil }
+        return row
+    }
+
+    /// The run ids jobs already hold, other than `except`'s own.
+    nonisolated static func taken(_ rows: [JSONValue], except jobId: String? = nil) -> [String] {
+        rows.compactMap { row in
+            guard case .object(let o) = row, Shop.recordId(row) != jobId, case .string(let id)? = o["actualHeadsJobId"] else { return nil }
+            return id
+        }
+    }
+}
+
+extension Shop {
+
+    /// After a finished Moonraker print on a job the book names: read how
+    /// much each head used and note it on the job. Best-effort and silent: a
+    /// printer whose history does not say per head simply has none.
+    ///
+    /// `jobId` is NOT `ended.orderId`. That one is the finish photo's pick,
+    /// which falls back to "the only printing job" and to a job already
+    /// moved on; a calibration print started at the printer's own screen
+    /// would put its grams on a shop job. This is `headActualsJob`, asked at
+    /// the moment the print ended: printing, on this machine, naming the file.
+    func noteHeadActuals(_ ended: FinishCamera.Ended, machine: Machine, jobId: String?) async {
+        guard ended.outcome == "finished", let jobId, !ended.filename.isEmpty,
+              machine.printerApi?.type == "moonraker", let engine else { return }
+        let endedAt = ended.finishedAt ?? Date()
+        for wait in HeadActuals.tries {
+            try? await Task.sleep(for: wait)
+            if Task.isCancelled { return }
+            guard source.build != nil, canWrite,
+                  case .object(let row)? = orderRows.first(where: { Self.recordId($0) == jobId }) else { return }
+            if row["actualHeadsJobId"] != nil { return }
+            guard let current = machines.first(where: { $0.id == machine.id }),
+                  let base = try? await PrinterWatch.baseURL(current, engine: engine) else { return }
+            var key = ""
+            if let sealed = current.printerApi?.apiKey, !sealed.isEmpty, let build = source.build {
+                key = (try? await Secrets.open(sealed, for: build)) ?? ""
+            }
+            guard let history = try? await PrinterWatch.get(base, path: "/server/history/list?limit=\(HeadActuals.historyLimit)",
+                                                            key: key, type: "moonraker", timeout: 10),
+                  let job = await HeadActuals.job(in: history, filename: ended.filename, endedAt: endedAt,
+                                                  taken: HeadActuals.taken(orderRows), engine: engine) else { continue }
+            _ = await writeHeadActuals(historyJob: job, jobId: jobId)
+            return
+        }
+    }
+
+    /// Put the rule's split on the job, through the write chain. False when
+    /// nothing was written: the history says nothing per head, the job
+    /// already holds a split, or this Mac may not write.
+    @discardableResult
+    func writeHeadActuals(historyJob: JSONValue, jobId: String) async -> Bool {
+        // THE PRINTER'S OWN RECORD, NOT A PERSON'S EDIT. This runs after a
+        // print ends, with whoever is or is not at the Mac: asked as a
+        // person's edit it was refused whenever the lock was on and nobody
+        // was signed in, which is how this Mac starts, and an overnight
+        // print's figures were dropped for good (the tries end after two
+        // minutes). The lock gates people, not the bookkeeping.
+        guard let engine, let build = source.build, canWrite, permitted(.system("the printer's own record")),
+              let row = orderRows.first(where: { Self.recordId($0) == jobId }),
+              case .object(let patch)? = try? await engine.perHeadPatch(order: row, historyJob: historyJob) else { return false }
+        // One print, one job: a run another job already holds is not written
+        // on a second (the row picker skips those; this is the same promise
+        // kept at the write, whoever picked the row).
+        if case .string(let run)? = patch["actualHeadsJobId"], HeadActuals.taken(orderRows, except: jobId).contains(run) { return false }
+        let wrote = (try? await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: jobId) { job -> Bool in
+            // Asked again on the record as it is on disk: the other app may
+            // have written this print's split since the rule was asked.
+            guard job["actualHeadsJobId"] == nil else { return false }
+            for (key, value) in patch where Self.headActualKeys.contains(key) { job[key] = value }
+            return true
+        }) ?? nil
+        guard wrote == true else { return false }
+        await load(source)
+        return true
+    }
+
+    /// The only keys a split writes.
+    nonisolated static let headActualKeys: Set<String> = ["actualHeads", "actualHeadsJobId", "actualHeadsBasis"]
+}
