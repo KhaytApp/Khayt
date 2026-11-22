@@ -1,5 +1,5 @@
 {
- "about": "lib/outbound.js allowed(settings, purpose, ctx). Master switch in settings.network (book), stricter-only local override in ctx.local, each purpose's own opt-in after. lan is never blocked but must be a private address or LAN name while offline (or while the book is unread). Decided Nov 22 (D1-D6 as recommended). Mac and iPhone run this file through JSC.",
+ "about": "lib/outbound.js allowed(settings, purpose, ctx). Master switch in settings.network (book), stricter-only local override in ctx.local, each purpose's own opt-in after. lan is never blocked but must be a private address or LAN name while offline (or while the book is unread). Decided Nov 22 (D1-D6 as recommended). Mac and iPhone run this file through JSC. Round 2 (Nov 22): storefront, the shop's online store (Medusa, Salla, Zid; the desktop's Khayt Cloud storefront routes), a purpose of its own, keepable.",
  "purposes": [
   "updates",
   "install-count",
@@ -12,6 +12,7 @@
   "messaging",
   "webhooks",
   "payments",
+  "storefront",
   "ai",
   "tax-authority",
   "exchange-rates",
@@ -813,6 +814,106 @@
    },
    "ctx": {
     "host": "2001:4860:4860::8888"
+   }
+  },
+  {
+   "why": "storefront: online, the online store's calls go",
+   "settings": {},
+   "purpose": "storefront",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
+  },
+  {
+   "why": "storefront: offline and not kept, blocked",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "storefront",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "storefront: offline and kept by name, it goes",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "storefront"
+     ]
+    }
+   },
+   "purpose": "storefront",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   }
+  },
+  {
+   "why": "storefront: keeping the cloud does not keep the online store",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "cloud"
+     ]
+    }
+   },
+   "purpose": "storefront",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "storefront: keeping the online store does not keep the cloud",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "storefront"
+     ]
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "storefront: this computer's own switch beats keeping it",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "storefront"
+     ]
+    }
+   },
+   "purpose": "storefront",
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   },
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   }
+  },
+  {
+   "why": "storefront: the book not read yet, blocked",
+   "settings": null,
+   "purpose": "storefront",
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
    }
   }
  ]
