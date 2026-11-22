@@ -182,15 +182,29 @@ final class ConnectionSettings: ObservableObject {
     @Published var pairedByCode: Bool {
         didSet { UserDefaults.standard.set(pairedByCode, forKey: Keys.pairedByCode) }
     }
-    /// The role this phone acts on (`lib/device-roles.js` `roleOf`).
-    var effectiveRole: String { DeviceRole.effective(role: deviceRole, pairedByCode: pairedByCode) }
+    /// The role this phone acts on (`lib/device-roles.js` `roleOf`), for what
+    /// only a role may do: the owner's switches and the scopes a screen offers.
+    /// A Khayt Cloud member never paired with a Mac acts on their cloud role,
+    /// and an unknown role is a viewer (`DeviceRole.acting`).
+    var effectiveRole: String {
+        let cloud = CloudSession.savedRole()
+        return DeviceRole.acting(role: deviceRole, pairedByCode: pairedByCode,
+                                 heldByMac: device != nil || !pin.isEmpty,
+                                 cloudSignedIn: cloud.signedIn, cloudRole: cloud.role, sampleShop: isSampleShop)
+    }
+    /// The role that decides whether this phone keeps the book and which
+    /// screens it shows: the Mac pairing's (`DeviceRole.effective`), unchanged.
+    /// Kept apart from `effectiveRole` on purpose: a cloud member's phone holds
+    /// the book the cloud gave it, and a stricter role here would make it
+    /// forget that book (floor mode).
+    private var bookRole: String { DeviceRole.effective(role: deviceRole, pairedByCode: pairedByCode) }
     /// Whether this phone may keep the shop's book (`book:read`): manager and
     /// owner. Below that it is a floor phone with no local book (D-P6 a).
-    var mayHoldBook: Bool { DeviceRole.mayHoldBook(effectiveRole) }
+    var mayHoldBook: Bool { DeviceRole.mayHoldBook(bookRole) }
     /// Whether this phone's role holds `scope` (what to show; the Mac checks).
     func can(_ scope: String) -> Bool { DeviceRole.allows(effectiveRole, scope) }
     /// Operator or viewer: the floor screens (no book, prices or clients).
-    var isFloorPhone: Bool { DeviceRole.isFloor(effectiveRole) }
+    var isFloorPhone: Bool { DeviceRole.isFloor(bookRole) }
     /// The Mac signed this phone out (`device-revoked`). The pairing screen
     /// says so, until a PIN is typed again.
     @Published var signedOutByMac: Bool {
