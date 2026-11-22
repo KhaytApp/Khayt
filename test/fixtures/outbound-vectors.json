@@ -18,6 +18,7 @@
   "exchange-rates",
   "lookups",
   "tunnel",
+  "switch-sync",
   "lan"
  ],
  "cases": [
@@ -1049,6 +1050,129 @@
     "allowed": true,
     "reason": "ok"
    }
+  },
+  {
+   "why": "switch-sync online: allowed like anything else",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   },
+   "settings": {}
+  },
+  {
+   "why": "switch-sync while offline by the LAN or this shop's own switch (not via Khayt Cloud): no call at all",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "switch-sync while offline through Khayt Cloud: the one call kept",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud"
+    }
+   }
+  },
+  {
+   "why": "switch-sync unticked: not kept even through Khayt Cloud",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud",
+     "dropSwitchSync": true
+    }
+   }
+  },
+  {
+   "why": "switch-sync is never kept by the keep list: only the via rule decides",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "switch-sync"
+     ]
+    }
+   }
+  },
+  {
+   "why": "switch-sync: a via that is not exactly 'cloud' does not count",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "Cloud"
+    }
+   }
+  },
+  {
+   "why": "switch-sync: this computer offline on its own makes no call, even through Khayt Cloud",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud"
+    }
+   },
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "through Khayt Cloud keeps ONLY switch-sync: the cloud purpose itself stays blocked",
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "settings": {
+    "network": {
+     "offline": true,
+     "via": "cloud"
+    }
+   }
+  },
+  {
+   "why": "switch-sync with the book unread: blocked",
+   "purpose": "switch-sync",
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
+   },
+   "settings": null
   }
  ]
 }
