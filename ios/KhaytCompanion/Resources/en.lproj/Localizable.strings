@@ -51,7 +51,7 @@
 "settings.port" = "Port: %d";
 "settings.pin" = "Owner LAN PIN";
 "settings.retest" = "Re-test pairing";
-"settings.unpair" = "Unpair this device";
+"settings.unpair" = "Sign out";
 "settings.unpair.footer" = "Deletes the shop's book from this phone, along with the PIN and the connectors' keys.";
 "settings.language" = "Language";
 "settings.notifications" = "Notifications";
@@ -564,6 +564,7 @@
 "settings.live_activities" = "Prints on the Lock Screen";
 "settings.count_install.hint" = "Once a day, sends only the app's platform, version and release channel, and whether this is its first day this week, this month or ever. No id, nothing about your shop.";
 "settings.count_install" = "Count this install (anonymous)";
+"settings.count_install.owner_only" = "Only the owner can change this.";
 "settings.privacy" = "Privacy";
 "settings.privacy_policy" = "Privacy policy";
 "alert.print.finished" = "Print finished";
@@ -1195,7 +1196,7 @@
 "connectors.key.enter" = "Enter";
 "connectors.key.replace" = "Replace";
 "connectors.key.delete" = "Delete key";
-"connectors.key.footer" = "Kept in this iPhone’s Keychain only. Each iPhone and Mac keeps its own, and Unpair deletes it.";
+"connectors.key.footer" = "Kept in this iPhone’s Keychain only. Each iPhone and Mac keeps its own, and Sign out deletes it.";
 "connectors.error.key_missing" = "Add the key “%@” in Settings ▸ Connectors first. Nothing was sent.";
 "connectors.error.build" = "This button can’t be used right now. Nothing was sent.";
 "connectors.error.scheme" = "Khayt opens only secure https links. Nothing was opened or sent.";

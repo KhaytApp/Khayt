@@ -51,7 +51,7 @@
 "settings.port" = "Bağlantı noktası: %d";
 "settings.pin" = "Sahip LAN PIN’i";
 "settings.retest" = "Eşlemeyi yeniden sına";
-"settings.unpair" = "Bu aygıtın eşlemesini kaldır";
+"settings.unpair" = "Oturumu kapat";
 "settings.unpair.footer" = "Dükkânın defterini, PIN’i ve bağlayıcı anahtarlarını bu telefondan siler.";
 "settings.language" = "Dil";
 "settings.notifications" = "Bildirimler";
@@ -564,6 +564,7 @@
 "settings.live_activities" = "Kilit Ekranı’nda baskılar";
 "settings.count_install.hint" = "Günde bir kez yalnızca uygulamanın platformunu, sürümünü ve sürüm kanalını, bir de bunun bu hafta, bu ay veya şimdiye dek ilk gün olup olmadığını gönderir. Kimlik yok, dükkânınız hakkında hiçbir şey yok.";
 "settings.count_install" = "Bu kurulumu say (anonim)";
+"settings.count_install.owner_only" = "Bunu yalnızca sahip değiştirebilir.";
 "settings.privacy" = "Gizlilik";
 "settings.privacy_policy" = "Gizlilik politikası";
 "alert.print.finished" = "Baskı bitti";
@@ -1195,7 +1196,7 @@
 "connectors.key.enter" = "Gir";
 "connectors.key.replace" = "Değiştir";
 "connectors.key.delete" = "Anahtarı sil";
-"connectors.key.footer" = "Yalnızca bu iPhone’un Anahtar Zinciri’nde tutulur. Her iPhone ve Mac kendi anahtarını tutar; eşleştirmeyi kaldırmak onu siler.";
+"connectors.key.footer" = "Yalnızca bu iPhone’un Anahtar Zinciri’nde tutulur. Her iPhone ve Mac kendi anahtarını tutar; oturumu kapatmak onu siler.";
 "connectors.error.key_missing" = "Önce Ayarlar ▸ Bağlayıcılar’da “%@” anahtarını girin. Hiçbir şey gönderilmedi.";
 "connectors.error.build" = "Bu düğme şu anda kullanılamıyor. Hiçbir şey gönderilmedi.";
 "connectors.error.scheme" = "Khayt yalnızca güvenli https bağlantılarını açar. Hiçbir şey açılmadı ya da gönderilmedi.";

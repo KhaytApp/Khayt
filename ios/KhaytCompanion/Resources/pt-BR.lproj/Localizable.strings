@@ -51,7 +51,7 @@
 "settings.port" = "Porta: %d";
 "settings.pin" = "PIN da rede local do proprietário";
 "settings.retest" = "Testar o pareamento novamente";
-"settings.unpair" = "Desparear este dispositivo";
+"settings.unpair" = "Desconectar";
 "settings.unpair.footer" = "Apaga deste iPhone o livro da oficina, o PIN e as chaves dos conectores.";
 "settings.language" = "Idioma";
 "settings.notifications" = "Notificações";
@@ -564,6 +564,7 @@
 "settings.live_activities" = "Impressões na Tela Bloqueada";
 "settings.count_install.hint" = "Uma vez por dia, envia apenas a plataforma, a versão e o canal de lançamento do app, e se este é o primeiro dia dele nesta semana, neste mês ou em geral. Sem ID, nada sobre a sua oficina.";
 "settings.count_install" = "Contar esta instalação (anônimo)";
+"settings.count_install.owner_only" = "Só o proprietário pode mudar isto.";
 "settings.privacy" = "Privacidade";
 "settings.privacy_policy" = "Política de privacidade";
 "alert.print.finished" = "Impressão concluída";
@@ -1195,7 +1196,7 @@
 "connectors.key.enter" = "Inserir";
 "connectors.key.replace" = "Substituir";
 "connectors.key.delete" = "Apagar chave";
-"connectors.key.footer" = "Guardada só nas Chaves deste iPhone. Cada iPhone e Mac tem a sua, e Desparear a apaga.";
+"connectors.key.footer" = "Guardada só nas Chaves deste iPhone. Cada iPhone e Mac tem a sua, e Desconectar a apaga.";
 "connectors.error.key_missing" = "Primeiro adicione a chave “%@” em Ajustes ▸ Conectores. Nada foi enviado.";
 "connectors.error.build" = "Este botão não pode ser usado agora. Nada foi enviado.";
 "connectors.error.scheme" = "O Khayt só abre links https seguros. Nada foi aberto nem enviado.";

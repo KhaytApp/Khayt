@@ -496,15 +496,27 @@ struct SettingsNotificationsPage: View {
 struct SettingsPrivacyPage: View {
     @EnvironmentObject private var settings: ConnectionSettings
 
+    /// Only the owner changes the install count (and, when the phone has
+    /// them, the crash and usage opt-ins).
+    static func ownerMayChange(_ effectiveRole: String) -> Bool { effectiveRole == "owner" }
+
     var body: some View {
         SettingsPage {
             if ActiveCountSender.ready {
+                // The owner's to change (Turki: "install count and telemetry
+                // owner-only", as #2636/#2642 on the desktop and the Mac). It
+                // stays a value of this phone; below owner it is shown, not
+                // changed.
                 VStack(spacing: 0) {
                     SettingsPieces.toggle(L10n.tr("settings.count_install"), $settings.countInstall, last: true)
+                        .disabled(!Self.ownerMayChange(settings.effectiveRole))
                 }
                 .card()
                 .padding(.top, 12)
                 SettingsPieces.foot(L10n.tr("settings.count_install.hint"))
+                if !Self.ownerMayChange(settings.effectiveRole) {
+                    SettingsPieces.foot(L10n.tr("settings.count_install.owner_only"))
+                }
             }
             // One page for both languages: each section has its Arabic beside it.
             Link(destination: SettingsRoute.privacyURL) {

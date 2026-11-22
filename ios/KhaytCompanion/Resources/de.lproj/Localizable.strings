@@ -51,7 +51,7 @@
 "settings.port" = "Port: %d";
 "settings.pin" = "LAN-PIN des Inhabers";
 "settings.retest" = "Kopplung erneut testen";
-"settings.unpair" = "Kopplung dieses Geräts aufheben";
+"settings.unpair" = "Abmelden";
 "settings.unpair.footer" = "Löscht das Shop-Buch, die PIN und die Schlüssel der Connectoren von diesem iPhone.";
 "settings.language" = "Sprache";
 "settings.notifications" = "Mitteilungen";
@@ -564,6 +564,7 @@
 "settings.live_activities" = "Drucke auf dem Sperrbildschirm";
 "settings.count_install.hint" = "Sendet einmal täglich nur Plattform, Version und Release-Kanal der App sowie ob dies der erste Tag dieser Woche, dieses Monats oder überhaupt ist. Keine ID, nichts über deinen Shop.";
 "settings.count_install" = "Diese Installation zählen (anonym)";
+"settings.count_install.owner_only" = "Nur der Inhaber kann das ändern.";
 "settings.privacy" = "Datenschutz";
 "settings.privacy_policy" = "Datenschutzerklärung";
 "alert.print.finished" = "Druck abgeschlossen";
@@ -1195,7 +1196,7 @@
 "connectors.key.enter" = "Eingeben";
 "connectors.key.replace" = "Ersetzen";
 "connectors.key.delete" = "Schlüssel löschen";
-"connectors.key.footer" = "Nur im Schlüsselbund dieses iPhones. Jedes iPhone und jeder Mac hat seinen eigenen, und Entkoppeln löscht ihn.";
+"connectors.key.footer" = "Nur im Schlüsselbund dieses iPhones. Jedes iPhone und jeder Mac hat seinen eigenen, und Abmelden löscht ihn.";
 "connectors.error.key_missing" = "Gib zuerst den Schlüssel „%@“ unter Einstellungen ▸ Connectoren ein. Nichts wurde gesendet.";
 "connectors.error.build" = "Diese Taste kann gerade nicht verwendet werden. Nichts wurde gesendet.";
 "connectors.error.scheme" = "Khayt öffnet nur sichere https-Links. Nichts wurde geöffnet oder gesendet.";

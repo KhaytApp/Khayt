@@ -51,7 +51,7 @@
 "settings.port" = "ポート: %d";
 "settings.pin" = "オーナー用LAN PIN";
 "settings.retest" = "ペアリングを再テスト";
-"settings.unpair" = "このデバイスのペアリングを解除";
+"settings.unpair" = "サインアウト";
 "settings.unpair.footer" = "お店の帳簿、PIN、コネクタのキーをこのiPhoneから削除します。";
 "settings.language" = "言語";
 "settings.notifications" = "通知";
@@ -564,6 +564,7 @@
 "settings.live_activities" = "ロック画面の印刷状況";
 "settings.count_install.hint" = "1日1回、アプリのプラットフォーム、バージョン、リリースチャンネルと、今週・今月・初めての初日かどうかだけを送信します。IDやお店に関する情報は含まれません。";
 "settings.count_install" = "このインストールをカウント(匿名)";
+"settings.count_install.owner_only" = "これを変更できるのはオーナーだけです。";
 "settings.privacy" = "プライバシー";
 "settings.privacy_policy" = "プライバシーポリシー";
 "alert.print.finished" = "印刷完了";
@@ -1195,7 +1196,7 @@
 "connectors.key.enter" = "入力";
 "connectors.key.replace" = "置き換え";
 "connectors.key.delete" = "キーを削除";
-"connectors.key.footer" = "このiPhoneのキーチェーンにのみ保存されます。iPhoneとMacはそれぞれ別のキーを持ち、ペアリング解除で削除されます。";
+"connectors.key.footer" = "このiPhoneのキーチェーンにのみ保存されます。iPhoneとMacはそれぞれ別のキーを持ち、サインアウトで削除されます。";
 "connectors.error.key_missing" = "先に 設定 ▸ コネクタ でキー「%@」を入力してください。何も送信されていません。";
 "connectors.error.build" = "このボタンは現在使用できません。何も送信されていません。";
 "connectors.error.scheme" = "Khaytは安全なhttpsリンクだけを開きます。何も開かず、送信もしていません。";
