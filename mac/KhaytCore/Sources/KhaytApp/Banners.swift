@@ -28,6 +28,19 @@ struct MoveBanners: View {
                 }
             }
         }
+        // THE SHOP'S SWITCH, FROM KHAYT CLOUD, WAITING FOR A PERSON
+        // (`Shop+NetworkSwitch`). Never applied on its own: an old "off" met
+        // by a new install, or a change made at another computer at the
+        // moment the switch was changed here.
+        if let ask = shop.networkSwitchAsk {
+            Banner(text: NetworkSwitchWords.sentence(ask, words: shop.words), symbol: "wifi.exclamationmark", tint: Khayt.attention) {
+                HStack(spacing: 8) {
+                    Button(shop.words.callIt("mac.net_ask_apply")) { Task { await shop.answerNetworkSwitch(apply: true) } }
+                    Button(shop.words.callIt("mac.net_ask_leave")) { Task { await shop.answerNetworkSwitch(apply: false) } }
+                }
+                .disabled(!shop.lockAllows("security", "edit"))
+            }
+        }
         // ORDERS THIS APP DRAFTED BY ITSELF, because the shop asked it to.
         //
         // Drafts only, and the shop reviews them before any is sent — but the

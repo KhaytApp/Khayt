@@ -165,6 +165,10 @@ struct KhaytApp: App {
                     // Opt-in crash reports and usage counts (#1789). Sends
                     // nothing unless the book says so; see `Telemetry`.
                     Telemetry.shared.start(shop: shop)
+                    // The shop's switch as Khayt Cloud holds it, for a shop that
+                    // shares it: now, and every fifteen minutes
+                    // (`Shop+NetworkSwitch`). Asks nothing unless signed in.
+                    shop.startNetworkSwitchChecks()
                     // Pages saved with the browser extension, waiting in the
                     // app group's inbox (`WebSaveInbox`). Never in a snapshot
                     // run: that is the sample, which would refuse and drop them.

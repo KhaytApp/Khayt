@@ -261,6 +261,14 @@ final class Shop {
     /// A refusal of something a person asked for, said on every screen with
     /// a way to the setting (page 27, frame D). Nil when closed.
     var outboundNotice: String?
+    /// A value from Khayt Cloud's network-switch route that waits for a
+    /// person before it is applied (`Shop+NetworkSwitch`). Nil when none.
+    var networkSwitchAsk: NetworkSwitchAsk?
+    var networkSwitchHeld: NetworkSwitch.Value?
+    /// How the network-switch route is asked. Nil is Khayt Cloud's session;
+    /// a test answers as the server would.
+    var networkSwitchFetch: NetworkSwitchFetch?
+    var networkSwitchTask: Task<Void, Never>?
     /// The gate this shop tells and asks; the app's, unless a test hands one in.
     var outboundGate: OutboundGate = .app
     /// Where this Mac keeps its own "make no internet calls" switch.

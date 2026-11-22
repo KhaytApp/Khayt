@@ -131,6 +131,13 @@ extension Shop {
         return .object(n)
     }
 
+    /// Whether a stored `settings.network` has the switch on, read as the
+    /// rule reads it: anything but exactly `false` (or absent) is on.
+    nonisolated static func offlineOf(_ network: JSONValue?) -> Bool {
+        guard case .object(let n)? = network, let v = n["offline"] else { return false }
+        return v != .bool(false) && v != .null
+    }
+
     /// `settings.network` with one purpose kept, or no longer kept, while
     /// offline. Only a purpose the rule knows, never `lan` (always allowed)
     /// and never `tunnel` (the Mac has none). The stamp is not touched.
@@ -177,11 +184,23 @@ extension Shop {
         moveProblem = nil
         guard permitted("security", "edit") else { return false }
         let name: String? = lockInForce ? signedIn?.name : nil
+        let before = networkSettings
+        let next = Self.network(.object(before), offline: on, by: name, at: now)
+        let changed = Self.offlineOf(.object(before)) != on
+        // TURNED ON, WITH THE OPTION ON: the one last call, while this Mac may
+        // still make it. Ten seconds at most; then it stops whatever came back.
+        if on, changed { await tellOthersSwitchedOn(next) }
         guard await writeNetwork({ Self.network($0, offline: on, by: name, at: now) }) else { return false }
         // Before the reload, which awaits: told now from what was written.
         var held = settingsDict
         held["network"] = Self.network(held["network"], offline: on, by: name, at: now)
         settingsValue = .object(held)
+        if changed, case .object(let n) = next, case .string(let stamp)? = n["changedAt"] {
+            if let later = NetworkSwitch.later(networkSwitchHighestSeen, stamp) { outboundDefaults.set(later, forKey: Self.highestSeenKey) }
+        }
+        // TURNED OFF: this Mac is online again; its first calls say so to
+        // Khayt Cloud if a value is published there (`Shop+NetworkSwitch`).
+        if !on, changed { await tellOthersSwitchedOff(next) }
         if !on, !outboundGate.isOffline { outboundGate.clearCounts() }
         if !on { outboundNotice = nil }
         await load(source)
@@ -240,10 +259,10 @@ extension Shop {
     /// "Also tell my other computers through Khayt Cloud". This Mac's own
     /// choice, off unless the owner turns it on.
     nonisolated static let tellOthersKey = "network.tellOthers"
-    /// Whether the row is offered at all. Off until the one call it makes is
-    /// wired to Khayt Cloud's route: a switch that sends nothing must not be
-    /// on screen saying it does.
-    nonisolated(unsafe) static var tellOthersOffered = false
+    /// Whether the row is offered at all. On since its one call is wired to
+    /// Khayt Cloud's route (`Shop+NetworkSwitch`); it was hidden until then,
+    /// because a switch that sends nothing must not be on screen saying it does.
+    nonisolated(unsafe) static var tellOthersOffered = true
 
     var outboundTellsOthers: Bool { Self.tellOthersOffered && outboundDefaults.bool(forKey: Self.tellOthersKey) }
 
