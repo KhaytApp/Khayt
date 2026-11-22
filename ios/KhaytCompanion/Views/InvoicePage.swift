@@ -149,6 +149,10 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     @Published private(set) var drawn = false
     private var document: InvoiceDocument?
     private var filename = "invoice.pdf"
+    /// The page waiting for the blocking rules to be in place.
+    private var pending: String?
+    /// Whether `localOnly` is attached to this web view.
+    private(set) var rulesInstalled = false
 
     override init() {
         let config = WKWebViewConfiguration()
@@ -158,6 +162,54 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         super.init()
         webView.navigationDelegate = self
         webView.isOpaque = false
+        Task { await installRules() }
+    }
+
+    // ── NOTHING FROM THE INTERNET, EVER (follow-up to #2638) ──────────────
+    //
+    // A shop's document is drawn from what is on the phone: the html, the
+    // bundled `invoice.css`, and the logo as a `data:` URL (`safeBizLogo`).
+    // The navigation delegate below stops a link or a redirect, but not an
+    // `<img src="https://…">`, a CSS `url()` or an `@import` inside a field
+    // the shop typed: those load as resources, and each one is an internet
+    // call the shop's "Make no internet calls" switch never saw, and a
+    // tracking pixel in a customer's document. So every load that is not
+    // `data:`, `blob:` or `about:` is blocked, online or not, as the
+    // desktop's CSP does (`img-src 'self' data: blob:`). Two layers: WebKit's
+    // content blocker for every load, and the page's own CSP.
+
+    /// The content blocker: block everything, then let `data:`, `blob:` and
+    /// `about:` through.
+    nonisolated static let localOnlyRules = """
+    [{"trigger":{"url-filter":".*"},"action":{"type":"block"}},
+     {"trigger":{"url-filter":"^(data|blob|about):"},"action":{"type":"ignore-previous-rules"}}]
+    """
+    nonisolated static let localOnlyIdentifier = "khayt.invoice.local-only"
+
+    /// The page's own policy, for the document Khayt wraps.
+    nonisolated static let localOnlyCSP =
+        "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'"
+
+    static func localOnlyList() async -> WKContentRuleList? {
+        let store = WKContentRuleListStore.default()
+        if let list = try? await store?.contentRuleList(forIdentifier: localOnlyIdentifier) { return list }
+        return try? await store?.compileContentRuleList(forIdentifier: localOnlyIdentifier,
+                                                         encodedContentRuleList: localOnlyRules)
+    }
+
+    private func installRules() async {
+        if let list = await Self.localOnlyList() {
+            webView.configuration.userContentController.add(list)
+            rulesInstalled = true
+        }
+        // Should the blocker fail to compile, every page still carries the
+        // local-only CSP (`page` and `withPolicy`), so the paper is drawn and
+        // still loads nothing remote.
+        if let html = pending { pending = nil; load(html) }
+    }
+
+    private func load(_ html: String) {
+        webView.loadHTMLString(html, baseURL: nil)
     }
 
     /// `wholePage`: the document is a page of its own, styles and all — the
@@ -167,7 +219,20 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         document = doc
         self.filename = filename
         drawn = false
-        webView.loadHTMLString(wholePage ? doc.html : Self.page(doc), baseURL: nil)
+        let html = wholePage ? Self.withPolicy(doc.html) : Self.page(doc)
+        if rulesInstalled { load(html) } else { pending = html }
+    }
+
+    /// A whole-page document with the local-only policy as the first thing
+    /// in its head, so it holds before any resource is named.
+    nonisolated static func withPolicy(_ html: String) -> String {
+        let meta = "<meta http-equiv=\"Content-Security-Policy\" content=\"\(localOnlyCSP)\">"
+        if let head = html.range(of: "<head>", options: .caseInsensitive) {
+            var out = html
+            out.insert(contentsOf: meta, at: head.upperBound)
+            return out
+        }
+        return "<!doctype html><html><head>" + meta + "</head><body>" + html + "</body></html>"
     }
 
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
@@ -257,6 +322,7 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     nonisolated static func page(_ doc: InvoiceDocument) -> String {
         """
         <!doctype html><html><head><meta charset="utf-8">
+        <meta http-equiv="Content-Security-Policy" content="\(localOnlyCSP)">
         <meta name="viewport" content="width=860">
         <style>\(stylesheet)</style>
         <style>
