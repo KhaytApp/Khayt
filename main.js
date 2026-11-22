@@ -191,6 +191,9 @@ const { resolvePrinterTarget } = require('./lib/main/printer-target');
 const printerUpload = require('./lib/printer-upload');
 const { sendSms, sendWhatsappTemplate, checkWhatsapp } = require('./lib/sms');
 const cloudClient = require('./lib/cloud-client');
+// Every Khayt Cloud request asks the "make no internet calls" gate (P8 PR 3).
+// Called at request time, so the gate (defined below) exists by then.
+cloudClient.setOutboundGate((purpose) => outboundGate.gate(purpose));
 const { summarizeBranch, totalBranches } = require('./lib/branch-summary');
 const aiTools = require('./lib/ai-tools');
 const aiPrivacy = require('./lib/ai-privacy');
@@ -307,7 +310,7 @@ const {
   safeStorage,
   safeJsonParse,
   crypto,
-  onStoreUpdated(data) { lanServerStore = data; },
+  onStoreUpdated(data) { lanServerStore = data; try { outboundGate.observe(); } catch (_) { /* before the gate exists */ } },
   // Read INSIDE the write chain, so a read-modify-write always sees the result of
   // every write queued ahead of it. See updateStoreOnDisk.
   getStore: () => lanServerStore,
@@ -2164,6 +2167,7 @@ require('./lib/main/offsite-backup.js').registerOffsiteBackup({
 // Backing library models up into the Khayt Vault (lib/main/vault-backup.js):
 // the Mac's library backup, to the same vault objects. Writes no record field.
 const vaultBackup = require('./lib/main/vault-backup.js').createVaultBackup({
+  outboundFetch: outboundGate.for('cloud'),
   app,
   readBook: () => { try { return readStoreDecryptedFromDisk(); } catch (_) { return null; } },
   getDek: () => (cloudBackend ? cloudDek : null),
@@ -2181,6 +2185,7 @@ ipcMain.handle('hub:vault-backup', async (_e, { recordIds } = {}) => {
 // Khayt Vault share links (lib/main/vault-links.js): the Mac's share sheet and
 // links sheet, for files already in the vault. Needs Khayt Cloud unlocked.
 require('./lib/main/vault-links.js').registerVaultLinks({
+  outboundFetch: outboundGate.for('cloud'),
   app, ipcMain, safeStorage,
   readBook: () => { try { return readStoreDecryptedFromDisk(); } catch (_) { return null; } },
   getDek: () => (cloudBackend ? cloudDek : null),
@@ -2553,6 +2558,7 @@ ipcMain.handle('hub:save-store', async (event, data) => {
     // Atomic + durable: fsync'd temp swap, with a one-generation .prev rollback.
     await atomicWriteStore(serialized);
     lanServerStore = merged;  // keep LAN server in sync (plaintext in-memory)
+    try { outboundGate.observe(); } catch (_) { /* the switch's last push: see lib/main/outbound-fetch.js */ }
     return guarded.refused && guarded.refused.length ? { ok: true, refused: guarded.refused } : { ok: true };
   } catch (e) {
     console.error('hub:save-store error:', e);
@@ -7417,9 +7423,11 @@ ipcMain.handle('hub:org-members', async (_e, { url, shopId, token } = {}) => {
 });
 
 ipcMain.handle('hub:cloud-lock', () => { cloudBackend = null; cloudDek = null; clearOrgSession(); return { ok: true }; });
+// The push right after "make no internet calls" is turned on still goes out,
+// once, so other computers and the phone hear about it (design §1.4).
 ipcMain.handle('hub:cloud-push', async (_e, snapshot) => {
   if (!cloudBackend) return { ok: false, error: 'locked' };
-  try { return { ok: true, ...(await cloudBackend.push(snapshot)) }; }
+  try { return { ok: true, ...(await outboundGate.lastPush(() => cloudBackend.push(snapshot))) }; }
   catch (e) { return { ok: false, error: String(e && e.message || e), status: (e && e.status) || null }; }
 });
 

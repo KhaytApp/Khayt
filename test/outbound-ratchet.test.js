@@ -12,6 +12,7 @@
  *   // outbound-exempt: <kind> — <reason>
  *                                   kind: browser | inbound-server | served-page | not-run | local-file
  *                                   | gate (lib/main/outbound-fetch.js's own wrapper)
+ *                                   | injected (a client whose fetch main hands in, gated)
  * Everything else counts against the file's baseline
  * (test/fixtures/outbound-ratchet-baseline.json). A new untagged call fails;
  * one that is gated or tagged must come off the baseline, so the list only
@@ -25,7 +26,7 @@ const { PURPOSES } = require('../lib/outbound.js');
 
 const ROOT = path.join(__dirname, '..');
 const BASELINE_FILE = path.join(__dirname, 'fixtures', 'outbound-ratchet-baseline.json');
-const EXEMPT_KINDS = ['browser', 'inbound-server', 'served-page', 'not-run', 'local-file', 'gate'];
+const EXEMPT_KINDS = ['browser', 'inbound-server', 'served-page', 'not-run', 'local-file', 'gate', 'injected'];
 
 const PRIMITIVES = [
   /(?<![\w.$])fetch\s*\(/, /globalThis\.fetch\b/, /\|\|\s*(?:globalThis\.)?fetch\b/,

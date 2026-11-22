@@ -1,6 +1,5 @@
 {
  "main.js": 28,
- "lib/cloud-client.js": 2,
  "lib/custom-smtp.js": 2,
  "lib/gdrive-client.js": 2,
  "lib/lan-intake.js": 2,
@@ -22,7 +21,6 @@
  "lib/s3-client.js": 2,
  "lib/sms.js": 3,
  "lib/updater.js": 1,
- "lib/vault-client.js": 2,
  "lib/webhook-send.js": 2,
  "lib/zatca-crypto.js": 3,
  "renderer/app-boot.js": 1,

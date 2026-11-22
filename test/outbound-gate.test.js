@@ -98,6 +98,44 @@ test('offlineAtStartup: the store or this computer says offline; unreadable fail
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('cloud: the push right after the switch turns on goes out once, then cloud is blocked (design §1.4)', async () => {
+  const { g, set, tick } = gate({ settings: {} });
+  assert.equal(g.check('cloud').allowed, true);
+  set({ network: { offline: true } });
+  g.observe();
+  let pushed = 0;
+  const push = () => g.lastPush(async () => { g.gate('cloud'); pushed += 1; return { ok: 1 }; });
+  assert.deepEqual(await push(), { ok: 1 }, 'the last push carries the switch');
+  await assert.rejects(push(), (e) => isBlocked(e), 'only once');
+  assert.equal(pushed, 1);
+  assert.equal(g.check('cloud').allowed, false, 'and nothing else of cloud meanwhile');
+  // Turned on, but no push within 10 s: none later.
+  set({}); g.observe(); set({ network: { offline: true } }); g.observe();
+  for (let i = 0; i < 11; i++) tick();
+  await assert.rejects(push(), (e) => isBlocked(e));
+  // This computer's own switch is not the shop's: no last push for it.
+  set({}); g.observe(); g.setLocal({ offline: true });
+  await assert.rejects(push(), (e) => isBlocked(e) && e.reason === 'offline-here');
+});
+
+test('PR 3 wiring: every cloud request asks the gate', () => {
+  const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+  const cc = read('lib/cloud-client.js');
+  assert.match(cc, /return async \(\{ method, path, body \}\) => \{\s*\n\s*askGate\(\);/);
+  assert.match(cc, /const base = validateCloudBaseUrl\(baseUrl\);\s*\n\s*askGate\(\);\s*\n\s*\/\/ outbound: cloud\s*\n\s*const res = await fetch\(`\$\{base\}\/v1\/shops\/\$\{seg\(shopId\)\}\/intake/);
+  const main = read('main.js');
+  assert.match(main, /cloudClient\.setOutboundGate\(\(purpose\) => outboundGate\.gate\(purpose\)\);/);
+  assert.equal((main.match(/outboundFetch: outboundGate\.for\('cloud'\),/g) || []).length, 2, 'both vault clients');
+  assert.match(main, /outboundGate\.lastPush\(\(\) => cloudBackend\.push\(snapshot\)\)/);
+  for (const f of ['lib/main/vault-backup.js', 'lib/main/vault-links.js']) assert.match(read(f), /fetch: cloudFetch\(\)/, f);
+  // The gate throws before any fetch: no gate set means no change (tests, other callers).
+  const C = require('../lib/cloud-client.js');
+  C.setOutboundGate(() => { const e = new Error('blocked'); e.code = 'outbound.blocked'; throw e; });
+  return C.httpTransport('https://cloud.khaytapp.com', 't')({ method: 'GET', path: '/v1/x' })
+    .then(() => assert.fail('should not send'), (e) => assert.equal(e.code, 'outbound.blocked'))
+    .finally(() => C.setOutboundGate(null));
+});
+
 test('the switch going on purges what was saved up before it (D5), once per change', () => {
   let purged = 0;
   let settings = {};
