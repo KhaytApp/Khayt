@@ -1,0 +1,362 @@
+{
+ "about": "lib/device-roles.js allows(role, path, method) for a paired phone (C1+C9, D-P4 as decided Nov 22). required: a scope, null (any paired device) or 'owner' (only the owner). The Mac and iPhone run this file through JavaScriptCore.",
+ "roles": [
+  "owner",
+  "manager",
+  "operator",
+  "viewer"
+ ],
+ "scopesFor": {
+  "viewer": [
+   "queue:read",
+   "machines:read",
+   "orders:read",
+   "inventory:read"
+  ],
+  "operator": [
+   "queue:read",
+   "machines:read",
+   "orders:read",
+   "inventory:read",
+   "orders:write",
+   "inventory:write",
+   "waste:write",
+   "machines:control"
+  ],
+  "manager": [
+   "queue:read",
+   "machines:read",
+   "orders:read",
+   "inventory:read",
+   "orders:write",
+   "inventory:write",
+   "waste:write",
+   "machines:control",
+   "clients:read",
+   "clients:write",
+   "expense:write",
+   "quote:write",
+   "book:read"
+  ]
+ },
+ "roleOf": [
+  {
+   "device": {},
+   "want": "owner"
+  },
+  {
+   "device": {
+    "role": null
+   },
+   "want": "owner"
+  },
+  {
+   "device": {
+    "role": "manager"
+   },
+   "want": "manager"
+  },
+  {
+   "device": {
+    "role": "admin"
+   },
+   "want": "viewer"
+  },
+  {
+   "device": null,
+   "want": "viewer"
+  }
+ ],
+ "grantable": {
+  "owner": [
+   "owner",
+   "manager",
+   "operator",
+   "viewer"
+  ],
+  "manager": [
+   "manager",
+   "operator",
+   "viewer"
+  ],
+  "operator": [],
+  "viewer": []
+ },
+ "cases": [
+  {
+   "why": "a viewer reads the queue",
+   "role": "viewer",
+   "path": "/api/queue",
+   "method": "GET",
+   "want": {
+    "ok": true,
+    "required": "queue:read",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "a viewer cannot pause a printer",
+   "role": "viewer",
+   "path": "/api/printer/m1/pause",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "machines:control",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "an operator may pause, resume and stop (D-P4)",
+   "role": "operator",
+   "path": "/api/printer/m1/pause",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "machines:control",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator may stop",
+   "role": "operator",
+   "path": "/api/printer/m1/stop",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "machines:control",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator moves a job's stage",
+   "role": "operator",
+   "path": "/api/orders/a1b2",
+   "method": "PATCH",
+   "want": {
+    "ok": true,
+    "required": "orders:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator adds a job photo",
+   "role": "operator",
+   "path": "/api/orders/a1b2/photos",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "orders:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator cannot read customers",
+   "role": "operator",
+   "path": "/api/clients",
+   "method": "GET",
+   "want": {
+    "ok": false,
+    "required": "clients:read",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator cannot approve a quote for a customer",
+   "role": "operator",
+   "path": "/api/orders/a1b2/approve",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator cannot take the book",
+   "role": "operator",
+   "path": "/api/store",
+   "method": "GET",
+   "want": {
+    "ok": false,
+    "required": "book:read",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator logs waste",
+   "role": "operator",
+   "path": "/api/waste",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "waste:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator cannot log an expense",
+   "role": "operator",
+   "path": "/api/expense",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "expense:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "a manager takes a local copy of the book",
+   "role": "manager",
+   "path": "/api/store",
+   "method": "GET",
+   "want": {
+    "ok": true,
+    "required": "book:read",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "a manager cannot write the book back",
+   "role": "manager",
+   "path": "/api/store/deltas",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "book:write",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "a manager prices a library model",
+   "role": "manager",
+   "path": "/api/library/x9/estimate",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "quote:write",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "the owner writes the book",
+   "role": "owner",
+   "path": "/api/store/deltas",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "book:write",
+    "role": "owner"
+   }
+  },
+  {
+   "why": "a route the table does not name: only the owner",
+   "role": "manager",
+   "path": "/api/files/local",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "the owner may use a route the table does not name",
+   "role": "owner",
+   "path": "/api/files/local",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "owner",
+    "role": "owner"
+   }
+  },
+  {
+   "why": "a direction a route does not offer a phone: only the owner",
+   "role": "manager",
+   "path": "/api/clients",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "any paired device asks who it is",
+   "role": "viewer",
+   "path": "/api/devices/self",
+   "method": "GET",
+   "want": {
+    "ok": true,
+    "required": null,
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "the /v1 prefix is the same route",
+   "role": "viewer",
+   "path": "/v1/orders?since=5",
+   "method": "GET",
+   "want": {
+    "ok": true,
+    "required": "orders:read",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "upper-case API segment",
+   "role": "viewer",
+   "path": "/API/Queue",
+   "method": "GET",
+   "want": {
+    "ok": true,
+    "required": "queue:read",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "a path outside the API: only the owner",
+   "role": "manager",
+   "path": "/order/abc",
+   "method": "GET",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "an unknown role is a viewer",
+   "role": "superuser",
+   "path": "/api/printer/m1/stop",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "machines:control",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "waiting list writes are customers' business",
+   "role": "operator",
+   "path": "/api/waiting-list/w1",
+   "method": "PATCH",
+   "want": {
+    "ok": false,
+    "required": "clients:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an empty id segment does not match a route with one",
+   "role": "viewer",
+   "path": "/api/orders//photos",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "viewer"
+   }
+  }
+ ]
+}
