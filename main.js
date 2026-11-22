@@ -1360,6 +1360,7 @@ ipcMain.handle('hub:pick-file', async (event, opts = {}) => {
   const filters = opts.filters || [{ name: 'All Files', extensions: ['*'] }];
   const result = await dialog.showOpenDialog(win, { filters, properties: ['openFile'] });
   if (result.canceled || !result.filePaths.length) return null;
+  notePickedFile(result.filePaths[0]);
   return result.filePaths[0];
 });
 
@@ -1884,6 +1885,55 @@ ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startP
   try {
     if (!gcodePath || !fs.existsSync(gcodePath)) return { ok: false, error: 'G-code file not found.' };
     return await yieldingFor(machine, () => uploadGcodeToPrinter(machine, gcodePath, startPrint));
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
+/* SEND CHECKS (Figma desktop page 129, S1/S1b/S1c): what the file says about
+ * itself, so the window can run lib/send-checks.js before the send instead of
+ * a plain "Send to …?". Only a file the person just picked in the open dialog
+ * (hub:pick-file), never a path the window names: the same reach rule as
+ * hub:parse-print-file's allowlist. Facts only, never the file's text. */
+const pickedFiles = [];   // the last few paths hub:pick-file returned
+function notePickedFile(p) {
+  const r = path.resolve(String(p || ''));
+  const i = pickedFiles.indexOf(r);
+  if (i !== -1) pickedFiles.splice(i, 1);
+  pickedFiles.push(r);
+  if (pickedFiles.length > 8) pickedFiles.shift();
+}
+const SEND_FACTS_WHOLE_MAX = 128 * 1024 * 1024;   // past this, the moves are not read (no toolpath bounds)
+ipcMain.handle('hub:printer-send-facts', async (_e, { gcodePath } = {}) => {
+  const resolved = path.resolve(String(gcodePath || ''));
+  if (!gcodePath || !pickedFiles.includes(resolved)) return { ok: false, error: 'not_picked' };
+  const out = { ok: true, name: path.basename(resolved), sliced: false };
+  if (!/\.(gcode|gco|g)$/i.test(resolved)) return out;
+  try {
+    const stat = await fs.promises.stat(resolved);
+    let text;
+    if (stat.size <= SEND_FACTS_WHOLE_MAX) {
+      text = await fs.promises.readFile(resolved, 'utf8');
+    } else {
+      const EDGE = 8 * 1024 * 1024;
+      const fh = await fs.promises.open(resolved, 'r');
+      try {
+        const head = Buffer.alloc(EDGE), tail = Buffer.alloc(EDGE);
+        await fh.read(head, 0, EDGE, 0);
+        await fh.read(tail, 0, EDGE, stat.size - EDGE);
+        text = head.toString('utf8') + '\n' + tail.toString('utf8');
+      } finally { await fh.close(); }
+    }
+    const GP = require('./lib/gcode-parse');
+    const parsed = parseGcodeText(text);
+    const bounds = require('./lib/gcode-placed-extents').placedExtents(text, { moves: stat.size <= SEND_FACTS_WHOLE_MAX });
+    return {
+      ...out,
+      sliced: true,
+      printTimeMins: parsed.printTimeMins,
+      filamentGrams: parsed.filamentGrams,
+      filaments: parsed.filaments,
+      header: GP.parsePrinterHeader(text),
+      bounds: bounds ? { x: bounds.x, y: bounds.y, z: bounds.z, source: bounds.source } : null,
+    };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 

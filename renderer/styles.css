@@ -6095,3 +6095,42 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .pp-role-opt span { display: flex; flex-direction: column; gap: 2px; }
 .pp-role-opt small { font-size: 12px; color: var(--text-muted); }
 .pp-end { font-size: 14px; line-height: 1.5; }
+
+/* -----------------------------------------------------------
+   Send to printer, checked first (Figma 129, S1 / S1b / S1c;
+   renderer/send-checks-dialog.js). Colour says how much each line matters:
+   a stop is --danger, a look-first is --warning, a line the printer did not
+   say is muted, and a pass is --success on the tick only.
+   ----------------------------------------------------------- */
+.modal.sc-dialog { max-width: 560px; padding: 24px; display: flex; flex-direction: column; gap: 12px; border-radius: 12px; }
+.sc-dialog .sc-head { margin: 0; font-size: 18px; font-weight: 700; color: var(--text); }
+.sc-file { font-size: 13px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.sc-meta { font-size: 12px; color: var(--text-muted); }
+.sc-eyebrow { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); }
+.sc-eyebrow::before { content: ''; width: 24px; height: 2px; background: var(--warning); flex: none; }
+/* Arabic letters must stay joined: no tracking, and no mono face. */
+[dir="rtl"] .sc-eyebrow { letter-spacing: 0; font-family: inherit; font-weight: 600; }
+.sc-list { display: flex; flex-direction: column; gap: 12px; }
+.sc-row { display: flex; gap: 10px; align-items: flex-start; }
+.sc-icon { flex: none; width: 16px; font-size: 14px; font-weight: 700; line-height: 1.3; text-align: center; }
+.sc-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sc-title { font-size: 13px; font-weight: 600; line-height: 1.3; color: var(--text); }
+.sc-hint { font-size: 12px; font-weight: 500; line-height: 1.35; color: var(--text-muted); }
+.sc-row.is-ok .sc-icon { color: var(--success); }
+.sc-row.is-warn .sc-icon, .sc-row.is-warn .sc-title { color: var(--warning); }
+.sc-row.is-block .sc-icon, .sc-row.is-block .sc-title { color: var(--danger); }
+.sc-row.is-info .sc-icon, .sc-row.is-info .sc-title { color: var(--text-muted); }
+.sc-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--border);
+  vertical-align: baseline; margin-inline: 2px; }
+.sc-actions { margin-top: 4px; justify-content: flex-end; }
+.sc-actions .btn { border-radius: 999px; min-height: 36px; padding-inline: 16px; }
+.sc-actions .btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+/* A printer's state on its card (Figma 129, S2): seven states as coloured
+   words. Paused is its own, in the "on hold" purple (--info), and busy. */
+.machine-live-state { font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--text-muted); }
+.machine-live-state.is-printing { color: var(--success); }
+.machine-live-state.is-paused { color: var(--info); }
+.machine-live-state.is-reconnecting { color: var(--warning); }
+.machine-live-state.is-error { color: var(--danger); }
