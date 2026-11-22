@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Windows/Linux: a shop's phone can follow its printers away from the shop, as from the Mac.** While Khayt Cloud is signed in and unlocked on this computer, it now sends each printer's state to Khayt Cloud, sealed with the shop's own key so the cloud cannot read it: what it is doing, how far along, its temperatures, what it needs from a person, and whether it is answering. It sends when something changes (at most every 2 seconds) and otherwise every 45 seconds, so the phone can tell a quiet printer from a computer that is off. It stops when Khayt Cloud is locked or signed out, when the app quits, and while "make no internet calls" is on and does not keep Khayt Cloud. If Khayt Cloud says the sign-in is no longer good, it stops until the shop signs in again. Nothing changes on screen. The rows are the same ones a phone reads over the shop's network (`lib/live-snapshot.js`), and the rules are the Mac's (`docs/LAN_API.md`). Tests: `test/live-snapshot.test.js`.
+
 - **Windows/Linux: the switch through Khayt Cloud is on screen (Settings ▸ General ▸ Internet use; the frames Turki signed off on Nov 22).**
   - **"Also tell my other computers through Khayt Cloud"** sits between the shop's switch and "Also on this computer only". It is this computer's own choice, off by default, and only the shop's owner on Khayt Cloud can turn it on. It is greyed until Khayt Cloud is unlocked on this computer.
   - **The switch's own line** says whether the other computers were told: through Khayt Cloud at the switch's time, stopping at their next check within 15 minutes; or not told, so turn it on there too.

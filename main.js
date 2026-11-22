@@ -5880,6 +5880,9 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
     // Deliberately not awaited: a LAN scan takes seconds and polling must not
     // stall behind it. It pushes its own update when it finds something.
     diagnoseMovedPrinters(machineList).catch(() => { /* never break polling */ });
+    // What the printers said, to Khayt Cloud when it is due (never throws,
+    // never awaited: a slow cloud must not hold the next poll).
+    livePrinterPublisher.tick();
   };
   await poll();
   // A later start took over while this one's first poll ran: it owns the interval.
@@ -6887,6 +6890,30 @@ const networkSwitchSync = require('./lib/main/network-switch-sync.js').createNet
   readMine: () => { try { return JSON.parse(fs.readFileSync(NETWORK_SWITCH_FILE(), 'utf8')); } catch (_) { return {}; } },
   writeMine: (v) => { const f = NETWORK_SWITCH_FILE(); fs.writeFileSync(f + '.tmp', JSON.stringify(v)); fs.renameSync(f + '.tmp', f); },
 });
+/* Each printer's live state to Khayt Cloud (PUT /live/printers), for the phone
+ * and the PWA away from the shop: the Mac's LivePrinterPublisher, rule for rule
+ * (lib/main/live-printer-publisher.js, lib/live-snapshot.js). Only while Khayt
+ * Cloud is unlocked here for the book's OWN shop, the role may write, and the
+ * gate allows `cloud`. Started at unlock; stopped at lock and at quit. */
+const livePrinterPublisher = require('./lib/main/live-printer-publisher.js').createLivePrinterPublisher({
+  session: () => {
+    if (!cloudBackend || !cloudDek || !cloudSessionInfo) return null;
+    // The book in memory, not a decrypt from disk every 15 s.
+    const cloud = lanServerStore && lanServerStore.settings && lanServerStore.settings.cloud;
+    if (!cloud || typeof cloud !== 'object' || cloud.enabled === false) return null;
+    const NSS = require('./lib/main/network-switch-sync.js');
+    const scope = NSS.scopeOf(cloudSessionInfo.url, cloudSessionInfo.shopId);
+    if (!scope || scope !== NSS.scopeOf(cloud.url, cloud.shopId)) return null;
+    return { url: cloudSessionInfo.url, shopId: cloudSessionInfo.shopId, token: cloudSessionInfo.token, dek: cloudDek,
+      role: typeof cloud.role === 'string' ? cloud.role : null, scope };
+  },
+  rows: () => require('./lib/live-snapshot.js').liveRows(lanServerStore || {}, printerStatusCache),
+  allowed: () => outboundGate.check('cloud').allowed === true,
+  put: (s, body) => cloudClient.putLivePrinters(s.url, s.shopId, s.token, body),
+  seal: (plain, dek) => require('./lib/sync-crypto.js').encryptStore(plain, dek),
+  log: (msg) => { try { console.warn(msg); } catch (_) { /* no console */ } },
+});
+app.on('will-quit', () => { try { livePrinterPublisher.stop(); } catch (_) { /* quitting */ } });
 ipcMain.handle('hub:network-switch-state', () => networkSwitchSync.state());
 ipcMain.handle('hub:network-switch-share', (_e, on) => networkSwitchSync.setShare(on === true));
 ipcMain.handle('hub:network-switch-answer', (_e, apply) => networkSwitchSync.answerPending(apply === true));
@@ -7552,10 +7579,14 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
         try { return recoverStoreRaw(MAX_STORE_BYTES).data || null; } catch (e) { return null; }
       },
     });
+    // This computer's printers, to the phone away from the shop (a new unlock
+    // forgets what the last session learned, a 401 included).
+    livePrinterPublisher.stop();
+    livePrinterPublisher.start();
     // The key exists now: hear the switch at once, then every 15 minutes.
     networkSwitchSync.start();
     return { ok: true };
-  } catch (e) { networkSwitchSync.stop(); cloudBackend = null; cloudDek = null; cloudSessionInfo = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
+  } catch (e) { networkSwitchSync.stop(); livePrinterPublisher.stop(); cloudBackend = null; cloudDek = null; cloudSessionInfo = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
 });
 
 /* ── Organisations (multi-shop) ───────────────────────────────────────────────
@@ -7720,7 +7751,7 @@ ipcMain.handle('hub:org-members', async (_e, { url, shopId, token } = {}) => {
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
-ipcMain.handle('hub:cloud-lock', () => { networkSwitchSync.stop(); cloudBackend = null; cloudDek = null; cloudSessionInfo = null; clearOrgSession(); return { ok: true }; });
+ipcMain.handle('hub:cloud-lock', () => { networkSwitchSync.stop(); livePrinterPublisher.stop(); cloudBackend = null; cloudDek = null; cloudSessionInfo = null; clearOrgSession(); return { ok: true }; });
 // The push right after "make no internet calls" is turned on still goes out,
 // once, so other computers and the phone hear about it (design §1.4).
 ipcMain.handle('hub:cloud-push', async (_e, snapshot) => {
