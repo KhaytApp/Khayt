@@ -138,18 +138,24 @@ enum QuoteFormFile {
             leaf = leaf.trimmingCharacters(in: .whitespaces)
             while leaf.hasPrefix(".") { leaf.removeFirst() }
             while leaf.hasSuffix(".") || leaf.hasSuffix(" ") { leaf.removeLast() }
+            // Bounded in UTF-8 bytes, which is what NAME_MAX (255) counts:
+            // 120 emoji are 120 Characters and far more bytes. An "extension"
+            // longer than 16 bytes is not one (one Character can be thousands
+            // of bytes of combining marks) and is cut with the rest.
+            if leaf.utf8.count > 200 {
+                let found = (leaf as NSString).pathExtension
+                let ext = found.utf8.count <= 16 ? found : ""
+                var stem = ext.isEmpty ? leaf : (leaf as NSString).deletingPathExtension
+                while stem.utf8.count > 180 { stem.removeLast() }
+                while stem.hasSuffix(".") || stem.hasSuffix(" ") { stem.removeLast() }
+                leaf = ext.isEmpty ? stem : stem + "." + ext
+            }
+            // LAST, on the name as it will be written: cutting a long name can
+            // leave a device name that was not there before ("CON" and 250
+            // spaces before the rest).
             let stemOnly = (leaf.split(separator: ".", omittingEmptySubsequences: false).first.map(String.init) ?? "")
                 .trimmingCharacters(in: .whitespaces).uppercased()
             if Self.windowsDevices.contains(stemOnly) { leaf = "_" + leaf }
-            // Bounded in UTF-8 bytes, which is what NAME_MAX (255) counts:
-            // 120 emoji are 120 Characters and far more bytes.
-            if leaf.utf8.count > 200 {
-                let ext = String((leaf as NSString).pathExtension.prefix(12))
-                var stem = (leaf as NSString).deletingPathExtension
-                while stem.utf8.count > 180 { stem.removeLast() }
-                leaf = ext.isEmpty ? stem : stem + "." + ext
-            }
-            while leaf.hasSuffix(".") || leaf.hasSuffix(" ") { leaf.removeLast() }
             return leaf.isEmpty ? "model" : leaf
         }
 
@@ -157,8 +163,10 @@ enum QuoteFormFile {
         /// are gone already, with the path).
         static let unsafeScalars: Set<Unicode.Scalar> = [":", "<", ">", "\"", "|", "?", "*"]
         /// Names Windows keeps for devices, with any extension.
+        /// `COM0`/`LPT0` and the superscript digits are on Microsoft's list too.
         static let windowsDevices: Set<String> = Set(["CON", "PRN", "AUX", "NUL"]
-            + (1...9).flatMap { ["COM" + String($0), "LPT" + String($0)] })
+            + ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "\u{B9}", "\u{B2}", "\u{B3}"]
+                .flatMap { ["COM" + $0, "LPT" + $0] })
     }
 
     /// Why a request with a file was left in the queue.
