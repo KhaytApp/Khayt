@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a phone that cancels pairing by code tells the Mac.** `DELETE /api/devices/pair/<pairId>` with the phone's poll secret ends its own request, so the Mac goes back to waiting at once and no longer shows a number nobody is looking at until the window ends. Only the phone that asked can cancel, an approval already given is not undone, and the offer stays counted.
+
 - **Mac: a paired phone carries a role, and the Mac enforces it on every request (draft, stacked on #2625; no new screens).** Phone pairing design, decided Nov 22.
   - **The check.** A request a phone signs is asked of the shared rule (`lib/device-roles.js`) with the path the server routes on. A request the phone's role does not cover is answered 403 `role-scope` with the scope it lacked. A route the rule does not name is the owner's. The check sits in the one place a device's signature is accepted, so no route can take a phone's key without it.
   - **Phones already paired are unchanged.** A phone paired with the owner PIN has no role and is the owner, as it was.
