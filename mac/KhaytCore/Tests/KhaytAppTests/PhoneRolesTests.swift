@@ -28,7 +28,7 @@ struct PhoneRolesTests {
         let engine = OperatorLockTests.sharedEngine
         guard case .array(let cases)? = v["cases"], case .array(let roleOf)? = v["roleOf"],
               case .array(let paths)? = v["phonePaths"] else { Issue.record("no vectors"); return }
-        #expect(cases.count >= 39 && roleOf.count >= 12 && paths.count >= 29)
+        #expect(cases.count >= 43 && roleOf.count >= 12 && paths.count >= 31)
         for value in cases {
             let c = Self.obj(value), want = Self.obj(c["want"])
             guard case .string(let role)? = c["role"], case .string(let path)? = c["path"], case .string(let method)? = c["method"] else { continue }

@@ -202,6 +202,11 @@ final class LanServer {
         /// `Shop.phonePrinterCommand`. Unset, the route is not here and the
         /// phone reads the 404 as "this Mac predates it".
         var printerCommand: (@MainActor (_ machineId: String, _ verb: PrinterVerb) async -> (Int, String))? = nil
+        /// "Bed is clear" / "Taken off" from a paired phone
+        /// (`Shop.phoneBedClear`): the same stamp the Mac's own button writes.
+        /// Unset, the route is not here and the phone reads the 404 as "this
+        /// Mac predates it".
+        var bedClear: (@MainActor (_ machineId: String) async -> (Int, String))? = nil
         /// A paired phone's photo of a job (`Shop.phoneAddJobPhoto`): the JPEG
         /// it sent, filed as the Mac's own Add Photo files one.
         var addJobPhoto: (@MainActor (_ jobId: String, _ data: Data) async -> (Int, String))? = nil
@@ -1460,6 +1465,22 @@ final class LanServer {
         // PIN sent bare; this one moves a machine mid-print, so it takes the
         // enrolled device's signature (`LanDevices`) and nothing less. The
         // gate still runs first, for the host check and the PIN being set.
+        // ── A PHONE SAYS THE BED IS CLEAR ────────────────────────────────
+        //
+        // `POST /api/printer/{machineId}/bed-clear`: the phone's "Bed is
+        // clear" and "Taken off". SIGNED PHONES ONLY, like the commands below:
+        // it changes what the dispatcher may offer next. The gate runs first
+        // (host, PIN, and the device's ROLE: `machines:control` in
+        // `lib/device-roles.js`, so a viewer's phone is refused there).
+        case (_, false) where request.method == "POST" && host.bedClear != nil
+                && Self.bedClearPath(path) != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let (status, body) = await host.bedClear!(Self.bedClearPath(path)!)
+            return .json(status, body)
+
         case (_, false) where request.method == "POST" && host.printerCommand != nil
                 && Self.printerPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
@@ -3347,6 +3368,9 @@ extension Shop {
         host.machinesLive = { [weak self] in self?.machinesLive() ?? [] }
         host.printerCommand = { [weak self] id, verb in
             await self?.phonePrinterCommand(id, verb) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        host.bedClear = { [weak self] id in
+            await self?.phoneBedClear(id) ?? (503, #"{"ok":false,"reason":"busy"}"#)
         }
         host.addJobPhoto = { [weak self] id, data in
             await self?.phoneAddJobPhoto(id, data) ?? (503, #"{"ok":false,"reason":"busy"}"#)

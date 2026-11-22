@@ -40,6 +40,8 @@ struct LanServerTests {
         /// What `/api/orders/{id}/photos` handed the stubbed photo hook: the
         /// job and the byte count, in order.
         let photoCalls = PrinterCalls()
+        /// What `/api/printer/{id}/bed-clear` handed the stubbed hook, in order.
+        let bedCalls = PrinterCalls()
         /// What reached the expense hook: the body's size, once per call.
         let expenseCalls = PrinterCalls()
         /// Files a slicer plugin announced again while the same bytes waited
@@ -172,6 +174,11 @@ struct LanServerTests {
             host.printerCommand = { id, verb in
                 printerCalls.calls.append("\(id) \(verb.rawValue)")
                 return (200, #"{"ok":true,"state":"paused"}"#)
+            }
+            let bedCalls = self.bedCalls
+            host.bedClear = { id in
+                bedCalls.calls.append(id)
+                return (200, #"{"ok":true,"bedClearedAt":"2026-11-22T10:00:00.000Z"}"#)
             }
             let photoCalls = self.photoCalls
             host.addJobPhoto = { id, data in

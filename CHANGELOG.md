@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a paired phone can say a bed is clear (draft, stacked on the phone-roles work; no new Mac screen).** `POST /api/printer/{machineId}/bed-clear` is the phone's "Bed is clear" and "Taken off". It writes what the Mac's own "Bed is clear" button writes, `bedClearedAt` on the machine, through one shared function, so the dispatcher may offer that printer again and the "print to take off" line ends. Signed, enrolled phones only; the role rule (`lib/device-roles.js`) asks for `machines:control`, so an operator, a manager or the owner may and a viewer's phone is refused. The printer itself is told nothing. Documented in `docs/LAN_API.md`; the desktop does not serve it yet.
+
 - **Mac: a phone that cancels pairing by code tells the Mac.** `DELETE /api/devices/pair/<pairId>` with the phone's poll secret ends its own request, so the Mac goes back to waiting at once and no longer shows a number nobody is looking at until the window ends. Only the phone that asked can cancel, an approval already given is not undone, and the offer stays counted.
 
 - **Mac: a paired phone carries a role, and the Mac enforces it on every request (draft, stacked on #2625; no new screens).** Phone pairing design, decided Nov 22.

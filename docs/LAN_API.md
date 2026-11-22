@@ -1131,6 +1131,30 @@ unset or short PIN is `401`.
 | 502 | `refused`: the printer said no, and `message` is what it said |
 | 503 | `busy`: the app is starting |
 
+### `POST /api/printer/{machineId}/bed-clear`
+
+> **Native Mac only** (Nov 2026, draft). `lib/lan-server.js` does not serve it
+> yet; the desktop is to match this shape.
+
+A paired phone saying a machine's plate is empty: the phone's **"Bed is clear"** (leftovers from a print that ended badly) and **"Taken off"** (a finished print). Both write the same thing, and the same thing as the Mac's own "Bed is clear" button: `bedClearedAt` on the machine, stamped now. The shared rules read it (`lib/auto-dispatch.js`: the printer may be offered again; `lib/waiting-at-machine.js`: `print-to-take-off` and `bed-to-clear` end). The body is empty. The printer itself is told nothing.
+
+**Requires a signed, enrolled phone**, as the commands above do: the owner PIN sent bare is `403 {"ok":false,"reason":"device-key-required"}`.
+
+**Role:** `machines:control` in `lib/device-roles.js` (`allowsRequest`): an operator's, a manager's or the owner's phone. A viewer's phone is refused with the usual `403 {"reason":"role-scope","required":"machines:control"}`, signed back.
+
+**Response 200:** `{"ok":true,"bedClearedAt":"2026-11-22T14:07:05.120Z"}`.
+
+**Refusals:** `{"ok":false,"reason":…,"message"?:…}`
+
+| Status | `reason` |
+|---|---|
+| 404 | `not-found`: no machine in use with that id (a retired printer is not one) |
+| 409 | `read-only`: this Mac is showing the sample book |
+| 500 | `not-saved`: the write failed (another computer holds the book, for one), and `message` says why |
+| 503 | `busy`: the app is starting |
+
+It is not refused while the printer is printing: a stamp made before a print ends is simply older than that print's end, and the rules ignore it. Sending it twice writes a newer stamp and changes nothing else.
+
 ### `POST /api/orders/{id}/photos`
 
 > **Served by both apps** (Nov 2026): the native Mac app and `lib/lan-server.js` (Windows/Linux).
