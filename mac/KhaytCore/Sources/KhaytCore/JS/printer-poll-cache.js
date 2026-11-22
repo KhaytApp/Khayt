@@ -204,6 +204,10 @@
 
   /** A poll that answered. Fresh object — a previous `error` must not survive. */
   function mergePollSuccess(prev, status, now) {
+    // "Not set up" (no address, a bad port, a missing serial: nothing was
+    // asked) comes back as { ok: false, error } rather than a throw. It is
+    // not an answer: it must not stamp lastOkAt (the Mac's not-set-up).
+    if (status && status.ok === false && status.error) return mergePollFailure(prev, status.error, now, null, 'not-set-up');
     const p = prev || {};
     const lastCompleted = captureCompletion(prev, status, now);
     // captureCompletion hands back the PREVIOUS completion when nothing finished,
@@ -301,13 +305,35 @@
    * (lib/printer-activity.js); absent otherwise, and dropped from an earlier
    * failure. A good poll builds a fresh entry, so it never outlives one.
    */
-  function mergePollFailure(prev, message, now, status) {
+  /* WHY there is no status, in a word no language changes: the Mac's
+   * PrinterWatch.failure, carried on the live rows as `errorCode`
+   * (docs/LAN_API.md). `error` is a sentence in the shop's language; a phone
+   * cannot match on that. A client treats a word it does not know as
+   * `unreachable`. */
+  const ERROR_CODES = ['access-refused', 'http', 'not-set-up', 'certificate', 'unreadable', 'unreachable'];
+  /** A failed poll's Error as one of ERROR_CODES, from its status and code, never its words. */
+  function failureCode(err) {
+    const e = err || {};
+    const st = Number(e.status);
+    if (Number.isInteger(st) && st >= 100 && st <= 599) return st === 401 || st === 403 ? 'access-refused' : 'http';
+    const code = String(e.code || '');
+    const msg = String(e.message || '');
+    if (/CONNACK/.test(msg)) return 'access-refused';                       // a Bambu access code turned down
+    if (/^(CERT_|ERR_TLS_CERT|DEPTH_ZERO_SELF_SIGNED|SELF_SIGNED|UNABLE_TO_VERIFY)/.test(code)) return 'certificate';
+    if (e.name === 'SyntaxError' || code === 'ERR_INVALID_JSON') return 'unreadable';
+    return 'unreachable';
+  }
+
+  function mergePollFailure(prev, message, now, status, errorCode) {
     const p = prev || {};
     const code = Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
-    const { httpStatus: _old, ...rest } = p;
+    const { httpStatus: _old, errorCode: _oldCode, ...rest } = p;
+    const why = ERROR_CODES.includes(errorCode) ? errorCode
+      : (code ? (code === 401 || code === 403 ? 'access-refused' : 'http') : 'unreachable');
     return {
       ...rest,
       ...(code ? { httpStatus: code } : {}),
+      errorCode: why,
       error: message,
       consecutiveFailures: (p.consecutiveFailures || 0) + 1,
       // Only stamp lastOkAt from lastUpdated on the FIRST failure — after that
@@ -430,7 +456,7 @@
   }
 
   const api = {
-    mergePollSuccess, mergePollFailure, isOffline, captureCompletion, endedAs,
+    mergePollSuccess, mergePollFailure, failureCode, ERROR_CODES, isOffline, captureCompletion, endedAs,
     isPrintingState, isInJob, findCompletion, mergePersisted, COMPLETIONS_KEPT,
     completionsToPersist, restoreCompletions, completionIsNew,
     tickJobClock, observedDurationS, CLOCK_START_MAX_PCT, CLOCK_MAX_GAP_MS,

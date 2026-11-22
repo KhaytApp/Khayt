@@ -92,7 +92,7 @@ const { isBlockedHost, isAllowedPrinterHost, sanitizeMailgunDomain, resolvesToBl
         sanitizePrinterHost } = require('./lib/host-guard');
 const { sendCustomSmtp } = require('./lib/custom-smtp');
 const {
-  mergePollSuccess, mergePollFailure, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
+  mergePollSuccess, mergePollFailure, failureCode, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
 } = require('./lib/printer-poll-cache');
 const sdcpClient = require('./lib/sdcp-client');
 const KhaytSdcpProtocol = require('./lib/sdcp');
@@ -5613,7 +5613,7 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
         if (completionIsNew(before, printerStatusCache[machine.id])) captured = true;
       } catch(e) {
         printerStatusCache[machine.id] = mergePollFailure(
-          printerStatusCache[machine.id], e.message, Date.now(), e && e.status,
+          printerStatusCache[machine.id], e.message, Date.now(), e && e.status, failureCode(e),
         );
       } finally { printerFullPollOn = null; }
     }
@@ -5652,7 +5652,7 @@ ipcMain.handle('hub:probe-printer', async (_e, machine) => {
   try {
     return mergePollSuccess(before, await fetchPrinterStatus(m), Date.now());
   } catch (e) {
-    return mergePollFailure(before, e.message, Date.now(), e && e.status);
+    return mergePollFailure(before, e.message, Date.now(), e && e.status, failureCode(e));
   }
 });
 

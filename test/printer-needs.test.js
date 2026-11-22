@@ -75,7 +75,8 @@ test('/api/machines/live: every entry has problems and waiting, empty when nothi
   const MK = require('../lib/moonraker.js');
   const k1 = MK.readStatus({ result: { status: { print_stats: { state: 'error', message: 'Thermal runaway' } } } });
   assert.ok(Array.isArray(k1.problems) && k1.problems.length >= 1, 'the poll worked them out');
-  const cache = { k1, k2: { state: 'idle' } };
+  const cache = { k1, k2: { state: 'idle' }, k3: { state: 'idle', error: 'Zugriff verweigert', errorCode: 'access-refused', httpStatus: 403, lastOkAt: Date.parse('2026-11-22T09:00:00.000Z') } };
+  store.machines.push(M('k3', 'octoprint'));
   registerLanServer({
     fs, ipcMain: { handle: (n, f) => handlers.set(n, f) }, BrowserWindow: class { static getAllWindows() { return []; } },
     safeJsonParse: (s, f) => { try { return JSON.parse(s); } catch { return f; } }, syncLanServerStoreFromDisk: () => {},
@@ -97,8 +98,39 @@ test('/api/machines/live: every entry has problems and waiting, empty when nothi
     assert.ok(by.k1.problems.length >= 1);
     assert.deepEqual(by.k2.waiting.map((w) => w.reason), ['print-to-take-off']);
     assert.deepEqual([by.hand.problems, by.hand.waiting], [[], []]);
+    assert.deepEqual([by.k3.errorCode, by.k3.httpStatus, by.k3.lastOkAt], ['access-refused', 403, '2026-11-22T09:00:00.000Z'], 'a refused printer, whatever the shop\'s language');
+    // The Mac's live-row fields: answering → lastOkAt set, no errorCode or httpStatus.
+    assert.equal(by.k2.errorCode, null);
+    assert.equal(by.k2.httpStatus, null);
+    assert.equal(by.k2.lastOkAt, null, 'k2 has no lastOkAt in this cache');
   } finally {
     await handlers.get('hub:stop-lan-server')(null, {});
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('live rows (the Mac\'s names): lastOkAt when it last ANSWERED, errorCode in a word, httpStatus', () => {
+  const PC = require('../lib/printer-poll-cache.js');
+  assert.deepEqual([...PC.ERROR_CODES], ['access-refused', 'http', 'not-set-up', 'certificate', 'unreadable', 'unreachable']);
+  const err = (o) => Object.assign(new Error(o.message || 'x'), o);
+  assert.equal(PC.failureCode(err({ status: 401 })), 'access-refused');
+  assert.equal(PC.failureCode(err({ status: 403 })), 'access-refused');
+  assert.equal(PC.failureCode(err({ status: 503 })), 'http');
+  assert.equal(PC.failureCode(err({ message: 'Bambu rejected the access code (CONNACK 5)' })), 'access-refused');
+  assert.equal(PC.failureCode(err({ code: 'DEPTH_ZERO_SELF_SIGNED_CERT' })), 'certificate');
+  assert.equal(PC.failureCode(Object.assign(new SyntaxError('Unexpected token <'))), 'unreadable');
+  assert.equal(PC.failureCode(err({ code: 'ECONNREFUSED' })), 'unreachable');
+  assert.equal(PC.failureCode(null), 'unreachable');
+  // A failure keeps when it last answered; a later answer clears the code.
+  let e = PC.mergePollSuccess(undefined, { state: 'idle' }, 1000);
+  assert.equal(e.lastOkAt, 1000);
+  e = PC.mergePollFailure(e, 'Zugriff verweigert', 2000, 401, 'access-refused');
+  assert.deepEqual([e.errorCode, e.httpStatus, e.lastOkAt], ['access-refused', 401, 1000]);
+  e = PC.mergePollFailure(e, 'still', 3000, null, PC.failureCode({ code: 'ETIMEDOUT' }));
+  assert.deepEqual([e.errorCode, e.httpStatus, e.lastOkAt], ['unreachable', undefined, 1000]);
+  e = PC.mergePollSuccess(e, { state: 'idle' }, 4000);
+  assert.deepEqual([e.errorCode, e.error, e.lastOkAt], [undefined, undefined, 4000]);
+  // "Not set up" ({ ok:false, error }) is not an answer: it does not stamp lastOkAt.
+  const n = PC.mergePollSuccess(e, { ok: false, error: 'Invalid port number' }, 5000);
+  assert.deepEqual([n.errorCode, n.lastOkAt, n.error], ['not-set-up', 4000, 'Invalid port number']);
 });
