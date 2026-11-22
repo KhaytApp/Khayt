@@ -2012,6 +2012,11 @@ final class Shop {
     /// The card controls each machine's model or protocol cannot do
     /// (`KhaytEngine.printerHiddenControls`): the card leaves them out.
     var machineHiddenControls: [String: Set<String>] = [:]
+    /// "Show prices in OrcaSlicer" as the screen shows it (`Shop+ConnectorPrices`).
+    /// The server reads the switch itself, from the same defaults.
+    var connectorPricesOn = LanConnectorPairing.pricesOn
+    /// Where the switch is kept. A test hands in its own.
+    var connectorPricesDefaults: UserDefaults = .standard
     /// A test's own device store; the app uses the Keychain's (`.shared`).
     var lanDevicesForTests: LanDevices?
     /// Hands a linked file the app fetched back to its cloud drive, so its

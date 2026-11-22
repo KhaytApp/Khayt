@@ -73,6 +73,19 @@ extension Snapshot {
         await settle()
         shot("b-screen", width: 960, ConnectedAppsScreen(shop: shop, refreshes: false, scrolls: false))
 
+        // Page 24: the same screen with "Show prices in OrcaSlicer" off (as
+        // above, B), then on with a grant per slicer.
+        shop.connectorPricesOn = true
+        shop.connectedApps[0].priceGrant = "price"
+        await settle()
+        shot("f-prices-on", width: 960, ConnectedAppsScreen(shop: shop, refreshes: false, scrolls: false))
+        shop.connectedApps[0].priceGrant = "cost"
+        await settle()
+        shot("g-prices-cost", width: 960, ConnectedAppsScreen(shop: shop, refreshes: false, scrolls: false))
+        shop.connectedApps[0].priceGrant = nil
+        shop.connectorPricesOn = false
+        await settle()
+
         // E: Settings ▸ Online keeps only a pointer.
         shot("e-pointer", width: 560, Form { ConnectedAppsPointer(shop: shop) }.formStyle(.grouped).frame(height: 90))
 
