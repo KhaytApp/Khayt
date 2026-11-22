@@ -322,6 +322,13 @@ function refuseSay(error) {
   else if (error) toast('⚠ ' + String(error), 'error', 6000);
 }
 
+/** lib/network-switch.js stampAfter: max(now, newest seen + 1 ms). */
+function stampNow(seen) {
+  const NS = global.KhaytNetworkSwitch;
+  const s = NS && typeof NS.stampAfter === 'function' ? NS.stampAfter(Date.now(), seen) : null;
+  return s || new Date().toISOString();
+}
+
 /** Save the shop's switch through the window's ordinary save; main's guard decides. */
 async function saveNetwork(patch) {
   const cur = shopView();
@@ -329,7 +336,9 @@ async function saveNetwork(patch) {
   // When and by whom are the SWITCH's: a Keep tick changes neither (review of
   // #2633: it re-dated "Turned on by" and reset the 30-day clock).
   const flipped = !!next.offline !== !!cur.offline;
-  if (flipped) { next.changedAt = new Date().toISOString(); next.changedBy = whoChanges(); }
+  // Monotonic (decision A): never before a stamp this computer has seen, the
+  // book's own or one heard from Khayt Cloud, whatever this clock says.
+  if (flipped) { next.changedAt = stampNow([cur.changedAt, _last && _last.ns && _last.ns.highestSeen]); next.changedBy = whoChanges(); }
   else { next.changedAt = cur.changedAt || null; next.changedBy = cur.changedBy || null; }
   // Through Khayt Cloud (lib/main/network-switch-sync.js): turning it ON
   // tells the cloud FIRST, while this computer is still online (the last

@@ -604,3 +604,142 @@ test('Dev Hub: turning it off at a sharing computer PUTs offline:false only over
   assert.equal((await h.sync.publish({ offline: false })).sent, true);
   assert.equal(h.server.puts.length, 1);
 });
+
+// ── The Mac's retry review (#2647) and Dev Hub's decisions A and B, for the desktop ──
+
+const OFF_10 = { offline: false, keep: [], changedAt: '2026-11-22T10:00:00.000Z', changedBy: 'Sara' };
+const owedOff = (over = {}) => harness(Object.assign({ mine: { share: true, pendingOff: { changedAt: OFF_10.changedAt } }, network: Object.assign({}, OFF_10) }, over));
+
+test('retry 1: a 409 on an automatic retry never asks the person; the retry ends and the newer value is taken', async () => {
+  const h = owedOff();
+  h.publishRemote(plain({ offline: true, changedAt: '2026-11-22T09:00:00.000Z' }));   // older: the PUT goes
+  h.server.putStatus = 409;
+  h.server.onPut = async () => { h.server.putStatus = null; h.publishRemote(plain({ offline: true, changedAt: '2026-11-22T10:05:00.000Z' })); h.server.putStatus = 409; };
+  await h.sync.tick();
+  assert.equal(h.sync.state().conflict, null, 'no question for a retry');
+  assert.equal(h.sync.state().pendingOff, false, 'the retry ended');
+  assert.equal(h.book().network.offline, true, 'the newer (offline) value was taken: this computer does not stay online');
+  assert.equal(h.book().network.changedAt, '2026-11-22T10:05:00.000Z');
+});
+
+test('retry 2: the shortcuts read the SEALED value, never the outer stamp', async () => {
+  // (a) The outer stamp claims 10:05, the sealed value says 09:00: not superseded, the PUT goes.
+  const a = owedOff();
+  a.publishRemote(plain({ offline: true, changedAt: '2026-11-22T09:00:00.000Z' }));
+  a.server.value.changedAt = '2026-11-22T10:05:00.000Z';
+  await a.sync.tick();
+  assert.equal(a.server.puts.length, 1, 'a lying outer stamp is not proof of a newer value');
+  // (b) A same-instant ON is not this "off" having arrived.
+  const b = owedOff();
+  b.publishRemote(plain({ offline: true, changedAt: OFF_10.changedAt }));
+  await b.sync.tick();
+  assert.equal(b.server.puts.length, 1, 'same instant, ON: the off still goes');
+  // (c) A value that cannot be opened proves nothing either way.
+  const c = owedOff();
+  c.server.value = { changedAt: '2026-11-22T11:00:00.000Z', receivedAt: 'x', ciphertext: { junk: true } };
+  await c.sync.tick();
+  assert.equal(c.server.puts.length, 1);
+  // (d) Really superseded (sealed and newer): no PUT over it; it is applied.
+  const d2 = owedOff();
+  d2.publishRemote(plain({ offline: true, changedAt: '2026-11-22T10:05:00.000Z' }));
+  await d2.sync.tick();
+  assert.equal(d2.server.puts.length, 0);
+  assert.equal(d2.book().network.offline, true);
+  assert.equal(d2.sync.state().pendingOff, false);
+  // (e) Really arrived (sealed, same stamp, off): settled without a PUT.
+  const e = owedOff();
+  e.publishRemote(plain({ offline: false, keep: [], changedAt: OFF_10.changedAt }));
+  await e.sync.tick();
+  assert.equal(e.server.puts.length, 0);
+  assert.equal(e.sync.state().pendingOff, false);
+});
+
+test('retry 3: an older retry in flight touches only its own stamp, never a newer unsent "off"', async () => {
+  const h = owedOff();
+  h.publishRemote(plain({ offline: true, changedAt: '2026-11-22T09:00:00.000Z' }));
+  // While the 10:00 retry is out, a newer "off" (10:02) is recorded as owed.
+  h.server.onGet = async () => { h.file().scopes[SCOPE].pendingOff = { changedAt: '2026-11-22T10:02:00.000Z' }; };
+  h.server.putStatus = 503;       // and the retry's PUT fails
+  await h.sync.tick();
+  assert.equal(h.mine().pendingOff.changedAt, '2026-11-22T10:02:00.000Z', 'a failing old retry did not put its own stamp back over the newer one');
+  const k = owedOff();
+  k.publishRemote(plain({ offline: true, changedAt: '2026-11-22T09:00:00.000Z' }));
+  k.server.onPut = async () => { k.file().scopes[SCOPE].pendingOff = { changedAt: '2026-11-22T10:02:00.000Z' }; };
+  await k.sync.tick();
+  assert.equal(k.mine().pendingOff.changedAt, '2026-11-22T10:02:00.000Z', 'a succeeding old retry did not clear the newer one');
+});
+
+test('retry 4: 401 keeps the retry and asks for a sign-in; 403, 400 and 413 end it', async () => {
+  const h = owedOff();
+  h.publishRemote(plain({ offline: true, changedAt: '2026-11-22T09:00:00.000Z' }));
+  h.server.putStatus = 401;
+  const before = h.changes();
+  await h.sync.tick();
+  assert.equal(h.sync.state().pendingOff, true, '401: kept');
+  assert.equal(h.sync.state().signIn, true, 'and the window is asked to sign in again');
+  assert.ok(h.changes() > before);
+  h.server.putStatus = null;
+  await h.sync.tick();
+  assert.deepEqual([h.sync.state().pendingOff, h.sync.state().signIn], [false, false], 'signed in: sent, and the ask clears');
+  for (const code of [403, 400, 413]) {
+    const x = owedOff();
+    x.publishRemote(plain({ offline: true, changedAt: '2026-11-22T09:00:00.000Z' }));
+    x.server.putStatus = code;
+    await x.sync.tick();
+    assert.equal(x.sync.state().pendingOff, false, `${code}: the retry ends`);
+  }
+  // The GET answering 401 keeps it too.
+  const g = owedOff();
+  g.server.status = 401;
+  await g.sync.tick();
+  assert.deepEqual([g.sync.state().pendingOff, g.sync.state().signIn], [true, true]);
+});
+
+test('decision A: stamps are monotonic; another computer\'s clock 5 minutes ahead cannot make this one\'s change look older', async () => {
+  const NSL = require('../lib/network-switch.js');
+  assert.equal(NSL.stampAfter(Date.parse('2026-11-22T10:00:00.000Z'), ['2026-11-22T10:05:00.000Z']), '2026-11-22T10:05:00.001Z');
+  assert.equal(NSL.stampAfter(Date.parse('2026-11-22T10:06:00.000Z'), ['2026-11-22T10:05:00.000Z', null, 'junk']), '2026-11-22T10:06:00.000Z');
+  assert.equal(NSL.justBefore('2026-11-22T10:00:00.000Z'), '2026-11-22T09:59:59.999Z');
+  // This computer at 10:00; the other computer, 5 minutes ahead, turned the switch ON at "10:05".
+  const h = harness({ mine: { share: true } });
+  h.publishRemote(plain({ offline: true, changedAt: '2026-11-22T10:05:00.000Z' }));
+  assert.equal((await h.sync.pull()).act, 'apply');
+  // The person turns it OFF here a moment later: stamped after what was seen, not at 10:00.
+  const stamp = NSL.stampAfter(NOW, [h.book().network.changedAt, h.sync.state().highestSeen]);
+  assert.equal(stamp, '2026-11-22T10:05:00.001Z');
+  assert.deepEqual(NSL.keepNewerNetwork({ offline: false, changedAt: stamp }, h.book().network, NOW).offline, false, 'main\'s save guard keeps it');
+  h.setBook({ offline: false, keep: [], changedAt: stamp, changedBy: 'Sara' });
+  const r = await h.sync.publish({ offline: false });
+  assert.equal(r.sent, true, 'the off goes, over the value it follows');
+  assert.equal(sc.decryptStore(h.server.puts[0].ciphertext, h.dek).changedAt, stamp);
+  // Turning it ON again here: the stamp is ahead of this clock and still taken as fresh.
+  const on = NSL.stampAfter(NOW, [stamp]);
+  const r2 = await h.sync.publish({ offline: true, network: Object.assign({}, ON_NOW, { changedAt: on }) });
+  assert.equal(r2.why === 'stamp', false, 'not refused as stale');
+  // The window stamps through the same rule.
+  const ui = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'internet-use.js'), 'utf8');
+  assert.match(ui, /next\.changedAt = stampNow\(\[cur\.changedAt, _last && _last\.ns && _last\.ns\.highestSeen\]\)/);
+  const html = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'index.html'), 'utf8');
+  assert.ok(html.indexOf('<script src="../lib/network-switch.js">') !== -1 && html.indexOf('<script src="../lib/network-switch.js">') < html.indexOf('<script src="internet-use.js">'));
+});
+
+test('decision B: a value AT this computer\'s change (the same instant) answers the 409; never one older than conflict.at', async () => {
+  const h = harness({ mine: { share: true } });
+  const mine = new Date(NOW).toISOString();
+  h.server.conflictAt = mine;                 // the 409 names the same instant
+  h.server.putStatus = 409;
+  h.server.getFail = true;                    // nothing held at the 409
+  await h.sync.publish({ offline: true, network: Object.assign({}, ON_NOW, { changedAt: mine }) });
+  h.server.putStatus = null; h.server.getFail = false;
+  h.publishRemote(plain({ offline: false, keep: [], changedAt: mine }));
+  assert.equal((await h.sync.answerConflict('adopt')).applied, true, 'same instant: answered');
+  // Never older than conflict.at, even when at or after this computer's change.
+  const k = harness({ mine: { share: true } });
+  k.server.conflictAt = '2026-11-22T10:05:00.000Z';
+  k.server.putStatus = 409; k.server.getFail = true;
+  await k.sync.publish({ offline: true, network: Object.assign({}, ON_NOW, { changedAt: mine }) });
+  k.server.putStatus = null; k.server.getFail = false;
+  k.publishRemote(plain({ offline: false, keep: [], changedAt: mine }));
+  assert.equal((await k.sync.answerConflict('adopt')).ok, false);
+  assert.equal(k.book().network && k.book().network.offline === false && k.book().network.changedAt === mine, false);
+});
