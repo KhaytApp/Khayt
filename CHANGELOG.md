@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Shared test values: pairing a phone by number (not wired).** `docs/phone-pair.vectors.json` holds eight cases of the phone's pairing math: the commit, the Mac's signed offer and the 6-digit check number. They use the phone's own prefixes (`khayt-phone-commit-v1`, `khayt-enrol-phone-v1`, `khayt-phone-check-v1`), so a slicer-plugin offer can never pass as a phone's or the other way round. `scripts/write-pair-vectors.js` writes them, and before that must reproduce the slicer plugin's `docs/connector-pair.vectors.json` exactly, so the phone set is the reviewed math with new prefixes. The iPhone and the Mac's phone route run them. Tests: `test/pair-vectors.test.js`.
+
 - **Shared rule (not yet wired): what a paired phone may do, by the role the shop gives it.** `lib/device-roles.js` is the role-to-scope table decided for pairing a phone by code. A viewer reads the queue, printers, jobs and stock. An operator also updates jobs, stock and waste, and may pause, resume and stop printers. A manager also handles customers, expenses and pricing, and keeps a local copy of the book. Only the owner writes the book back. A phone paired before roles existed stays the owner. Any route the table does not name needs the owner, so a new route is closed until it is listed. The Mac's LAN server and the iPhone wire it later. Tests: `test/device-roles.test.js`, with vectors in `test/fixtures/device-roles-vectors.json` for the Mac and iPhone.
 
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
