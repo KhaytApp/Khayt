@@ -396,6 +396,20 @@ final class PhonePairingTests: XCTestCase {
         XCTAssertTrue(StubPairMac.selfSigned)
     }
 
+    /// A cancel that comes back "approved" is taken only when the person has
+    /// not moved on (review of #2635): never over the PIN step, a PIN pairing
+    /// in progress or a newer attempt.
+    func testALateApprovalNeverTakesOverAnotherChoice() {
+        let may = PairingView.mayFinishAfterCancel
+        XCTAssertTrue(may(false, .find, false, true), "Cancel, back on Find: the approval is shown")
+        XCTAssertTrue(may(false, .code, false, false), "the screen went away: finished, shown at the next open")
+        XCTAssertFalse(may(false, .pin, false, true), "the person chose the PIN")
+        XCTAssertFalse(may(false, .find, true, true), "a PIN pairing is running")
+        XCTAssertFalse(may(true, .find, false, true), "a newer attempt started")
+        XCTAssertFalse(may(true, .code, false, true), "a new number is up")
+        XCTAssertFalse(may(false, .manual, false, true), "typing another address")
+    }
+
     /// A wrong secret is the route's 404: nothing is given up, nothing changes.
     func testACancelWithAWrongSecretIsUnknown() async throws {
         let s = freshSettings()

@@ -282,7 +282,12 @@ struct PairingView: View {
 
     private func startCode(_ mine: Int) async {
         let started = await api.startCodePairing(name: settings.nameToSend)
-        guard mine == attempt, step == .code else { return }
+        guard mine == attempt, step == .code else {
+            // Cancelled (or left) while the Mac was being asked: it has
+            // already put this number up, so give it up there too.
+            if case .number(let late) = started { Task { _ = await api.cancelCodePairing(late) } }
+            return
+        }
         switch started {
         case .number(let t): ticket = t
         case .unsupported:
@@ -339,26 +344,50 @@ struct PairingView: View {
 
     // ── GIVING THE NUMBER UP (#2631) ───────────────────────────────────────
     //
-    // Cancel, Use the PIN or leaving the screen tells the Mac, so it stops
-    // showing a number nobody is looking at. The ticket is taken first, so the
-    // poll and a second call find nothing to give up. If the Mac had ALREADY
-    // approved (409 "approved"), the approval stands (the Mac does not undo
-    // it): the phone finishes it, as the poll would have a moment later, and
-    // shows it when the screen is still up.
+    // Cancel, Use the PIN or the screen going away tells the Mac, so it stops
+    // showing a number nobody is looking at. The ticket is taken and the
+    // attempt moved on first, so the poll and a second call find nothing.
+    //
+    // If the Mac had ALREADY approved (409 "approved"), that approval stands
+    // on the Mac. The phone finishes it only when the person has not moved on
+    // (`mayFinishAfterCancel`): never over the PIN step, a PIN pairing in
+    // progress or a newer attempt, whose choice is theirs (review of #2635).
+    // And it never marks the phone paired by itself: the approved screen's
+    // Continue does, now or at the next open (`onAppear` above), so a person
+    // always sees which Mac and which role before the phone uses it.
     private func giveUpTheNumber() {
+        // A number still being asked for (no ticket yet, still on the number
+        // step) is moved on too, so its late answer is given up in startCode.
+        // Not when the step already changed: that is this same give-up's
+        // second call (the button, then the step's onDisappear).
+        guard ticket != nil || step == .code else { return }
+        attempt += 1
         guard let t = ticket else { return }
         ticket = nil
-        attempt += 1
+        let mine = attempt
         let presence = presence
         Task { @MainActor in
             guard await api.cancelCodePairing(t) == .approved else { return }
-            let shown = presence.shown
-            let done = await api.finishCodePairing(t, markPaired: !shown)
-            if done, shown, presence.shown {
+            let wanted = {
+                Self.mayFinishAfterCancel(stale: mine != attempt, step: step, connecting: isConnecting,
+                                          shown: presence.shown)
+            }
+            guard wanted() else { return }
+            let done = await api.finishCodePairing(t, markPaired: false, stillWanted: wanted)
+            if done, wanted(), presence.shown {
                 CompanionHaptics.success()
                 step = .approved
             }
         }
+    }
+
+    /// A cancel came back "approved": may the phone take that approval?
+    /// Only when nothing newer has started (`stale`) and the person is not
+    /// pairing another way: back on Find (Cancel) or off this screen. Not on
+    /// the PIN step, not while a PIN pairing runs, not on a new number.
+    nonisolated static func mayFinishAfterCancel(stale: Bool, step: Step, connecting: Bool, shown: Bool) -> Bool {
+        guard !stale, !connecting else { return false }
+        return !shown || step == .find
     }
 
     /// "481 207": the check number in two groups, as the Mac shows it.
@@ -413,14 +442,15 @@ struct PairingView: View {
             .padding(.top, 16)
             foot(L10n.tr("pair.code.foot")).padding(.top, 8)
             Spacer(minLength: 18)
-            centredLink(L10n.tr("pair.code.use_pin")) { giveUpTheNumber(); attempt += 1; olderMac = false; goToPin() }
-            tonal(L10n.tr("pair.code.cancel")) { giveUpTheNumber(); attempt += 1; step = .find }
+            centredLink(L10n.tr("pair.code.use_pin")) { giveUpTheNumber(); olderMac = false; goToPin() }
+            tonal(L10n.tr("pair.code.cancel")) { giveUpTheNumber(); step = .find }
         }
         .task(id: ticket?.offer.pairId) {
             if let t = ticket { await waitForTheMac(t, attempt) }
         }
-        // Any other way off the number (the cloud sign-in, the sample shop,
-        // the app taking the screen away) gives it up too.
+        // The number step going away for any other reason (the pairing
+        // screen itself closing) gives it up too. Backgrounding or quitting
+        // the app sends nothing: the Mac's window runs the number out.
         .onDisappear { giveUpTheNumber() }
     }
 
