@@ -7,6 +7,7 @@ import KhaytCore
 /// connector's reviewed v2 flow, so it is held to `docs/connector-pair.vectors.json`
 /// with the connector's prefixes; the phone's variant is then exercised end to
 /// end against a simulated Mac, including the offers it must refuse.
+@MainActor
 final class PhonePairingTests: XCTestCase {
 
     private var root: URL {
@@ -178,5 +179,185 @@ final class PhonePairingTests: XCTestCase {
                        "book:read")
         XCTAssertNil(DeviceRole.refusedScope(status: 403, body: Data(#"{"reason":"connector-scope"}"#.utf8)))
         XCTAssertNil(DeviceRole.refusedScope(status: 401, body: Data(#"{"reason":"role-scope","required":"book:read"}"#.utf8)))
+    }
+
+    // MARK: End to end, against a stand-in Mac
+
+    private var saved: (host: String, port: Int, pin: String, paired: Bool, sample: Bool, identity: String,
+                        device: DeviceKey.Credential?, role: String?, byCode: Bool)?
+
+    override func setUp() {
+        let s = ConnectionSettings()
+        saved = (s.host, s.port, s.pin, s.isPaired, s.isSampleShop, s.macIdentityKey, s.device, s.deviceRole, s.pairedByCode)
+        StubPairMac.reset()
+    }
+
+    override func tearDown() {
+        guard let saved else { return }
+        let s = ConnectionSettings()
+        s.host = saved.host; s.port = saved.port; s.pin = saved.pin; s.isPaired = saved.paired; s.isSampleShop = saved.sample
+        s.macIdentityKey = saved.identity; s.device = saved.device; s.deviceRole = saved.role; s.pairedByCode = saved.byCode
+        s.signedOutByMac = false; s.needsPairAgain = false
+        StubPairMac.reset()
+    }
+
+    private func freshSettings() -> ConnectionSettings {
+        let s = ConnectionSettings()
+        s.host = "khayt-pair-stub.invalid"; s.port = 3219; s.isSampleShop = false; s.isPaired = false
+        s.macIdentityKey = ""; s.device = nil; s.deviceRole = nil; s.pairedByCode = false
+        // Digits typed on the PIN screen before choosing the number instead:
+        // they must not throw the new enrolment away (review of #2630).
+        s.pin = "1234"
+        return s
+    }
+
+    func testPairingByNumberEndToEnd() async throws {
+        let s = freshSettings()
+        StubPairMac.role = "operator"
+        let api = KhaytAPIClient(settings: s, protocols: [StubPairMac.self], withBook: false)
+        guard case .number(let ticket) = await api.startCodePairing(name: "Workshop iPhone", version: "4.12") else {
+            return XCTFail("a number to show")
+        }
+        XCTAssertEqual(ticket.check, StubPairMac.check, "the phone and the Mac show the same number")
+        XCTAssertNil(StubPairMac.sentPin, "no PIN crosses the Wi-Fi")
+        XCTAssertEqual(await api.pollCodePairing(ticket), .waiting)
+        StubPairMac.approved = true
+        XCTAssertEqual(await api.pollCodePairing(ticket), .approved)
+        let done = await api.finishCodePairing(ticket)
+        XCTAssertTrue(done)
+        XCTAssertNotNil(s.device)
+        XCTAssertEqual(s.device?.deviceId, StubPairMac.deviceId)
+        XCTAssertEqual(s.macIdentityKey, StubPairMac.identity.publicKey.rawRepresentation.base64EncodedString())
+        XCTAssertEqual(s.pin, "", "no PIN kept")
+        XCTAssertTrue(s.isPaired)
+        XCTAssertTrue(s.pairedByCode)
+        XCTAssertEqual(s.deviceRole, "operator")
+        XCTAssertFalse(s.mayHoldBook, "an operator phone is a floor phone")
+        XCTAssertTrue(StubPairMac.selfSigned, "the approval was proved with a signed request")
+    }
+
+    func testAnApprovalThatIsNotProvedChangesNothing() async throws {
+        let s = freshSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubPairMac.self], withBook: false)
+        guard case .number(let ticket) = await api.startCodePairing(name: "x", version: "1") else { return XCTFail() }
+        StubPairMac.approved = true
+        StubPairMac.enrols = false              // "approved", but no such device on the Mac
+        let done = await api.finishCodePairing(ticket)
+        XCTAssertFalse(done)
+        XCTAssertNil(s.device)
+        XCTAssertFalse(s.pairedByCode)
+        XCTAssertEqual(s.pin, "1234", "nothing changed")
+    }
+
+    func testAnOlderMacFallsBackToThePin() async {
+        let s = freshSettings()
+        StubPairMac.hasRoute = false
+        let api = KhaytAPIClient(settings: s, protocols: [StubPairMac.self], withBook: false)
+        XCTAssertEqual(await api.startCodePairing(name: "x", version: "1"), .unsupported)
+        StubPairMac.hasRoute = true
+        StubPairMac.closed = true
+        XCTAssertEqual(await api.startCodePairing(name: "x", version: "1"), .closed)
+    }
+
+    func testAPinPhoneIsTheOwnerWhateverAReplySays() async {
+        let s = freshSettings()
+        s.deviceRole = nil; s.pairedByCode = false
+        let api = KhaytAPIClient(settings: s, protocols: [StubPairMac.self], withBook: false)
+        StubPairMac.role = "viewer"
+        await api.refreshDeviceRole()
+        XCTAssertNil(s.deviceRole)
+        XCTAssertEqual(s.effectiveRole, "owner")
+        XCTAssertTrue(s.mayHoldBook)
+    }
+}
+
+/// A Mac with `POST /api/devices/pair` (phone prefixes), its reveal and poll,
+/// and a signed `GET /api/devices/self`.
+final class StubPairMac: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var hasRoute = true
+    nonisolated(unsafe) static var closed = false
+    nonisolated(unsafe) static var approved = false
+    nonisolated(unsafe) static var enrols = true
+    nonisolated(unsafe) static var role: String? = "operator"
+    nonisolated(unsafe) static var commit = ""
+    nonisolated(unsafe) static var check = ""
+    nonisolated(unsafe) static var key: SymmetricKey?
+    nonisolated(unsafe) static var sentPin: String?
+    nonisolated(unsafe) static var selfSigned = false
+    static let identity = Curve25519.Signing.PrivateKey()
+    nonisolated(unsafe) static var server = Curve25519.KeyAgreement.PrivateKey()
+    static let deviceId = "dev_stubCodePhone01"
+    static let pairId = "pairid000001"
+    static let poll = "pollsecret0000000000000000000001"
+
+    static func reset() {
+        hasRoute = true; closed = false; approved = false; enrols = true; role = "operator"; commit = ""; check = ""
+        key = nil; sentPin = nil; selfSigned = false; server = Curve25519.KeyAgreement.PrivateKey()
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-pair-stub.invalid" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func stopLoading() {}
+
+    private static func body(of request: URLRequest) -> Data? {
+        if let b = request.httpBody { return b }
+        guard let s = request.httpBodyStream else { return nil }
+        s.open(); defer { s.close() }
+        var d = Data(); var buf = [UInt8](repeating: 0, count: 4096)
+        while s.hasBytesAvailable { let n = s.read(&buf, maxLength: buf.count); if n <= 0 { break }; d.append(buf, count: n) }
+        return d
+    }
+
+    override func startLoading() {
+        let url = request.url!
+        let path = url.path()
+        let body = Self.body(of: request)
+        if let pin = request.value(forHTTPHeaderField: "x-khayt-pin") { Self.sentPin = pin }
+        let obj = body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+        let serverPub = Self.server.publicKey.rawRepresentation.base64EncodedString()
+        let idPub = Self.identity.publicKey.rawRepresentation.base64EncodedString()
+        var answer: (Int, Any) = (404, ["error": "not found"])
+        switch (request.httpMethod ?? "GET", path) {
+        case ("POST", "/api/devices/pair") where Self.hasRoute:
+            if Self.closed { answer = (403, ["reason": "pairing-closed"]); break }
+            Self.commit = obj["commit"] as? String ?? ""
+            let sig = try! Self.identity.signature(for: PairCode.offerMessage(.phone, deviceId: Self.deviceId,
+                                                                               serverPublic: serverPub, commit: Self.commit))
+            answer = (200, ["pairId": Self.pairId, "pollSecret": Self.poll, "deviceId": Self.deviceId,
+                            "publicKey": serverPub, "sig": sig.base64EncodedString(), "identity": idPub])
+        case ("POST", "/api/devices/pair/\(Self.pairId)/reveal") where request.value(forHTTPHeaderField: "x-khayt-poll") == Self.poll:
+            let pub = obj["publicKey"] as? String ?? "", nonce = obj["nonce"] as? String ?? ""
+            guard PairCode.commit(.phone, publicKey: pub, nonce: nonce) == Self.commit,
+                  let raw = Data(base64Encoded: pub),
+                  let phonePub = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw),
+                  let shared = try? Self.server.sharedSecretFromKeyAgreement(with: phonePub) else {
+                answer = (403, ["state": "expired", "reason": "bad-reveal"]); break
+            }
+            Self.check = PairCode.check(.phone, deviceId: Self.deviceId, identity: idPub, serverPublic: serverPub,
+                                        clientPublic: pub, nonce: nonce)
+            Self.key = shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: DeviceKey.salt,
+                                                      sharedInfo: Data(Self.deviceId.utf8), outputByteCount: 32)
+            answer = (200, ["state": "waiting"])
+        case ("GET", "/api/devices/pair/\(Self.pairId)") where request.value(forHTTPHeaderField: "x-khayt-poll") == Self.poll:
+            answer = (200, ["state": Self.approved ? "approved" : "waiting"])
+        case ("GET", "/api/devices/self"):
+            guard Self.enrols, let key = Self.key, request.value(forHTTPHeaderField: "x-khayt-device") == Self.deviceId else {
+                answer = (401, ["reason": "device-unknown"]); break
+            }
+            let canonical = DeviceKey.canonical(method: "GET", target: DeviceKey.requestTarget(url),
+                                                time: Int(request.value(forHTTPHeaderField: "x-khayt-time") ?? "") ?? 0,
+                                                nonce: request.value(forHTTPHeaderField: "x-khayt-nonce") ?? "", body: body)
+            let expected = Data(HMAC<SHA256>.authenticationCode(for: Data(canonical.utf8), using: key)).base64EncodedString()
+            guard expected == request.value(forHTTPHeaderField: "x-khayt-mac") else { answer = (401, ["reason": "device-auth"]); break }
+            Self.selfSigned = true
+            answer = (200, ["deviceId": Self.deviceId, "role": Self.role.map { $0 as Any } ?? NSNull()])
+        default: break
+        }
+        let data = try! JSONSerialization.data(withJSONObject: answer.1)
+        let response = HTTPURLResponse(url: url, statusCode: answer.0, httpVersion: "HTTP/1.1",
+                                       headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
     }
 }

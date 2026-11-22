@@ -458,7 +458,8 @@ final class KhaytAPIClient: ObservableObject {
         // not ask for one: the Mac would answer 403 role-scope anyway.
         guard settings.mayHoldBook else {
             forgetBookForFloorMode()
-            throw KhaytAPIError.unauthorized
+            // Not `.unauthorized`: the pairing screen reads that as a refused PIN.
+            throw KhaytAPIError.notConfigured
         }
         let (data, response) = try await request(path: "/api/store", method: "GET",
                                                  body: nil, requiresPin: true)
@@ -468,11 +469,12 @@ final class KhaytAPIClient: ObservableObject {
         // The Mac says this phone's role does not reach the book: whatever the
         // phone believed, it is a floor phone now, and a book it holds is one
         // it may no longer have.
+        // NOT acted on by itself: replies to a phone carry no MAC, so anyone on
+        // the Wi-Fi could send this 403. The role is asked again with a signed
+        // request instead, and only a code-paired phone's role ever moves.
         if DeviceRole.refusedScope(status: http.statusCode, body: data) == "book:read" {
-            if settings.mayHoldBook { settings.deviceRole = "viewer" }
-            forgetBookForFloorMode()
-            Task { await self.refreshDeviceRole() }
-            throw KhaytAPIError.unauthorized
+            if settings.pairedByCode { Task { await self.refreshDeviceRole() } }
+            throw KhaytAPIError.notConfigured
         }
         guard (200...299).contains(http.statusCode) else {
             throw try decodeAPIError(data, status: http.statusCode)
@@ -607,12 +609,14 @@ final class KhaytAPIClient: ObservableObject {
     /// phone — just re-paired or signed in) adopts the cloud's store, whose
     /// settings hold no `plugins`, and the Mac's read must be the one that wins.
     func refreshEverywhere(_ book: CompanionBook) async {
+        // The Mac may have changed this phone's role since: ask before deciding
+        // whether there is a book to keep (a code-paired phone only).
+        if settings.pairedByCode { await refreshDeviceRole() }
         if settings.isConfigured, (try? await sendPendingChanges()) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
         }
         var cloudDone = false
-        // A floor phone keeps no book from the cloud either (D-P6 a).
-        if cloud != nil, settings.mayHoldBook {
+        if cloud != nil {
             // A refused round adopted nothing: the Mac's book still comes down.
             let round = await syncThroughCloud()
             if case .refused? = round { cloudDone = false } else { cloudDone = round != nil }
@@ -726,6 +730,9 @@ final class KhaytAPIClient: ObservableObject {
     /// answer; an edit made meanwhile stays pending for the next one.
     @discardableResult
     func syncThroughCloud() async -> CloudSync.Pushed? {
+        // A floor phone (operator or viewer) keeps no book, from the cloud
+        // either (D-P6 a). Every caller comes through here.
+        guard settings.mayHoldBook else { return nil }
         if let running = cloudRound { return await running.value }
         let round = Task { await self.oneCloudRound() }
         cloudRound = round
@@ -2493,6 +2500,9 @@ final class KhaytAPIClient: ObservableObject {
                                                     sig: answer.sig, phonePrivate: phone,
                                                     identityKey: identity) else { return .failed }
         settings.device = credential
+        // Enrolled on the owner PIN: the owner, as before roles (D-P1).
+        settings.pairedByCode = false
+        settings.deviceRole = nil
         // Signed from here on: the PIN is not kept for a reply to ask for.
         settings.dropPinAfterEnrolment()
         return .enrolled
@@ -2670,43 +2680,75 @@ extension KhaytAPIClient {
         return status == 200 ? (Self.pairState(data) ?? .unknown) : .unknown
     }
 
-    /// Step 5, after `.approved`: pin the identity that signed the offer, keep
-    /// the derived key, and read the role the Mac gave. No PIN is kept, because
-    /// none was typed.
+    /// Step 5, after `.approved`. The poll is unsigned, so the approval is
+    /// PROVED first, with one request signed by the new key (`GET
+    /// /api/devices/self`): only a Mac that enrolled this exact key answers it.
+    /// Nothing in the settings changes until then. Then: the PIN goes (without
+    /// the PIN's didSet throwing the new enrolment away), the identity that
+    /// signed the offer is pinned, the key kept, the role taken.
     @discardableResult
     func finishCodePairing(_ ticket: CodePairTicket) async -> Bool {
-        guard let credential = ticket.pairing.credential(ticket.offer) else { return false }
+        guard let credential = ticket.pairing.credential(ticket.offer),
+              case .some(let role) = await deviceSelf(credential) else { return false }
+        settings.dropPinAfterEnrolment()
+        settings.signedOutByMac = false
+        settings.needsPairAgain = false
         // Identity first: changing it drops any older enrolment (its didSet).
         settings.macIdentityKey = ticket.offer.identity
         settings.device = credential
         settings.pairedByCode = true
-        settings.deviceRole = nil          // a viewer until the Mac says more
-        settings.pin = ""
+        settings.deviceRole = role
         settings.isPaired = true
-        await refreshDeviceRole()
         if !settings.mayHoldBook { forgetBookForFloorMode() }
-        return true
+        return usableDevice == credential
     }
 
-    /// `GET /api/devices/self` (signed): the role the Mac holds for this phone.
-    /// A role change on the Mac takes effect at the next request; this keeps
-    /// the screens in step. Nothing changes when the Mac cannot be asked.
-    func refreshDeviceRole() async {
-        guard let device = usableDevice, let url = try? makeURL(path: "/api/devices/self"),
-              let (data, response) = try? await send(url, method: "GET", body: nil, auth: .device(device)),
+    /// The role the Mac holds for `credential`, from a signed request: nil when
+    /// the Mac did not answer 200 (not enrolled, unreachable), `.some(nil)` for
+    /// an answer with no role. A role that is not text reads as "viewer".
+    private func deviceSelf(_ credential: DeviceKey.Credential) async -> String?? {
+        guard let url = try? makeURL(path: "/api/devices/self"),
+              let (data, response) = try? await send(url, method: "GET", body: nil, auth: .device(credential)),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: data) else { return }
-        // Text, whatever it says: `DeviceRole.effective` reads an unknown role as viewer.
-        if case .string(let role)? = o["role"] { settings.deviceRole = role } else { settings.deviceRole = nil }
+              case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: data) else { return nil }
+        switch o["role"] {
+        case .string(let r)?: return .some(r)
+        case nil, .null?: return .some(nil)
+        default: return .some("viewer")
+        }
+    }
+
+    /// Keep the screens in step with the role the Mac holds (a role change on
+    /// the Mac takes effect at its next request anyway). Only a code-paired
+    /// phone has a role to read: a phone enrolled on the owner PIN is the
+    /// owner, and no reply can make it less.
+    ///
+    /// Replies to a phone carry no MAC yet, so this answer can be forged by a
+    /// host on the Wi-Fi. That can only make the phone show LESS (a forged
+    /// "owner" gains nothing: the Mac checks every request), and the book it
+    /// may then drop is one with nothing unsent in it (`forgetBookForFloorMode`).
+    func refreshDeviceRole() async {
+        guard settings.pairedByCode, let device = usableDevice,
+              case .some(let role) = await deviceSelf(device) else { return }
+        settings.deviceRole = role
         if !settings.mayHoldBook { forgetBookForFloorMode() }
     }
 
-    /// D-P6 a: an operator or viewer phone keeps no book. Whatever book is on
-    /// disk (from before a role change) goes, with its rollback copy, and the
-    /// screens fall back to asking the Mac (`fromBook` finds no book).
+    /// D-P6 a: an operator or viewer phone keeps no book, nor anything taken
+    /// from one: the book with its rollback copy, the cached answers (clients,
+    /// orders, stock), the library pictures and the shop's traces (Spotlight,
+    /// the feed, widgets), as unpairing clears them. Never while edits are
+    /// waiting to be sent: those are the person's work, not the shop's book.
     func forgetBookForFloorMode() {
-        guard holdsBookOnDisk || holdsBook else { return }
+        // Only on the way down (a book is held): a floor phone's own cached
+        // answers are what it is allowed to see, and clearing them each round
+        // would leave its screens blank offline.
+        guard settings.pairedByCode, !settings.mayHoldBook, pendingCount == 0,
+              holdsBookOnDisk || holdsBook else { return }
         book?.forget()
+        Task { await CompanionCache.shared.clear() }
+        Task { await LibraryThumbs.shared.clear() }
+        ShopTraces.forget()
         refreshHoldsBook()
     }
 
