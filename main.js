@@ -6805,7 +6805,9 @@ const networkSwitchSync = require('./lib/main/network-switch-sync.js').createNet
     const scope = NSS.scopeOf(cloudSessionInfo.url, cloudSessionInfo.shopId);
     if (!scope || scope !== NSS.scopeOf(cloud.url, cloud.shopId)) return null;
     // The token's role, a hint only: the server refuses a non-owner write.
-    return Object.assign({}, cloudSessionInfo, { dek: cloudDek, role: cloud.role || 'owner', scope });
+    // No role recorded is NOT the owner (security review of #2645, LOW-1): it
+    // fails closed, so the share option greys and nothing is published.
+    return Object.assign({}, cloudSessionInfo, { dek: cloudDek, role: typeof cloud.role === 'string' && cloud.role ? cloud.role : null, scope });
   },
   // Who may change the switch here: the staff lock's rule, as for the switch
   // itself (security review of #2645, MED-1).
