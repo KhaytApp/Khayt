@@ -572,6 +572,44 @@ struct PhoneRolesTests {
         #expect(await open.phoneRolesGrantable() == ["owner", "manager", "operator", "viewer"])
     }
 
+    @Test("a manager may open Pair a phone, as the owner may; an operator, a viewer and nobody may not (Turki, Nov 22)")
+    func whoMayOpenPairing() async throws {
+        let shop = await OperatorLockTests.shop()
+        shop.lanDevicesForTests = LanDevices.inMemory()
+        let engine = try #require(shop.engine)
+        // The opener set is the rule's: exactly the roles that may give a phone a role.
+        for role in ["owner", "manager", "operator", "viewer", "nobody"] {
+            let gives = try await engine.deviceRolesGrantable(by: role)
+            #expect(Shop.pairingOpeners.contains(role) == !gives.isEmpty, Comment(rawValue: role))
+        }
+        for (who, may) in [(nil, false), (("OP-v", "4444"), false), (("OP-x", "3333"), false),
+                           (("OP-m", "2222"), true), (("OP-o", "1111"), true)] as [((String, String)?, Bool)] {
+            shop.lockNow()
+            shop.closePairing()
+            if let who { #expect(await shop.signIn(who.0, pin: who.1) == .ok) }
+            let name = Comment(rawValue: who?.0 ?? "nobody")
+            #expect(shop.mayOpenPairing == may, name)
+            shop.moveProblem = nil
+            shop.openPairing()
+            #expect(shop.lanPairing.isOpenNow == may, name)
+            #expect(LockReviewTests.refused(shop) == !may, name)
+            // Opening changes nothing about what this person may approve.
+            #expect((await shop.phoneRolesGrantable()).isEmpty == !may, name)
+        }
+        // A manager who opened the window still cannot give Owner, nor change settings.
+        shop.lockNow()
+        #expect(await shop.signIn("OP-m", pin: "2222") == .ok)
+        #expect(!(await shop.phoneRolesGrantable()).contains("owner"))
+        #expect(!shop.lockAllows("settings", "edit"))
+        shop.closePairing()
+        // The staff lock off: whoever is at the Mac opens it, as before.
+        let open = await OperatorLockTests.shop(on: false)
+        #expect(open.mayOpenPairing)
+        // The button asks without saying.
+        let view = try LockRound3Tests.source("Shop+PairedPhones.swift")
+        #expect(view.contains(".disabled(!shop.mayOpenPairing || !reachable)"))
+    }
+
     @Test("changing a paired phone's role is the owner's alone; a manager cannot lift a phone or lower the owner's")
     func roleChangeIsTheOwners() async throws {
         let shop = await OperatorLockTests.shop()
