@@ -118,6 +118,11 @@ test('stampAfter ignores a seen stamp further ahead than FUTURE_MS (a wrong cloc
   assert.equal(NS.FUTURE_MS, 10 * 60 * 1000, 'the route\'s own limit');
   assert.equal(NS.stampAfter(N, ['2026-11-23T10:00:00.000Z']), '2026-11-22T10:00:00.000Z', 'a day ahead: ignored');
   assert.equal(NS.stampAfter(N, ['2026-11-23T10:00:00.000Z', '2026-11-22T10:05:00.000Z']), '2026-11-22T10:05:00.001Z', 'the sane one still counts');
-  assert.equal(NS.stampAfter(N, ['2026-11-22T10:10:00.000Z']), '2026-11-22T10:10:00.001Z', 'exactly at the limit counts');
-  assert.equal(NS.stampAfter(N, ['2026-11-22T10:10:00.001Z']), '2026-11-22T10:00:00.000Z', 'one ms past it does not');
+  assert.equal(NS.stampAfter(N, ['2026-11-22T10:09:59.999Z']), '2026-11-22T10:10:00.000Z', '1 ms inside the limit counts, and lands exactly on it');
+  assert.equal(NS.stampAfter(N, ['2026-11-22T10:10:00.000Z']), '2026-11-22T10:00:00.000Z', 'exactly at the limit is ignored: +1 ms would pass what judge accepts');
+  assert.equal(NS.stampAfter(N, ['2026-11-22T10:10:00.001Z']), '2026-11-22T10:00:00.000Z', 'past it, ignored');
+  // Whatever it returns, judge's own limit accepts it.
+  for (const seen of ['2026-11-22T10:09:59.999Z', '2026-11-22T10:10:00.000Z']) {
+    assert.ok(Date.parse(NS.stampAfter(N, [seen])) <= N + NS.FUTURE_MS);
+  }
 });
