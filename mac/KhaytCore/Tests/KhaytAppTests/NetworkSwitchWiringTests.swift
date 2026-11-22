@@ -254,11 +254,17 @@ struct NetworkSwitchWiringTests {
         #expect(shop.networkSwitchAsk == .changedElsewhere(at: NetworkSwitch.date(theirs), turningOn: false) && shop.networkSwitchHeld == nil)
         #expect(shop.networkSwitchAsk?.choices.map(\.key) == ["mac.net_ask_newer"], "no \"keep\" when it would loosen the shop's switch")
         // Even an answer of "no" is read as the newer setting: nothing here can leave the Mac online for good.
-        await shop.answerNetworkSwitch(apply: false)
-        #expect(shop.networkSwitchAsk == nil && !shop.outboundOfflineHere)
-        #expect(shop.networkSwitchHighestSeen != theirs, "not marked seen: the next check applies it")
+        // The value is not held, so the answer reads it; the read fails, and the question stays.
+        await server.forget()
+        await Self.gated(shop) { await shop.answerNetworkSwitch(apply: false) }
+        #expect(await server.asked.map(\.method) == ["GET"])
+        #expect(shop.networkSwitchAsk == .changedElsewhere(at: NetworkSwitch.date(theirs), turningOn: false), "never cleared with nothing applied")
+        #expect(!shop.outboundOfflineHere && shop.networkSwitchAnswerProblem == shop.words.callIt("mac.net_ask_unreached"))
+        #expect(shop.networkSwitchHighestSeen != theirs, "not marked seen")
+        // Khayt Cloud answers: the same answer now applies the newer setting.
         await server.answerGet(200, try Self.published(.init(offline: true, keep: [], changedAt: theirs, changedBy: "Noura")))
-        await Self.gated(shop) { await shop.checkNetworkSwitch() }
+        await Self.gated(shop) { await shop.answerNetworkSwitch(apply: false) }
+        #expect(shop.networkSwitchAsk == nil && shop.networkSwitchAnswerProblem == nil)
         #expect(Self.obj(book.network)["offline"] == .bool(true) && Self.obj(book.network)["via"] == .string("cloud"))
         #expect(shop.outboundGate.isOffline)
     }
@@ -416,6 +422,142 @@ struct NetworkSwitchWiringTests {
         await Self.gated(shop) { await shop.checkNetworkSwitch() }
         #expect(Self.obj(book.network)["offline"] == .bool(false), "not applied while the question stands")
         #expect(shop.networkSwitchHeld?.changedAt == newer)
+    }
+
+    // MARK: - "Use the newer setting" when the newer setting is not held (Dev Hub, Nov 22)
+
+    /// The owner turned the switch ON, another computer won (409), and the
+    /// read of what it set failed: the question waits with only a stamp.
+    static func beatenUnread() async throws -> (Shop, Server, NetworkBookForTests, theirs: String) {
+        let (shop, server, book) = await Self.shop(option: true)
+        let theirs = Self.stamp(-2)
+        await server.answerPut(409, Data(#"{"reason":"stale","changedAt":"\#(theirs)"}"#.utf8))
+        await server.answerGet(500, Data())
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(true) })
+        #expect(shop.networkSwitchAsk == .changedElsewhere(at: NetworkSwitch.date(theirs), turningOn: true))
+        #expect(shop.networkSwitchHeld == nil && shop.networkSwitchHeldStamp == theirs)
+        #expect(Self.obj(book.network)["offline"] == .bool(true) && Self.obj(book.network)["via"] == nil)
+        #expect(!shop.hearsNetworkSwitch, "offline by a switch that did not come through Khayt Cloud: no check may ask")
+        await server.forget()
+        return (shop, server, book, theirs)
+    }
+
+    @Test("the answer reads the newer setting once, even while offline, and applies it")
+    func answerReadsAndApplies() async throws {
+        let (shop, server, book, theirs) = try await Self.beatenUnread()
+        await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: theirs, changedBy: "Noura")))
+        await Self.gated(shop) { await shop.answerNetworkSwitch(apply: true) }
+        #expect(await server.asked.map(\.method) == ["GET"], "one read, the answer's own")
+        #expect(Self.obj(book.network)["offline"] == .bool(false) && Self.obj(book.network)["changedAt"] == .string(theirs))
+        #expect(!shop.outboundGate.isOffline && !shop.outboundOfflineHere)
+        #expect(shop.networkSwitchAsk == nil && shop.networkSwitchHeldStamp == nil && shop.networkSwitchAnswerProblem == nil)
+        #expect(!shop.networkSwitchAnswering)
+    }
+
+    @Test("the read fails: the question stays, nothing is applied, and it says Khayt Cloud could not be reached; asked again, it works")
+    func answerKeepsTheQuestion() async throws {
+        let (shop, server, book, theirs) = try await Self.beatenUnread()
+        await Self.gated(shop) { await shop.answerNetworkSwitch(apply: true) }
+        #expect(await server.asked.map(\.method) == ["GET"], "one read, not a retry loop")
+        #expect(shop.networkSwitchAsk == .changedElsewhere(at: NetworkSwitch.date(theirs), turningOn: true), "never cleared with nothing applied")
+        #expect(shop.networkSwitchHeldStamp == theirs && shop.networkSwitchHeldTurningOn)
+        #expect(shop.networkSwitchAnswerProblem == shop.words.callIt("mac.net_ask_unreached"))
+        #expect(Self.obj(book.network)["offline"] == .bool(true) && shop.outboundGate.isOffline, "this Mac is as it was")
+        #expect(!shop.networkSwitchAnswering)
+        // Khayt Cloud is back: the same button now reads it and applies it.
+        await server.forget()
+        await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: theirs, changedBy: nil)))
+        await Self.gated(shop) { await shop.answerNetworkSwitch(apply: true) }
+        #expect(Self.obj(book.network)["offline"] == .bool(false))
+        #expect(shop.networkSwitchAsk == nil && shop.networkSwitchAnswerProblem == nil)
+    }
+
+    @Test("Khayt Cloud holds nothing, a replayed older value, or this Mac's own switch: the question stays and nothing is applied")
+    func answerEdges() async throws {
+        // Nothing published there any more.
+        var (shop, server, book, theirs) = try await Self.beatenUnread()
+        await server.answerGet(404, Data(#"{"reason":"none"}"#.utf8))
+        await Self.gated(shop) { await shop.answerNetworkSwitch(apply: true) }
+        #expect(shop.networkSwitchAsk != nil && shop.networkSwitchAnswerProblem == shop.words.callIt("mac.net_ask_nothing_there"))
+        #expect(Self.obj(book.network)["offline"] == .bool(true))
+
+        // A value older than the one the 409 spoke of is not the newer setting.
+        (shop, server, book, theirs) = try await Self.beatenUnread()
+        await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: Self.stamp(3600), changedBy: nil)))
+        await Self.gated(shop) { await shop.answerNetworkSwitch(apply: true) }
+        #expect(shop.networkSwitchAsk == .changedElsewhere(at: NetworkSwitch.date(theirs), turningOn: true))
+        #expect(shop.networkSwitchAnswerProblem == shop.words.callIt("mac.net_ask_unreached"))
+        #expect(Self.obj(book.network)["offline"] == .bool(true), "an old value replayed is not applied")
+
+        // Under this Mac's own switch no call is made at all.
+        (shop, server, book, theirs) = try await Self.beatenUnread()
+        await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: theirs, changedBy: nil)))
+        _ = shop.setOutboundOfflineHere(true)
+        await server.forget()
+        await Self.gated(shop) { await shop.answerNetworkSwitch(apply: true) }
+        #expect(await server.asked.isEmpty, "this Mac's own switch is stricter than the owner's answer")
+        #expect(shop.networkSwitchAsk != nil && Self.obj(book.network)["offline"] == .bool(true))
+    }
+
+    @Test("after a restart only the stamp is kept: the answer still reads and applies; a held value makes no call")
+    func answerAfterRestart() async throws {
+        let mine = Self.stamp(600)
+        let (shop, server, book) = await Self.shop(option: false, network: .object(["offline": .bool(true), "changedAt": .string(mine)]))
+        let theirs = Self.stamp(300)
+        shop.outboundDefaults.set(theirs, forKey: Shop.heldStampKey(Self.shopId))
+        shop.outboundDefaults.set(true, forKey: Shop.heldTurningOnKey(Self.shopId))
+        shop.startNetworkSwitchChecks()
+        shop.networkSwitchTask?.cancel()
+        #expect(shop.networkSwitchAsk == .changedElsewhere(at: NetworkSwitch.date(theirs), turningOn: true) && shop.networkSwitchHeld == nil)
+        await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: theirs, changedBy: nil)))
+        await server.forget()
+        await Self.gated(shop) { await shop.answerNetworkSwitch(apply: true) }
+        #expect(await server.asked.map(\.method) == ["GET"])
+        #expect(Self.obj(book.network)["offline"] == .bool(false) && shop.networkSwitchAsk == nil)
+
+        // With the value held (the usual 409), the answer asks nothing.
+        let (held, server2, book2) = await Self.shop(option: true)
+        let at = Self.stamp(-2)
+        await server2.answerPut(409, Data(#"{"reason":"stale","changedAt":"\#(at)"}"#.utf8))
+        await server2.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: at, changedBy: nil)))
+        #expect(await Self.gated(held) { await held.setOutboundOffline(true) })
+        await server2.forget()
+        await Self.gated(held) { await held.answerNetworkSwitch(apply: true) }
+        #expect(await server2.asked.isEmpty && Self.obj(book2.network)["offline"] == .bool(false))
+    }
+
+    @Test("the gate lets through only the owner's one switch-sync read: no other purpose, never under this Mac's own switch")
+    func gateException() throws {
+        let gate = OutboundGate()
+        gate.update(book: .settings(.object(["network": .object(["offline": .bool(true), "changedAt": .string(Self.stamp(60))])])))
+        #expect(throws: (any Error).self) { try gate.require(.switchSync) }
+        try OutboundGate.$ownersSwitchAnswer.withValue(true) {
+            try gate.require(.switchSync)
+            #expect(throws: (any Error).self) { try gate.require(.cloud) }
+            #expect(!gate.allows(.updates))
+            var local = gate.currentLocal
+            local.offline = true
+            gate.update(local: local)
+            #expect(throws: (any Error).self) { try gate.require(.switchSync) }
+        }
+        // A book not read yet waits, with or without the answer.
+        let unread = OutboundGate()
+        unread.update(book: .unread)
+        OutboundGate.$ownersSwitchAnswer.withValue(true) {
+            #expect(throws: (any Error).self) { try unread.require(.switchSync) }
+        }
+    }
+
+    @Test("the three sentences are said in words, and the question's buttons wait while the answer reads")
+    func answerWords() async throws {
+        let (shop, _, _) = await Self.shop(option: true)
+        for key in ["mac.net_ask_unreached", "mac.net_ask_nothing_there", "mac.net_ask_not_saved"] {
+            let said = shop.words.callIt(key)
+            #expect(!said.hasPrefix("mac.") && said.count > 30, Comment(rawValue: key))
+        }
+        let src = try String(contentsOf: Self.sources.appending(path: "Shop+NetworkSwitch.swift"), encoding: .utf8)
+        #expect(src.contains(".disabled(!mayAnswer || shop.networkSwitchAnswering)"))
+        #expect(src.contains("if let problem = shop.networkSwitchAnswerProblem"))
     }
 
     @Test("stamps are remembered per shop")

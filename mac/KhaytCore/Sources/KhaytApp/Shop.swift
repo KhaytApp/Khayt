@@ -265,6 +265,11 @@ final class Shop {
     /// person before it is applied (`Shop+NetworkSwitch`). Nil when none.
     var networkSwitchAsk: NetworkSwitchAsk?
     var networkSwitchHeld: NetworkSwitch.Value?
+    /// Why the owner's last answer to `networkSwitchAsk` changed nothing (the
+    /// newer setting could not be read). Shown under the question, which stays.
+    var networkSwitchAnswerProblem: String?
+    /// The owner's answer is reading the newer setting: its buttons wait.
+    var networkSwitchAnswering = false
     /// How the network-switch route is asked. Nil is Khayt Cloud's session;
     /// a test answers as the server would.
     var networkSwitchFetch: NetworkSwitchFetch?

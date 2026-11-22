@@ -81,6 +81,18 @@ public final class OutboundGate: @unchecked Sendable {
     /// running beside it through the app's gate.
     @TaskLocal public static var scoped: OutboundGate?
 
+    /// ── THE OWNER'S ANSWER READS THE SWITCH ONCE ─────────────────────────────
+    ///
+    /// Set only around the ONE `switch-sync` GET the owner's own answer makes
+    /// ("Use the newer setting", when the other computer's value is not held:
+    /// Dev Hub, Nov 22, inside the 15-minute switch-sync exception Turki
+    /// accepted). The shop's switch may be on and not shared, so the rule
+    /// would refuse the call and the Mac could never hear the setting its
+    /// owner just asked for. A person pressed a button; this is that press's
+    /// call and no other: only `switch-sync`, only with a book read, and
+    /// NEVER under this Mac's own switch, which stays stricter than anything.
+    @TaskLocal public static var ownersSwitchAnswer = false
+
     /// The gate a call site asks: the task's own when a test gave it one,
     /// else the app's.
     public static var shared: OutboundGate { scoped ?? app }
@@ -216,6 +228,10 @@ public final class OutboundGate: @unchecked Sendable {
     /// goes (a name or address, with or without a scheme and port).
     public func require(_ purpose: OutboundPurpose, host: String? = nil) throws {
         lock.lock()
+        if purpose == .switchSync, Self.ownersSwitchAnswer, !local.offline, case .settings = book {
+            lock.unlock()
+            return
+        }
         let answer = unlockedVerdict(purpose, host: host)
         if !answer.allowed {
             var entry = counts[purpose] ?? Blocked(count: 0, last: clock())

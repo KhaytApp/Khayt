@@ -415,7 +415,35 @@ extension Shop {
         // makes internet calls.
         guard permitted("security", "edit") else { return }
         let ask = networkSwitchAsk
-        let value = networkSwitchHeld
+        var value = networkSwitchHeld
+        // ── "USE THE NEWER SETTING", AND THE NEWER SETTING IS NOT HELD ───────
+        //
+        // The read after the 409 failed, or the app restarted (only the stamp
+        // is kept). The answer itself reads it, once: the owner pressed the
+        // button, so this is their call, made even while the shop's switch is
+        // on here (never under this Mac's own switch). Read: applied below.
+        // Not read: THE QUESTION STAYS. Clearing it with nothing applied left
+        // this Mac offline with no question, and, its switch not having come
+        // through Khayt Cloud, no call it may make to hear the switch again.
+        if case .changedElsewhere(_, let turningOn)? = ask, value == nil, apply || !turningOn {
+            guard !networkSwitchAnswering else { return }
+            networkSwitchAnswering = true
+            defer { networkSwitchAnswering = false }
+            networkSwitchAnswerProblem = nil
+            switch await readNewerSetting() {
+            case .read(let read): value = read
+            case .nothingPublished:
+                networkSwitchAnswerProblem = words.callIt("mac.net_ask_nothing_there")
+                return
+            case .unreached:
+                networkSwitchAnswerProblem = words.callIt("mac.net_ask_unreached")
+                return
+            }
+            // Asked while the read was in flight: the question may have been
+            // answered by a check that heard the value, or the book changed.
+            guard networkSwitchAsk == ask else { return }
+        }
+        networkSwitchAnswerProblem = nil
         let stamp = value?.changedAt ?? networkSwitchHeldStamp
         networkSwitchAsk = nil
         networkSwitchHeld = nil
@@ -437,9 +465,61 @@ extension Shop {
             // The shop's switch follows the newer setting. When that value
             // could not be read, it is not marked seen: the next check that
             // may ask applies it, as "use the newer setting" says.
-            if let value { await applyNetworkSwitch(value, shopId: networkSwitchShopId) }
+            guard let value else { return }
+            let applied = await applyNetworkSwitch(value, shopId: networkSwitchShopId, asAnswer: true)
+            // Not applied, and not because this Mac already has it or newer:
+            // the book could not be written. The question comes back with the
+            // value, so the answer can be given again; it is never dropped
+            // with nothing applied.
+            if !applied, !networkSwitchAlreadySeen(value) {
+                networkSwitchHeld = value
+                holdStamp(value.changedAt)
+                outboundDefaults.set(turningOn, forKey: Self.heldTurningOnKey(networkSwitchShopId))
+                networkSwitchAsk = .changedElsewhere(at: NetworkSwitch.date(value.changedAt), turningOn: turningOn)
+                networkSwitchAnswerProblem = words.callIt("mac.net_ask_not_saved")
+            }
         case nil:
             return
+        }
+    }
+
+    /// Whether this Mac has already seen this value, or a newer one, from
+    /// Khayt Cloud (applied by a check, or left as it is by the owner).
+    func networkSwitchAlreadySeen(_ value: NetworkSwitch.Value) -> Bool {
+        guard let seen = networkSwitchHighestSeen.flatMap(NetworkSwitch.date), let when = NetworkSwitch.date(value.changedAt) else { return false }
+        return when <= seen
+    }
+
+    /// What the owner's answer read.
+    enum NewerSetting: Equatable {
+        case read(NetworkSwitch.Value)
+        /// Khayt Cloud answered, and holds no setting for this shop now.
+        case nothingPublished
+        /// Not signed in, not reached, refused, or a value that fails a check.
+        case unreached
+    }
+
+    /// The ONE `switch-sync` GET the owner's answer makes. The value must
+    /// pass every check a heard value passes, and be the one the 409 spoke
+    /// of or newer: at or after the stamp the server gave then, else at or
+    /// after this Mac's own change. An older value replayed here is not it.
+    func readNewerSetting(now: Date = Date()) async -> NewerSetting {
+        guard !outboundOfflineHere, let (connection, token, dek) = await networkSwitchSession(),
+              connection.shopId == networkSwitchShopId else { return .unreached }
+        let fetch = networkSwitchFetcher
+        let (heard, published) = await OutboundGate.$ownersSwitchAnswer.withValue(true) {
+            await Self.networkSwitchGet(connection, token: token, fetch: fetch)
+        }
+        switch heard {
+        case .failed: return .unreached
+        case .none: return .nothingPublished
+        case .published:
+            guard let published,
+                  case .success(let value) = NetworkSwitch.read(published, shopId: connection.shopId, dek: dek,
+                                                                highestSeen: networkSwitchHighestSeen, purposes: outboundPurposeIds),
+                  !NetworkSwitch.isAhead(value, now: now), let when = NetworkSwitch.date(value.changedAt) else { return .unreached }
+            if let floor = (networkSwitchHeldStamp ?? networkSwitchOwnStamp).flatMap(NetworkSwitch.date), when < floor { return .unreached }
+            return .read(value)
         }
     }
 
@@ -449,12 +529,17 @@ extension Shop {
     /// switch is never touched: a value with `offline: false` lifts the
     /// shop's switch, not the computer's.
     @discardableResult
-    func applyNetworkSwitch(_ value: NetworkSwitch.Value, shopId: String) async -> Bool {
+    func applyNetworkSwitch(_ value: NetworkSwitch.Value, shopId: String, asAnswer: Bool = false) async -> Bool {
         // lock: system — the shop's own switch, as its owner set it at another computer, checked and sealed with the shop's key
         guard source.isReal || networkBookForTests != nil, shopId == networkSwitchShopId, !shopId.isEmpty,
               let when = NetworkSwitch.date(value.changedAt) else { return false }
-        if let seen = NetworkSwitch.later(networkSwitchHighestSeen, networkSwitchOwnStamp), let seenAt = NetworkSwitch.date(seen),
-           when <= seenAt { return false }
+        // The owner's answer applies the value the 409 spoke of, which the
+        // server placed AT or after this Mac's own change: the same instant
+        // is still the other computer's, and still newer than anything seen
+        // from Khayt Cloud. Everything else must be strictly newer than both.
+        let seen = asAnswer ? networkSwitchHighestSeen : NetworkSwitch.later(networkSwitchHighestSeen, networkSwitchOwnStamp)
+        if let seen, let seenAt = NetworkSwitch.date(seen), when <= seenAt { return false }
+        if asAnswer, let own = networkSwitchOwnStamp.flatMap(NetworkSwitch.date), when < own { return false }
         guard await writeNetworkSettings({ NetworkSwitch.applied(value, to: $0) }) else { return false }
         sawNetworkSwitchStamp(value.changedAt)
         if !value.offline {
@@ -606,13 +691,20 @@ struct NetworkSwitchQuestion: View {
                             .buttonStyle(.bordered)
                     }
                 }
-                .disabled(!mayAnswer)
+                .disabled(!mayAnswer || shop.networkSwitchAnswering)
                 if link {
                     Spacer(minLength: 8)
                     OpenInternetUse(shop: shop)
                 }
             }
             .controlSize(.small)
+            // The answer changed nothing, and why: the question stays.
+            if let problem = shop.networkSwitchAnswerProblem {
+                Text(problem)
+                    .font(.system(size: 12)).foregroundStyle(Khayt.late)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.horizontal, rounded ? 12 : 16)
         .padding(.vertical, 9)
