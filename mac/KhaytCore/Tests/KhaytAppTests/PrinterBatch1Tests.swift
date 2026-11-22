@@ -227,7 +227,8 @@ struct PrinterBatch1Tests {
         for value in cases {
             let c = Self.obj(value)
             let why: String = { if case .string(let s)? = c["why"] { return s }; return "?" }()
-            let got = try await engine.sendChecksVector(file: c["file"] ?? .null, machine: c["machine"] ?? .null, loaded: c["loaded"])
+            let got = try await engine.sendChecksVector(file: c["file"] ?? .null, machine: c["machine"] ?? .null, loaded: c["loaded"],
+                                                         live: c["live"], opts: c["opts"])
             #expect(got == c["want"], Comment(rawValue: why))
         }
     }

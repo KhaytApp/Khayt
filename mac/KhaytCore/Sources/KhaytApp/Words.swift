@@ -4126,7 +4126,7 @@ final class Words {
         "mac.apps_screen_sub": ["en": "Slicers that send files to this Mac. They never see your book or customers, and see prices only if you allow it below.", "ar": "برامج التقطيع التي ترسل الملفات إلى هذا الـMac. لا ترى دفترك أو عملاءك أبدًا، ولا ترى الأسعار إلا إذا سمحت بذلك أدناه."],
         "mac.apps_prices": ["en": "Show prices in OrcaSlicer", "ar": "إظهار الأسعار في OrcaSlicer"],
         "mac.apps_prices_off": ["en": "Off: no slicer sees a price. Turn on to choose which slicers may.", "ar": "متوقف: لا يرى أي برنامج تقطيع سعرًا. شغّله لتختار البرامج المسموح لها."],
-        "mac.apps_prices_on": ["en": "The Khayt tab shows your price for the sliced plate, worked out here from your spools, rates and markup. Only to the slicers you choose below; nothing is saved.", "ar": "يعرض تبويب Khayt سعرك للّوح المقطَّع، محسوبًا هنا من بكراتك وأسعارك وهامش ربحك. فقط للبرامج التي تختارها أدناه، ولا يُحفظ شيء."],
+        "mac.apps_prices_on": ["en": "The Khayt tab shows your price for the sliced plate, worked out here from your spools, rates and markup. Only to the slicers you choose below; nothing is saved.", "ar": "يعرض تبويب خيط سعرك للّوح المقطَّع، محسوبًا هنا من بكراتك وأسعارك وهامش ربحك. فقط للبرامج التي تختارها أدناه، ولا يُحفظ شيء."],
         "mac.apps_prices_owner": ["en": "Only the owner can change this.", "ar": "المالك وحده يستطيع تغيير هذا."],
         "mac.apps_grant_label": ["en": "Prices", "ar": "الأسعار"],
         "mac.apps_grant_none": ["en": "None", "ar": "لا شيء"],

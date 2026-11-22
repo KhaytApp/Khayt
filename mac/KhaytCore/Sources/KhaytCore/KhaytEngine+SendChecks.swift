@@ -99,14 +99,18 @@ extension KhaytEngine {
     /// The vectors' own call, for the parity test: the file as the fixture
     /// gives it (`headerText` read by `parsePrinterHeader`), and a U1's
     /// `print_task_config` through `fromPrintTaskConfig`.
-    public func sendChecksVector(file: JSONValue, machine: JSONValue, loaded: JSONValue?) throws -> JSONValue {
+    /// `live` and `opts` are the bed-not-cleared vectors' (#2606): the poll's
+    /// entry for the machine, and the send's options; absent, no bed finding.
+    public func sendChecksVector(file: JSONValue, machine: JSONValue, loaded: JSONValue?,
+                                 live: JSONValue? = nil, opts: JSONValue? = nil) throws -> JSONValue {
         try runtime.call2("""
-            (function (c, machine, l) {
+            (function (c, machine, l, live, opts) {
               var f = Object.assign({}, c);
               if (f.headerText) f.header = globalThis.KhaytGcodeParse.parsePrinterHeader(f.headerText);
               var LC = globalThis.KhaytLoadedColours;
-              return globalThis.KhaytSendChecks.sendChecks(f, machine, l ? (l.ptc ? LC.fromPrintTaskConfig(l.ptc) : l.loaded) : undefined);
-            })(ARG0, ARG1, ARG2)
-            """, [file, machine, loaded ?? .null], as: JSONValue.self)
+              return globalThis.KhaytSendChecks.sendChecks(f, machine, l ? (l.ptc ? LC.fromPrintTaskConfig(l.ptc) : l.loaded) : undefined,
+                live === null ? undefined : live, opts === null ? undefined : opts);
+            })(ARG0, ARG1, ARG2, ARG3, ARG4)
+            """, [file, machine, loaded ?? .null, live ?? .null, opts ?? .null], as: JSONValue.self)
     }
 }
