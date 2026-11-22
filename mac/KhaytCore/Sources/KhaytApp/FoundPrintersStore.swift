@@ -48,8 +48,13 @@ enum FoundPrintersStore {
     /// TESTS ONLY: runs between the merge and the write, where the other
     /// app's write can land.
     nonisolated(unsafe) static var beforeWriteForTests: (() -> Void)?
-    /// How many times a write that found the file changed starts again.
-    static let tries = 4
+    /// How many times a write that found the file changed starts again:
+    /// `rememberInFile`'s own default in `lib/found-printers.js`. That
+    /// function is the same read, merge, look-again, write as the loop in
+    /// `Shop.rememberFound`; it takes its file access as JavaScript callbacks,
+    /// which this engine cannot hand it, so the loop is here and the MERGE is
+    /// the lib's (`remember`), which is the part that must not differ.
+    static let tries = 3
 
     /// Whole-file, atomic: a reader never sees half a list.
     static func write(_ list: [JSONValue], _ build: StoreReader.Build) throws {

@@ -137,6 +137,16 @@ extension LibraryEditPerfTests {
             #expect(try String(contentsOf: file, encoding: .utf8).contains(#""round":\#(round)"#), "a clobber after giving up")
             await shop.rememberFound(found, now: later)
 
+            // A printer that moved still says where it was after the file is read back.
+            let moved = try JSONDecoder().decode([KhaytEngine.FoundPrinter].self, from: Data(#"""
+                [{"name":"U1","host":"192.168.1.77","port":7125,"serial":"SN1"}]
+                """#.utf8))
+            await shop.rememberFound(moved, now: later.addingTimeInterval(60))
+            let after = await shop.rememberedPrinters(now: later.addingTimeInterval(120))
+            let u1 = FoundPrintersTests.obj(try #require(after.first { FoundPrintersTests.obj($0)["serial"] == .string("SN1") }))
+            #expect(u1["host"] == .string("192.168.1.77") && u1["previousHost"] == .string("192.168.1.20"))
+            #expect(u1["vendor"] == .string("Snapmaker"), "a find that did not say the vendor blanked it")
+
             // Forget.
             shop.forgetFoundPrinters()
             #expect(!FileManager.default.fileExists(atPath: file.path))
