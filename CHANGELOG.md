@@ -8,6 +8,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - **The poll steps aside for a person's command (`lib/poll-yield.js`).** While Pause, Resume, Stop, a speed or light change, Skip an object or a file send is on its way to a printer, the background poll leaves that printer alone, and an answer that was already in flight when the command went out is dropped. Before, such an answer could be recorded after the press and draw "Printing" again over a pause. The printer is asked again about 1.5 seconds after the reply. A command that never answers releases its printer by the rule's own limit. A phone's pause or stop through the Mac counts too.
   - **One result per print run (`lib/run-result.js`).** When a print ends on a job the book names, how it ended (finished, failed or cancelled) is written on that run, once: a second poll, a restart or the desktop finding the same end change nothing, and a mark the shop made itself is never replaced. A Bambu print the shop cancelled counts as cancelled, not as a failure against the printer.
   - **A card leaves out what its model cannot do (`lib/printer-capabilities.js`).** Skip an object is not offered on the resin printers the rule lists, and a Bambu P1P's light is not offered unless its kit is recorded. A model nobody has said anything about keeps every button, as before.
+- **Mac: filament per head is recorded when nobody is signed in.** With the staff lock on and nobody signed in, which is how the Mac starts, a finished print's per-head figures were refused as if a person had tried to edit the job, and lost. They are the printer's own record and are now written whoever is or is not at the Mac.
+
 - **Mac: each printer's problems and waiting reasons, worked out by the shared rules and sent to the phone and the cloud (draft, stacked on #2613).** After every sweep the Mac asks `lib/printer-problems.js` what each printer says is wrong and `lib/waiting-at-machine.js` whether it waits for a person, and adds `problems` and `waiting` to every printer on `/api/machines/live` and in the cloud's live snapshot. The phone only decodes them. A Snapmaker U1 is asked for two more status objects in the read it already gets (its exception list and power-loss flag), only when the printer itself lists them, so a runout names its head and a power loss is said (information only: Khayt never sends resume or discard). A printer that is not answering has no live problems, but a finished print whose bed was not cleared still shows as waiting, because that is read from what is stored. `rfid-tray` and `timelapse-attach` are bundled for the screens that follow their frames; nothing calls them yet. No new screens on the Mac. After a finished print on a job the book names, the Mac also reads the U1's history once (a read) and notes how much filament each head used on the job (`actualHeads`, split by the shared rule in proportion to the slicer's per-head figures and marked `proportional`). The printer's own job id is the key, so a print is never recorded twice, by this Mac, the desktop or a second look. Tests: the 15 problem vectors and 11 waiting vectors through the Mac's engine, the needs per printer, and the live row.
 - **Shared rules (printer batch 3, not yet on screen): how each print ended, each printer's success rate, and "waiting at the machine" that survives a restart.**
   - **One result per print.** A printer's finished job now records how it ended (finished, cancelled or failed) when its last word says so (`lib/printer-poll-cache.js`). A Bambu print the shop cancelled ends on "FAILED" too; the cancel code it gives makes it a cancel, so it is not held against the printer. `lib/run-result.js` puts one result on each print run, once. The shop's own mark (a failed check, a scrapped print) beats the printer's "complete", which is kept beside it.
@@ -184,9 +186,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - iPhone: an expense with a receipt photo, or a quote asked of the Mac, now says "This Mac can’t take … yet" when the Mac answers 404 (the native Mac serves neither route yet), instead of the Mac's English "Not found". Nothing looks saved, and the draft stays.
 - **Connectors: the desktop's consent sheet says when it updates an installed connector (Windows/Linux).** The same "Updates version 1.0.0" line as the Mac, shown only when the install goes over a different installed version, never on a first install, the same version again, or the read-only "What it sends" view.
 - **Mac: what the phone asked for and the Mac did not serve, and settings that did nothing (Nov 10 review, section B).** **An iPhone expense with a photographed receipt** failed when the host was a Mac: the Mac had no `POST /api/expense`. It serves it now, for a signed, paired phone, by the desktop's rules: the receipt must be a JPEG, PNG or PDF by its own first bytes and at most 6 MB, it is filed in `receipts/` beside the book before the expense is made (so no row ever points at a file that is not there), and the record is the same one Add Expense writes. **The phone's "ask the Mac" calculator** failed the same way; `POST /api/quote` is now one shared rule (`quotePart` in `lib/lan-rest.js`) that the Mac serves. **Receipts open on the Mac:** an expense with a receipt shows a paperclip in the Expenses table that opens it, or says it is not on this computer. **Minimum order amount** (Settings › Pricing & Tax) was saved and never read on the Mac; New Job now warns when the total is under it, as the other app's calculator does. **A spool tapped in a widget** opens Inventory with that spool selected, not the whole shelf under whatever was last searched. **The access-level note on an operator** said "This Mac does not ask for a PIN" long after the Mac had staff sign-in; it now says what the level does, in all 9 languages.
-- **Mac: what the phone asked for and the Mac did not serve, and settings that did nothing (Nov 10 review, section B).** **An iPhone expense with a photographed receipt** failed when the host was a Mac: the Mac had no `POST /api/expense`. It serves it now, for a signed, paired phone, by the desktop's rules: the receipt must be a JPEG, PNG or PDF by its own first bytes and at most 6 MB, it is filed in `receipts/` beside the book before the expense is made (so no row ever points at a file that is not there), and the record is the same one Add Expense writes. **The phone's "ask the Mac" calculator** failed the same way; `POST /api/quote` is now one shared rule (`quotePart` in `lib/lan-rest.js`) that the Mac serves. **Receipts open on the Mac:** an expense with a receipt shows a paperclip in the Expenses table that opens it, or says it is not on this computer. **Minimum order amount** (Settings › Pricing & Tax) was saved and never read on the Mac; New Job now warns when the total is under it, as the other app's calculator does. **A spool tapped in a widget** opens Inventory with that spool selected, not the whole shelf under whatever was last searched. **The access-level note on an operator** said "This Mac does not ask for a PIN" long after the Mac had staff sign-in; it now says what the level does, in all 9 languages. **Require inspector** (Settings › Production) was saved and asked nobody: with QC on and operators set up, passing or failing a job at inspection now asks who inspected it, opens on whoever is signed in at this Mac, records them on the job as the other app does, and with the setting on will not go ahead until somebody is chosen.
-- **Mac: what the phone asked for and the Mac did not serve, and settings that did nothing (Nov 10 review, section B).** **An iPhone expense with a photographed receipt** failed when the host was a Mac: the Mac had no `POST /api/expense`. It serves it now, for a signed, paired phone, by the desktop's rules: the receipt must be a JPEG, PNG or PDF by its own first bytes and at most 6 MB, it is filed in `receipts/` beside the book before the expense is made (so no row ever points at a file that is not there), and the record is the same one Add Expense writes. **The phone's "ask the Mac" calculator** failed the same way; `POST /api/quote` is now one shared rule (`quotePart` in `lib/lan-rest.js`) that the Mac serves. **Receipts open on the Mac:** an expense with a receipt shows a paperclip in the Expenses table that opens it, or says it is not on this computer. **Minimum order amount** (Settings › Pricing & Tax) was saved and never read on the Mac; New Job now warns when the total is under it, as the other app's calculator does. **A spool tapped in a widget** opens Inventory with that spool selected, not the whole shelf under whatever was last searched. **The access-level note on an operator** said "This Mac does not ask for a PIN" long after the Mac had staff sign-in; it now says what the level does, in all 9 languages. **Require inspector** (Settings › Production) was saved and asked nobody: with QC on and operators set up, passing or failing a job at inspection now asks who inspected it, opens on whoever is signed in at this Mac, records them on the job as the other app does, and with the setting on will not go ahead until somebody is chosen. **A phone editing from an old copy:** a delta may now carry `baseRev`, the revision the phone started from; when the Mac's copy was newer than that and the phone's replaced it, the Mac keeps its copy and says so, as it does for a tie. A phone that sends no `baseRev` is treated as before.
-- **Mac: what the phone asked for and the Mac did not serve, and settings that did nothing (Nov 10 review, section B).** **An iPhone expense with a photographed receipt** failed when the host was a Mac: the Mac had no `POST /api/expense`. It serves it now, for a signed, paired phone, by the desktop's rules: the receipt must be a JPEG, PNG or PDF by its own first bytes and at most 6 MB, it is filed in `receipts/` beside the book before the expense is made (so no row ever points at a file that is not there), and the record is the same one Add Expense writes. **The phone's "ask the Mac" calculator** failed the same way; `POST /api/quote` is now one shared rule (`quotePart` in `lib/lan-rest.js`) that the Mac serves. **Receipts open on the Mac:** an expense with a receipt shows a paperclip in the Expenses table that opens it, or says it is not on this computer. **Minimum order amount** (Settings › Pricing & Tax) was saved and never read on the Mac; New Job now warns when the total is under it, as the other app's calculator does. **A spool tapped in a widget** opens Inventory with that spool selected, not the whole shelf under whatever was last searched. **The access-level note on an operator** said "This Mac does not ask for a PIN" long after the Mac had staff sign-in; it now says what the level is for, in all 9 languages. **Require inspector** (Settings › Production) was saved and asked nobody: with QC on and operators set up, passing or failing a job at inspection now asks who inspected it, opens on whoever is signed in at this Mac, records them on the job as the other app does, and with the setting on will not go ahead until somebody is chosen. **A phone editing from an old copy:** a delta may now carry `baseRev`, the revision the phone started from; when the Mac's copy was newer than that and the phone's replaced it, the Mac keeps its copy and says so, as it does for a tie. A phone that sends no `baseRev` is treated as before.
 - **Mac: a storefront's or carrier's genuine delivery is no longer shut out by somebody else's bad requests (Nov 10 review, section E).** A Salla, Zid or carrier webhook reaches a Mac through a proxy or tunnel, so every delivery comes from one address; ten unsigned requests a minute from anyone kept that address locked out, and correctly signed orders were answered 429 before their signature was read. The signature is now judged first: a valid one is taken whatever the lockout says, and only requests that fail it are counted and throttled.
 - **Mac: three reliability faults from the Nov 10 review (section D).** **The book's lock is kept across a reload.** Every save reloads, and every reload deleted the lock file and wrote it again; a background write (a library scan, a phone's changes, a printer finishing) that checked ownership in that gap was refused as "another app owns this book" and, where nothing reported it, was lost. The claim is now kept while the same book stays open, and the lock file is replaced whole, never truncated and refilled. **A damaged book with a good rollback can be saved over.** The app opened the rollback (one save old) without saying so, and then refused every save, because the writers read only the damaged file. A write now starts from the same rollback, the damaged file is kept beside the book, and the window says once that it opened the last good copy. **The board builds at most 120 cards a column.** Completed only empties when jobs are marked delivered or shipped, so a shop that never marks them had every finished job built each time the board opened, on every search keystroke and after every save; the rest are one line, "N more in Jobs".
 - **Mac: everyday rough edges from the Nov 10 review (section C).** **New Job** takes the day the job was promised for ("by Thursday"; left off, the due date is still estimated from the queue) and a note, and Cancel asks before throwing away a job with parts on it. **Edit Job** can change the job's name, which is what the invoice is headed with and could never be corrected here; the change is kept in the job's edit history (`applyEdit` in `lib/order-edit.js`). **Empty screens say what to do:** Jobs, the Board, Machines, Inventory and the Catalogue each offer their own first step, as Customers did. **File ▸ New** gains New Spool, Add Printer, Add Expense and Log Failed Print, which had only their screen's + button. **The Stage column sorts in the order work moves** (quote, pending, printing … cancelled), not alphabetically by the stored word. **Arabic:** a customer's or supplier's phone number, email and tax number are typed and shown left to right (a phone number was drawn with its groups reversed), and letter-spacing is switched off on some forty headings and report cards where it pulled joined letters apart. Four icon-only menus (the "choose from the list" buttons on the spool, consumable and printer sheets, and the maintenance task menu) now have a name for VoiceOver and a tooltip.
@@ -7161,11 +7160,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Before you update
 
-- **If you are updating from 4.9 or earlier, Settings, the job page, Simple mode and the stage colours have changed: read this before you update.** Settings is one window with 14 panes in a sidebar, named as on the Mac app, in place of the strip of tabs; each setting is under the pane its name says, and File ▸ Settings… (Ctrl+,) opens it. In Jobs, a job's ⋯ menu has **Open page**, and the page's **Edit** opens one sheet for the whole job (Job, Parts, Price) with a **Markup** field and the new total shown before you save; **New job** opens the same sheet empty. "Target profit margin" is now called **Markup**: the same number and the same arithmetic. In Simple mode the board has four columns (Quote, Queued, Printing, Ready) and the screens that belong to Professional are left out; switch to Professional to have them back. Printing is amber in every theme and a job on hold is purple; in Arabic, Pending reads «بانتظار» and On hold «متوقف مؤقتاً». Once, in the background, Khayt reads your library's 3MF files again, so some cards show fewer colour dots: the colours the print uses, not every spool the printer had loaded. If you already run 4.10.0, nothing here is new to you; accept to continue.
-
 ### Security
-
-- **Security (all apps): a crafted G-code file can no longer freeze Khayt while its print time is read.** The print-time pattern in `lib/gcode-parse.js` (`estimated printing time … =`) rescanned to the end of the line from every occurrence of the phrase, so one long line of it with no "=" was quadratic: 800 KB took 13 seconds, and 32 MB would take hours. The Mac's intake quote runs it on a file a stranger sends, and every app runs it on G-code and on the G-code inside 3MFs. It is now one forward pass that finds what the old pattern found (4,000 generated cases), and `parseGcodeText` reads only a large file's first and last half megabyte, where slicers write their summary. `test/gcode-parse-adversarial.test.js` pins every metadata key at 50 KB in under 50 ms and linear to 8 MB. Found in the beta.40 security review.
 
 - **Security (all apps): a crafted 3MF can no longer freeze Khayt while its mesh or colours are read.** `lib/mf-mesh.js` found its tags with patterns like `<object …>…</object>` that rescanned to the end of the file from every opener with no ">" or no close, so a model file of `<object id="1">` repeated was quadratic: 200 KB took up to 2.3 seconds per pattern and 10 MB about 13 minutes. The same held for mesh, part, plate, volume, component, item, vertex and triangle tags and the model's unit, and the PrusaSlicer settings reader was quadratic on blank lines (200 KB: 19 seconds). All of them now scan with `indexOf` and find the same tags, and a mesh's triangles are counted without building a list of millions of matches. On this shop's 657 local 3MF files every answer is byte-identical before and after, and so is every model file's colour digest (2,228). `test/mf-mesh-adversarial.test.js` pins 14 shapes at 50 KB in under 50 ms and linear to 8 MB. Found in the beta.40 security review.
 
@@ -7175,11 +7170,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Before you update
 
-- **If you are updating from 4.9 or earlier, Settings, the job page, Simple mode and the stage colours have changed: read this before you update.** Settings is one window with 14 panes in a sidebar, named as on the Mac app, in place of the strip of tabs; each setting is under the pane its name says, and File ▸ Settings… (Ctrl+,) opens it. In Jobs, a job's ⋯ menu has **Open page**, and the page's **Edit** opens one sheet for the whole job (Job, Parts, Price) with a **Markup** field and the new total shown before you save; **New job** opens the same sheet empty. "Target profit margin" is now called **Markup**: the same number and the same arithmetic. In Simple mode the board has four columns (Quote, Queued, Printing, Ready) and the screens that belong to Professional are left out; switch to Professional to have them back. Printing is amber in every theme and a job on hold is purple; in Arabic, Pending reads «بانتظار» and On hold «متوقف مؤقتاً». Once, in the background, Khayt reads your library's 3MF files again, so some cards show fewer colour dots: the colours the print uses, not every spool the printer had loaded. If you already run 4.10.0, nothing here is new to you; accept to continue.
-
 ### Fixed
-
-- **Fixed (all apps): a job priced from agreed prices follows its parts again.** #2523 kept "a price that was not built from its parts" when a part was added, and took a job priced wholly from **agreed** prices for one, because such a job has no cost-plus factor either. So a customer with a price agreement who ordered three instead of one was billed for one: a part agreed at 100, taken from 1 to 3, stayed 100 where it should be 300; a new agreed price, or a second agreed part, did not move the bill either. Nothing asked and no price change was logged. It shipped in desktop 4.10.0 and was caught in the Mac beta.40 pre-release review before any Mac build carried it. The rule (`lib/order-edit.js applyParts`) now keeps a price only where part of it is explained neither by cost nor by an agreed price, and in such a job what was agreed still follows its parts: 300 made of an agreed 100 and 200 nothing explains, taken to two of the agreed part, is 400. New shared vectors `test/fixtures/parts-edit-vectors.json` (13 cases: agreed only, mixed, unexplained, cost-plus) run under node and through the Mac's engine; 5 of them fail on the rule as 4.10.0 has it.
 
 - **Shared rule: a followed-up quote, or one the customer was messaged about, is not a draft (all apps).** A follow-up carries the quote's total, so it is a send, but `quoteIsDraft` (#2524) did not count it, and a quote that was followed up but never shared could re-price itself on a parts or markup change without asking. `followUpSentAt` or a `followUpCount` above 0 now counts as sent, and so does any message in the customer's `commLog` logged against the job (`orderId`), when the caller passes the customer (`ctx.client` or `ctx.clients`; the shared rule's own markup and parts edits and the desktop job sheet do). Shared vectors in `test/fixtures/quote-draft-vectors.json` for every app's engine. Raised by the iPhone lane while making the phone stamp its quotes (#2526).
 
@@ -7605,14 +7596,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 > **No change to Khayt itself.** Every entry below is in Bed Ready (`renderer/bedready.html`, the `KHAYT_FLAVOR=bedready` build); Khayt loads `index.html` and has no HueForge tab. They reach users through Bed Ready 1.4.0 (`## [bedready-v1.4.0]` above; downloads in KhaytApp/bedready). Khayt 4.1.0 behaves exactly like 4.0.0.
 
 ### Added
-
-- **Bed Ready HueForge: reliefs bigger than the bed print as tiles.** In relief mode the width can go up to 1000 mm. A picture wider or deeper than the U1 bed, less 10 mm to spare, is cut evenly into tiles that each fit. The preview shows the seams, and the verdict says "3×2 tiles, each fits the bed" instead of asking you to reduce the width. Neighbouring tiles share their edge heights, so the pieces butt together flush. Every tile prints with the same colour bands, so it is one picture, not several re-solved ones. The 3MF export asks for one name and saves `name-r1c1-U1.3mf`, `-r1c2-` and so on beside it; STL saves one file per tile. A hanger is left off a tiled print, and the verdict says so.
-
-- **Bed Ready HueForge: fix the colour of one area.** In relief mode, click an area of the preview and pick, from the colours the stack can print, the one it should be. The area is the connected run of similar colour in the picture around the click (small, medium or large spread), so a second patch of the same colour elsewhere is left alone. Fixes are listed with how many pixels each took and the colour it actually prints, and each can be removed. They are kept as a spot and a colour, not a height, so they hold when the width, height, filaments or vividness change; a new picture clears them. The 3MF and the STL print the fixed heights.
-
-- **Bed Ready HueForge: hang a relief on a nail, or make it a keychain.** Print settings in relief mode have a "hanger": a round hole through the top of the picture, a wall's width in from the edge, or a loop on a tab above it. The hole is 2 to 12 mm (4 mm takes a keyring). The loop's tab prints 1.6 mm thick, or the relief's full height if that is thinner, never thinner than the base, so it does not snap off a keyring. The preview shows the hole and the tab in the colour the tab prints, and the size includes the tab. Both the U1 3MF and the STL carry it. The part stays one closed shell; a hole that would cut a small picture in two is left out.
-
-- **Bed Ready HueForge: measure your filaments from a printed card.** "Calibrate filaments" prints a small U1 card from the stack: one row per filament, steps of 1 to 13 layers over two contrasting backings, framed in the darkest filament with a light square marking the top-left. Photograph it, click its four corners, and Bed Ready measures each filament's real colour and TD (`lib/hueforge-calibrate.js`), shows them next to the stated values with a fit check, and puts them into the stack on "Use measured values". The relief then composites with measured numbers instead of the colour on the label and a TD guessed from lightness. Exposure and white balance are corrected from the lightest filament's stated colour. TD is read from the difference between the two backings, so exposure does not change it. A filament too opaque or too translucent for the steps is flagged rather than given a made-up TD.
 
 ## [4.0.0] - 2026-10-31
 
@@ -9965,14 +9948,6 @@ This release charges a product's prep once per line and its packaging by the box
 
 ### Added
 
-- **Mac: Recalculate from parts.** Once a job's price was typed (or kept on a seen quote), there was no way back to the arithmetic: Markup said "price was typed", and clearing the price field saved nothing. Edit Job now has "Recalculate from parts…": a markup (the job's own, else the shop's default), price now → new price, then "Use". It goes through the shared rule (`applyJobEdit { reprice }`, #2576) with the same locks as any price edit. A frozen job is refused, in words. The price may not go below what was paid. A price the customer has seen, or a sent proforma asking more than the new price, is asked about first. The typed price is dropped and the change logged. Figma: Mac file, page 19. The 12 shared reprice vectors run through the Mac's engine.
-
-- **Mac: a Snapmaker U1's camera stays awake while you watch it, and its chamber light can be switched from Khayt.** The U1 only refreshes its camera picture while one of Snapmaker's own apps asks it to, so after a few minutes Khayt showed a paused picture. While a camera tile or the machine sheet is on screen, Khayt now asks the printer to keep the camera going, renewing once a minute. It never asks the camera to stop: the printer lets it lapse by itself, and someone else may still be watching. The request goes over the printer's WebSocket, which also carries Snapmaker's firmware methods, so the rule in `lib/webcam.js` allows one method (`camera.start_monitor`) and the Mac checks every frame against it. The chamber light is read from the printer and switched with the two `SET_LED` lines the same module allows, from a "Light on/off" button on the camera tile and a switch on the machine sheet; a switch that does not take snaps back and says the printer could not be reached. Approach learned from lanwen/orca-snapmaker-u1-camera-plugin (MIT). Shared vectors: `test/fixtures/u1-camera-vectors.json`.
-
-- **Mac: a product's labour is charged once, and its own rates can be set on the product.** These are two catalogue faults Turki found (a product costed at 400+ where the calculator said 70+). First, the labour, power and wear fields on the product sheet belonged to the NEXT new part: typing them on an open product changed nothing, and Save dropped them. Second, labour was charged on every part and every piece. A product now has its own Labour section (rate, prep and finishing, charged ONCE, or per part if the shop ticks that) and Machine section (power, electricity, wear and failure, for every part by its print time), through the shared rule (#2575). A part can still keep its own figure, and says so. New products start with the shop's defaults. A product saved before keeps its cost until the shop chooses "Use the new cost" or "Keep labour per part", and is told when its price is below the new cost. A job, a shelf sale or a web order taken from such a product carries its parts without labour and packaging, plus the two once at the job level (`labourCost`/`packagingCost`, #2581), so it costs what the catalogue says. Each such part is marked (`orderLevelCosts`), and an edit keeps the mark, so a re-costed part never takes its labour back. A part added by hand keeps its own labour, as the shared rule says (`addedPartMark`, Turki, Nov 19). Break-even now counts a job's labour and packaging carried once. Figma: Mac file, page 18. Tests: the shared vectors run through the Mac's engine; a round trip per field; a ratchet against summing a job's cost outside the engine; the hand-part vectors both ways; break-even with once-costs.
-
-- **All apps: prep is charged once per line, post-processing per piece; packaging by the box.** A part's labour was (prep + post) × rate on every piece, so a line of 10 paid its prep ten times: 24.75 too much for every piece after the first at Khayt's defaults (0.25 h × 90 × 1.1), 222.75 on a line of 10. The shared rule (`KhaytOrderMoney.lineLabour`) is now (prep + post × qty) × rate for the line, and the calculator, products, store orders, the Mac and the phone all use it. A product is one line: prep once, post per finished product, whatever its parts' own quantities. Adding the same product to the calculator again makes it one line of 2, not two products. A product can say how many fit one box ("Pieces per box", 1 by default, a box each as before): a line of N ships in N ÷ that, rounded up (`KhaytOrderMoney.lineBoxes`). A part added by hand is one box for its line, as before. A new product on the desktop carries the shop's rates, as on the Mac, so its labour is charged once. Products saved before this keep their catalogue cost, and the jobs and web orders taken from them, until the shop chooses "Use the new cost"; jobs already taken keep the cost they were taken at.
-
 - **Mac: prep once per line, finishing per piece, packaging by the box (the shared rule from #2586).**
   - **Product sheet.** A product with its own rates now separates "Prep, once per line" from "Finishing, per piece". It has a "Pieces per box" field (blank means a box each) and a "For N pieces" preview of what a line of N costs: parts, labour, packaging and how many boxes, the cost and per piece. Every figure comes from the shared rule (`productJobParts` with `units`, `jobCost`, `lineBoxes`), so the Mac does no sums of its own. Figma: Mac file, page 21.
   - **Online orders.** A web order's line of a product with its own rates is now ONE line of N pieces through the same rule as the desktop's store orders: prep once, finishing per piece, packaging by the box. Before, it was one piece's labour and packaging times the quantity. The line counts the pieces still to print, as the shared rule does. A product saved before this keeps its own sum.
@@ -9981,9 +9956,6 @@ This release charges a product's prep once per line and its packaging by the box
   - **Stored jobs are unchanged.** Jobs already taken keep their cost: an unmarked part is the old sum.
   - **Tests.** The 18 shared vectors (`test/fixtures/line-labour-vectors.json`) run through the Mac's engine. Also tested: fields that aren't the Mac's survive a save, a marked part costs prep once while a stored one does not, an online line counts the pieces to print, and the preview's boxes match its packaging.
 
-- **Mac: the slicer plugin follows its files into jobs, and the log says what it sent (off until "Pair a slicer" is switched on).** A job or quote made from a file a paired plugin sent remembers which file it was, so that plugin's Khayt tab can show its own file name next to the job, and nothing else about it. Each file a plugin sends adds one line to the team activity log, naming the file and the plugin. That line is the only thing a plugin's file writes to the book. "Asked: print" now names the machine the plugin asked for. New Job and New Quote on the Connected apps screen now open the job; before, they did nothing there. The pairing steps in the app and its Help now match the plugin: open the Khayt tab, type the address, click Pair.
-
-- **Mac: the route that lets the Khayt tab in OrcaSlicer show the shop's price for a sliced plate (off; not visible yet).** `POST /api/connectors/price` takes the plate's slice facts from a paired plugin (time, filaments by type, colour and grams, the printer preset, and a quantity). It prices them with the shared rule `lib/connector-price.js` (#2588), which runs the calculator's own code on one new hand part, and answers sealed. Nothing is stored or logged.
   - **Off by default.** The shop must turn on "Show prices in OrcaSlicer" and grant each device: none (the default), price, or price and cost.
   - **What each grant sees.** A device granted price never sees the cost or margin; the route passes only an allow-list of keys.
   - **Off is a 200 `{"prices":"off"}`, not a 404**, so the tab never mistakes a shop's choice for an old Mac.
@@ -9993,31 +9965,21 @@ This release charges a product's prep once per line and its packaging by the box
 
 ### Changed
 
-- **All apps: a product's labour and packaging are carried once on the job, and a job's cost comes from one place.** A job taken from a product with its own rates keeps the product's labour and packaging as two job-level costs, not inside every part, so its cost equals the catalogue's. Editing a part, recalculating from parts, duplicating, reprinting and every report (profit by product, break-even, the dashboard's cost of goods, the job's profitability) count them once. When some parts have an agreed price, the labour and packaging are priced only on the parts that are not agreed. A part added by hand to such a job keeps its own labour. Jobs taken before this are unchanged.
-
 - **All apps: a payment total can't be set below what a payment plan recorded, and the invoice's plan list tells the truth.** Correcting a job's payment to less than the plan's starting point plus the rows paid by their own recorded payment is refused (as clearing a payment already is), so money is never left owed with no plan row asking for it. The invoice's payment schedule marks each row paid or pending by the plan's own rule, so a row only covered by money that was later corrected away reads pending.
 
 ### Fixed
-
-- **Fixed (all apps): a printer that was paused, preparing, busy or waiting for a person was shown as free.** Khayt read each printer's state by looking for the words "error" and "print", so anything else counted as idle: a paused print, a Bambu preparing or slicing, a resin printer homing or exposing between layers, a Duet changing tools, a PrusaLink asking for attention, a failed print still on the bed, and an OctoPrint whose printer was unplugged. The "idle printers" list and the published lead time both treat idle as free. Each protocol's state words are now one closed list (`lib/printer-activity.js`): working and paused printers count as busy, a printer that needs a person as an error, and a printer that says it is not connected as reconnecting. A word no list knows is read as before. A printer that refuses Khayt's key is now recognised from the HTTP status, which a failed poll keeps.
 
 - **Mac: a USD job no longer reads "sold below cost" in the ledger.** The ledger showed every figure in the shop's currency, but a job's price, invoice split and margin revenue are in the job's own currency, while its cost is in the shop's. So an 80 USD job at 3.75 that cost 150 SAR read −70, "sold below cost", when it made 150 SAR (50%). Now each row's figures go across at the job's own frozen rate. The cost comes from the shared rule through the engine (`jobCost`, #2581): parts, components, and a product's labour and packaging, which the old sum left out. As on the desktop's Orders Log, the ledger's margin leaves out the overhead (`jobCost(o, {overhead: false})`). Every other report still counts it. A ratchet test keeps a job's cost from being summed in Swift again.
 
 - **Fixed (all apps): a job taken in another currency had its cost of goods counted at the exchange rate.** A job's cost is the shop's own figure (what its parts cost in the shop's currency) whatever currency the customer pays in, but the profit and loss report, the average margin and the AI price assistant converted it as if it were the job's: a job in US dollars with 40 SAR of parts counted 150 SAR of cost (×3.75). Its margin, and the period's gross profit, read too low. They now count the cost as it is, and the price assistant compares like with like. A print kit made of jobs in different currencies now shows its cost instead of "mixed currencies". Jobs in the shop's own currency are unchanged.
 
-- **Fixed (Mac and iPhone engine): a payment the shared rule refuses is no longer taken as recorded.** The engine's payment call dropped the rule's refusal, so a refused payment looked recorded. It now carries `refused`, the rule's words for it and the floor it names; the Mac's three ways of recording a payment (Record payment, a pay-later link's payment, a paid web order) write nothing on a refusal and say why ("The payment was not recorded…", 9 languages, or the rule's own sentence). The phone reads the same engine and follows in its own PR. This must be on main before the shared rule starts refusing a payment that would bring a plan's recorded rows below what was paid.
-
 - **Mac: Recalculate charges the job's own overhead, and the sheet can't save twice.** Recalculate passed the shop's overhead rate as it is today, so a job priced without overhead (an online order or a shelf sale) picked up a share of it. It now uses the job's own rate, in the preview and the save. While a recalculation saves, Use is disabled. Opening the sheet no longer replaces a markup you typed. A markup that can't be read, or a save that did not happen, now says so instead of closing silently. The "kept price" hint refreshes after a save. (#2603)
 
 - **Mac: the "For N pieces" preview waits for you to stop typing, and a part whose costing failed keeps its rates on save.** (#2603)
 
-- **Fixed (all apps): a part added by hand to a job from a product lost its own labour in the profit and loss report, the dashboard's cost of goods and a reprint.** A job taken from a product with its own rates carries that product's labour and packaging once, at the job level, and a part added to it by hand keeps its own labour. The P&L's stock share, the dashboard's cost of goods and a reprint stripped labour and packaging from every part of such a job, the hand part's included: one job read 150.70 of cost of goods instead of 55.50, and its reprint lost about 164 of the hand part's labour. Each part is now costed as it was taken: the product's parts without the labour the job carries, the hand part with its own.
-
 - **Fixed (all apps): recalculating a finished job's price, or changing its markup, now asks first.** It already asked on a job whose price the customer had seen, but a completed job slipped past the question, so "Recalculate from parts" could take a finished, invoiced job from 500 to 133.86 without a word.
 
 ### Security
-
-- **Mac: the slicer plugin's queue ETag no longer gives the queue away (off until "Pair a slicer" is switched on).** The queue a plugin reads is encrypted, but its ETag was a plain hash of the same content, sent in the clear, so someone on the shop's network could check a guess about the queue against it. It is now keyed to that plugin's own key, so it only says "unchanged" and is never the same for two plugins.
 
 ## [4.0.0-beta.41] - 2026-11-18
 
@@ -10867,8 +10829,6 @@ This release brings most of what the Windows and Linux app could do that the Mac
 
 ### Before you update
 
-- **The catalogue now counts each part's quantity in a product's cost.** A part used three times in a product was costed once, so the catalogue suggested a price well under what a job made from that product costs. The catalogue and a job now agree. Saved product prices do not change by themselves: a product's price moves only when you open it, edit it and save. The catalogue's margin column now shows the real margin, so a product priced under the old rule may show a thin or negative margin. Review those products and re-save any you want re-priced.
-
 ### Changed
 
 - **The product sheet says when a saved price is out of date.** It shows the saved price with "Saved price kept; today's costs give X", and after an edit "was X → now Y".
@@ -10892,10 +10852,6 @@ This release brings most of what the Windows and Linux app could do that the Mac
 [VERSIONING.md](./VERSIONING.md).*
 
 ### Before you update
-
-- **VAT is now counted when the invoice is issued, not when the job is finished.** In Saudi Arabia VAT is due when the invoice is issued, and every booked job gets an invoice number. The VAT summary, the P&L's VAT, the ZATCA VAT return export and the tax summary CSV now include jobs that are still pending or printing. A quarter can therefore show more VAT payable than before, and a quarter that used to show a refund may now show a payment. Quotes, a quote still waiting for the customer's approval, and cancelled, voided or fully credited jobs are not counted. Revenue and cost of goods still count finished work only. Check the VAT figures for any quarter you have not filed yet. A return re-exported for a quarter you already filed can differ from what you filed, so keep the copy you submitted.
-- **Gross margin no longer counts shipping as a cost.** Shipping is part of the price the customer pays, and the courier's bill is recorded as an expense, so the dashboard and the P&L now show the same gross margin. A job with shipping shows a higher margin than before.
-- **The custom report's Price column is now revenue excluding tax.** It is called "Revenue (excl. tax)" and is net of credit notes, as in the P&L. The balance column is called "Balance due (incl. tax)". Saved reports still open, but a filter or sort on Price now uses the new figure.
 
 ### Changed
 
@@ -17026,7 +16982,6 @@ hand back work done away from the desk.
   quotes and bought nothing sat at the top of "lifetime value". And a customer
   whose first two jobs landed on the same day counted as two new customers.
 
-
 ## [4.0.0-alpha.25] - 2026-09-18
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
@@ -19221,7 +19176,6 @@ against them test for test. It becomes the main Khayt on macOS, a native Windows
 app follows, and this Electron build continues as the third option for everyone
 else. Nothing you have to do, and nothing about this release depends on it.
 
-
 ### Before you update
 
 - **Finishing a job now takes off the shelf what the job actually used, not
@@ -19535,7 +19489,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   (`29:12 + 0:00 + 41:50 = 71:02`) and becomes a total over a count beyond that,
   because ten terms is not an arithmetic anybody verifies.
 
-
 - **The tax you pay on a purchase is money you get back, and Khayt can hold it
   now.** A box on an expense for the VAT on the supplier's invoice. It comes off
   the VAT you charged, so the quarterly report shows what you actually owe
@@ -19549,7 +19502,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   workarounds — the VAT column below was written as a squeezed second line
   because a conditional table column needs 14.4.
 
-
 - **The Mac app's tests run on a pull request.** Everything in CI ran on Linux,
   so for as long as the native app has existed none of its 705 tests had run on
   a PR — not the guard that the Quick Look extension carries no Swift entry
@@ -19559,8 +19511,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
 
   It builds the extensions before testing, because the entry-point guard READS
   THE BUILT BINARY and skips when there is nothing to read.
-
-
 
 - **The space bar answers the question too.** Pressing space on a `.3mf` in
   Finder shows the plate render large, with the printer, layer height, nozzle,
@@ -21069,7 +21019,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   It now requires a window big enough to be one somebody reads, and when it
   finds none it says which windows were open instead of failing quietly.
 
-
 - **Two of ten models in one real library were filed under a picture of
   themselves from above.** Importing a 3MF took the largest `Metadata/*.png` in
   the archive, and a slicer writes several: the plate render, a small copy of it,
@@ -21419,7 +21368,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   shop (the daily backup and a named restore point). They are minted on demand,
   so an import re-mints; a shop that migrates by export republishes its portal
   links.
-
 
 - **Your backups before an app update are kept properly.** They were counted
   as ordinary daily backups and survived only by accident of how the filenames
@@ -21948,7 +21896,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   converter's colour dialog, "Delivered", "Done", "Resent", and the hint inside
   the product name box. Every one is written properly now, in all nine
   languages, and Khayt will not build if another one appears.
-
 
 ## [3.7.0-beta.24] - 2026-09-02
 
@@ -22528,7 +22475,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   It always says what it did: converted, resized, recompressed, and from what
   size to what size.
 
-
 - **Khayt can tell a customer when their order would actually be ready.**
   Settings now has **Delivery estimates**: how many printing hours you get
   through on a working day, how many days a week you work, and how long
@@ -22627,7 +22573,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Those protections are now applied to every response the shop's server sends,
   rather than page by page, so a page added later cannot be left out.
 
-
 - **A model measured in inches, centimetres or metres is now the right size in the
   preview.** A 3MF file records the units its numbers are in, and the preview was
   reading every file as though it were in millimetres. A part drawn as 12×12×6
@@ -22689,7 +22634,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   nowhere. Update times sent as `eventTime` are also read now; they were being
   dropped.
 
-
 - **Hardened a text-escaping helper that could have stopped escaping.** Two
   places in Khayt used a short helper to make customer-supplied text safe to
   display, and each was written to fall back to the raw text if the main
@@ -22709,7 +22653,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   The file Khayt generates for a Medusa store also declares its imports the way
   Medusa's own examples do, which keeps it compiling in projects with stricter
   TypeScript settings than the default.
-
 
 ## [3.7.0-beta.9] - 2026-08-27
 
@@ -22816,7 +22759,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Printing something twice as fast as you quoted is not flagged. You will hear
   about overcharging from your customers.
 
-
 - **You can install a design someone else made.** Khayt has had the machinery
   for custom designs for a long time and nobody has ever used it, because there
   was nowhere to put one: designs lived inside the application file, which is
@@ -22839,7 +22781,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   the problem rather than just saying no. Checking again on load matters because
   a file that was fine when you installed it may not be fine tomorrow — if it
   changes on disk it stops loading, and says so instead of quietly applying.
-
 
 ### Fixed
 
@@ -22913,7 +22854,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   utilisation"* — so you can choose on looks and know the price, or choose on the
   numbers you need. A design that costs you nothing says nothing.
 
-
 ### Fixed
 
 - **The Flow board never marked an order late.** Not "rarely" — never, since the
@@ -22925,7 +22865,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
 
   If you use Flow and have wondered why nothing ever looked urgent: it was this,
   and it is fixed.
-
 
 ### Added
 
@@ -22947,7 +22886,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   behaviour is covered by tests end to end, but if you have one, this is the
   release to tell us about it.
 
-
 ### Fixed
 
 - **An order that arrives twice from your online store no longer becomes two
@@ -22967,7 +22905,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Orders that carry no order number are still accepted exactly as before — an
   order Khayt cannot recognise is still an order, and losing it would be worse
   than the duplicate.
-
 
 ### Added
 
@@ -23048,7 +22985,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   accepts the connection and then says nothing at all, which looks identical to a
   dead printer. The message now names it, and the machine dialog says so before
   you spend eight seconds finding out.
-
 
 - **An OctoPrint printer reported the slicer's guess as the measured weight.**
   When a job finishes, Khayt reads what it *actually* used off the printer. On
@@ -23403,7 +23339,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   run branches. If any of them cannot, your shop quietly keeps sending whole
   stores exactly as before, with no error and nothing for you to do. The saving
   starts on its own once they are all updated.
-
 
 ## [3.6.0] - 2026-08-21
 
@@ -24080,7 +24015,6 @@ are unaffected; those were never estimates.
   rather than looking expired. A server that is genuinely misconfigured still
   reports as a failure, because that one will not fix itself by waiting.
 
-
 ## [3.6.0-beta.14] - 2026-08-09
 
 ### Added
@@ -24146,7 +24080,6 @@ are unaffected; those were never estimates.
   spanning two currencies refuses to add them. **Disband** takes the jobs back
   out and leaves the prints untouched.
 
-
 ### Security
 
 - **Khayt no longer has any way to read a message thread without proving the
@@ -24157,7 +24090,6 @@ are unaffected; those were never estimates.
   route can now be closed on the server with nothing left depending on it. If your
   Khayt Cloud server is older than this build, the Messages panel now says so and
   tells you to update it, rather than quietly reading the thread another way.
-
 
 ## [3.6.0-beta.13] - 2026-08-07
 
@@ -24264,13 +24196,11 @@ are unaffected; those were never estimates.
   plaques the same size on the outside can carry different faces, and only you
   can say whether they are the same job.
 
-
 ## [3.6.0-beta.12] - 2026-08-06
 
 Mostly about telling you the truth when something did not work. Signing in to the
 cloud stops asking you to wait for a code the server already failed to send, and
 "Slice for exact quote" stops handing back a time with the weight left blank.
-
 
 ### Fixed
 
@@ -24305,12 +24235,10 @@ cloud stops asking you to wait for a code the server already failed to send, and
   each say plainly when the email could not be sent, instead of sending you to
   wait for it.
 
-
 ## [3.6.0-beta.11] - 2026-08-04
 
 Signing in to the cloud, when it goes wrong, now says what went wrong. Nothing
 about quoting changes on this build.
-
 
 ### Fixed
 
@@ -24330,7 +24258,6 @@ about quoting changes on this build.
   comes from when the server reports one, and offers **Send it again** without
   making you close the dialog and start over.
 
-
 ## [3.6.0-beta.10] - 2026-08-04
 
 The estimator stops pretending it knows one number. Grams-per-hour was learned
@@ -24342,7 +24269,6 @@ disagreed, rather than as something your printer does.
 
 **Quotes for unsliced models move again on this build**, for a different reason
 than they moved in beta.9 — see [docs/BETA-RELEASE.md](./docs/BETA-RELEASE.md).
-
 
 ### Added
 
@@ -24653,7 +24579,6 @@ installs that did not work.
   The board is now what you get, in every theme. If you prefer the list, switch
   once and it stays switched — including for shops that already chose it.
 
-
 ## [3.6.0-beta.6] - 2026-08-02
 
 One change you will see, and it exists because two prints ran back to back —
@@ -24696,7 +24621,6 @@ which is an ordinary day in a shop and something no test had ever imagined.
 
 - The Snapmaker U1 catalogue entry is pinned to what the machine itself reports.
 
-
 ## [3.6.0-beta.5] - 2026-08-02
 
 Two fixes to the files Bed Ready sends a Snapmaker U1, both found by opening a
@@ -24730,7 +24654,6 @@ Two fixes to the files Bed Ready sends a Snapmaker U1, both found by opening a
   rather than an invented shape. `lib/hueforge.js` gained tests in beta.4; its
   mesh geometry proved correct.
 
-
 ## [3.6.0-beta.4] - 2026-08-01
 
 A small one, and only for Bed Ready. Two settings that Khayt would accept
@@ -24759,7 +24682,6 @@ without complaint and then quietly build an unprintable plan from.
   be correct — every test heightfield produces exactly the volume its shape
   implies, checked against Khayt's own STL reader, and the output slices cleanly
   in PrusaSlicer.
-
 
 ## [3.6.0-beta.3] - 2026-08-01
 
@@ -24796,7 +24718,6 @@ without real hardware in front of it.
   checked against hand-written examples, which can agree with a mistake
   forever. Read live, mid-print, from a Snapmaker U1 on stock firmware: every
   field correct. Stock firmware is enough; no custom firmware needed.
-
 
 ## [3.6.0-beta.2] - 2026-08-01
 
@@ -24854,7 +24775,6 @@ is the reason this exists.
 - `npm run verify:estimator` slices a spread of shapes with a real PrusaSlicer
   and prints Khayt's estimate beside the truth. That is where the percentages
   above come from.
-
 
 ## [3.6.0-beta.1] - 2026-07-31
 
@@ -24953,7 +24873,6 @@ becomes the default download.
 - **A part's file reference can be a real link.** The free-text file field is
   still there; alongside it you can now pick from your print library, which is
   what lets a finished job teach the file it printed.
-
 
 ## [3.5.3] - 2026-08-01
 
@@ -25165,7 +25084,6 @@ they first downloaded, with no sign anything was wrong.
 This release is the first to publish that file, which means **3.4.1 still has to
 be installed by hand**; from here on the AppImage will offer updates by itself.
 
-
 ### Fixed
 
 - **Linux never received automatic updates.** Khayt's Linux builds were published
@@ -25179,7 +25097,6 @@ be installed by hand**; from here on the AppImage will offer updates by itself.
   can replace itself, but the check did not know that and reported the same
   answer as a genuine no-update-found. It now says plainly that this install
   cannot update itself, and points at the download page.
-
 
 ## [3.4.0] - 2026-07-29
 
@@ -25730,7 +25647,6 @@ this is what changed for you since 3.1.0.
 - Per-printer camera feed (LAN only).
 - Printer discovery on the local network, including PrusaLink and Moonraker.
 - Keyboard shortcuts shown on the sidebar items they belong to.
-
 
 ## [3.2.0-beta.61] - 2026-07-22
 

@@ -70,7 +70,13 @@ extension Shop {
     /// already holds a split, or this Mac may not write.
     @discardableResult
     func writeHeadActuals(historyJob: JSONValue, jobId: String) async -> Bool {
-        guard let engine, let build = source.build, canWrite, permitted("orders", "edit"),
+        // THE PRINTER'S OWN RECORD, NOT A PERSON'S EDIT. This runs after a
+        // print ends, with whoever is or is not at the Mac: asked as a
+        // person's edit it was refused whenever the lock was on and nobody
+        // was signed in, which is how this Mac starts, and an overnight
+        // print's figures were dropped for good (the tries end after two
+        // minutes). The lock gates people, not the bookkeeping.
+        guard let engine, let build = source.build, canWrite, permitted(.system("the printer's own record")),
               let row = orderRows.first(where: { Self.recordId($0) == jobId }),
               case .object(let patch)? = try? await engine.perHeadPatch(order: row, historyJob: historyJob) else { return false }
         let wrote = (try? await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: jobId) { job -> Bool in
