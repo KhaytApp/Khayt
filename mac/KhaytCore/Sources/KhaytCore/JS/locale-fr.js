@@ -5393,6 +5393,7 @@
   "plg.pil_unlisted": "La liste de Khayt ne contient aucun connecteur nommé {id}. Rien n'a été installé.",
   "plg.pil_otherVersion": "La version {v} de {id} n'est pas celle que Khayt liste actuellement. Rien n'a été installé. Rouvrez sa page pour la version actuelle.",
   "plg.pil_withdrawn": "Khayt a retiré la version {v} de {id}. Rien n'a été installé.",
+  "plg.pil_needsNewer": "La version {v} de {id} nécessite un Khayt plus récent. Rien n’a été installé. Mettez Khayt à jour, puis rouvrez sa page.",
   "plg.pil_manifest": "Khayt n'a pas pu obtenir une copie fiable de {id}. Rien n'a été installé.",
   "plg.reviewed_by_khayt": "Vérifié par Khayt",
   "plg.consent_updates": "Met à jour la version {from} : ce qu’il envoie vous est de nouveau présenté pour accord.",

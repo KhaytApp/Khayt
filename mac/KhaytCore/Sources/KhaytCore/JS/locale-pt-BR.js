@@ -5394,6 +5394,7 @@
   "plg.pil_unlisted": "A lista do Khayt não tem nenhum conector chamado {id}. Nada foi instalado.",
   "plg.pil_otherVersion": "A versão {v} de {id} não é a que o Khayt lista agora. Nada foi instalado. Abra a página dele de novo para a versão atual.",
   "plg.pil_withdrawn": "O Khayt retirou a versão {v} de {id}. Nada foi instalado.",
+  "plg.pil_needsNewer": "A versão {v} de {id} precisa de um Khayt mais recente. Nada foi instalado. Atualize o Khayt e abra a página dele de novo.",
   "plg.pil_manifest": "O Khayt não conseguiu obter uma cópia confiável de {id}. Nada foi instalado.",
   "plg.reviewed_by_khayt": "Revisado pelo Khayt",
   "plg.consent_updates": "Atualiza a versão {from} — o que ele envia é listado de novo para você concordar.",

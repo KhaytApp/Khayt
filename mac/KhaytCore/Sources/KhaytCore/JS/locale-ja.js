@@ -5393,6 +5393,7 @@
   "plg.pil_unlisted": "Khaytの一覧に {id} というコネクタはありません。何もインストールされていません。",
   "plg.pil_otherVersion": "{id} のバージョン {v} は、Khaytが現在掲載しているものではありません。何もインストールされていません。現在のバージョンはページを開き直してください。",
   "plg.pil_withdrawn": "Khaytは {id} のバージョン {v} を取り下げました。何もインストールされていません。",
+  "plg.pil_needsNewer": "{id} のバージョン {v} には新しい Khayt が必要です。何もインストールされていません。Khayt を更新してから、もう一度ページを開いてください。",
   "plg.pil_manifest": "Khaytは {id} の信頼できるコピーを取得できませんでした。何もインストールされていません。",
   "plg.reviewed_by_khayt": "Khayt 審査済み",
   "plg.consent_updates": "バージョン {from} を更新します — 送信する内容をもう一度確認して同意してください。",

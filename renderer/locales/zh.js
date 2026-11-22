@@ -5393,6 +5393,7 @@
   "plg.pil_unlisted": "Khayt 的列表中没有名为 {id} 的连接器。没有安装任何内容。",
   "plg.pil_otherVersion": "{id} 的 {v} 版本不是 Khayt 目前列出的版本。没有安装任何内容。请重新打开其页面获取当前版本。",
   "plg.pil_withdrawn": "Khayt 已撤回 {id} 的 {v} 版本。没有安装任何内容。",
+  "plg.pil_needsNewer": "{id} 的 {v} 版本需要更新的 Khayt。未安装任何内容。请先更新 Khayt，再重新打开它的页面。",
   "plg.pil_manifest": "Khayt 无法获取可信的 {id} 副本。没有安装任何内容。",
   "plg.reviewed_by_khayt": "已由 Khayt 审核",
   "plg.consent_updates": "更新版本 {from} — 它发送的内容会再次列出，供你同意。",

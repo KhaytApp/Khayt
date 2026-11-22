@@ -5393,6 +5393,7 @@
   "plg.pil_unlisted": "Khayt'ın listesinde {id} adlı bir bağlayıcı yok. Hiçbir şey yüklenmedi.",
   "plg.pil_otherVersion": "{id} bağlayıcısının {v} sürümü Khayt'ın şu anda listelediği sürüm değil. Hiçbir şey yüklenmedi. Güncel sürüm için sayfasını yeniden açın.",
   "plg.pil_withdrawn": "Khayt, {id} bağlayıcısının {v} sürümünü geri çekti. Hiçbir şey yüklenmedi.",
+  "plg.pil_needsNewer": "{id} sürüm {v}, daha yeni bir Khayt gerektiriyor. Hiçbir şey yüklenmedi. Khayt’ı güncelleyin, ardından sayfasını yeniden açın.",
   "plg.pil_manifest": "Khayt, {id} için güvenebileceği bir kopya alamadı. Hiçbir şey yüklenmedi.",
   "plg.reviewed_by_khayt": "Khayt tarafından incelendi",
   "plg.consent_updates": "{from} sürümünü günceller — gönderdikleri onayınız için yeniden listelenir.",

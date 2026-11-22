@@ -5394,6 +5394,7 @@
   "plg.pil_unlisted": "Khayt's list has no connector called {id}. Nothing was installed.",
   "plg.pil_otherVersion": "Version {v} of {id} is not the one Khayt lists now. Nothing was installed. Open its page again for the current version.",
   "plg.pil_withdrawn": "Khayt withdrew version {v} of {id}. Nothing was installed.",
+  "plg.pil_needsNewer": "Version {v} of {id} needs a newer Khayt. Nothing was installed. Update Khayt, then open its page again.",
   "plg.pil_manifest": "Khayt could not get a copy of {id} it can trust. Nothing was installed.",
   "plg.reviewed_by_khayt": "Reviewed by Khayt",
   "plg.consent_updates": "Updates version {from} — what it sends is listed again for you to agree to.",

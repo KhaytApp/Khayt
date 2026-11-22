@@ -285,7 +285,17 @@ async function installPluginManifest(manifest) {
  * hand install: Settings ▸ Integrations, main's check again, the consent
  * sheet, and nothing stored until Install. Same as the Mac (#2622).
  */
+let _pluginLinkBusy = false, _pluginLinkAgain = false;
+/** One sheet at a time: a link that arrives while one is open is taken after it closes. */
 async function takePluginInstallLink() {
+  if (_pluginLinkBusy) { _pluginLinkAgain = true; return; }
+  _pluginLinkBusy = true;
+  try { await takeOnePluginInstallLink(); } finally {
+    _pluginLinkBusy = false;
+    if (_pluginLinkAgain) { _pluginLinkAgain = false; takePluginInstallLink(); }
+  }
+}
+async function takeOnePluginInstallLink() {
   if (!window.hubAPI?.pluginInstallLinkTake) return;
   let r;
   try { r = await window.hubAPI.pluginInstallLinkTake(); } catch (_) { return; }
@@ -294,7 +304,7 @@ async function takePluginInstallLink() {
   // Main decided who may; the window's own lock is asked as well.
   const refusal = r.ok && typeof operatorCan === 'function' && !operatorCan('settings', 'edit') ? 'notAllowed' : (r.ok ? null : r.refusal);
   if (refusal) {
-    const key = 'plg.pil_' + (['off', 'notAllowed', 'index', 'unlisted', 'otherVersion', 'withdrawn', 'manifest'].includes(refusal) ? refusal : 'index');
+    const key = 'plg.pil_' + (['off', 'notAllowed', 'index', 'unlisted', 'otherVersion', 'withdrawn', 'manifest', 'needsNewer'].includes(refusal) ? refusal : 'index');
     toast(t(key, vars), 'error', 8000);
     return;
   }

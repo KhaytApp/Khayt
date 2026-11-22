@@ -7799,6 +7799,7 @@ ipcMain.handle('hub:plugin-install-link-take', async () => {
       fetchBytes: connectorFetchBytes,
       nowMs: Date.now(),
       lastSerial: U.lastSerial(lanServerStore.settings),
+      platform: 'desktop', appVersion: app.getVersion(), schema: U.SCHEMA,
     });
     return r.ok ? { ok: true, id: link.id, version: link.version, manifest: r.manifest } : refused(r.refusal);
   } catch (_) {

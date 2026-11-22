@@ -206,7 +206,7 @@ test('the window takes the offer through the same door as a hand install', () =>
   for (const r of P.REFUSALS) assert.ok(words['plg.pil_' + r], 'a sentence for ' + r);
 });
 
-test('packaging (review at release): khayt:// declared for Windows (NSIS + appx) and Linux only; never macOS, never Bed Ready', () => {
+test('packaging (review at release): khayt:// declared for the Windows Store package (appx; NSIS registers it at run time) and Linux only; never macOS, never Bed Ready', () => {
   const fs = require('fs'), path = require('path');
   const root = path.join(__dirname, '..');
   const b = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).build;
@@ -220,4 +220,28 @@ test('packaging (review at release): khayt:// declared for Windows (NSIS + appx)
   assert.deepEqual(schemes(cfg.protocols), ['bedready']);
   assert.deepEqual(schemes(cfg.win && cfg.win.protocols), []);
   assert.deepEqual(schemes(cfg.linux && cfg.linux.protocols), []);
+});
+
+test('a version that needs a newer Khayt or index schema is refused, as the update check would withhold it (review)', async () => {
+  const withReq = (requires) => { const ix = indexFor(V, sha(GOOD_BYTES)); ix.entries[0].requires = requires; return signIndex(ix); };
+  const run = async (ix, ctx) => {
+    const fetchBytes = fetcher({ [C.INDEX_URL]: bytesOf(ix), [MANIFEST_URL]: GOOD_BYTES });
+    const r = await P.offer(link, Object.assign({ fetchBytes, keys: KEYS, nowMs: NOW, platform: 'desktop', appVersion: '3.7.0', schema: U.SCHEMA }, ctx));
+    return { r, asked: fetchBytes.asked };
+  };
+  let x = await run(withReq({ desktop: '3.9.0' }));
+  assert.deepEqual([x.r.ok, x.r.refusal], [false, 'needsNewer']);
+  assert.deepEqual(x.asked, [C.INDEX_URL], 'nothing downloaded');
+  x = await run(withReq({ schema: U.SCHEMA + 1 }));
+  assert.equal(x.r.refusal, 'needsNewer');
+  x = await run(withReq({ desktop: '3.7.0', mac: '9.9.9' }));
+  assert.equal(x.r.ok, true, 'exactly the version needed, and another platform\'s need is not ours');
+  x = await run(withReq({ desktop: '3.6.0' }), { appVersion: '3.7.0-beta.1' });
+  assert.equal(x.r.ok, true);
+});
+
+test('one consent sheet at a time: a second link waits for the first (review)', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'renderer', 'plugins.js'), 'utf8');
+  assert.match(src, /if \(_pluginLinkBusy\) \{ _pluginLinkAgain = true; return; \}/);
+  assert.match(src, /'needsNewer'\]/);
 });
