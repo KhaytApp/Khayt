@@ -43,8 +43,14 @@ const SENTRY_DSN = process.env.SENTRY_DSN
 let sentry = null;
 const SentryConsent = require('./lib/main/sentry-consent.js');
 if (!isBedReady && SENTRY_DSN && (app.isPackaged || process.env.SENTRY_DSN)
-    && SentryConsent.crashConsentAtStartup(require('fs'), require('path').join(app.getPath('userData'), 'khayt-store.json'))) {
+    && SentryConsent.crashConsentAtStartup(require('fs'), require('path').join(app.getPath('userData'), 'khayt-store.json'))
+    // And not while the shop (or this computer) makes no internet calls (P8):
+    // read from disk here too, since the book is not in memory yet.
+    && !require('./lib/main/outbound-fetch.js').offlineAtStartup(require('fs'),
+      require('path').join(app.getPath('userData'), 'khayt-store.json'),
+      require('path').join(app.getPath('userData'), 'network-local.json'))) {
   try {
+    // outbound: crash-reports (started only with consent and online; beforeSend asks again)
     sentry = require('@sentry/electron/main');
     sentry.init({
       dsn: SENTRY_DSN,
@@ -56,6 +62,23 @@ if (!isBedReady && SENTRY_DSN && (app.isPackaged || process.env.SENTRY_DSN)
       // pass through beforeSend, so a consent turned OFF mid-session could not
       // stop them.
       integrations: (defaults) => SentryConsent.withoutSessions(defaults),
+      // EVERY envelope asks the gate, not only events (security review of
+      // #2627): client reports (counts of dropped events) and the offline
+      // transport's retries of envelopes queued earlier never pass
+      // beforeSend. So the BASE transport is wrapped, which every send and
+      // every retry goes through; a refused envelope reads as sent and is
+      // dropped, not kept (D5). And no client reports at all.
+      sendClientReports: false,
+      transport: sentry.makeElectronOfflineTransport((options) => {
+        const base = sentry.makeElectronTransport(options);
+        return Object.assign({}, base, {
+          send: (envelope) => {
+            let ok = false;
+            try { ok = telemetryConsent().crash === true; } catch (_) { ok = false; }
+            return ok ? base.send(envelope) : Promise.resolve({});
+          },
+        });
+      }),
       // Crash reporting is OPT-IN. Settings offers it as a checkbox that
       // defaults to off, and the app tells the user "Khayt sends nothing by
       // default" — but Sentry was initialised purely on app.isPackaged and
@@ -199,6 +222,38 @@ const ENTRY_HTML = isBedReady ? 'bedready.html' : 'index.html';
 let mainWindow;
 let lanServerStore = {};
 
+/* ── "Make no internet calls" (P8; lib/outbound.js decides) ───────────────
+ * One gate for every call this process makes to the internet. It reads the
+ * book's settings.network from main's own copy (`{}` until the book loads,
+ * which reads as "not known yet": automatic calls wait a tick), this
+ * computer's stricter-only switch (network-local.json) and the install
+ * count's own per-computer switch (D3). */
+const NETWORK_LOCAL_FILE = () => path.join(app.getPath('userData'), 'network-local.json');
+const outboundGate = require('./lib/main/outbound-fetch.js').createOutboundGate({
+  // The book from disk when main's copy is not loaded yet, as printerAllowed
+  // does (reviews of #2627): otherwise the 12 s update check and the install
+  // count met `settings-unknown` on a slow start and skipped. A fresh install
+  // with no book has no switch: `{}`, today's behaviour.
+  getSettings: () => {
+    const has = () => lanServerStore && lanServerStore.settings && typeof lanServerStore.settings === 'object';
+    if (!has()) { try { syncLanServerStoreFromDisk(); } catch (_) { /* unreadable: unknown below */ } }
+    if (has()) return lanServerStore.settings;
+    try { if (!fs.existsSync(dataFilePath())) return {}; } catch (_) { /* unknown */ }
+    return null;
+  },
+  // The switch turned on (the shop's or this computer's): the crash and usage
+  // queue saved BEFORE it is purged, so it cannot leave the day the switch is
+  // turned off again (D5; security review of #2627).
+  onOffline: () => { try { fs.unlinkSync(TELEMETRY_QUEUE_FILE()); } catch (_) { /* none */ } },
+  readLocal: () => { try { return JSON.parse(fs.readFileSync(NETWORK_LOCAL_FILE(), 'utf8')); } catch (_) { return {}; } },
+  writeLocal: (v) => {
+    const f = NETWORK_LOCAL_FILE();
+    fs.writeFileSync(f + '.tmp', JSON.stringify(v));
+    fs.renameSync(f + '.tmp', f);
+  },
+  readInstallCountOff: () => readActiveCount().off === true,
+});
+
 /** Only the main app window may invoke privileged hub:* IPC (blocks stray webContents). */
 function isTrustedRenderer(event) {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
@@ -318,6 +373,7 @@ const { registerQuotePayLink } = require('./lib/main/quote-pay-link-sign.js');
 const { registerUpdater, isVersionNewer } = require('./lib/updater');
 const { setupAutoUpdater } = registerUpdater({
   app,
+  outbound: outboundGate,
   fs,
   ipcMain,
   BrowserWindow,
@@ -2289,7 +2345,18 @@ const TELEMETRY_QUEUE_FILE = () => path.join(app.getPath('userData'), 'telemetry
 
 function telemetryConsent() {
   const tm = (lanServerStore && lanServerStore.settings && lanServerStore.settings.telemetry) || {};
-  return { crash: !!tm.crashOptIn, usage: !!tm.usageOptIn, installId: tm.installId || '' };
+  // The opt-in AND the "make no internet calls" switch (lib/outbound.js: the
+  // switch can only take away). Blocked is DROPPED, never queued (D5):
+  // enqueueTelemetry stores nothing a stream may not send, and the sender's
+  // backoff does not grow, since it never tries.
+  // The opt-in first: a shop that never opted in is not "blocked" by the
+  // switch, and must not show hundreds of blocks in the Settings list.
+  let crash = false, usage = false;
+  try {
+    crash = tm.crashOptIn === true && outboundGate.check('crash-reports').allowed;
+    usage = tm.usageOptIn === true && outboundGate.check('usage-stats').allowed;
+  } catch (_) { crash = false; usage = false; }
+  return { crash, usage, installId: tm.installId || '' };
 }
 
 function readTelemetryQueue() {
@@ -2345,6 +2412,7 @@ async function flushTelemetry() {
       readQueue: readTelemetryQueue,
       writeQueue: (q) => fs.writeFileSync(TELEMETRY_QUEUE_FILE(), JSON.stringify(q), 'utf8'),
       consent: telemetryConsent(),
+      // outbound: usage-stats (and crash-reports: telemetryConsent checks both)
       fetchImpl: (...a) => fetch(...a),
       appVersion: app.getVersion(),
       backoffMs: telemetryBackoffMs,
@@ -2361,6 +2429,7 @@ async function flushTelemetry() {
 const ActiveCount = require('./lib/active-count.js');
 const ACTIVE_COUNT_FILE = () => path.join(app.getPath('userData'), 'active-count.json');
 let activeCountSending = false;
+let activeCountWaits = 0;
 // scripts/e2e-active-count-smoke.mjs points the sender at its own loopback
 // server. Honoured for 127.0.0.1 only, so it can never redirect a real count.
 const ACTIVE_COUNT_E2E = /^http:\/\/127\.0\.0\.1:\d+\//.test(process.env.KHAYT_ACTIVE_COUNT_E2E || '')
@@ -2386,6 +2455,20 @@ function writeActiveCount(s) {
 
 async function sendActiveCount() {
   if (activeCountSending) return;
+  // The shop's switch, this computer's, and the count's own (D3). Checked
+  // before due(), so a blocked count is not marked as tried.
+  const gate = outboundGate.check('install-count');
+  if (!gate.allowed) {
+    // The book not read yet (a count due 30 s after launch can beat it on a
+    // slow start): ask again shortly rather than an hour later. A few times
+    // only; the hourly timer covers the rest.
+    if (gate.reason === 'settings-unknown' && activeCountWaits < 12) {
+      activeCountWaits += 1;
+      setTimeout(() => { sendActiveCount().catch(() => {}); }, 5000).unref?.();
+    }
+    return;
+  }
+  activeCountWaits = 0;
   const today = ActiveCount.utcDay(Date.now());
   const state = readActiveCount();
   if (!ActiveCount.due(state, today, activeCountReady())) return;
@@ -2397,6 +2480,7 @@ async function sendActiveCount() {
     // Node's fetch, not Chromium's: no cookie jar and no OS locale. The two
     // headers it does add are pinned to the Mac's fixed values, so every app's
     // count looks the same and says nothing about the machine.
+    // outbound: install-count
     const res = await fetch(ACTIVE_COUNT_E2E || ActiveCount.ENDPOINT, {
       method: 'POST',
       credentials: 'omit',
@@ -2420,6 +2504,18 @@ function startActiveCount() {
   setTimeout(() => { sendActiveCount().catch(() => {}); }, ACTIVE_COUNT_E2E ? 500 : 30 * 1000).unref?.();
   setInterval(() => { sendActiveCount().catch(() => {}); }, 60 * 60 * 1000).unref?.();
 }
+
+// The Settings list (P8 PR 5 draws it): every purpose, its state and how
+// often the switch has refused it this session. And this computer's own
+// stricter switch, which is not in the book.
+ipcMain.handle('hub:outbound-describe', async () => ({ rows: outboundGate.describe(), local: { offline: outboundGate.local().offline === true } }));
+ipcMain.handle('hub:outbound-set-local', async (_e, patch) => {
+  // Only the owner changes the switch under the staff lock, this computer's
+  // own included (Turki, Nov 22 round 2). The book's settings.network is held
+  // by the save guard (PrinterPermission SECURITY_SETTINGS).
+  if (!PrinterPermission.mayChangeNetwork(lanServerStore)) return { ok: false, error: 'not_permitted' };
+  try { return { ok: true, local: outboundGate.setLocal(patch) }; } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
 
 ipcMain.handle('hub:active-count-get', async () => ({ ready: activeCountReady(), on: !readActiveCount().off }));
 ipcMain.handle('hub:active-count-set', async (_e, on) => {
