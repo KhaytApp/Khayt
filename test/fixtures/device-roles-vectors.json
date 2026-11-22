@@ -1,5 +1,5 @@
 {
- "about": "lib/device-roles.js allows(role, path, method) for a paired phone (C1+C9, D-P4 as decided Nov 22). required: a scope, null (any paired device) or 'owner' (only the owner). The Mac and iPhone run this file through JavaScriptCore. Paths are percent-decoded per segment; a segment that decodes to '/', '\\\\', a control, '.' or '..' (or does not decode) is owner-only. GET/HEAD read, POST/PATCH/PUT/DELETE write, anything else owner-only. Case-sensitive, as the servers route.",
+ "about": "lib/device-roles.js allows(role, path, method) for a paired phone (C1+C9, D-P4 as decided Nov 22). required: a scope, null (any paired device) or 'owner' (only the owner). The Mac and iPhone run this file through JavaScriptCore. Paths are percent-decoded per segment; a segment that decodes to '/', '\\\\', a control, '.' or '..' (or does not decode) is owner-only. GET/HEAD read, POST/PATCH/PUT/DELETE write, anything else owner-only. Case-sensitive, as the servers route. `requests`: allowsRequest(role, path, method, body, job), what the SERVERS call; body is the parsed object or its JSON text, job the stored job the path names (or null). `settableRoles`: settableRoles(device, approver).",
  "roles": [
   "owner",
   "manager",
@@ -703,5 +703,401 @@
    "/api/waste",
    "waste:write"
   ]
+ ],
+ "requests": [
+  {
+   "why": "an operator creates a job without a price",
+   "role": "operator",
+   "method": "POST",
+   "path": "/api/orders",
+   "body": {
+    "project": "Clip"
+   },
+   "job": null,
+   "want": {
+    "ok": true,
+    "required": "orders:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator creates a job WITH a price: pricing",
+   "role": "operator",
+   "method": "POST",
+   "path": "/api/orders",
+   "body": {
+    "project": "Clip",
+    "price": 120
+   },
+   "job": null,
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator creates a quote: pricing",
+   "role": "operator",
+   "method": "POST",
+   "path": "/api/orders",
+   "body": {
+    "project": "Clip",
+    "status": "quote"
+   },
+   "job": null,
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "a manager creates a priced quote",
+   "role": "manager",
+   "method": "POST",
+   "path": "/v1/orders",
+   "body": {
+    "project": "Clip",
+    "price": 120,
+    "status": "quote"
+   },
+   "job": null,
+   "want": {
+    "ok": true,
+    "required": "quote:write",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "an operator moves a pending job to printing",
+   "role": "operator",
+   "method": "PATCH",
+   "path": "/api/orders/a1b2",
+   "body": {
+    "status": "printing"
+   },
+   "job": {
+    "status": "pending"
+   },
+   "want": {
+    "ok": true,
+    "required": "orders:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator moves a QUOTE on (what /approve does): refused",
+   "role": "operator",
+   "method": "PATCH",
+   "path": "/api/orders/a1b2",
+   "body": {
+    "status": "pending"
+   },
+   "job": {
+    "status": "quote"
+   },
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "a manager moves a quote on",
+   "role": "manager",
+   "method": "PATCH",
+   "path": "/api/orders/a1b2",
+   "body": {
+    "status": "pending"
+   },
+   "job": {
+    "status": "quote"
+   },
+   "want": {
+    "ok": true,
+    "required": "quote:write",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "a status with no job to look at: treated as a quote",
+   "role": "operator",
+   "method": "PATCH",
+   "path": "/api/orders/a1b2",
+   "body": {
+    "status": "printing"
+   },
+   "job": null,
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an operator assigns a machine to a quote (no status): allowed",
+   "role": "operator",
+   "method": "PATCH",
+   "path": "/api/orders/a1b2",
+   "body": {
+    "machineId": "m1"
+   },
+   "job": {
+    "status": "quote"
+   },
+   "want": {
+    "ok": true,
+    "required": "orders:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "a price on a job update: pricing",
+   "role": "operator",
+   "method": "PATCH",
+   "path": "/api/orders/a1b2",
+   "body": {
+    "status": "printing",
+    "price": 5
+   },
+   "job": {
+    "status": "pending"
+   },
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "priceOverride counts as a price",
+   "role": "operator",
+   "method": "POST",
+   "path": "/api/orders",
+   "body": {
+    "project": "Clip",
+    "priceOverride": 5
+   },
+   "job": null,
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "a price of null is no price",
+   "role": "operator",
+   "method": "POST",
+   "path": "/api/orders",
+   "body": {
+    "project": "Clip",
+    "price": null
+   },
+   "job": null,
+   "want": {
+    "ok": true,
+    "required": "orders:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "JSON text is read like the object",
+   "role": "operator",
+   "method": "POST",
+   "path": "/api/orders",
+   "body": "{\"project\":\"Clip\",\"price\":3}",
+   "job": null,
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an unreadable body is pricing",
+   "role": "operator",
+   "method": "PATCH",
+   "path": "/api/orders/a1b2",
+   "body": "{not json",
+   "job": {
+    "status": "pending"
+   },
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "no body at all is pricing",
+   "role": "operator",
+   "method": "POST",
+   "path": "/api/orders",
+   "body": null,
+   "job": null,
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "an array body is pricing",
+   "role": "operator",
+   "method": "POST",
+   "path": "/api/orders",
+   "body": [
+    {
+     "price": 1
+    }
+   ],
+   "job": null,
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "photos stay orders:write whatever the body",
+   "role": "operator",
+   "method": "POST",
+   "path": "/api/orders/a1b2/photos",
+   "body": null,
+   "job": null,
+   "want": {
+    "ok": true,
+    "required": "orders:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "reads are untouched",
+   "role": "viewer",
+   "method": "GET",
+   "path": "/api/orders",
+   "body": null,
+   "job": null,
+   "want": {
+    "ok": true,
+    "required": "orders:read",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "other routes are untouched",
+   "role": "operator",
+   "method": "POST",
+   "path": "/api/printer/m1/pause",
+   "body": null,
+   "job": null,
+   "want": {
+    "ok": true,
+    "required": "machines:control",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "a viewer cannot write a job at all",
+   "role": "viewer",
+   "method": "POST",
+   "path": "/api/orders",
+   "body": {
+    "project": "Clip"
+   },
+   "job": null,
+   "want": {
+    "ok": false,
+    "required": "orders:write",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "the owner passes, and the answer still names what it needed",
+   "role": "owner",
+   "method": "PATCH",
+   "path": "/api/orders/a1b2",
+   "body": {
+    "status": "pending"
+   },
+   "job": {
+    "status": "quote"
+   },
+   "want": {
+    "ok": true,
+    "required": "quote:write",
+    "role": "owner"
+   }
+  },
+  {
+   "why": "an encoded id is the same job route",
+   "role": "operator",
+   "method": "PATCH",
+   "path": "/api/orders/a1%2Db2",
+   "body": {
+    "status": "pending"
+   },
+   "job": {
+    "status": "quote"
+   },
+   "want": {
+    "ok": false,
+    "required": "quote:write",
+    "role": "operator"
+   }
+  }
+ ],
+ "settableRoles": [
+  {
+   "why": "a PIN-paired phone can only be the owner",
+   "device": {},
+   "approver": "owner",
+   "want": [
+    "owner"
+   ]
+  },
+  {
+   "why": "a manager cannot set anything on a PIN-paired phone",
+   "device": {},
+   "approver": "manager",
+   "want": []
+  },
+  {
+   "why": "a code-paired phone: what the approver may grant",
+   "device": {
+    "rolesVersion": 1,
+    "role": "operator"
+   },
+   "approver": "manager",
+   "want": [
+    "manager",
+    "operator",
+    "viewer"
+   ]
+  },
+  {
+   "why": "the owner may give a code-paired phone any role",
+   "device": {
+    "rolesVersion": 1,
+    "role": "viewer"
+   },
+   "approver": "owner",
+   "want": [
+    "owner",
+    "manager",
+    "operator",
+    "viewer"
+   ]
+  },
+  {
+   "why": "an operator may set nothing",
+   "device": {
+    "rolesVersion": 1
+   },
+   "approver": "operator",
+   "want": []
+  }
  ]
 }
