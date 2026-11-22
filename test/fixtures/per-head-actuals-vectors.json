@@ -399,7 +399,7 @@
    }
   },
   {
-   "why": "a loaded row whose colour is not one names nothing",
+   "why": "a loaded row whose colour is not one names nothing by itself",
    "head": 0,
    "at": {
     "loaded": [
@@ -417,6 +417,83 @@
    "head": 0,
    "at": null,
    "want": null
+  },
+  {
+   "why": "an eight-digit colour (RRGGBBAA) is its first six",
+   "head": 0,
+   "at": {
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "#FF0000FF",
+      "material": "PLA"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#FF0000",
+    "material": "PLA",
+    "colourFrom": "loaded"
+   }
+  },
+  {
+   "why": "a row spelled color is read",
+   "head": 0,
+   "at": {
+    "loaded": [
+     {
+      "slot": 0,
+      "color": "#00ff00",
+      "material": "PETG"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#00FF00",
+    "material": "PETG",
+    "colourFrom": "loaded"
+   }
+  },
+  {
+   "why": "a bad row for a head does not hide a good one after it",
+   "head": 0,
+   "at": {
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "red",
+      "material": "PLA"
+     },
+     {
+      "slot": 0,
+      "hex": "#123456",
+      "material": "ABS"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#123456",
+    "material": "ABS",
+    "colourFrom": "loaded"
+   }
+  },
+  {
+   "why": "a long material is cut at 40 characters and never through one",
+   "head": 0,
+   "at": {
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "#123456",
+      "material": "a😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#123456",
+    "material": "a😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+    "colourFrom": "loaded"
+   }
   }
  ],
  "patchWithColour": {

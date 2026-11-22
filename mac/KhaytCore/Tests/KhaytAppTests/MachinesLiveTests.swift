@@ -67,6 +67,8 @@ struct MachinesLiveTests {
         #expect(said(PrinterWatch.Refusal.http(503, "")) == "http 503")
         #expect(said(PrinterWatch.Refusal.handshakeRefused("no")) == "access-refused -")
         #expect(said(PrinterWatch.Refusal.noHost) == "not-set-up -")
+        #expect(said(PrinterWatch.Refusal.needsMainboardId) == "not-set-up -", "an Elegoo with no mainboard id was never asked")
+        #expect(said(PrinterWatch.Refusal.needsSerial) == "not-set-up -")
         #expect(said(PrinterWatch.Refusal.notJSON) == "unreadable -")
         #expect(said(BambuMqtt.Trouble.refused(5)) == "access-refused -")
         #expect(said(BambuMqtt.Trouble.certificateChanged) == "certificate -")

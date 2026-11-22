@@ -70,7 +70,7 @@ final class PrinterWatch {
     ///   access-refused   the printer answered and said no: HTTP 401 or 403,
     ///                    a handshake or an access code turned down
     ///   http             any other HTTP status (`httpStatus` says which)
-    ///   not-set-up       no address, a bad port, a missing serial: nothing was asked
+    ///   not-set-up       no address, a bad port, a missing serial or mainboard id: nothing was asked
     ///   certificate      a Bambu's certificate is not the one expected
     ///   unreadable       it answered with something that is not its protocol
     ///   unreachable      no answer: off, asleep, another network, hung up
@@ -79,7 +79,7 @@ final class PrinterWatch {
             switch refusal {
             case .http(let code, _): return (code == 401 || code == 403 ? "access-refused" : "http", code)
             case .handshakeRefused: return ("access-refused", nil)
-            case .noHost, .notALanAddress, .badPort, .needsSerial: return ("not-set-up", nil)
+            case .noHost, .notALanAddress, .badPort, .needsSerial, .needsMainboardId: return ("not-set-up", nil)
             case .notJSON, .unreadable, .redirected: return ("unreadable", nil)
             default: return ("unreachable", nil)
             }

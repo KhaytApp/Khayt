@@ -83,14 +83,21 @@ extension Shop {
     /// already holds a split, or this Mac may not write.
     @discardableResult
     ///
-    /// `filamentDetect` and the machine's `loaded` list say what was in each
-    /// head, so the split keeps each head's colour and material as they were
-    /// at this print (`lib/printer-actuals.js headColour`).
+    /// `filamentDetect` and what the machine has loaded say what was in each
+    /// head, so the split keeps each head's colour and material
+    /// (`lib/printer-actuals.js headColour`). Both are read a minute or so
+    /// after the print ends, not during it.
     func writeHeadActuals(historyJob: JSONValue, jobId: String,
                           filamentDetect: JSONValue = .null, machineId: String? = nil) async -> Bool {
+        // What the printer itself reports as loaded wins over what was typed
+        // on the machine (`loadedSlots`): a U1 reports every head, tagged or
+        // not, and the typed list is for printers that cannot say.
         var loaded: JSONValue = .null
-        if let machineId, case .object(let m)? = machineRows.first(where: { Self.recordId($0) == machineId }),
-           let list = m["loaded"] { loaded = list }
+        if let machineId {
+            loaded = .array(loadedSlots(for: machineId).map {
+                .object(["slot": .number(Double($0.slot)), "hex": .string($0.hex), "material": .string($0.material)])
+            })
+        }
         guard let engine, let build = source.build, canWrite, permitted("orders", "edit"),
               let row = orderRows.first(where: { Self.recordId($0) == jobId }),
               case .object(let patch)? = try? await engine.perHeadPatch(order: row, historyJob: historyJob,
