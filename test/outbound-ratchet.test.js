@@ -82,14 +82,22 @@ function scan(rel) {
   let untagged = 0;
   const bad = [];
   for (let i = 0; i < code.length; i++) {
-    if (!PRIMITIVES.some((re) => re.test(code[i]))) continue;
+    // Every match counts, not every line: a second call added to a line
+    // already on the baseline is a new call (review of #2627).
+    let hits = 0;
+    for (const re of PRIMITIVES) hits += (code[i].match(new RegExp(re.source, 'g')) || []).length;
+    if (!hits) continue;
     const tag = tagOf(lines[i]) || (i > 0 ? tagOf(lines[i - 1]) : null);
-    if (!tag) { untagged += 1; continue; }
+    if (!tag) { untagged += hits; continue; }
     if (tag.exempt) { if (!EXEMPT_KINDS.includes(tag.exempt)) bad.push(`${rel}:${i + 1} unknown exempt kind ${tag.exempt}`); continue; }
     if (!PURPOSES.includes(tag.purpose)) { bad.push(`${rel}:${i + 1} unknown purpose ${tag.purpose}`); continue; }
-    const asks = src.includes(`check('${tag.purpose}'`) || src.includes(`gate('${tag.purpose}'`)
-      || src.includes(`.for('${tag.purpose}'`) || (tag.purpose === 'updates' && src.includes('updatesAllowed()'))
-      || tag.purpose === 'lan';
+    // In CODE, not a comment: a tag cannot be satisfied by writing the words
+    // (review of #2627). `lan` needs no gate yet: PR 4 adds the address check
+    // (and the resolve-time one) every lan call must go through.
+    const body = code.join('\n');
+    const asks = [`check('${tag.purpose}'`, `gate('${tag.purpose}'`, `Gate('${tag.purpose}'`, `.for('${tag.purpose}'`].some((n) => body.includes(n))
+      || (tag.purpose === 'updates' && body.includes('updatesAllowed()'))
+      || tag.purpose === 'lan';   // TODO(PR 4): require the lan address gate here
     if (!asks) bad.push(`${rel}:${i + 1} tagged ${tag.purpose} but the file never asks the gate for it`);
   }
   return { untagged, bad };
@@ -115,11 +123,16 @@ test('the gated phone-home paths are tagged (PR 2)', () => {
   const main = fs.readFileSync(path.join(ROOT, 'main.js'), 'utf8');
   assert.match(main, /\/\/ outbound: install-count\n\s*const res = await fetch\(ACTIVE_COUNT_E2E/);
   assert.match(main, /const gate = outboundGate\.check\('install-count'\);\s*\n\s*if \(!gate\.allowed\) \{/);
-  assert.match(main, /crash = outboundGate\.check\('crash-reports'\)\.allowed;/);
-  assert.match(main, /usage = outboundGate\.check\('usage-stats'\)\.allowed;/);
+  assert.match(main, /crash = tm\.crashOptIn === true && outboundGate\.check\('crash-reports'\)\.allowed;/);
+  assert.match(main, /usage = tm\.usageOptIn === true && outboundGate\.check\('usage-stats'\)\.allowed;/);
+  // Sentry: every envelope (client reports, retries of queued ones) through the gate.
+  assert.match(main, /sendClientReports: false,/);
+  assert.match(main, /transport: sentry\.makeElectronOfflineTransport\(\(options\) => \{\s*\n\s*const base = sentry\.makeElectronTransport\(options\);/);
+  assert.match(main, /return ok \? base\.send\(envelope\) : Promise\.resolve\(\{\}\);/);
   assert.match(main, /!require\('\.\/lib\/main\/outbound-fetch\.js'\)\.offlineAtStartup\(/);
   const upd = fs.readFileSync(path.join(ROOT, 'lib', 'updater.js'), 'utf8');
-  assert.match(upd, /if \(updatesAllowed\(\)\.allowed\) autoUpdater\.checkForUpdates\(\)/);
+  assert.match(upd, /if \(g\.allowed\) \{ autoUpdater\.checkForUpdates\(\)\.catch\(\(\) => \{\}\); return; \}/);
+  assert.match(upd, /if \(g\.reason === 'settings-unknown' && waits < 10\)/);
   assert.match(upd, /if \(!gate\.allowed\) return \{ status: 'blocked', currentVersion, blocked:/);
   assert.match(upd, /if \(!gate\.allowed\) return \{ ok: false, blocked: \{ purpose: 'updates'/);
 });

@@ -40,7 +40,7 @@ test('the gate fails closed, not open', () => {
   // internet calls" switch): an unread book is settings-unknown, which is no,
   // and anything that throws is no.
   assert.match(fn, /let crash = false, usage = false;/, 'no consent until the gate says yes');
-  assert.match(fn, /crash = outboundGate\.check\('crash-reports'\)\.allowed;/);
+  assert.match(fn, /crash = tm\.crashOptIn === true && outboundGate\.check\('crash-reports'\)\.allowed;/);
   assert.match(fn, /\} catch \(_\) \{ crash = false; usage = false; \}/, 'a throw is no-consent');
   const O = require('../lib/outbound.js');
   assert.equal(O.allowed(null, 'crash-reports').allowed, false, 'the book not read yet');

@@ -88,6 +88,27 @@ test('offlineAtStartup: the store or this computer says offline; unreadable fail
   fs.rmSync(local);
   fs.writeFileSync(store, '{"settings":{"network":{"offline":true');
   assert.equal(offlineAtStartup(fs, store, local), true, 'a cut-off file');
+  fs.writeFileSync(store, JSON.stringify({ settings: { network: { offline: 'true' } } }));
+  assert.equal(offlineAtStartup(fs, store, local), true, 'read as the runtime gate reads it: present and not false');
+  fs.writeFileSync(local, JSON.stringify({ offline: 1 }));
+  fs.writeFileSync(store, JSON.stringify({ settings: {} }));
+  assert.equal(offlineAtStartup(fs, store, local), true, 'this computer, written as 1');
+  fs.rmSync(local);
   assert.equal(offlineAtStartup(fs, path.join(dir, 'none.json'), local), true, 'no store: Sentry would not start anyway');
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('the switch going on purges what was saved up before it (D5), once per change', () => {
+  let purged = 0;
+  let settings = {};
+  let local = {};
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => local, writeLocal: (v) => { local = v; }, onOffline: () => { purged += 1; } });
+  g.check('updates');
+  assert.equal(purged, 0);
+  settings = { network: { offline: true } };
+  g.check('updates'); g.check('cloud');
+  assert.equal(purged, 1, 'once');
+  settings = {}; g.check('updates');
+  g.setLocal({ offline: true });
+  assert.equal(purged, 2, 'this computer\'s switch too');
 });

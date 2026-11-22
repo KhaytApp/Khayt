@@ -62,6 +62,23 @@ if (!isBedReady && SENTRY_DSN && (app.isPackaged || process.env.SENTRY_DSN)
       // pass through beforeSend, so a consent turned OFF mid-session could not
       // stop them.
       integrations: (defaults) => SentryConsent.withoutSessions(defaults),
+      // EVERY envelope asks the gate, not only events (security review of
+      // #2627): client reports (counts of dropped events) and the offline
+      // transport's retries of envelopes queued earlier never pass
+      // beforeSend. So the BASE transport is wrapped, which every send and
+      // every retry goes through; a refused envelope reads as sent and is
+      // dropped, not kept (D5). And no client reports at all.
+      sendClientReports: false,
+      transport: sentry.makeElectronOfflineTransport((options) => {
+        const base = sentry.makeElectronTransport(options);
+        return Object.assign({}, base, {
+          send: (envelope) => {
+            let ok = false;
+            try { ok = telemetryConsent().crash === true; } catch (_) { ok = false; }
+            return ok ? base.send(envelope) : Promise.resolve({});
+          },
+        });
+      }),
       // Crash reporting is OPT-IN. Settings offers it as a checkbox that
       // defaults to off, and the app tells the user "Khayt sends nothing by
       // default" — but Sentry was initialised purely on app.isPackaged and
@@ -213,7 +230,21 @@ let lanServerStore = {};
  * count's own per-computer switch (D3). */
 const NETWORK_LOCAL_FILE = () => path.join(app.getPath('userData'), 'network-local.json');
 const outboundGate = require('./lib/main/outbound-fetch.js').createOutboundGate({
-  getSettings: () => (lanServerStore && lanServerStore.settings && typeof lanServerStore.settings === 'object' ? lanServerStore.settings : null),
+  // The book from disk when main's copy is not loaded yet, as printerAllowed
+  // does (reviews of #2627): otherwise the 12 s update check and the install
+  // count met `settings-unknown` on a slow start and skipped. A fresh install
+  // with no book has no switch: `{}`, today's behaviour.
+  getSettings: () => {
+    const has = () => lanServerStore && lanServerStore.settings && typeof lanServerStore.settings === 'object';
+    if (!has()) { try { syncLanServerStoreFromDisk(); } catch (_) { /* unreadable: unknown below */ } }
+    if (has()) return lanServerStore.settings;
+    try { if (!fs.existsSync(dataFilePath())) return {}; } catch (_) { /* unknown */ }
+    return null;
+  },
+  // The switch turned on (the shop's or this computer's): the crash and usage
+  // queue saved BEFORE it is purged, so it cannot leave the day the switch is
+  // turned off again (D5; security review of #2627).
+  onOffline: () => { try { fs.unlinkSync(TELEMETRY_QUEUE_FILE()); } catch (_) { /* none */ } },
   readLocal: () => { try { return JSON.parse(fs.readFileSync(NETWORK_LOCAL_FILE(), 'utf8')); } catch (_) { return {}; } },
   writeLocal: (v) => {
     const f = NETWORK_LOCAL_FILE();
@@ -2194,10 +2225,12 @@ function telemetryConsent() {
   // switch can only take away). Blocked is DROPPED, never queued (D5):
   // enqueueTelemetry stores nothing a stream may not send, and the sender's
   // backoff does not grow, since it never tries.
+  // The opt-in first: a shop that never opted in is not "blocked" by the
+  // switch, and must not show hundreds of blocks in the Settings list.
   let crash = false, usage = false;
   try {
-    crash = outboundGate.check('crash-reports').allowed;
-    usage = outboundGate.check('usage-stats').allowed;
+    crash = tm.crashOptIn === true && outboundGate.check('crash-reports').allowed;
+    usage = tm.usageOptIn === true && outboundGate.check('usage-stats').allowed;
   } catch (_) { crash = false; usage = false; }
   return { crash, usage, installId: tm.installId || '' };
 }
