@@ -866,6 +866,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Business Mode setup wizard (new first-run experience)
   initWizard();
 
+  // "Make no internet calls": the General entry's line and, after 30 days
+  // without an update check while updates are blocked, the banner (D2).
+  window.KhaytInternetUse?.refresh?.().catch?.(() => {});
+
   // The search shortcut is drawn as Ctrl K, the key on Windows and Linux; a
   // macOS build shows its own symbol (preload tags <html> platform-darwin).
   if (document.documentElement.classList.contains('platform-darwin')) {

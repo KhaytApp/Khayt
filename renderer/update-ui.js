@@ -423,6 +423,12 @@
       }
       return;
     }
+    // Refused by "Make no internet calls" (D2: no one-time override): the
+    // reason in the shop's language, never "update check failed".
+    if (res?.status === 'blocked') {
+      if (statusEl) statusEl.textContent = window.KhaytInternetUse?.refusalText?.(res.blocked) || '';
+      return;
+    }
     if (res?.status === 'error') {
       if (statusEl) {
         statusEl.textContent = `⚠ Update check failed: ${res.message || 'unknown error'}`;

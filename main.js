@@ -2460,7 +2460,12 @@ function startActiveCount() {
 // The Settings list (P8 PR 5 draws it): every purpose, its state and how
 // often the switch has refused it this session. And this computer's own
 // stricter switch, which is not in the book.
-ipcMain.handle('hub:outbound-describe', async () => ({ rows: outboundGate.describe(), local: { offline: outboundGate.local().offline === true } }));
+ipcMain.handle('hub:outbound-describe', async () => ({
+  rows: outboundGate.describe(),
+  local: { offline: outboundGate.local().offline === true },
+  // For the Updates row's "Last checked" and the 30-day red row and banner (D2).
+  updatesLastCheckedAt: (() => { try { return require('./lib/updater').lastUpdateCheckAt(); } catch (_) { return null; } })(),
+}));
 ipcMain.handle('hub:outbound-set-local', async (_e, patch) => {
   // Only the owner changes the switch under the staff lock, this computer's
   // own included (Turki, Nov 22 round 2). The book's settings.network is held

@@ -10,7 +10,7 @@ try {
   else tag();
 } catch { /* non-DOM context; ignore */ }
 
-contextBridge.exposeInMainWorld('hubAPI', {
+const hubAPI = {
   // QR + meta
   generateQR: (text, options) => ipcRenderer.invoke('hub:generate-qr', text, options),
   appVersion: () => ipcRenderer.invoke('hub:app-version'),
@@ -457,4 +457,43 @@ contextBridge.exposeInMainWorld('hubAPI', {
   onUpdateDownloadProgress: (() => { let _cb=null; ipcRenderer.on('update-download-progress', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onUpdateDownloaded:       (() => { let _cb=null; ipcRenderer.on('update-downloaded',        (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onUpdateError:            (() => { let _cb=null; ipcRenderer.on('update-error',             (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
-});
+};
+
+/* ── "Make no internet calls": every refused reply is reported (P8 PR 5) ──
+ *
+ * Main refuses a call the switch blocks in one of a few shapes: a reply with
+ * `blocked: {purpose, reason}` (most handlers, the updater's status
+ * 'blocked'), or an error whose text is OutboundBlocked's "outbound blocked:
+ * <purpose> (<reason>)" (a library that throws, or a handler that passes
+ * e.message on). Rather than teach every screen each shape, every hubAPI reply
+ * is looked at here, and a refusal is handed to the window as one event
+ * (renderer/internet-use.js), which says it only when a person acted a moment
+ * before: automatic calls are counted on their row, never toasted. The reply
+ * itself is returned unchanged. */
+const BLOCKED_TEXT = /outbound blocked: ([a-z-]+) \(([a-z-]+)\)/;
+function blockedOf(v) {
+  try {
+    if (!v) return null;
+    if (typeof v === 'object' && v.blocked && typeof v.blocked === 'object' && typeof v.blocked.purpose === 'string') {
+      return { purpose: String(v.blocked.purpose), reason: String(v.blocked.reason || 'offline'), host: v.blocked.host ? String(v.blocked.host) : undefined };
+    }
+    const text = typeof v === 'string' ? v : (typeof v === 'object' ? String(v.error || v.message || '') : '');
+    const m = text.slice(0, 400).match(BLOCKED_TEXT);
+    return m ? { purpose: m[1], reason: m[2] } : null;
+  } catch (_) { return null; }
+}
+function reportBlocked(b) {
+  try { window.dispatchEvent(new CustomEvent('khayt:outbound-blocked', { detail: JSON.stringify(b) })); } catch (_) { /* no window */ }
+}
+for (const k of Object.keys(hubAPI)) {
+  const fn = hubAPI[k];
+  if (typeof fn !== 'function' || /^on[A-Z]/.test(k)) continue;
+  hubAPI[k] = function (...args) {
+    const r = fn.apply(this, args);
+    if (!r || typeof r.then !== 'function') return r;
+    return r.then((v) => { const b = blockedOf(v); if (b) reportBlocked(b); return v; },
+      (e) => { const b = blockedOf(e); if (b) reportBlocked(b); throw e; });
+  };
+}
+
+contextBridge.exposeInMainWorld('hubAPI', hubAPI);

@@ -774,6 +774,9 @@ function _saveRefused(refused) {
   for (const r of refused) {
     const s = String(r);
     if (s === 'activeOperatorId') parts.add(t('err.refused_signin'));
+    // "Make no internet calls" is the owner's, under the lock: said as itself,
+    // not as "the shop lock" (P8 PR 5).
+    else if (s === 'settings.network') parts.add(t('err.refused_network'));
     else if (s.startsWith('settings.') || s === 'settings') parts.add(t('err.refused_lock'));
     else if (s.startsWith('operators')) parts.add(t('err.refused_people'));
     else if (s.startsWith('machines.')) parts.add(t('err.refused_printer'));

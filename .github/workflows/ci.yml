@@ -430,6 +430,9 @@ jobs:
       - name: E2E smoke (printer discovery)
         run: xvfb-run -a npm run test:e2e:discovery
 
+      - name: E2E smoke (Internet use settings)
+        run: xvfb-run -a npm run test:e2e:internetuse
+
       - name: E2E smoke (quit flushes pending save)
         run: xvfb-run -a npm run test:e2e:quitflush
 
