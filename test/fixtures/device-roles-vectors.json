@@ -1,5 +1,5 @@
 {
- "about": "lib/device-roles.js allows(role, path, method) for a paired phone (C1+C9, D-P4 as decided Nov 22). required: a scope, null (any paired device) or 'owner' (only the owner). The Mac and iPhone run this file through JavaScriptCore.",
+ "about": "lib/device-roles.js allows(role, path, method) for a paired phone (C1+C9, D-P4 as decided Nov 22). required: a scope, null (any paired device) or 'owner' (only the owner). The Mac and iPhone run this file through JavaScriptCore. Paths are percent-decoded per segment; a segment that decodes to '/', '\\\\', a control, '.' or '..' (or does not decode) is owner-only. GET/HEAD read, POST/PATCH/PUT/DELETE write, anything else owner-only. Case-sensitive, as the servers route.",
  "roles": [
   "owner",
   "manager",
@@ -64,6 +64,50 @@
   },
   {
    "device": null,
+   "want": "viewer"
+  },
+  {
+   "device": {
+    "rolesVersion": 1
+   },
+   "want": "viewer"
+  },
+  {
+   "device": {
+    "rolesVersion": 1,
+    "role": "operator"
+   },
+   "want": "operator"
+  },
+  {
+   "device": {
+    "kind": "connector"
+   },
+   "want": "viewer"
+  },
+  {
+   "device": {
+    "kind": "connector",
+    "role": "owner"
+   },
+   "want": "owner"
+  },
+  {
+   "device": {
+    "role": " owner"
+   },
+   "want": "viewer"
+  },
+  {
+   "device": {
+    "role": [
+     "owner"
+    ]
+   },
+   "want": "viewer"
+  },
+  {
+   "device": [],
    "want": "viewer"
   }
  ],
@@ -304,13 +348,13 @@
    }
   },
   {
-   "why": "upper-case API segment",
+   "why": "the servers route case-sensitively: an upper-case path is no route, so owner-only",
    "role": "viewer",
    "path": "/API/Queue",
    "method": "GET",
    "want": {
-    "ok": true,
-    "required": "queue:read",
+    "ok": false,
+    "required": "owner",
     "role": "viewer"
    }
   },
@@ -357,6 +401,307 @@
     "required": "owner",
     "role": "viewer"
    }
+  },
+  {
+   "why": "%2F inside an id cannot reach approve (reviews of #2625)",
+   "role": "operator",
+   "path": "/api/orders/x%2Fapprove",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "%2f, lower case, the same",
+   "role": "viewer",
+   "path": "/api/orders/x%2fquote-url",
+   "method": "GET",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "a backslash inside an id cannot climb to the book",
+   "role": "operator",
+   "path": "/api/orders/x\\..\\..\\store\\deltas",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "a dot segment is not routed on",
+   "role": "viewer",
+   "path": "/api/orders/..",
+   "method": "GET",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "an encoded dot segment either",
+   "role": "viewer",
+   "path": "/api/orders/%2e%2e",
+   "method": "GET",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "bad percent-encoding is not routed on",
+   "role": "viewer",
+   "path": "/api/orders/%E0%A4%A",
+   "method": "GET",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "an encoded control character is not routed on",
+   "role": "viewer",
+   "path": "/api/orders/a%00b",
+   "method": "GET",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "an ordinary encoded id still matches",
+   "role": "operator",
+   "path": "/api/orders/o%5F123",
+   "method": "PATCH",
+   "want": {
+    "ok": true,
+    "required": "orders:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "HEAD is a read",
+   "role": "viewer",
+   "path": "/api/queue",
+   "method": "HEAD",
+   "want": {
+    "ok": true,
+    "required": "queue:read",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "OPTIONS is owner-only",
+   "role": "viewer",
+   "path": "/api/queue",
+   "method": "OPTIONS",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "an unknown verb is owner-only",
+   "role": "manager",
+   "path": "/api/orders/a1",
+   "method": "PROPFIND",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "a manager fetches a library thumbnail (the servers' word is thumb)",
+   "role": "manager",
+   "path": "/api/library/PF-1/thumb",
+   "method": "GET",
+   "want": {
+    "ok": true,
+    "required": "quote:write",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "the Mac's cancel is stop's scope",
+   "role": "operator",
+   "path": "/api/printer/m1/cancel",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "machines:control",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "a trailing slash is the same route",
+   "role": "viewer",
+   "path": "/api/queue/",
+   "method": "GET",
+   "want": {
+    "ok": true,
+    "required": "queue:read",
+    "role": "viewer"
+   }
   }
+ ],
+ "phonePaths": [
+  [
+   "GET",
+   "/api/clients",
+   "clients:read"
+  ],
+  [
+   "POST",
+   "/api/expense",
+   "expense:write"
+  ],
+  [
+   "GET",
+   "/api/identity",
+   null
+  ],
+  [
+   "POST",
+   "/api/intake/estimate",
+   "quote:write"
+  ],
+  [
+   "GET",
+   "/api/inventory",
+   "inventory:read"
+  ],
+  [
+   "PATCH",
+   "/api/inventory/s1",
+   "inventory:write"
+  ],
+  [
+   "DELETE",
+   "/api/inventory/s1",
+   "inventory:write"
+  ],
+  [
+   "GET",
+   "/api/library",
+   "quote:write"
+  ],
+  [
+   "POST",
+   "/api/library/PF-1/estimate",
+   "quote:write"
+  ],
+  [
+   "GET",
+   "/api/library/PF-1/thumb",
+   "quote:write"
+  ],
+  [
+   "GET",
+   "/api/machines",
+   "machines:read"
+  ],
+  [
+   "GET",
+   "/api/machines/live",
+   "machines:read"
+  ],
+  [
+   "GET",
+   "/api/orders",
+   "orders:read"
+  ],
+  [
+   "POST",
+   "/api/orders",
+   "orders:write"
+  ],
+  [
+   "PATCH",
+   "/api/orders/o_123",
+   "orders:write"
+  ],
+  [
+   "POST",
+   "/api/orders/o_123/photos",
+   "orders:write"
+  ],
+  [
+   "POST",
+   "/api/printer/m1/pause",
+   "machines:control"
+  ],
+  [
+   "POST",
+   "/api/printer/m1/resume",
+   "machines:control"
+  ],
+  [
+   "POST",
+   "/api/printer/m1/stop",
+   "machines:control"
+  ],
+  [
+   "GET",
+   "/api/proof",
+   null
+  ],
+  [
+   "GET",
+   "/api/queue",
+   "queue:read"
+  ],
+  [
+   "POST",
+   "/api/quote",
+   "quote:write"
+  ],
+  [
+   "GET",
+   "/api/status",
+   null
+  ],
+  [
+   "GET",
+   "/api/store",
+   "book:read"
+  ],
+  [
+   "POST",
+   "/api/store/deltas",
+   "book:write"
+  ],
+  [
+   "GET",
+   "/api/store/settings",
+   "book:read"
+  ],
+  [
+   "GET",
+   "/api/waiting-list",
+   "clients:read"
+  ],
+  [
+   "PATCH",
+   "/api/waiting-list/w1",
+   "clients:write"
+  ],
+  [
+   "POST",
+   "/api/waste",
+   "waste:write"
+  ]
  ]
 }

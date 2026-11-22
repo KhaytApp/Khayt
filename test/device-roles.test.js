@@ -25,6 +25,16 @@ test('the role table, the legacy owner and what each approver may grant', () => 
   assert.equal(D.DEFAULT_ROLE, 'operator', 'D-P2');
 });
 
+test('every path the iPhone calls (ios/ on main) maps to its intended scope, none falls through to owner by accident', () => {
+  for (const [method, p, want] of V.phonePaths) assert.equal(D.requiredScope(p, method), want, `${method} ${p}`);
+  // allowsDevice is roleOf then allows.
+  assert.equal(D.allowsDevice({ rolesVersion: 1, role: 'operator' }, '/api/printer/m/stop', 'POST').ok, true);
+  assert.equal(D.allowsDevice({ rolesVersion: 1 }, '/api/printer/m/stop', 'POST').ok, false, 'a code-paired phone that lost its role is a viewer');
+  assert.equal(D.allowsDevice({}, '/api/store/deltas', 'POST').ok, true, 'the legacy PIN-paired phone is the owner');
+  assert.equal(D.allowsDevice({ kind: 'connector' }, '/api/queue', 'GET').ok, true, 'a connector is at most a viewer here (its own scope check runs first)');
+  assert.equal(D.allowsDevice({ kind: 'connector' }, '/api/orders', 'POST').ok, false);
+});
+
 test('each role holds everything the role below it holds (the ladder only adds)', () => {
   for (let i = 0; i < D.ROLES.length - 1; i++) {
     const hi = D.scopesFor(D.ROLES[i]), lo = D.scopesFor(D.ROLES[i + 1]);
@@ -36,6 +46,7 @@ test('each role holds everything the role below it holds (the ladder only adds)'
 test('the shared tables cannot be changed by a caller', () => {
   assert.throws(() => { 'use strict'; D.scopesFor('viewer').push('book:write'); });
   assert.throws(() => { 'use strict'; D.ROUTES[0].path.push('x'); });
+  assert.throws(() => { 'use strict'; D.allows = () => ({ ok: true }); }, 'the API object is frozen');
   assert.equal(D.allows('viewer', '/api/store/deltas', 'POST').ok, false);
 });
 
