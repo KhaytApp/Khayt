@@ -105,24 +105,16 @@ test('the split written by someone else meanwhile is kept (re-checked inside the
   assert.equal(r.told.length, 0);
 });
 
-test('nothing when the person signed in may not edit orders', async () => {
-  const r = rig({
-    settings: { operatorLockEnabled: true, activeOperatorId: 'V' },
-    operators: [{ id: 'V', roleKey: 'viewer' }],
-  });
-  assert.equal(await r.h.noteEdge(U1M, printing, complete, ENDED), false);
-  assert.equal(r.writes.length, 0);
-  assert.equal(r.book.printLog[0].actualHeads, undefined);
-  // Under the lock with nobody signed in: refused too.
+test('recorded whoever is signed in: the printer's own record, not a person's edit (overnight, nobody signed in since #2608)', async () => {
+  // The print finishes with the lock on and nobody signed in: the figures are on the job afterwards.
   const n = rig({ settings: { operatorLockEnabled: true } });
-  assert.equal(await n.h.noteEdge(U1M, printing, complete, ENDED), false);
-  assert.equal(n.writes.length, 0);
-  // An operator who may edit orders writes.
-  const ok = rig({
-    settings: { operatorLockEnabled: true, activeOperatorId: 'O' },
-    operators: [{ id: 'O', roleKey: 'owner' }],
-  });
-  assert.equal(await ok.h.noteEdge(U1M, printing, complete, ENDED), true);
+  assert.equal(await n.h.noteEdge(U1M, printing, complete, ENDED), true);
+  assert.ok(Array.isArray(n.book.printLog[0].actualHeads) && n.book.printLog[0].actualHeads.length > 0, 'the figures are on the job');
+  assert.ok(n.book.printLog[0].actualHeadsJobId);
+  // A viewer signed in: recorded too.
+  const v = rig({ settings: { operatorLockEnabled: true, activeOperatorId: 'V' }, operators: [{ id: 'V', roleKey: 'viewer' }] });
+  assert.equal(await v.h.noteEdge(U1M, printing, complete, ENDED), true);
+  assert.ok(v.book.printLog[0].actualHeadsJobId);
 });
 
 test('nothing when the history row is older than 20 minutes', async () => {
