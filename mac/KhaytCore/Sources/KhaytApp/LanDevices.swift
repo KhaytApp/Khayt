@@ -547,7 +547,6 @@ final class LanDevices: @unchecked Sendable {
         return diff == 0
     }
 
-    /// The 401 body for a refusal.
     /// The key to sign a `device-revoked` refusal with, or nil.
     ///
     /// ONLY for a request that the signed-out phone itself made: its id is on
@@ -573,6 +572,7 @@ final class LanDevices: @unchecked Sendable {
         return key
     }
 
+    /// The 401 body for a refusal.
     static func body(_ verdict: Verdict) -> String {
         guard case .refused(let reason, let now) = verdict else { return "{}" }
         if let now { return #"{"reason":"\#(reason)","now":\#(now)}"# }
