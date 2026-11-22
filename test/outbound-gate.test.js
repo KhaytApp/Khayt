@@ -142,10 +142,10 @@ test('cloud with a book on disk that cannot be read: not held back (it is how su
 test('PR 3 wiring: every cloud request asks the gate', () => {
   const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
   const cc = read('lib/cloud-client.js');
-  assert.match(cc, /return async \(\{ method, path, body \}\) => \{\s*\n\s*askGate\(\);/);
-  assert.match(cc, /const base = validateCloudBaseUrl\(baseUrl\);\s*\n\s*askGate\(\);\s*\n\s*\/\/ outbound: cloud\s*\n\s*const res = await fetch\(`\$\{base\}\/v1\/shops\/\$\{seg\(shopId\)\}\/intake/);
+  assert.match(cc, /return async \(\{ method, path, body \}\) => \{\s*\n\s*await askGate\(base \+ path\);/);
+  assert.match(cc, /const base = validateCloudBaseUrl\(baseUrl\);\s*\n\s*await askGate\(base\);\s*\n\s*\/\/ outbound: cloud\s*\n\s*const res = await fetch\(`\$\{base\}\/v1\/shops\/\$\{seg\(shopId\)\}\/intake/);
   const main = read('main.js');
-  assert.match(main, /cloudClient\.setOutboundGate\(\(purpose\) => outboundGate\.gate\(purpose\)\);/);
+  assert.match(main, /cloudClient\.setOutboundGate\(\(purpose, url\) => outboundGate\.gateFor\(purpose, url\)\);/);
   assert.equal((main.match(/outboundFetch: outboundGate\.for\('cloud'\),/g) || []).length, 2, 'both vault clients');
   assert.match(main, /outboundGate\.lastPush\(\(\) => cloudBackend\.push\(snapshot\)\)/);
   assert.match(main, /outboundGate\.lastPull\(\(\) => cloudBackend\.pull\(\)\)/);
@@ -172,4 +172,66 @@ test('the switch going on purges what was saved up before it (D5), once per chan
   settings = {}; g.check('updates');
   g.setLocal({ offline: true });
   assert.equal(purged, 2, 'this computer\'s switch too');
+});
+
+test('PR 4: gateFor — a purpose, or lan for the shop\'s own network, resolved while offline', async () => {
+  let settings = { network: { offline: true } };
+  let answers = [{ address: '192.168.1.9' }];
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => ({}), lookup: async () => answers });
+  await assert.rejects(g.gateFor('messaging', 'https://api.mailgun.net/'), (e) => isBlocked(e) && e.reason === 'offline');
+  // A self-hosted ntfy on the LAN, by name: resolved, every answer on the LAN.
+  assert.equal((await g.gateFor('messaging', 'http://ntfy.lan/topic')).allowed, true);
+  answers = [{ address: '192.168.1.9' }, { address: '93.184.216.34' }];
+  await assert.rejects(g.gateFor('messaging', 'http://ntfy.lan/topic'), (e) => isBlocked(e) && e.reason === 'lan-host-public', 'one public answer is enough to refuse');
+  answers = [];
+  await assert.rejects(g.gateFor('messaging', 'http://octopi/'), (e) => isBlocked(e), 'no answer: refused');
+  // An IP literal on the LAN needs no lookup.
+  assert.equal((await g.gateFor('webhooks', 'http://10.0.0.7:8080/hook')).allowed, true);
+  // Online: no lookup at all, today's behaviour.
+  settings = {};
+  answers = [{ address: '8.8.8.8' }];
+  assert.equal((await g.gateFor('messaging', 'http://ntfy.lan/topic')).allowed, true);
+  assert.equal((await g.gateFor('messaging', 'https://api.mailgun.net/')).allowed, true);
+});
+
+test('PR 4: the runtime belt — offline, only the LAN and hosts a gated call just asked for', async () => {
+  let settings = { network: { offline: true, keep: ['storage'] } };
+  let t = 1000;
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => ({}), now: () => t });
+  assert.equal(g.beltAllows('http://192.168.1.40/api'), true);
+  assert.equal(g.beltAllows('https://evil.example.com/x'), false, 'unrouted');
+  assert.equal(g.blocked().unrouted.count, 1);
+  await g.gateFor('storage', 'https://s3.amazonaws.com/bucket/k');   // kept: noted
+  assert.equal(g.beltAllows('https://s3.amazonaws.com/bucket/other'), true);
+  t += 6 * 60 * 1000;
+  assert.equal(g.beltAllows('https://s3.amazonaws.com/bucket/other'), false, 'the note expires');
+  settings = {};
+  assert.equal(g.beltAllows('https://evil.example.com/x'), true, 'online: everything passes, as today');
+  assert.equal(g.beltAllows('/relative'), true, 'not the internet');
+});
+
+test('PR 4 wiring: every library call asks lib/outbound-hook.js; main sets it and wraps the global fetch', async () => {
+  const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+  for (const [f, p] of [['lib/s3-client.js', 'storage'], ['lib/gdrive-client.js', 'storage'], ['lib/sms.js', 'messaging'],
+    ['lib/main/payment-links.js', 'payments'], ['lib/makerrun-library.js', 'makerrun'], ['lib/makerrun-v1.js', 'makerrun'],
+    ['lib/makerrun-account.js', 'makerrun'], ['lib/orca-filament-install.js', 'catalogues'], ['lib/zatca-crypto.js', 'tax-authority'],
+    ['lib/custom-smtp.js', 'messaging'], ['lib/lan-server.js', 'tunnel']]) {
+    assert.match(read(f), new RegExp(`ask\\('${p}'`), f);
+  }
+  assert.match(read('lib/webhook-send.js'), /OutboundHook\.ask\(deps\.purpose \|\| 'webhooks', url\)/);
+  const main = read('main.js');
+  assert.match(main, /require\('\.\/lib\/outbound-hook\.js'\)\.setOutboundGate\(\(purpose, url\) => outboundGate\.gateFor\(purpose, url\)\);/);
+  assert.match(main, /globalThis\.fetch = function outboundBelt\(input, init\)/);
+  for (const p of ['exchange-rates', 'messaging', 'ai']) assert.match(main, new RegExp(`outboundRefusal\\('${p}'`), p);
+  assert.match(main, /GD\.exchangeCode\(outboundGate\.for\('storage'\)/);
+  assert.match(main, /await outboundGate\.gateFor\('catalogues', url\);/);
+  // A blocked integration answers in the one shape the window reads (PR 5).
+  const H = require('../lib/outbound-hook.js');
+  H.setOutboundGate(async (purpose) => { const e = new Error('x'); e.code = 'outbound.blocked'; e.purpose = purpose; e.reason = 'offline'; throw e; });
+  try {
+    const W = require('../lib/webhook-send.js');
+    assert.deepEqual(await W.postPinned('https://example.com/hook', {}), { ok: false, error: 'outbound.blocked', blocked: { purpose: 'webhooks', reason: 'offline' } });
+    const S = require('../lib/custom-smtp.js');
+    assert.deepEqual((await S.sendCustomSmtp({ host: 'smtp.example.com', from: 'a@b.c', to: 'd@e.f', subject: 's', html: 'h' })).blocked, { purpose: 'messaging', reason: 'offline' });
+  } finally { H.setOutboundGate(null); }
 });

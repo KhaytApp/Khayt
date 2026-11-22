@@ -33,6 +33,7 @@ let _lastPoFilterHash = '';     // detects filter changes to reset PO page
 let filamentsDB = [];
 let filamentCatalog = null;
 if (typeof fetch === 'function' && typeof document !== 'undefined') {
+  // outbound-exempt: local-file — the app's own bundled catalogue
   fetch('../assets/filament-catalog.json').then(r => r.json()).then(cat => {
     const FC = globalThis.KhaytFilamentCatalog;
     if (!FC || !cat || !Array.isArray(cat.filaments)) throw new Error('catalogue unreadable');

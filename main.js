@@ -193,7 +193,7 @@ const { sendSms, sendWhatsappTemplate, checkWhatsapp } = require('./lib/sms');
 const cloudClient = require('./lib/cloud-client');
 // Every Khayt Cloud request asks the "make no internet calls" gate (P8 PR 3).
 // Called at request time, so the gate (defined below) exists by then.
-cloudClient.setOutboundGate((purpose) => outboundGate.gate(purpose));
+cloudClient.setOutboundGate((purpose, url) => outboundGate.gateFor(purpose, url));
 const { summarizeBranch, totalBranches } = require('./lib/branch-summary');
 const aiTools = require('./lib/ai-tools');
 const aiPrivacy = require('./lib/ai-privacy');
@@ -263,7 +263,38 @@ const outboundGate = require('./lib/main/outbound-fetch.js').createOutboundGate(
     fs.renameSync(f + '.tmp', f);
   },
   readInstallCountOff: () => readActiveCount().off === true,
+  lookup: (host) => require('dns').promises.lookup(host, { all: true, verbatim: true }),
 });
+// THE RUNTIME BELT (design §2.2): what the source test missed fails loudly
+// here instead of leaking. While this computer is offline, a global fetch to
+// a host that is neither on the shop's network nor one a gated call just
+// asked for is refused as 'unrouted' and logged. Online it passes everything.
+{
+  // outbound-exempt: gate — the belt wraps the global fetch; it adds a refusal, never a call
+  const rawGlobalFetch = globalThis.fetch;
+  if (typeof rawGlobalFetch === 'function') {
+    // outbound-exempt: gate — see above
+    globalThis.fetch = function outboundBelt(input, init) {
+      let ok = true;
+      try { ok = outboundGate.beltAllows(input); } catch (_) { ok = true; }
+      if (!ok) {
+        const OB = require('./lib/main/outbound-fetch.js').OutboundBlocked;
+        console.warn('[outbound] refused an unrouted request while offline:', (() => { try { return new URL(String(input && input.url ? input.url : input)).hostname; } catch (_) { return '?'; } })());
+        return Promise.reject(new OB('unrouted', 'offline'));
+      }
+      return rawGlobalFetch.call(this, input, init);
+    };
+  }
+}
+// Every library module's internet call asks the same gate (lib/outbound-hook.js).
+require('./lib/outbound-hook.js').setOutboundGate((purpose, url) => outboundGate.gateFor(purpose, url));
+/** A person-started call the switch refuses: the reply the window turns into words (P8 PR 5). */
+async function outboundRefusal(purpose, url) {
+  try { await outboundGate.gateFor(purpose, url); return null; } catch (e) {
+    if (e && e.code === 'outbound.blocked') return { ok: false, error: 'outbound.blocked', blocked: { purpose: e.purpose, reason: e.reason } };
+    throw e;
+  }
+}
 
 /** Only the main app window may invoke privileged hub:* IPC (blocks stray webContents). */
 function isTrustedRenderer(event) {
@@ -549,6 +580,9 @@ ipcMain.handle('hub:fetch-exchange-rates', async (_e, base) => {
   const code = String(base || 'SAR').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
   if (code.length !== 3) return { ok: false, error: 'Invalid base currency' };
   try {
+    const refusal = await outboundRefusal('exchange-rates', `https://open.er-api.com/v6/latest/${code}`);
+    if (refusal) return refusal;
+    // outbound: exchange-rates
     const res = await fetch(`https://open.er-api.com/v6/latest/${code}`, {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(10000),
@@ -968,6 +1002,7 @@ ipcMain.handle('hub:share-whatsapp', async (_e, { phone, message, pdfPath }) => 
   const clean = (String(phone || '').replace(/[^\d]/g, ''));
   const text = encodeURIComponent(String(message || '').slice(0, 4096));
   const url = clean ? `https://wa.me/${clean}?text=${text}` : `https://wa.me/?text=${text}`;
+  // outbound-exempt: browser — hands the address to the person's own browser
   await shell.openExternal(url);
   // Path-confinement: only reveal files inside userData or known download locations
   if (pdfPath) {
@@ -1709,6 +1744,7 @@ async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
     body = bytes;
   }
   try {
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(`http://${printerHost}:${portNum}${req.path}`,
       { method: req.method, headers: req.headers, body, signal: AbortSignal.timeout(60000) });
     return printerUpload.accepted(res.status)
@@ -3301,7 +3337,8 @@ function gdriveAuthorize(cfg) {
       if (!code) { reply('Not connected', 'Google did not return an authorisation code.'); finish({ ok: false, error: 'No authorisation code.' }); return; }
 
       try {
-        const tok = await GD.exchangeCode(globalThis.fetch, {
+        // outbound: storage (the Drive sign-in's code exchange, through the gate)
+        const tok = await GD.exchangeCode(outboundGate.for('storage'), {
           clientId: cfg.clientId, clientSecret: cfg.clientSecret, code, verifier, redirectUri,
         });
         if (!tok.refresh_token) {
@@ -3327,6 +3364,7 @@ function gdriveAuthorize(cfg) {
     // which can resolve to ::1 and produce a redirect_uri Google will not match.
     server.listen(0, '127.0.0.1', () => {
       redirectUri = `http://127.0.0.1:${server.address().port}/callback`;
+      // outbound-exempt: browser — hands the address to the person's own browser
       shell.openExternal(GD.authUrl({ clientId: cfg.clientId, redirectUri, challenge, state }))
         .catch((e) => finish({ ok: false, error: `Could not open the browser: ${e.message}` }));
     });
@@ -5293,6 +5331,7 @@ function isAppIndexNavigation(navigationUrl) {
 ipcMain.handle('hub:open-external', async (_e, url) => {
   const s = String(url || '');
   if (!isAllowedExternalUrl(s)) return { ok: false, error: 'Blocked URL' };
+  // outbound-exempt: browser — hands the address to the person's own browser
   await shell.openExternal(s);
   return { ok: true };
 });
@@ -5747,6 +5786,7 @@ async function fetchPrinterHistory(machine, limit) {
   const headers = {};
   if (apiKey) headers['X-Api-Key'] = apiKey;
   try {
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(`http://${printerHost}:${portNum}/server/history/list?limit=${n}`, {
       headers, redirect: 'manual', signal: AbortSignal.timeout(30000),
     });
@@ -5800,6 +5840,7 @@ async function sendPrinterCommand(machine, command) {
     if (req.unsupported) return { ok: false, error: req.unsupported };
     try {
       await sdcpClient.askOnce({
+        // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
         connect: (url) => new WebSocket(url),
         url: KhaytSdcpProtocol.websocketUrl(printerHost),
         request: JSON.parse(req.sdcp.frame),
@@ -5828,6 +5869,7 @@ async function sendPrinterCommand(machine, command) {
   let jobId = null;
   if (printerCommands.requiresJobId(type)) {
     try {
+      // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
       const res = await fetch(`${base}/api/v1/job`, { headers, redirect: 'manual', signal: AbortSignal.timeout(5000) });
       if (!res.ok) return { ok: false, error: 'No job is running on this printer' };
       jobId = (await res.json())?.id ?? null;
@@ -5847,6 +5889,7 @@ async function sendPrinterCommand(machine, command) {
       // send `"M25"` to a firmware expecting `M25`.
       init.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     }
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(`${base}${req.path}`, init);
     if (res.status >= 300 && res.status < 400) { const e = new Error('Unexpected redirect from printer'); e.fatal = true; throw e; }
     if (!res.ok) { const e = new Error(`Printer responded ${res.status}`); e.status = res.status; throw e; }
@@ -5885,6 +5928,7 @@ async function sendPrinterCommand(machine, command) {
             // Only a refusal earns the handshake. A password-less standalone
             // Duet — the common case — pays nothing for this branch.
             if (e.fatal || !isHttpStatus(e, KhaytDuet.ENDPOINTS[flavour].unauthorized)) throw e;
+            // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
             const raw = await (await fetch(`${base}${KhaytDuet.ENDPOINTS[flavour].connect(password)}`, {
               headers, redirect: 'manual', signal: AbortSignal.timeout(10000),
             })).json();
@@ -5948,6 +5992,7 @@ async function plateObjects(machine) {
   if (apiKey) headers['X-Api-Key'] = apiKey;
   const base = `http://${printerHost}:${portNum}`;
   try {
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(`${base}/printer/objects/query?${excludeObject.QUERY}`, {
       headers, redirect: 'manual', signal: AbortSignal.timeout(10000),
     });
@@ -5973,6 +6018,7 @@ ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) 
   const req = excludeObject.excludeRequest(name, read.data);
   if (req.refused) return { ok: false, error: req.refused };
   try {
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(read.base + req.path, {
       method: req.method, headers: read.headers,
       redirect: 'manual', signal: AbortSignal.timeout(10000),
@@ -6095,6 +6141,7 @@ async function fetchPrinterStatus(machine) {
     const board = String(serial || printerSlug || '').trim();
     if (!board) return { ok: false, error: 'SDCP needs the printer’s mainboard ID — run a network scan to find it.' };
     return sdcpClient.fetchStatus({
+      // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
       connect: (url) => new WebSocket(url),
       ip: printerHost,
       mainboardId: board,
@@ -6118,6 +6165,7 @@ async function fetchPrinterStatus(machine) {
   const get = async (p, extraHeaders) => {
     // redirect:'manual' so a compromised/misconfigured printer host can't 302 the poller off the
     // validated LAN address to loopback/metadata (the response here IS returned to the renderer).
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(`${baseUrl}${p}`, {
       headers: extraHeaders ? { ...headers, ...extraHeaders } : headers,
       redirect: 'manual', signal: AbortSignal.timeout(5000),
@@ -6360,6 +6408,9 @@ ipcMain.handle('hub:send-email', async (event, { to, subject, body, smtpConfig }
   cfg.apiKey = resolveStoreSecret(cfg.apiKey, d => d?.settings?.emailConfig?.apiKey);
   if (cfg?.provider === 'sendgrid' && cfg?.apiKey) {
     try {
+      const refusal = await outboundRefusal('messaging', 'https://api.sendgrid.com/v3/mail/send');
+      if (refusal) return refusal;
+      // outbound: messaging
       const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
@@ -6383,6 +6434,9 @@ ipcMain.handle('hub:send-email', async (event, { to, subject, body, smtpConfig }
         from: `${cfg.fromName||'Khayt'} <mailgun@${mgDomain}>`,
         to, subject, html: body
       });
+      const refusal = await outboundRefusal('messaging', 'https://api.mailgun.net/');
+      if (refusal) return refusal;
+      // outbound: messaging
       const res = await fetch(`https://api.mailgun.net/v3/${mgDomain}/messages`, {
         method: 'POST',
         headers: { 'Authorization': `Basic ${Buffer.from(`api:${cfg.apiKey}`).toString('base64')}` },
@@ -6561,11 +6615,14 @@ ipcMain.handle('hub:ai-extract', async (_e, { apiKey, model, system, request, im
 
   // Retry transient faults (429/529/5xx) with backoff. Raw fetch gives us none
   // of this for free, so a single rate-limit reply used to kill the feature.
+  const refusal = await outboundRefusal('ai', shaped.url);
+  if (refusal) return refusal;
   const MAX_ATTEMPTS = 3;
   let lastError = 'AI request failed';
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     let res;
     try {
+      // outbound: ai
       res = await fetch(shaped.url, {
         method: 'POST',
         headers: shaped.headers,
@@ -6872,6 +6929,7 @@ ipcMain.handle('hub:bedready-open-signin', () => {
     bedreadyLinkArmedAt = Date.now(); // arm: the next bedready:// link is user-initiated and expected
     bedreadyLinkNonce = crypto.randomBytes(16).toString('hex'); // bind the handshake to this click
     const url = makerrunLibrary.signInUrl() + '?state=' + encodeURIComponent(bedreadyLinkNonce);
+    // outbound-exempt: browser — hands the address to the person's own browser
     require('electron').shell.openExternal(url);
     return { ok: true };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
@@ -7008,6 +7066,7 @@ if (isBedReady) {
 
   // age_required: the website's /age page is the only place an account can confirm its age.
   ipcMain.handle('hub:makerrun-open-age', async () => {
+    // outbound-exempt: browser — hands the address to the person's own browser
     try { await shell.openExternal(MAKERRUN_BASE + '/age'); return { ok: true }; }
     catch (e) { return MRV1.toIpcError(e); }
   });
@@ -7017,6 +7076,7 @@ if (isBedReady) {
   ipcMain.handle('hub:makerrun-open-page', async (_e, { slug } = {}) => {
     try {
       if (!mrCatalog.validSlug(slug)) return { ok: false, error: 'That is not a MakerRun design id.', code: 'bad_request' };
+      // outbound-exempt: browser — hands the address to the person's own browser
       await shell.openExternal(MAKERRUN_BASE + '/designs/' + encodeURIComponent(slug));
       return { ok: true };
     } catch (e) { return MRV1.toIpcError(e); }
@@ -7527,6 +7587,7 @@ ipcMain.handle('hub:plugin-send', async (_e, req) => {
     const out = await pluginSend.send({ entry, trigger, records: r.records || {}, delivery: r.delivery, settings: disk && disk.settings });
     if (out.ok && out.method === 'OPEN') {
       if (!isAllowedExternalUrl(out.url)) return { ok: false, refused: 'url' };
+      // outbound-exempt: browser — hands the address to the person's own browser
       await shell.openExternal(out.url);
     }
     return out;
@@ -7547,6 +7608,8 @@ const CONNECTOR_UPDATES_ON = CONNECTORS_ON && process.env.KHAYT_CONNECTOR_UPDATE
 const connectorUpdates = require('./lib/main/connector-updates');
 async function connectorFetchBytes(url, maxBytes) {
   if (!/^https:\/\//.test(String(url))) throw new Error('https only');
+  await outboundGate.gateFor('catalogues', url);
+  // outbound: catalogues
   const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const buf = Buffer.from(await res.arrayBuffer());
@@ -7653,7 +7716,10 @@ ipcMain.handle('hub:send-ntfy', async (_e, { type, title, body } = {}) => {
   for (const k of ['Title']) {
     if (/[^\x20-\x7e]/.test(headers[k] || '')) headers[k] = `=?UTF-8?B?${Buffer.from(headers[k], 'utf8').toString('base64')}?=`;
   }
+  const refusal = await outboundRefusal('messaging', req.url);   // a self-hosted ntfy on the LAN is lan
+  if (refusal) return refusal;
   try {
+    // outbound: messaging
     const res = await fetch(req.url, { method: 'POST', headers, body: req.body, redirect: 'manual', signal: AbortSignal.timeout(10000) });
     if (res.status >= 300 && res.status < 400) return { ok: false, error: 'The ntfy server redirected; check the address' };
     if (!res.ok) return { ok: false, status: res.status, error: res.status === 401 || res.status === 403 ? 'The ntfy server refused the access token' : `ntfy answered ${res.status}` };
@@ -7687,7 +7753,10 @@ ipcMain.handle('hub:send-telegram', async (_e, { botToken, chatId, message } = {
   if (isBlockedHost('api.telegram.org')) return { ok: false, error: 'Host is blocked' };
   const url = `https://api.telegram.org/bot${encodeURIComponent(botToken)}/sendMessage`;
   const body = JSON.stringify({ chat_id: chatIdStr, text: message.slice(0, 4096) });
+  const refusal = await outboundRefusal('messaging', 'https://api.telegram.org/');
+  if (refusal) return refusal;
   try {
+    // outbound: messaging
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -7746,9 +7815,11 @@ function createWindow() {
     if (url.startsWith('https://')) {
       try {
         const parsed = new URL(url);
+        // outbound-exempt: browser — hands the address to the person's own browser
         if (!isBlockedHost(parsed.hostname)) shell.openExternal(url);
       } catch { /* invalid URL — deny */ }
     } else if (url.startsWith('mailto:')) {
+      // outbound-exempt: browser — hands the address to the person's own browser
       shell.openExternal(url);
     }
     return { action: 'deny' };
@@ -7788,6 +7859,7 @@ function openHelpLink(url) {
     console.error('refusing to open a non-https help link:', target);
     return;
   }
+  // outbound-exempt: browser — hands the address to the person's own browser
   shell.openExternal(target).catch((e) => console.error('help link failed:', e));
 }
 

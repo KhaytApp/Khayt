@@ -13,6 +13,7 @@
  *                                   kind: browser | inbound-server | served-page | not-run | local-file
  *                                   | gate (lib/main/outbound-fetch.js's own wrapper)
  *                                   | injected (a client whose fetch main hands in, gated)
+ *                                   | ipc (a window call whose main-side handler asks the gate)
  * Everything else counts against the file's baseline
  * (test/fixtures/outbound-ratchet-baseline.json). A new untagged call fails;
  * one that is gated or tagged must come off the baseline, so the list only
@@ -26,7 +27,19 @@ const { PURPOSES } = require('../lib/outbound.js');
 
 const ROOT = path.join(__dirname, '..');
 const BASELINE_FILE = path.join(__dirname, 'fixtures', 'outbound-ratchet-baseline.json');
-const EXEMPT_KINDS = ['browser', 'inbound-server', 'served-page', 'not-run', 'local-file', 'gate', 'injected'];
+/* Whole files whose network calls are TEXT, not calls Khayt makes: a tag
+ * cannot go on the line, because the line is inside a template the LAN
+ * server sends byte for byte (a test pins those bytes). */
+const SERVED_FILES = {
+  'lib/lan-intake.js': 'served-page — the intake page\'s script runs in the customer\'s browser',
+  'lib/lan-order-page.js': 'served-page — the order page\'s script runs in the customer\'s browser',
+  'lib/lan-pages.js': 'served-page — the status pages and service worker run in a browser',
+  'lib/lan-quote-page.js': 'served-page — the quote page\'s script runs in the customer\'s browser',
+  'renderer/integrations.js': 'served-page — the survey snippet the shop copies into its own site',
+  'lib/medusa-subscriber.js': 'not-run — code the shop pastes into its own Medusa server; Khayt only shows it',
+};
+
+const EXEMPT_KINDS = ['browser', 'inbound-server', 'served-page', 'not-run', 'local-file', 'gate', 'injected', 'ipc'];
 
 const PRIMITIVES = [
   /(?<![\w.$])fetch\s*\(/, /globalThis\.fetch\b/, /\|\|\s*(?:globalThis\.)?fetch\b/,
@@ -78,6 +91,7 @@ function tagOf(raw) {
 }
 
 function scan(rel) {
+  if (Object.prototype.hasOwnProperty.call(SERVED_FILES, rel)) return { untagged: 0, bad: [] };
   const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
   const { lines, code } = codeLines(src);
   let untagged = 0;
@@ -96,7 +110,9 @@ function scan(rel) {
     // (review of #2627). `lan` needs no gate yet: PR 4 adds the address check
     // (and the resolve-time one) every lan call must go through.
     const body = code.join('\n');
-    const asks = [`check('${tag.purpose}'`, `gate('${tag.purpose}'`, `Gate('${tag.purpose}'`, `.for('${tag.purpose}'`].some((n) => body.includes(n))
+    const asks = [`check('${tag.purpose}'`, `gate('${tag.purpose}'`, `Gate('${tag.purpose}'`, `.for('${tag.purpose}'`, `gateFor('${tag.purpose}'`,
+      `outboundRefusal('${tag.purpose}'`, `ask('${tag.purpose}'`].some((n) => body.includes(n))
+      || (body.includes('OutboundHook.ask(') && body.includes(`'${tag.purpose}'`))
       || (tag.purpose === 'updates' && body.includes('updatesAllowed()'))
       || tag.purpose === 'lan';   // TODO(PR 4): require the lan address gate here
     if (!asks) bad.push(`${rel}:${i + 1} tagged ${tag.purpose} but the file never asks the gate for it`);
