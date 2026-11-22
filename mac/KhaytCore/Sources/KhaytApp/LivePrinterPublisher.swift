@@ -67,7 +67,10 @@ final class LivePrinterPublisher {
             // Honoured, up to the rule's limit: a wrong answer must not
             // silence this Mac for hours.
             let limit = (try? await engine.liveMaxRetryAfter()) ?? 300
-            notBefore = now.addingTimeInterval(min(max(retry, 0), limit))
+            // Not a number at all ("nan") would make a date nothing can be
+            // compared with, and silence this Mac until the app restarts.
+            let wait = retry.isFinite ? min(max(retry, 0), limit) : LivePrinters.minInterval
+            notBefore = now.addingTimeInterval(wait)
         case 403, 401:
             refused = true
         default:

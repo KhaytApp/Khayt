@@ -168,13 +168,28 @@ struct LivePrintersTests {
                                   dek: Self.dek, canWrite: true, now: now.addingTimeInterval(31 * 60), token: { "t" })
         #expect(calls.count == 4)
 
+        // A 429 whose Retry-After is not a number does not silence this Mac for the session.
+        let odd = LivePrinterPublisher()
+        var answers = [429, 200]
+        odd.fetch = { r in
+            calls.append((r.httpMethod ?? "", r.url?.path ?? ""))
+            let code = answers.isEmpty ? 200 : answers.removeFirst()
+            return (Data("{}".utf8), HTTPURLResponse(url: r.url!, statusCode: code, httpVersion: nil,
+                                                     headerFields: ["Retry-After": "nan"])!)
+        }
+        await odd.publishIfDue(rows: rows, engine: e, connection: conn, dek: Self.dek, canWrite: true, now: now, token: { "t" })
+        #expect(calls.count == 5)
+        await odd.publishIfDue(rows: [Self.answered("m1", now.addingTimeInterval(10))], engine: e, connection: conn, dek: Self.dek,
+                               canWrite: true, now: now.addingTimeInterval(10), token: { "t" })
+        #expect(calls.count == 6, "a Retry-After that is not a number stopped every later snapshot")
+
         let q = LivePrinterPublisher()
         status = 403
         q.fetch = p.fetch
         await q.publishIfDue(rows: rows, engine: e, connection: conn, dek: Self.dek, canWrite: true, now: now, token: { "t" })
         await q.publishIfDue(rows: [Self.answered("m1", now, progress: 99)], engine: e, connection: conn, dek: Self.dek,
                              canWrite: true, now: now, token: { "t" })
-        #expect(calls.count == 5, "a 403 is not asked again every sweep")
+        #expect(calls.count == 7, "a 403 is not asked again every sweep")
     }
 
     @Test("Swift keeps no copy of the snapshot's rules")
