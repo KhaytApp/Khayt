@@ -555,7 +555,7 @@ struct NetworkSwitchWiringTests {
             let said = shop.words.callIt(key)
             #expect(!said.hasPrefix("mac.") && said.count > 30, Comment(rawValue: key))
         }
-        let src = try String(contentsOf: Self.sources.appending(path: "Shop+NetworkSwitch.swift"), encoding: .utf8)
+        let src = try String(contentsOf: Self.sources.appending(path: "NetworkSwitchQuestion.swift"), encoding: .utf8)
         #expect(src.contains(".disabled(!mayAnswer || shop.networkSwitchAnswering)"))
         #expect(src.contains("if let problem = shop.networkSwitchAnswerProblem"))
     }

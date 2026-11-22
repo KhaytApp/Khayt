@@ -138,7 +138,7 @@ struct NetworkSwitchFramesTests {
         let banners = try String(contentsOf: Self.sources.appending(path: "Banners.swift"), encoding: .utf8)
         #expect(banners.contains("NetworkSwitchQuestion(shop: shop, ask: ask)"))
         #expect(!banners.contains("NetworkSwitchWords.sentence(ask"), "the plain banner was replaced")
-        let question = try String(contentsOf: Self.sources.appending(path: "Shop+NetworkSwitch.swift"), encoding: .utf8)
+        let question = try String(contentsOf: Self.sources.appending(path: "NetworkSwitchQuestion.swift"), encoding: .utf8)
         let body = try #require(question.range(of: "struct NetworkSwitchQuestion"))
         #expect(question[body.upperBound...].contains("OpenInternetUse(shop: shop)"), "the existing link, not a new screen")
         #expect(question[body.upperBound...].contains(".disabled(!mayAnswer || shop.networkSwitchAnswering)"), "others see it and cannot answer")
