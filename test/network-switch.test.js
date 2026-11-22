@@ -131,7 +131,12 @@ function harness(over = {}) {
       if (server.hang) return new Promise(() => {});
       server.puts.push(body);
       if (server.onPut) await server.onPut();
-      if (server.putStatus) return { status: server.putStatus, body: { reason: 'stale', changedAt: '2026-11-22T10:05:00.000Z' } };
+      // A 409 names the newer stamp the server holds, as the real route does;
+      // with none newer held, 10:05 (or the test's server.conflictAt).
+      if (server.putStatus) {
+        const held = server.value && server.value.changedAt > body.changedAt ? server.value.changedAt : null;
+        return { status: server.putStatus, body: { reason: 'stale', changedAt: server.conflictAt || held || '2026-11-22T10:05:00.000Z' } };
+      }
       server.value = { changedAt: body.changedAt, receivedAt: 'x', ciphertext: body.ciphertext };
       return { status: 200, body: { ok: true, changedAt: body.changedAt } };
     },
@@ -282,6 +287,7 @@ test('review M2: an off that could not go is sent again with the same stamp at t
 
 test('rule 3: a 409 is held for the person, never applied by the timer, never retried', async () => {
   const h = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  h.publishRemote(plain());              // "off" goes only over a published value (GET first)
   h.server.putStatus = 409;
   const r = await h.sync.publish({ offline: false });
   assert.equal(r.why, 'stale');
@@ -294,6 +300,7 @@ test('rule 3: a 409 is held for the person, never applied by the timer, never re
   assert.equal((await h.sync.answerConflict('adopt')).applied, true);
   assert.equal(h.book().network.offline, true);
   const k = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  k.publishRemote(plain());
   k.server.putStatus = 409;
   await k.sync.publish({ offline: false });
   k.server.putStatus = null;
@@ -308,6 +315,7 @@ test('rule 3: a 409 is held for the person, never applied by the timer, never re
 
 test('frame G: "Keep it on this computer only" after turning it ON keeps this computer offline and the shop takes the newer setting', async () => {
   const h = harness({ mine: { share: true } });
+  h.server.conflictAt = new Date(NOW + 3 * 60000).toISOString();   // the 409 names what the GET later reads
   h.server.putStatus = 409;
   const on = Object.assign({}, ON_NOW, { changedAt: new Date(NOW).toISOString() });
   h.setBook(on);
@@ -388,6 +396,7 @@ test('review H1/M1: the newer value is fetched at the 409, so both answers work 
 test('review H2: a retry already in flight cannot open a conflict for a change the book no longer holds', async () => {
   // "Off" owed from earlier (turned off while sharing), sent by the tick, not the person.
   const h = harness({ mine: { share: true, highestSeen: '2026-11-22T09:00:00.000Z' }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  h.publishRemote(plain());           // "off" goes only over a published value (GET first)
   h.server.putStatus = 409;
   // While that PUT is out, the person answers / changes the switch: the book moves on.
   h.server.onPut = async () => { h.setBook({ offline: true, changedAt: '2026-11-22T10:01:00.000Z' }); };
@@ -457,6 +466,7 @@ const conflictNotHeld = async (mineOn) => {
   const h = harness({ mine: { share: true } });
   const net = mineOn ? Object.assign({}, ON_NOW, { changedAt: new Date(NOW).toISOString() })
     : { offline: false, changedAt: new Date(NOW).toISOString() };
+  h.server.conflictAt = new Date(NOW + 60000).toISOString();   // what the 409 names, and the GET later reads
   h.server.putStatus = 409;
   h.server.getFail = true;            // the GET at the 409 fails: nothing held
   await h.sync.publish({ offline: mineOn, network: net });
@@ -545,4 +555,52 @@ test('frame G words: a direction only when read and opposite; Keep only when str
     const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'locales', l + '.js'), 'utf8');
     for (const k of ['iu.g.conflict_general_body', 'iu.g.unreachable', 'iu.g.conflict_on_body', 'iu.g.conflict_off_body']) assert.match(src, new RegExp(`"${k.replace(/\./g, '\\.')}":`), `${l} ${k}`);
   }
+});
+
+// ── Cloud lane review of #2645 / #2646 ─────────────────────────────────────
+
+async function conflicted() {
+  const h = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  h.publishRemote(plain());                 // published, so "off" is sent
+  h.server.putStatus = 409;                 // the server names 10:05 as its stamp
+  await h.sync.publish({ offline: false });
+  h.server.putStatus = null;
+  return h;
+}
+
+test('security: "Use the newer setting" never applies a value older than the stamp the 409 named', async () => {
+  const h = await conflicted();
+  // A replayed value stamped between this computer's change (10:00) and the 409's (10:05).
+  h.publishRemote(plain({ changedAt: '2026-11-22T10:02:00.000Z' }));
+  const r = await h.sync.answerConflict('adopt');
+  assert.deepEqual(r, { ok: false, why: 'not-held' });
+  assert.equal(h.book().network.offline, false, 'nothing applied');
+  assert.equal(h.sync.state().conflict.at, '2026-11-22T10:05:00.000Z', 'the question stays, with its stamp');
+  // The real newer value: applied.
+  h.publishRemote(plain({ changedAt: '2026-11-22T10:05:00.000Z' }));
+  assert.deepEqual(await h.sync.answerConflict('adopt'), { ok: true, kept: false, applied: true });
+  assert.equal(h.book().network.offline, true);
+  assert.equal(h.sync.state().conflict, null);
+});
+
+test('nothing held: the answer keeps the conflict and its stamp until a value is applied', async () => {
+  const h = await conflicted();
+  h.server.getFail = true;
+  assert.deepEqual(await h.sync.answerConflict('adopt'), { ok: false, why: 'unreachable' });
+  assert.equal(h.sync.state().conflict.at, '2026-11-22T10:05:00.000Z');
+  assert.equal(h.book().network.offline, false);
+  h.server.getFail = false;
+  h.publishRemote(plain({ changedAt: '2026-11-22T10:06:00.000Z' }));
+  assert.equal((await h.sync.answerConflict('adopt')).applied, true);
+  assert.equal(h.sync.state().conflict, null);
+});
+
+test('Dev Hub: turning it off at a sharing computer PUTs offline:false only over a published value; after a 404, nothing', async () => {
+  const h = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  assert.deepEqual(await h.sync.publish({ offline: false }), { ok: true, sent: false });
+  assert.equal(h.server.gets, 1, 'asked first');
+  assert.equal(h.server.puts.length, 0, 'nothing published: nothing sent, so the switch is not published again');
+  h.publishRemote(plain());
+  assert.equal((await h.sync.publish({ offline: false })).sent, true);
+  assert.equal(h.server.puts.length, 1);
 });
