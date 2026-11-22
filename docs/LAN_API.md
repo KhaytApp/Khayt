@@ -1059,6 +1059,9 @@ A phone paired with this Mac carries a **role**: owner, manager, operator or vie
 - A phone paired with the owner PIN before roles existed has no role and is the **owner**, as it was.
 - A role holds whether the staff lock is on or off.
 - The owner PIN and API tokens are unchanged.
+- **Pricing through a job update is `quote:write`.** A write to `/api/orders` or `/api/orders/<id>` that carries a `price`, creates a job as a quote, or sends a `status` for a job that is a quote now (which accepts it) needs `quote:write`, whatever the route's own scope. An operator moves jobs; it does not price them.
+- **The role answers are signed back.** `GET /api/devices/self` and every `role-scope` 403 carry `x-khayt-reply-mac` (the connector's: `HMAC(key, "khayt-reply-v1\n" + request nonce + "\n" + status + "\n" + sha256hex(body))`, base64), and only when the request's own signature passed. A phone should act on a role answer only when the MAC checks out. Other routes' answers are not signed yet.
+- **A phone paired with the owner PIN is always the owner.** It holds the PIN, so it could send the PIN instead of its key; it cannot be given a lesser role. Remove it and pair it again by code.
 
 | Role | Scopes |
 |---|---|
@@ -1078,9 +1081,10 @@ The slicer plugin's commit-then-reveal flow (`POST /api/connectors/pair`) with t
 - `POST /api/devices/pair` with `{v:2, commit, name, app, version}` → `{pairId, pollSecret, deviceId, publicKey, sig, identity}`. Only while a person has opened **Pair a phone** (120 s, 3 offers). 404 while the Mac has pairing by code off.
 - `POST /api/devices/pair/<pairId>/reveal` with `{publicKey, nonce}` and `x-khayt-poll` → `{"state":"waiting"}`. A mismatch expires the offer; no number is ever shown for it.
 - `GET /api/devices/pair/<pairId>` with `x-khayt-poll` → `{"state":"waiting"|"approved"|"denied"|"expired"}`.
+- Shared vectors: `docs/phone-pair.vectors.json` (the commitment, the signed offer, the check number, the derived key, and the reveals each side must refuse).
 - A person at the Mac compares the number, picks a role (Operator by default; only the owner may give Owner, a manager up to Manager) and approves. The device is enrolled with that role.
 
-**Signing out.** A phone paired by code holds no tag of the PIN: a PIN change does not sign it out. **Remove** does (`device-revoked`). A phone paired with the owner PIN is still signed out by a PIN change.
+**Signing out.** A phone paired by code holds no tag of the PIN: a PIN change does not sign it out. The server still needs a LAN PIN of at least 8 characters to answer anyone: with the PIN cleared or too short, a phone paired by code is refused like everyone else until one is set. **Remove** does (`device-revoked`). A phone paired with the owner PIN is still signed out by a PIN change.
 
 ### `GET /api/machines/live`
 

@@ -456,6 +456,83 @@ struct PhoneRolesTests {
         #expect(await shop.approvePhone(role: "viewer", pairId: again.pairId, check: again.check) == .nothingToApprove)
     }
 
+    // MARK: - The shared phone-pairing vectors (docs/phone-pair.vectors.json)
+
+    static func pairVectors() throws -> [String: JSONValue] {
+        obj(try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: root.appending(path: "docs/phone-pair.vectors.json"))))
+    }
+    static func text(_ c: [String: JSONValue], _ key: String) -> String {
+        if case .string(let s)? = c[key] { return s }
+        return ""
+    }
+
+    @Test("the phone's prefixes are the vectors' own, spelled out here")
+    func prefixes() throws {
+        let p = Self.obj(try Self.pairVectors()["prefixes"])
+        #expect(p["commit"] == .string("khayt-phone-commit-v1"))
+        #expect(p["offer"] == .string("khayt-enrol-phone-v1"))
+        #expect(p["check"] == .string("khayt-phone-check-v1"))
+        #expect(LanConnectorPairing.Flavor.phone.commit == "khayt-phone-commit-v1")
+        #expect(LanConnectorPairing.Flavor.phone.offer == "khayt-enrol-phone-v1")
+        #expect(LanConnectorPairing.Flavor.phone.check == "khayt-phone-check-v1")
+    }
+
+    @Test("commitment, signed offer, check number and derived key match the shared phone vectors, and the window reaches the same number")
+    func phonePairVectors() throws {
+        guard case .array(let cases)? = try Self.pairVectors()["cases"] else { Issue.record("no cases"); return }
+        #expect(cases.count >= 9)
+        let hex = LanConnectorPairingTests.hex
+        for value in cases {
+            let c = Self.obj(value)
+            let name = Comment(rawValue: Self.text(c, "name"))
+            let identity = try Curve25519.Signing.PrivateKey(rawRepresentation: hex(Self.text(c, "identitySeedHex")))
+            let server = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: hex(Self.text(c, "serverPrivateHex")))
+            let phone = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: hex(Self.text(c, "pluginPrivateHex")))
+            let phonePublic = Self.text(c, "pluginPublic"), nonce = Self.text(c, "nonce")
+            let deviceId = Self.text(c, "deviceId"), serverPublic = Self.text(c, "serverPublic")
+            #expect(identity.publicKey.rawRepresentation.base64EncodedString() == Self.text(c, "identityPublic"), name)
+            #expect(server.publicKey.rawRepresentation.base64EncodedString() == serverPublic, name)
+            #expect(phone.publicKey.rawRepresentation.base64EncodedString() == phonePublic, name)
+            let commit = LanConnectorPairing.commitment(pluginPublic: phonePublic, nonce: nonce, flavor: .phone).base64EncodedString()
+            #expect(commit == Self.text(c, "commit"), name)
+            let message = LanConnectorPairing.offerMessage(deviceId: deviceId, serverPublic: serverPublic, commitment: commit, flavor: .phone)
+            #expect(String(decoding: message, as: UTF8.self) == Self.text(c, "offerMessage"), name)
+            #expect(identity.publicKey.isValidSignature(try #require(Data(base64Encoded: Self.text(c, "sig"))), for: message), name)
+            #expect(LanConnectorPairing.check(deviceId: deviceId, identityPublic: Self.text(c, "identityPublic"), serverPublic: serverPublic,
+                                              pluginPublic: phonePublic, nonce: nonce, flavor: .phone) == Self.text(c, "check"), name)
+            // The key both sides keep.
+            let derived = try #require(LanDevices.derive(server, phone.publicKey, deviceId: deviceId))
+            #expect(derived.base64EncodedString() == Self.text(c, "derivedKey"), name)
+            // The same case through the Mac's own window, with the vector's keys.
+            let window = LanConnectorPairing(enabled: true, flavor: .phone)
+            window.open()
+            let offer = try window.request(commitment: commit, name: "Phone", app: "Khayt iPhone", version: "1", address: "192.168.1.9",
+                                           identity: identity, freshKey: { server }, deviceId: deviceId, pollSecret: "poll")
+            #expect(offer.publicKey == serverPublic, name)
+            #expect(identity.publicKey.isValidSignature(try #require(Data(base64Encoded: offer.sig)), for: message), name)
+            #expect(window.reveal(pairId: offer.pairId, secret: "poll", publicKey: phonePublic, nonce: nonce) == .accepted, name)
+            #expect(window.pending?.check == Self.text(c, "check"), name)
+        }
+    }
+
+    @Test("the vectors' three reveals the Mac must refuse: a short nonce, a key that was not committed, an all-zero key")
+    func refusedReveals() throws {
+        guard case .array(let all)? = try Self.pairVectors()["refuse"] else { Issue.record("no refusals"); return }
+        let mine = all.map(Self.obj).filter { $0["refusedBy"] == .string("mac") }
+        #expect(Set(mine.map { Self.text($0, "name") }) == ["short-nonce", "reveal-mismatch", "all-zero-phone-key"])
+        for c in mine {
+            let name = Comment(rawValue: Self.text(c, "name"))
+            let window = LanConnectorPairing(enabled: true, flavor: .phone)
+            window.open()
+            let offer = try window.request(commitment: Self.text(c, "commit"), name: "Phone", app: "Khayt iPhone", version: "1",
+                                           address: "192.168.1.9", identity: .init(), pollSecret: "poll")
+            #expect(window.reveal(pairId: offer.pairId, secret: "poll", publicKey: Self.text(c, "revealPublic"),
+                                  nonce: Self.text(c, "revealNonce")) == .refused, name)
+            #expect(window.pending == nil, name)
+            #expect(window.poll(pairId: offer.pairId, secret: "poll") == .expired, name)
+        }
+    }
+
     // MARK: - Who may give which role
 
     @Test("the owner gives any role, a manager up to manager, anyone else none; the lock off is the owner (D-P3)")
