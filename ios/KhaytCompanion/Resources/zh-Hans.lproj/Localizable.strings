@@ -53,7 +53,7 @@
 "settings.retest" = "重新测试配对";
 "settings.unpair" = "退出登录";
 "settings.unpair.footer" = "将从此 iPhone 删除店铺账本、PIN 及连接器密钥。此 iPhone 也会退出 Khayt Cloud。";
-"settings.unpair.title" = "要退出此店铺吗？";
+"settings.unpair.title" = "要从此店铺退出登录吗？";
 "settings.language" = "语言";
 "settings.notifications" = "通知";
 "settings.notify.queue" = "队列变化";
