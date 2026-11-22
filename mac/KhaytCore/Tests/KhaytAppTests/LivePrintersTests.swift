@@ -5,6 +5,7 @@ import Testing
 
 /// Publishing the printers to Khayt Cloud (`PUT /live/printers`), as its
 /// contract (`docs/api-contract.md`, "Live channel & live printers") says.
+@MainActor
 struct LivePrintersTests {
     static let dek = Data(repeating: 7, count: 32)
     static func row(_ id: String, progress: Double = 42, at: String = "2026-09-25T10:15:02.000Z",
@@ -117,7 +118,6 @@ struct LivePrintersTests {
     }
 
     @Test("the publisher: PUT once, quiet while nothing changes, silent when no printer answers, stops for good on a 403")
-    @MainActor
     func publisher() async {
         let e = Self.engine
         let p = LivePrinterPublisher()
