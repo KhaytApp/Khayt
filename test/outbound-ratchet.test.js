@@ -14,6 +14,7 @@
  *                                   | gate (lib/main/outbound-fetch.js's own wrapper)
  *                                   | injected (a client whose fetch main hands in, gated)
  *                                   | ipc (a window call whose main-side handler asks the gate)
+ *                                   | caller-gated (a module whose host main resolves onto the LAN first)
  * Everything else counts against the file's baseline
  * (test/fixtures/outbound-ratchet-baseline.json). A new untagged call fails;
  * one that is gated or tagged must come off the baseline, so the list only
@@ -39,11 +40,11 @@ const SERVED_FILES = {
   'lib/medusa-subscriber.js': 'not-run — code the shop pastes into its own Medusa server; Khayt only shows it',
 };
 
-const EXEMPT_KINDS = ['browser', 'inbound-server', 'served-page', 'not-run', 'local-file', 'gate', 'injected', 'ipc'];
+const EXEMPT_KINDS = ['browser', 'inbound-server', 'served-page', 'not-run', 'local-file', 'gate', 'injected', 'ipc', 'caller-gated'];
 
 const PRIMITIVES = [
   /(?<![\w.$])fetch\s*\(/, /globalThis\.fetch\b/, /\|\|\s*(?:globalThis\.)?fetch\b/,
-  /require\(\s*['"](?:https?|net|tls|dgram)['"]\s*\)/,
+  /require\(\s*['"](?:node:)?(?:https?|http2|net|tls|dgram|undici)['"]\s*\)/,
   /\bnet\.request\(/, /\bsession\.[a-zA-Z]+\.fetch\b/,
   /require\(\s*['"]electron-updater['"]\s*\)/, /\.checkForUpdates\(/, /\.downloadUpdate\(/,
   /require\(\s*['"]localtunnel['"]\s*\)/, /require\(\s*['"]@sentry\/electron[^'"]*['"]\s*\)/,
@@ -114,7 +115,9 @@ function scan(rel) {
       `outboundRefusal('${tag.purpose}'`, `ask('${tag.purpose}'`].some((n) => body.includes(n))
       || (body.includes('OutboundHook.ask(') && body.includes(`'${tag.purpose}'`))
       || (tag.purpose === 'updates' && body.includes('updatesAllowed()'))
-      || tag.purpose === 'lan';   // TODO(PR 4): require the lan address gate here
+      // `lan` must be backed by the file actually keeping it on the shop's
+      // network (review of #2629): a lan label alone proves nothing.
+      || (tag.purpose === 'lan' && /resolvePrinterTarget|isAllowedPrinterHost|urlHost|gateLan\(|gateFor\(|spoolmanBase\(/.test(body));
     if (!asks) bad.push(`${rel}:${i + 1} tagged ${tag.purpose} but the file never asks the gate for it`);
   }
   return { untagged, bad };

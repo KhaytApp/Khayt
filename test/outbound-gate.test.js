@@ -42,9 +42,9 @@ test('opted-out is not a block: telemetryConsent asks often, and most shops neve
 });
 
 test('this computer can be stricter, and the install count keeps its own switch (D3)', () => {
-  const { g, setCountOff } = gate();
+  const { g, setCountOff, tick } = gate();
   assert.equal(g.check('install-count').allowed, true);
-  setCountOff(true);
+  setCountOff(true); tick();   // read at most once a second
   assert.equal(g.check('install-count').reason, 'opted-out');
   g.setLocal({ offline: true });
   assert.equal(g.check('webhooks').reason, 'offline-here');
@@ -182,11 +182,16 @@ test('PR 4: gateFor — a purpose, or lan for the shop\'s own network, resolved 
   // A self-hosted ntfy on the LAN, by name: resolved, every answer on the LAN.
   assert.equal((await g.gateFor('messaging', 'http://ntfy.lan/topic')).allowed, true);
   answers = [{ address: '192.168.1.9' }, { address: '93.184.216.34' }];
-  await assert.rejects(g.gateFor('messaging', 'http://ntfy.lan/topic'), (e) => isBlocked(e) && e.reason === 'lan-host-public', 'one public answer is enough to refuse');
+  await assert.rejects(g.gateFor('messaging', 'http://ntfy.lan/topic'), (e) => isBlocked(e) && e.purpose === 'messaging' && e.reason === 'offline', 'one public answer: not the shop\'s network, so judged as messaging');
+  assert.equal(g.blocked().lan.reason, 'lan-host-public', 'and the lan refusal is counted');
   answers = [];
   await assert.rejects(g.gateFor('messaging', 'http://octopi/'), (e) => isBlocked(e), 'no answer: refused');
   // An IP literal on the LAN needs no lookup.
   assert.equal((await g.gateFor('webhooks', 'http://10.0.0.7:8080/hook')).allowed, true);
+  // Kept messaging still goes when the name leads outside (review of #2629).
+  settings = { network: { offline: true, keep: ['messaging'] } };
+  answers = [{ address: '93.184.216.34' }];
+  assert.equal((await g.gateFor('messaging', 'http://ntfy.lan/topic')).reason, 'kept');
   // Online: no lookup at all, today's behaviour.
   settings = {};
   answers = [{ address: '8.8.8.8' }];
@@ -234,4 +239,26 @@ test('PR 4 wiring: every library call asks lib/outbound-hook.js; main sets it an
     const S = require('../lib/custom-smtp.js');
     assert.deepEqual((await S.sendCustomSmtp({ host: 'smtp.example.com', from: 'a@b.c', to: 'd@e.f', subject: 's', html: 'h' })).blocked, { purpose: 'messaging', reason: 'offline' });
   } finally { H.setOutboundGate(null); }
+});
+
+test('review of #2629: hosts noted while online let nothing through once the switch is on; kept calls gated without a URL are noted', () => {
+  let settings = {};
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => ({}) });
+  g.noteHost('https://cloud.khaytapp.com/v1/active');   // online: not noted
+  settings = { network: { offline: true, keep: ['install-count'] } };
+  g.check('updates');                                   // the switch goes on: the list is cleared
+  assert.equal(g.beltAllows('https://cloud.khaytapp.com/v1/active'), false);
+  g.noteHost('https://cloud.khaytapp.com/v1/active');   // a kept count, gated without its URL
+  assert.equal(g.beltAllows('https://cloud.khaytapp.com/v1/active'), true);
+  // The book not read yet: the belt reads the switch as it was at start.
+  const g2 = createOutboundGate({ getSettings: () => null, readLocal: () => ({}), startupOffline: true });
+  assert.equal(g2.beltAllows('https://example.com/'), false);
+  const g3 = createOutboundGate({ getSettings: () => null, readLocal: () => ({}), startupOffline: false });
+  assert.equal(g3.beltAllows('https://example.com/'), true);
+});
+
+test('review of #2629: an unreadable book holds back only the automatic calls home', () => {
+  const g = createOutboundGate({ getSettings: () => null, readLocal: () => ({}), bookUnreadable: () => true });
+  for (const p of ['cloud', 'messaging', 'storage', 'ai', 'payments']) assert.equal(g.check(p).allowed, true, p);
+  for (const p of ['updates', 'install-count', 'crash-reports', 'usage-stats']) assert.equal(g.check(p).reason, 'settings-unknown', p);
 });

@@ -255,7 +255,10 @@ const outboundGate = require('./lib/main/outbound-fetch.js').createOutboundGate(
   // The switch turned on (the shop's or this computer's): the crash and usage
   // queue saved BEFORE it is purged, so it cannot leave the day the switch is
   // turned off again (D5; security review of #2627).
-  onOffline: () => { try { fs.unlinkSync(TELEMETRY_QUEUE_FILE()); } catch (_) { /* none */ } },
+  onOffline: () => {
+    try { fs.unlinkSync(TELEMETRY_QUEUE_FILE()); } catch (_) { /* none */ }
+    noSpellcheckDownloads();
+  },
   readLocal: () => { try { return JSON.parse(fs.readFileSync(NETWORK_LOCAL_FILE(), 'utf8')); } catch (_) { return {}; } },
   writeLocal: (v) => {
     const f = NETWORK_LOCAL_FILE();
@@ -264,6 +267,8 @@ const outboundGate = require('./lib/main/outbound-fetch.js').createOutboundGate(
   },
   readInstallCountOff: () => readActiveCount().off === true,
   lookup: (host) => require('dns').promises.lookup(host, { all: true, verbatim: true }),
+  // What the switch read as the app started, for the belt until the book loads.
+  startupOffline: (() => { try { return require('./lib/main/outbound-fetch.js').offlineAtStartup(fs, path.join(app.getPath('userData'), 'khayt-store.json'), path.join(app.getPath('userData'), 'network-local.json')); } catch (_) { return true; } })(),
 });
 // THE RUNTIME BELT (design §2.2): what the source test missed fails loudly
 // here instead of leaking. While this computer is offline, a global fetch to
@@ -282,12 +287,33 @@ const outboundGate = require('./lib/main/outbound-fetch.js').createOutboundGate(
         console.warn('[outbound] refused an unrouted request while offline:', (() => { try { return new URL(String(input && input.url ? input.url : input)).hostname; } catch (_) { return '?'; } })());
         return Promise.reject(new OB('unrouted', 'offline'));
       }
+      // A call to the shop's own network while offline follows no redirect:
+      // a NAS or a self-hosted service answering 307 to a public host would
+      // otherwise carry the request out (review of #2629).
+      try {
+        if (outboundGate.beltOffline()) {
+          const h = new URL(String(input && input.url ? input.url : input)).hostname;
+          if (require('./lib/outbound.js').isLanHost(h)) init = Object.assign({}, init || {}, { redirect: 'manual' });
+        }
+      } catch (_) { /* a relative URL: not the internet */ }
       return rawGlobalFetch.call(this, input, init);
     };
   }
 }
 // Every library module's internet call asks the same gate (lib/outbound-hook.js).
 require('./lib/outbound-hook.js').setOutboundGate((purpose, url) => outboundGate.gateFor(purpose, url));
+/* Chromium downloads spellcheck dictionaries from Google on Windows and Linux
+ * (review of #2629): while offline it is pointed at an address that answers
+ * nothing. Back online, the next start uses the default again. */
+function noSpellcheckDownloads() {
+  try {
+    const { session } = require('electron');
+    // outbound-exempt: local-file — points Chromium's dictionary download at nothing while offline
+    if (app.isReady() && session && session.defaultSession) session.defaultSession.setSpellCheckerDictionaryDownloadURL('http://127.0.0.1:9/');
+  } catch (_) { /* not ready, or no spellcheck: nothing downloads either way */ }
+}
+app.whenReady().then(() => { if (outboundGate.beltOffline()) noSpellcheckDownloads(); }).catch(() => {});
+
 /** A person-started call the switch refuses: the reply the window turns into words (P8 PR 5). */
 async function outboundRefusal(purpose, url) {
   try { await outboundGate.gateFor(purpose, url); return null; } catch (e) {
@@ -2338,7 +2364,7 @@ async function flushTelemetry() {
       writeQueue: (q) => fs.writeFileSync(TELEMETRY_QUEUE_FILE(), JSON.stringify(q), 'utf8'),
       consent: telemetryConsent(),
       // outbound: usage-stats (and crash-reports: telemetryConsent checks both)
-      fetchImpl: (...a) => fetch(...a),
+      fetchImpl: (...a) => { outboundGate.noteHost(a[0]); return fetch(...a); },
       appVersion: app.getVersion(),
       backoffMs: telemetryBackoffMs,
       nextAttemptAt: telemetryNextAttempt,
@@ -2405,6 +2431,7 @@ async function sendActiveCount() {
     // Node's fetch, not Chromium's: no cookie jar and no OS locale. The two
     // headers it does add are pinned to the Mac's fixed values, so every app's
     // count looks the same and says nothing about the machine.
+    outboundGate.noteHost(ACTIVE_COUNT_E2E || ActiveCount.ENDPOINT);   // a kept count passes the belt
     // outbound: install-count
     const res = await fetch(ACTIVE_COUNT_E2E || ActiveCount.ENDPOINT, {
       method: 'POST',
@@ -3291,6 +3318,7 @@ const GDRIVE_AUTH_TIMEOUT_MS = 600000;
  */
 function gdriveAuthorize(cfg) {
   return new Promise((resolve) => {
+    // outbound-exempt: inbound-server — the Drive sign-in's one-shot loopback listener
     const http = require('node:http');
     const { verifier, challenge } = GD.pkcePair();
     // Binds the redirect to THIS attempt. Without it the loopback server would
