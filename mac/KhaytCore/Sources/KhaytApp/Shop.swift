@@ -1645,6 +1645,7 @@ final class Shop {
         WidgetFeed.shared.update(shop: self)
         guard let engine, !machineRows.isEmpty else { return }
         let fleet = Self.fleetForDashboard(machineRows, cache: printers.statusCache)
+        machineChips = (try? await engine.machineChips(machines: fleet.machines, cache: fleet.cache)) ?? [:]
         facts = try? await engine.dashboardFacts(orders: orderRows, machines: fleet.machines,
                                                  settings: kpiSettings.isEmpty ? settingsDict : kpiSettings,
                                                  statusCache: fleet.cache,
@@ -2017,6 +2018,9 @@ final class Shop {
     var connectorPricesOn = LanConnectorPairing.pricesOn
     /// Where the switch is kept. A test hands in its own.
     var connectorPricesDefaults: UserDefaults = .standard
+    /// Each polled printer's state chip (`KhaytEngine.machineChips`), as of
+    /// the last sweep. Empty until the first one: no chip is drawn before then.
+    var machineChips: [String: KhaytEngine.MachineChip] = [:]
     /// A test's own device store; the app uses the Keychain's (`.shared`).
     var lanDevicesForTests: LanDevices?
     /// Hands a linked file the app fetched back to its cloud drive, so its

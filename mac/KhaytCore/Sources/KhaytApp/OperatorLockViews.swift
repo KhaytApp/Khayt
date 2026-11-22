@@ -162,6 +162,7 @@ struct LockSection: View {
     @State private var pinFor: ShopOperator?
     @State private var turningOff = false
     @State private var shown: ShownCode?
+    @State private var showingRoles = false
 
     struct ShownCode: Identifiable { let code: String; var id: String { code } }
 
@@ -190,6 +191,7 @@ struct LockSection: View {
                 }
             }
             .disabled(!canChange)
+            Button(words.callIt("mac.roles_open") + "\u{2026}") { showingRoles = true }
             if !shop.operators.isEmpty {
                 Divider()
                 ForEach(shop.operators) { op in
@@ -215,6 +217,7 @@ struct LockSection: View {
         }
         .shopSheet(item: $pinFor) { op in SetPinSheet(shop: shop, person: op) }
         .shopSheet(isPresented: $turningOff) { LockOffSheet(shop: shop) }
+        .shopSheet(isPresented: $showingRoles) { PrinterRolesSheet(shop: shop) }
         .shopSheet(item: $shown) { s in RecoveryCodeSheet(shop: shop, code: s.code) }
     }
 

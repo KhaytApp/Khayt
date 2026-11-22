@@ -935,6 +935,13 @@ final class Activator: NSObject, NSApplicationDelegate {
             // memory (`SnapshotBeta13.swift`).
             // Only the Connected apps section (Figma page 16), on the sample,
             // in memory (`SnapshotConnectedApps.swift`).
+            // Only printer batch 1 (Figma page 23), on the sample, in memory
+            // (`SnapshotBatch1.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_BATCH1"] == "1", let shop = subject {
+                await captureBatch1(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_APPS"] == "1", let shop = subject {
                 await captureConnectedApps(shop, into: dir, dark: dark)
                 NSApp.terminate(nil)

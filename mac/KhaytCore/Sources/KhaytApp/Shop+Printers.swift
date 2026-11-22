@@ -120,7 +120,7 @@ extension Shop {
     /// offered. `lib/printer-relocate.js` draws that line and this does not
     /// redraw it.
     func applyRelocation(_ move: KhaytEngine.Relocation) async {
-        guard permitted("orders", "edit") else { return }
+        guard permittedPrinter("connection") else { return }
         relocateProblem = nil
         guard let engine, let build = source.build else {
             relocateProblem = words.callIt("mac.move_sample"); return
@@ -262,11 +262,12 @@ extension Shop {
     }
 
     func tell(_ machine: Machine, _ verb: PrinterControl.Verb) async {
-        // A printer is told what to do by somebody running the floor —
-        // `orders`/`edit` in lib/rbac.js, which an operator has and a viewer
-        // does not (alpha.62 re-check: pause, cancel, send, drop and power
-        // asked nothing).
-        guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
+        // A printer is told what to do by somebody running the floor: the
+        // `control` verb of the printers area in lib/rbac.js (P5), which an
+        // operator has and a viewer does not, unless the shop tightened it
+        // (alpha.62 re-check: pause, cancel, send, drop and power asked
+        // nothing; they asked "edit orders" until printers had their own area).
+        guard permittedPrinter("control") else { printerProblem[machine.id] = moveProblem; return }
         guard let engine else { return }
         printerProblem[machine.id] = nil
         printerBusy.insert(machine.id)
@@ -286,7 +287,7 @@ extension Shop {
     /// Speed preset or chamber light on a Bambu (S11 follow-on). Same gate
     /// as `tell`; the speed is confirmed by the card first while printing.
     func control(_ machine: Machine, _ control: PrinterControl.Control) async {
-        guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
+        guard permittedPrinter("control") else { printerProblem[machine.id] = moveProblem; return }
         guard let engine else { return }
         printerProblem[machine.id] = nil
         printerBusy.insert(machine.id)
@@ -371,7 +372,7 @@ extension Shop {
             }
             return
         }
-        guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
+        guard permittedPrinter("send") else { printerProblem[machine.id] = moveProblem; return }
         sendNote = nil
         printerProblem[machine.id] = nil
         printerBusy.insert(machine.id)
@@ -470,7 +471,7 @@ extension Shop {
     /// Drop one object from a running print. NOT UNDOABLE — the caller has
     /// already asked; see `lib/exclude-object.js`.
     func drop(_ object: String, on machine: Machine) async {
-        guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
+        guard permittedPrinter("control") else { printerProblem[machine.id] = moveProblem; return }
         guard let engine else { return }
         printerProblem[machine.id] = nil
         printerBusy.insert(machine.id)
@@ -657,7 +658,7 @@ extension Shop {
     /// Switch a machine's plug. Off goes through the shared rule, every time:
     /// power is never cut while the printer is printing, paused, silent or hot.
     func switchPlug(_ machine: Machine, on: Bool) async {
-        guard permitted("orders", "edit") else { plugProblem[machine.id] = moveProblem; return }
+        guard permittedPrinter("control") else { plugProblem[machine.id] = moveProblem; return }
         await performPlugSwitch(machine, on: on)
     }
 
@@ -921,6 +922,28 @@ extension Shop {
                               refused: nil)
     }
 
+    /// The parts of a machine the printers area calls its connection (P5):
+    /// address, transport and access code (`printerApi`), camera and plug.
+    nonisolated static let connectionKeys = ["printerApi", "webcam", "smartPlug"]
+
+    /// Whether a save changes the connection: a connection key differs from
+    /// how the sheet opened. A NEW machine counts only when one was typed (an
+    /// address, a camera switched on, a plug chosen), so adding a printer by
+    /// its name and rates is still the inventory's.
+    nonisolated static func connectionChanged(_ input: [String: JSONValue], opened: [String: JSONValue]?) -> Bool {
+        if let opened {
+            return connectionKeys.contains { key in input[key] != nil && input[key] != opened[key] }
+        }
+        func text(_ key: String, _ field: String) -> String {
+            if case .object(let o)? = input[key], case .string(let s)? = o[field] { return s }
+            return ""
+        }
+        if !text("printerApi", "host").isEmpty { return true }
+        if case .object(let cam)? = input["webcam"], cam["enabled"] == .bool(true) { return true }
+        let plug = text("smartPlug", "type")
+        return !plug.isEmpty && plug != "none"
+    }
+
     /// `opened` is the sheet's `MachineSheet.Form.input()` for the machine as
     /// it opened — nil for a new one.
     ///
@@ -931,6 +954,10 @@ extension Shop {
     func saveMachine(_ input: [String: JSONValue], id: Machine.ID?, catalogId: String?,
                      opened: [String: JSONValue]?) async -> Bool {
         guard permitted("inventory", "edit") else { return false }
+        // The connection is the printers area's (P5): a role the shop took
+        // "Edit the connection" from can still edit a machine's name, rates
+        // and nozzle, and saves only when the connection is as it opened.
+        if Self.connectionChanged(input, opened: opened), !permittedPrinter("connection") { return false }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {

@@ -52,7 +52,7 @@ extension Shop {
             }
             return
         }
-        guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
+        guard permittedPrinter("send") else { printerProblem[machine.id] = moveProblem; return }
         guard let type = machine.printerApi?.type, !type.isEmpty else { return }
         // Can this printer run what the slicer will write?
         let stem = model.deletingPathExtension().lastPathComponent

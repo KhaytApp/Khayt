@@ -410,6 +410,13 @@ struct MachineCard: View {
                             .labelStyle(.titleAndIcon).lineLimit(1)
                     }
                 }
+                // What the printer is doing, in one chip (C2): the shared
+                // rule's seven states. Only for a machine in service that
+                // Khayt polls; under service or retired is said just below.
+                if machine.inService, let chip = shop.machineChips[machine.id] {
+                    Spacer(minLength: 8)
+                    MachineStateChip(chip: chip, words: shop.words)
+                }
             }
             // Under service or retired, said in words with its reason and
             // date — never colour alone.
@@ -1910,7 +1917,7 @@ private struct Live: View {
                 }
             }
             .buttonStyle(.bordered).controlSize(.small)
-            .disabled(!shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
+            .disabled(!shop.canMoveJobs || !shop.printerAllows("control"))
             if let problem = shop.plugProblem[machine.id] {
                 Text(problem).font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2011,7 +2018,7 @@ private struct Live: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .disabled(busy || !shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
+                .disabled(busy || !shop.canMoveJobs || !shop.printerAllows("control"))
             } else if known != nil {
                 // Said, not left blank: a card with no buttons under a running
                 // print reads as a missing feature somebody forgot to draw.

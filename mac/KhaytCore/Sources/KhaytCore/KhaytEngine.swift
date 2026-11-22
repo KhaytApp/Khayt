@@ -959,6 +959,15 @@ public actor KhaytEngine {
         // `public-quote`, whose `materialBasis` it calls.
         "quote-sheet",
         "gcode-parse",
+        // What to tell a shop before a file goes to a printer (C8): reads
+        // gcode-parse, print-fit, printer-upload, loaded-colours and
+        // color-mix at call time, so it only has to come after them.
+        // Where a sliced file's models sit on the bed (`file.bounds` for the
+        // bed rows of send-checks). gcode-geometry first: the reader falls
+        // back to it for a file with no object list.
+        "gcode-geometry",
+        "gcode-placed-extents",
+        "send-checks",
         // Which customers are worth keeping.
         // Whether the shop can take another job, and when it would start.
         // How many quotes turn into work, and how much of the money does.
@@ -4702,6 +4711,26 @@ public actor KhaytEngine {
         public let areas: [String]
         public let actions: [String]
         public let matrix: [String: [String: [String: Bool]]]
+        /// `KhaytRbac.PRINTER_VERBS`: what a person does to a printer (send,
+        /// control, connection, unlink) → the `printers` action it needs.
+        /// Empty when decoded from data that predates it: every verb refused.
+        public let printerVerbs: [String: String]
+
+        public init(roles: [String], areas: [String], actions: [String],
+                    matrix: [String: [String: [String: Bool]]], printerVerbs: [String: String] = [:]) {
+            self.roles = roles; self.areas = areas; self.actions = actions
+            self.matrix = matrix; self.printerVerbs = printerVerbs
+        }
+
+        private enum CodingKeys: String, CodingKey { case roles, areas, actions, matrix, printerVerbs }
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            roles = try c.decode([String].self, forKey: .roles)
+            areas = try c.decode([String].self, forKey: .areas)
+            actions = try c.decode([String].self, forKey: .actions)
+            matrix = try c.decode([String: [String: [String: Bool]]].self, forKey: .matrix)
+            printerVerbs = try c.decodeIfPresent([String: String].self, forKey: .printerVerbs) ?? [:]
+        }
 
         /// `KhaytRbac.can`: lock off means everything; an unknown role is the
         /// least privileged; an unknown area or action is refused.
@@ -4711,11 +4740,30 @@ public actor KhaytEngine {
             let r = matrix[key] != nil ? key : (roles.last ?? "viewer")
             return matrix[r]?[area.lowercased()]?[action.lowercased()] == true
         }
+
+        /// `KhaytRbac.canPrinter` (P5): may `role` do `verb` to a printer?
+        /// The matrix's `printers` area, then the shop's own tightening
+        /// (`settings.roleLimits`: `{ role: { printers: { verb: false } } }`).
+        /// A limit only takes a right away, and never from the owner. The
+        /// lookup is held to the module over every role, verb and limit by
+        /// `PrinterRolesTests`.
+        public func canPrinter(role: String, verb: String, lockEnabled: Bool, limits: JSONValue? = nil) -> Bool {
+            if !lockEnabled { return true }
+            guard let action = printerVerbs[verb] else { return false }
+            let key = role.lowercased()
+            let r = matrix[key] != nil ? key : (roles.last ?? "viewer")
+            guard can(role: r, area: "printers", action: action, lockEnabled: true) else { return false }
+            if r == "owner" { return true }
+            guard case .object(let all)? = limits, case .object(let mine)? = all[r],
+                  case .object(let row)? = mine["printers"] else { return true }
+            return row[verb] != .bool(false)
+        }
     }
 
     public func rbac() throws -> Rbac {
         try runtime.call2("""
-            ({ roles: KhaytRbac.ROLES, areas: KhaytRbac.AREAS, actions: KhaytRbac.ACTIONS, matrix: KhaytRbac.MATRIX })
+            ({ roles: KhaytRbac.ROLES, areas: KhaytRbac.AREAS, actions: KhaytRbac.ACTIONS, matrix: KhaytRbac.MATRIX,
+               printerVerbs: KhaytRbac.PRINTER_VERBS })
             """, [], as: Rbac.self)
     }
 
@@ -4723,6 +4771,12 @@ public actor KhaytEngine {
     public func rbacCan(role: String, area: String, action: String, lockEnabled: Bool) throws -> Bool {
         try runtime.call2("KhaytRbac.can(ARG0, ARG1, ARG2, { lockEnabled: ARG3 })",
                           [.string(role), .string(area), .string(action), .bool(lockEnabled)], as: Bool.self)
+    }
+
+    /// `KhaytRbac.canPrinter`, asked of the module itself — for the parity test.
+    public func rbacCanPrinter(role: String, verb: String, lockEnabled: Bool, limits: JSONValue?) throws -> Bool {
+        try runtime.call2("KhaytRbac.canPrinter(ARG0, ARG1, { lockEnabled: ARG2, limits: ARG3 })",
+                          [.string(role), .string(verb), .bool(lockEnabled), limits ?? .null], as: Bool.self)
     }
 
     /// A legacy free-text role ("Admin", "Technician") as a role key.
