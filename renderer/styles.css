@@ -6021,6 +6021,10 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .iu-label { font-size: 14px; font-weight: 600; line-height: 20px; }
 .iu-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.45; }
 .iu-owner-only { margin: 0; }
+/* Frame G: a question or a conflict from Khayt Cloud, above the switches. */
+.iu-g { padding: 15px 17px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.iu-g-title { font-size: 14px; font-weight: 600; line-height: 1.45; }
+.iu-g-btns { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .iu-switch { flex: none; width: 36px; height: 20px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-soft); position: relative; cursor: pointer; padding: 0; transition: background .15s; }
 .iu-switch .iu-knob { position: absolute; top: 2px; inset-inline-start: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface, #fff); box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: inset-inline-start .15s; }
 [dir="rtl"] .iu-back .iu-chev { display: inline-block; transform: scaleX(-1); }

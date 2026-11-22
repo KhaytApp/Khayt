@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Windows/Linux: the switch through Khayt Cloud is on screen (Settings ▸ General ▸ Internet use; the frames Turki signed off on Nov 22).**
+  - **"Also tell my other computers through Khayt Cloud"** sits between the shop's switch and "Also on this computer only". It is this computer's own choice, off by default, and only the shop's owner on Khayt Cloud can turn it on. It is greyed until Khayt Cloud is unlocked on this computer.
+  - **The switch's own line** says whether the other computers were told: through Khayt Cloud at the switch's time, stopping at their next check within 15 minutes; or not told, so turn it on there too.
+  - **Messages from Khayt Cloud**, above the switches, in the shop's words:
+    - the 7-day question ("Apply it here?");
+    - a newer change at another computer;
+    - a clock that may be behind.
+  - **A newer change elsewhere.** "Keep it on this computer only" is offered only when the person was turning the switch on here. It turns this computer's own switch on, and the shop takes the newer setting. After turning it off there is only "Use the newer setting": a computer may be stricter than the shop, never looser, and main refuses a "keep" in that case too.
+  - In 9 languages. Tests: `npm run test:e2e:netswitchcloud`, `test/network-switch.test.js`.
+
 - **Windows/Linux (not on screen yet): the "make no internet calls" switch reaches the shop's other computers through Khayt Cloud.** The book's settings never come down in a sync, so a switch turned on at one computer reached no other. Now, while Khayt Cloud is unlocked, this computer asks Khayt Cloud for the shop's switch when it unlocks and every 15 minutes (khayt-cloud #223).
   - **What it applies.** Only a value sealed with the shop's key, for this shop, stamped as the server says, and newer than anything this computer has seen (`lib/network-switch.js`). Anything else is ignored, and only the reason is logged.
   - **The 7-day rule.** A computer with no switch history of its own does not go offline by itself on a value more than 7 days old. It holds it until someone answers.

@@ -113,6 +113,8 @@ function harness(over = {}) {
   let may = over.mayChange !== false;
   const notes = [];
   const logs = [];
+  const local = { offline: false, sets: 0 };
+  let changes = 0;
   const client = {
     async getNetworkSwitch(url, shopId, token, opts) {
       server.gets += 1; server.lastGetPurpose = opts && opts.purpose;
@@ -140,10 +142,12 @@ function harness(over = {}) {
     readMine: () => JSON.parse(JSON.stringify(file)),
     writeMine: (v) => { file = JSON.parse(JSON.stringify(v)); },
     log: (m) => logs.push(m),
+    setLocalOffline: () => { local.offline = true; local.sets += 1; },
+    changed: () => { changes += 1; },
   });
   const publishRemote = (p) => { server.value = { changedAt: p.changedAt, receivedAt: 'x', ciphertext: sc.encryptStore(p, dek) }; };
   return { sync, server, dek, book: () => book, setBook: (n) => { book = { network: n }; }, mine: () => file.scopes[SCOPE] || {}, file: () => file,
-    notes, logs, publishRemote, lock: () => { sess = null; }, unlock: () => { sess = { url: 'https://cloud.example', shopId: SHOP, token: 't', role: 'owner', dek, scope: SCOPE }; }, deny: () => { may = false; } };
+    notes, logs, publishRemote, local, changes: () => changes, lock: () => { sess = null; }, unlock: () => { sess = { url: 'https://cloud.example', shopId: SHOP, token: 't', role: 'owner', dek, scope: SCOPE }; }, deny: () => { may = false; } };
 }
 const ON_NOW = { offline: true, keep: ['updates'], changedAt: '2026-11-22T10:00:00.000Z', changedBy: 'Sara' };
 
@@ -290,9 +294,52 @@ test('rule 3: a 409 is held for the person, never applied by the timer, never re
   k.server.putStatus = null;
   k.publishRemote(plain({ changedAt: '2026-11-22T10:05:00.000Z' }));
   await k.sync.pull();
-  assert.deepEqual(await k.sync.answerConflict('keep'), { ok: true, kept: true });
-  assert.equal((await k.sync.pull()).why, 'not-newer', 'kept here: the newer one is not applied');
+  // Turning it OFF here: nothing to keep on this computer only (stricter-only, frame G).
+  assert.deepEqual(await k.sync.answerConflict('keep'), { ok: false, why: 'looser' });
+  assert.ok(k.sync.state().conflict, 'the conflict stays open for "Use the newer setting"');
+  assert.equal(k.local.sets, 0);
   assert.equal(k.book().network.offline, false);
+});
+
+test('frame G: "Keep it on this computer only" after turning it ON keeps this computer offline and the shop takes the newer setting', async () => {
+  const h = harness({ mine: { share: true } });
+  h.server.putStatus = 409;
+  const on = Object.assign({}, ON_NOW, { changedAt: new Date(NOW).toISOString() });
+  h.setBook(on);
+  const r = await h.sync.publish({ offline: true, network: on });
+  assert.equal(r.why, 'stale');
+  assert.equal(h.sync.state().conflict.offline, true);
+  h.server.putStatus = null;
+  h.publishRemote(plain({ offline: false, changedAt: new Date(NOW + 3 * 60000).toISOString() }));
+  assert.equal((await h.sync.pull()).act, 'held');
+  const k = await h.sync.answerConflict('keep');
+  assert.equal(k.ok, true);
+  assert.equal(k.kept, true);
+  assert.equal(k.applied, true);
+  assert.equal(h.local.offline, true, 'this computer stays offline on its own switch');
+  assert.equal(h.book().network.offline, false, 'the shop follows the newer setting');
+  assert.equal(h.sync.state().conflict, null);
+  assert.equal((await harness().sync.answerConflict('keep')).why, 'none', 'no conflict, nothing to answer');
+});
+
+test('frame G: a second 409 in a row says the clock may be behind; a 200 clears it; the window is told', async () => {
+  const h = harness({ mine: { share: true }, network: { offline: false, changedAt: '2026-11-22T10:00:00.000Z' } });
+  h.server.putStatus = 409;
+  await h.sync.publish({ offline: false });
+  assert.equal(h.sync.state().clockBehind, false);
+  const c0 = h.changes();
+  assert.ok(c0 >= 1, 'the conflict appearing tells the window');
+  await h.sync.answerConflict('adopt');
+  h.setBook({ offline: false, changedAt: '2026-11-22T10:01:00.000Z' });
+  await h.sync.publish({ offline: false });
+  assert.equal(h.sync.state().clockBehind, true);
+  h.server.putStatus = null;
+  h.setBook({ offline: false, changedAt: '2026-11-22T10:02:00.000Z' });
+  await h.sync.answerConflict('adopt');
+  await h.sync.publish({ offline: false });
+  assert.equal(h.sync.state().clockBehind, false);
+  assert.equal(h.sync.state().owner, true);
+  assert.equal(harness({ role: 'manager' }).sync.state().owner, false);
 });
 
 test('per server and shop: another scope\'s stamps and held values never apply; the staff lock gates every answer', async () => {
