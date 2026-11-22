@@ -28,7 +28,7 @@ function rig(opts = {}) {
   const book = {
     settings: Object.assign({}, opts.settings || {}),
     operators: opts.operators || [],
-    machines: [{ id: 'M1', loaded: [{ slot: 2, hex: '#ff8800', material: 'PETG' }] }],
+    machines: [{ id: 'M1', printerApi: { type: 'moonraker', host: '192.168.1.50' }, loaded: [{ slot: 2, hex: '#ff8800', material: 'PETG' }] }],
     printLog: [Object.assign({ id: 'J1', machineId: 'M1', status: 'printing', parts: [{ fileRef: FILE }] }, opts.job || {})],
   };
   const reads = [];
@@ -50,7 +50,8 @@ function rig(opts = {}) {
       return next;
     },
     notify: (id, fields) => told.push({ id, fields }),
-    sleep: async () => {},
+    sleep: opts.sleep || (async () => {}),
+    stopped: opts.stopped,
   });
   return { book, h, reads, writes, told };
 }
@@ -174,4 +175,70 @@ test('wired: main notes the edge in both polls, reads through the pinned path, a
   assert.match(preload, /onPrinterHeadActuals:.*'printer-head-actuals'/);
   const boot = fs.readFileSync(path.join(ROOT, 'renderer/app-boot.js'), 'utf8');
   assert.ok(boot.includes('window.hubAPI.onPrinterHeadActuals((payload)'));
+});
+
+
+// ── The review (Nov 22) ───────────────────────────────────────────────────
+
+test('an earlier run of the same file, already on another job, is never written onto this one; the closest run wins', async () => {
+  // Job A printed part.gcode and holds A1; job B prints it again and finishes 10 min later.
+  const r = rig({ history: { result: { jobs: [row({ job_id: 'A1', end_time: ENDED / 1000 - 600 })] } } });
+  r.book.printLog.unshift({ id: 'A', machineId: 'M1', status: 'completed', parts: [{ fileRef: FILE }], actualHeadsJobId: 'A1' });
+  assert.equal(await r.h.noteEdge(U1M, printing, complete, ENDED), false, 'B\'s own row is not there yet: nothing, rather than A\'s');
+  assert.equal(r.book.printLog[1].actualHeadsJobId, undefined);
+  // With both rows, B gets its own, the closest.
+  const both = rig({ history: { result: { jobs: [row({ job_id: 'A1', end_time: ENDED / 1000 - 600 }), row({ job_id: 'B1', end_time: ENDED / 1000 - 5 })] } } });
+  both.book.printLog.unshift({ id: 'A', machineId: 'M1', status: 'completed', parts: [{ fileRef: FILE }], actualHeadsJobId: 'A1' });
+  assert.equal(await both.h.noteEdge(U1M, printing, complete, ENDED), true);
+  assert.equal(both.book.printLog[1].actualHeadsJobId, 'B1');
+  // The closest of two unrecorded runs.
+  assert.equal(H.historyJob({ result: { jobs: [row({ job_id: 'far', end_time: ENDED / 1000 - 900 }), row({ job_id: 'near', end_time: ENDED / 1000 - 20 })] } }, FILE, ENDED).job_id, 'near');
+});
+
+test('only the printing job that names the file: never the only printing job running another file, never a moved-on job', async () => {
+  // The shop's job X is mine.gcode; the printer ran a calibration print from its screen.
+  const x = rig({ job: { parts: [{ fileRef: 'mine.gcode' }] } });
+  assert.equal(await x.h.noteEdge(U1M, printing, complete, ENDED), null);
+  assert.equal(x.reads.length, 0, 'the printer is not even asked');
+  // An old completed job naming the file gets nothing from a reprint started at the printer.
+  const old = rig({ job: { status: 'completed' } });
+  assert.equal(await old.h.noteEdge(U1M, printing, complete, ENDED), null);
+  // Moved to another machine between the edge and the write: nothing.
+  const moved = rig();
+  moved.book.printLog[0].machineId = 'M2';
+  assert.equal(await moved.h.lookAfter({ machine: U1M, jobId: 'J1', filename: FILE, endedAt: ENDED }), false);
+  assert.equal(moved.book.printLog[0].actualHeadsJobId, undefined);
+});
+
+test('a hostile printer cannot put an oversized or odd job id, or infinite grams, in the book', async () => {
+  for (const job_id of ['x'.repeat(5000), { a: 1 }, 'has space', '']) {
+    const r = rig({ history: { result: { jobs: [row({ job_id })] } } });
+    assert.equal(await r.h.noteEdge(U1M, printing, complete, ENDED), false, JSON.stringify(job_id).slice(0, 30));
+    assert.equal(r.book.printLog[0].actualHeadsJobId, undefined);
+  }
+  const inf = rig({ history: { result: { jobs: [row({ filament_used: 1e308, metadata: { filament_weight: [10, 10, 10], filament_total: 1e-300 } })] } } });
+  assert.equal(await inf.h.noteEdge(U1M, printing, complete, ENDED), false);
+  assert.equal(inf.book.printLog[0].actualHeads, undefined);
+  assert.equal(H.JOB_ID.test('0000A7'), true);
+});
+
+test('a look ends when the app quits or polling stops, or the printer is gone or re-addressed', async () => {
+  const q = rig({ stopped: () => true });
+  assert.equal(await q.h.noteEdge(U1M, printing, complete, ENDED), false);
+  assert.equal(q.reads.length, 0);
+  const gone = rig();
+  gone.book.machines = [];
+  assert.equal(await gone.h.noteEdge(U1M, printing, complete, ENDED), false);
+  assert.equal(gone.reads.length, 0);
+  const moved = rig();
+  moved.book.machines[0].printerApi.host = '192.168.1.99';
+  assert.equal(await moved.h.noteEdge(U1M, printing, complete, ENDED), false);
+  assert.equal(moved.reads.length, 0, 'never asks the old address');
+});
+
+test('main reads the printer with a size cap', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'main.js'), 'utf8');
+  assert.match(src, /const MOONRAKER_READ_MAX = 1024 \* 1024;/);
+  assert.match(src, /if \(size > MOONRAKER_READ_MAX\) throw/);
+  assert.match(src, /stopped: \(\) => _quittingNow \|\| _flushedForQuit \|\| !printerPollInterval/);
 });

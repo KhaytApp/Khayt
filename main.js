@@ -5719,8 +5719,19 @@ async function moonrakerRead(machine, pathAndQuery, timeoutMs) {
     headers, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs || 10000),
   });
   if (!res.ok) throw new Error(`Printer answered HTTP ${res.status}`);
-  return res.json();
+  // At most MOONRAKER_READ_MAX: a device at the printer's address cannot
+  // stream hundreds of MB into this process (review).
+  const declared = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MOONRAKER_READ_MAX) throw new Error('Printer answer too large');
+  const chunks = []; let size = 0;
+  for await (const c of res.body) {
+    size += c.length;
+    if (size > MOONRAKER_READ_MAX) throw new Error('Printer answer too large');   // leaving the loop cancels the stream
+    chunks.push(Buffer.from(c));
+  }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
+const MOONRAKER_READ_MAX = 1024 * 1024;
 
 /* Filament used per head after a finished U1 (Moonraker) print, with each
  * head's colour and material, on the job (lib/main/head-actuals.js; the Mac's
@@ -5733,6 +5744,9 @@ const headActuals = require('./lib/main/head-actuals.js').createHeadActuals({
     return lanServerStore;
   },
   updateStoreOnDisk: (mutate) => updateStoreOnDisk(mutate),
+  // A look 20 s or 90 s after the print ends does not run into a quit or
+  // after printer polling was switched off.
+  stopped: () => _quittingNow || _flushedForQuit || !printerPollInterval,
   notify: (id, fields) => {
     BrowserWindow.getAllWindows().forEach((w) => {
       if (!w.isDestroyed()) w.webContents.send('printer-head-actuals', { id, fields });
