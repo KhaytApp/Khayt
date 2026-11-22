@@ -626,6 +626,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+  if (window.hubAPI?.onLanMachineBedCleared) {
+    window.hubAPI.onLanMachineBedCleared((payload) => {
+      // A paired phone said a plate is empty. The server wrote it to disk;
+      // take the stamp into the window's copy, or its next saveAll() would
+      // write the machine back without it. Never an older stamp over a newer.
+      const id = payload && payload.id, at = payload && payload.bedClearedAt;
+      if (!id || typeof at !== 'string' || typeof machines === 'undefined') return;
+      const m = machines.find((x) => x && x.id === id);
+      if (!m || (Date.parse(m.bedClearedAt || '') || 0) >= (Date.parse(at) || 0)) return;
+      m.bedClearedAt = at;
+      saveAll();
+      if (typeof renderMachineQueues === 'function') renderMachineQueues();   // draws Next up too
+    });
+  }
   if (window.hubAPI?.onLanWasteLogged) {
     window.hubAPI.onLanWasteLogged((payload) => {
       // Phone logged a failed print. The server has already written it to disk;

@@ -1180,8 +1180,10 @@ unset or short PIN is `401`.
 
 ### `POST /api/printer/{machineId}/bed-clear`
 
-> **Native Mac only** (Nov 2026, draft). `lib/lan-server.js` does not serve it
-> yet; the desktop is to match this shape.
+> **Served by both apps** (Nov 2026, drafts): the native Mac app and
+> `lib/lan-server.js` (Windows/Linux), through the shared rule
+> `lib/lan-rest.js` `machineBedClear`. The desktop has no sample book, so it
+> never answers `409 read-only`.
 
 A paired phone saying a machine's plate is empty: the phone's **"Bed is clear"** (leftovers from a print that ended badly) and **"Taken off"** (a finished print). Both write the same thing, and the same thing as the Mac's own "Bed is clear" button: `bedClearedAt` on the machine, stamped now. The shared rules read it (`lib/auto-dispatch.js`: the printer may be offered again; `lib/waiting-at-machine.js`: `print-to-take-off` and `bed-to-clear` end). The body is empty. The printer itself is told nothing.
 

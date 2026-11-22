@@ -518,3 +518,27 @@ test('Remove signs a code-paired phone out: device-revoked, signed', async () =>
   assert.deepEqual([r.status, r.json], [401, { reason: 'device-revoked' }]);
   assert.ok(macOk(code, r));
 });
+
+test('POST /api/printer/{id}/bed-clear (the Mac\'s shape): a signed phone of operator and up stamps bedClearedAt; a viewer, the bare PIN, an unknown or retired printer are refused', async () => {
+  store.machines = [{ id: 'm1', name: 'U1' }, { id: 'm2', name: 'Old', status: 'retired' }];
+  const viewer = await pairPhone('viewer');
+  const operator = await pairPhone('operator');
+  const v = await signed(viewer, 'POST', '/api/printer/m1/bed-clear');
+  assert.deepEqual([v.status, v.json], [403, { reason: 'role-scope', required: 'machines:control' }]);
+  assert.equal(store.machines[0].bedClearedAt, undefined, 'a viewer writes nothing');
+  const before = Date.now();
+  const ok = await signed(operator, 'POST', '/api/printer/m1/bed-clear');
+  assert.equal(ok.status, 200, ok.text);
+  assert.equal(ok.json.ok, true);
+  assert.ok(Date.parse(ok.json.bedClearedAt) >= before - 5);
+  assert.equal(store.machines[0].bedClearedAt, ok.json.bedClearedAt, 'the same write as the desk\'s button');
+  assert.ok(macOk(operator, ok), 'signed back');
+  assert.deepEqual((await signed(operator, 'POST', '/api/printer/nope/bed-clear')).json, { ok: false, reason: 'not-found' });
+  const retired = await signed(operator, 'POST', '/api/printer/m2/bed-clear');
+  assert.deepEqual([retired.status, retired.json], [404, { ok: false, reason: 'not-found' }]);
+  assert.equal(store.machines[1].bedClearedAt, undefined);
+  const bare = await call('POST', '/api/printer/m1/bed-clear', { headers: { 'x-khayt-pin': PIN } });
+  assert.deepEqual([bare.status, bare.json], [403, { ok: false, reason: 'device-key-required' }]);
+  const pinPhone = await enrolWithPin();   // a PIN-paired phone is the owner
+  assert.equal((await signed(pinPhone, 'POST', '/api/printer/m1/bed-clear')).status, 200);
+});

@@ -776,6 +776,29 @@
     }
   }
 
+  /**
+   * POST /api/printer/{id}/bed-clear: a person saying the plate is empty
+   * (docs/LAN_API.md; the Mac's Shop+PhonePrinter). The same write as the
+   * desk's "Bed is clear" button: `bedClearedAt` stamped now. The shared rules
+   * read it (auto-dispatch, waiting-at-machine). Not refused while printing:
+   * a stamp older than the print's end is ignored by them. A retired printer
+   * is not "in use", so it is not found.
+   */
+  function machineBedClear(cur, machineId, ctx) {
+    const machines = Array.isArray(cur && cur.machines) ? cur.machines : [];
+    const i = machines.findIndex((m) => m && typeof m === 'object' && m.id === machineId);
+    const m = i === -1 ? null : machines[i];
+    const retired = m && (String(m.status || '') === 'retired' || !!String(m.retiredAt || ''));
+    if (!machineId || !m || retired) return { status: 404, body: { ok: false, reason: 'not-found' } };
+    const at = new Date(Number.isFinite(ctx && ctx.nowMs) ? ctx.nowMs : Date.now()).toISOString();
+    const next = machines.slice();
+    next[i] = { ...m, bedClearedAt: at };
+    return {
+      status: 200, body: { ok: true, bedClearedAt: at }, store: { ...cur, machines: next },
+      emit: { channel: 'lan-machine-bed-cleared', payload: { id: machineId, bedClearedAt: at } },
+    };
+  }
+
   /** Every collection a rule here reads or writes. */
   const BOOK_KEYS = ['printLog', 'waitingList', 'waitingListHistory', 'settings', 'machines',
     'clients', 'inventory', 'wasteLog'];
@@ -787,7 +810,7 @@
     ordersList, machinesList, inventoryList, waitingList, clientsList, orderQuoteUrl, quotePart,
     orderCreate, orderPatch, orderApprove,
     inventoryCreate, inventoryPatch, inventoryDelete,
-    waitingListPatch, wasteCreate,
+    waitingListPatch, wasteCreate, machineBedClear,
     normalizePrinterEvent, printerEvent,
     localDay,
   };
