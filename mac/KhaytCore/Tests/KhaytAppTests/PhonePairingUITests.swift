@@ -291,4 +291,37 @@ struct PhonePairingUITests {
         #expect(src.contains("askedBody(asked, ready: !settles || settled == asked.pairId)"))
         #expect(src.contains("role = await shop.phoneDefaultRole() ?? grantable.last ?? \"operator\""))
     }
+
+    /// "Sign out" is the one word for taking a phone off, in every app
+    /// (Turki, Nov 22). The list says it, asks with it and confirms with it;
+    /// "Remove" is not said of a phone anywhere.
+    @Test("a paired phone is signed out, in those words, in every language")
+    func signOutIsTheWord() async throws {
+        let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let view = try String(contentsOf: sources.appending(path: "PhonePairingViews.swift"), encoding: .utf8)
+        #expect(view.contains(#"words.callIt("mac.phones_sign_out") + "\u{2026}""#))
+        #expect(view.contains(#"callIt("mac.phones_sign_out_q""#) && view.contains(#"confirm: shop.words.callIt("mac.phones_sign_out")"#))
+        #expect(!view.contains("phones_remove"))
+        let words = try String(contentsOf: sources.appending(path: "Words.swift"), encoding: .utf8)
+        #expect(!words.contains("\"mac.phones_remove"), "the retired keys are gone")
+        #expect(words.contains(#""mac.phones_sign_out": ["en": "Sign out", "ar": "تسجيل الخروج"]"#))
+        // The sentences beside the list say the same word.
+        for key in ["mac.phones_roles_note", "mac.phones_roles_manager", "mac.phones_role_pin"] {
+            let line = try #require(words.split(separator: "\n").first { $0.contains("\"\(key)\"") })
+            #expect(line.contains("sign") && !line.lowercased().contains("remove"), Comment(rawValue: key))
+            #expect(!line.contains("إزال") && !line.contains("أزل"), Comment(rawValue: key + " (ar)"))
+        }
+        let folder = sources.appending(path: "Resources")
+        let gone = ["Entfernen", "entfernen", "Quitar", "quítalo", "quites", "Retirer", "retirez", "retiriez", "削除", "Remover", "remova", "removê", "Kaldır", "kaldır", "移除"]
+        for lang in ["de", "es", "fr", "ja", "pt-BR", "tr", "zh"] {
+            let data = try Data(contentsOf: folder.appending(path: "mac-words-\(lang).json"))
+            let table = try #require(try JSONSerialization.jsonObject(with: data) as? [String: String])
+            #expect(table["mac.phones_remove"] == nil && table["mac.phones_remove_q"] == nil, Comment(rawValue: lang))
+            for key in ["mac.phones_roles_note", "mac.phones_roles_manager", "mac.phones_role_pin"] {
+                let said = try #require(table[key], Comment(rawValue: lang + " " + key))
+                #expect(!gone.contains { said.contains($0) }, Comment(rawValue: "\(lang) \(key): \(said)"))
+            }
+        }
+    }
 }

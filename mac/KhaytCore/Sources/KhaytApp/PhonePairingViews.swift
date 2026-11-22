@@ -543,7 +543,7 @@ struct PairedPhoneRow: View {
                 Text(verbatim: role.map { words.callIt(PhonePairingUI.nameKey($0)) } ?? "\u{2026}")
                     .foregroundStyle(settable.isEmpty ? .secondary : .primary)
             }
-            Button(words.callIt("mac.phones_remove") + "\u{2026}", action: remove)
+            Button(words.callIt("mac.phones_sign_out") + "\u{2026}", action: remove)
                 .controlSize(.small)
                 .disabled(!mayRemove)
         }
@@ -620,9 +620,9 @@ struct PairedPhonesByCode: View {
             await readRoles()
         }
         .askFirst($removing,
-                  title: { shop.words.callIt("mac.phones_remove_q", ["name": .string(PhonePairingUI.shown($0.name, shop.words))]) },
+                  title: { shop.words.callIt("mac.phones_sign_out_q", ["name": .string(PhonePairingUI.shown($0.name, shop.words))]) },
                   message: { _ in shop.words.callIt("mac.phones_sign_out_note") },
-                  confirm: shop.words.callIt("mac.phones_remove"),
+                  confirm: shop.words.callIt("mac.phones_sign_out"),
                   cancel: shop.words.callIt("common.cancel")) { phone in
             Task {
                 problem = await shop.removePhone(phone.id) ? nil : shop.moveProblem
