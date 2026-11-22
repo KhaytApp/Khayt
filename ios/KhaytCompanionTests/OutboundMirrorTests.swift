@@ -62,8 +62,8 @@ final class OutboundMirrorTests: XCTestCase {
 
     /// The app's gate and the extension's agree: what the book says reaches
     /// the extension on the same write, and the extension's fetch follows it.
-    func testTheExtensionFollowsEveryBookTheAppFollows() {
-        OutboundGate.$scoped.withValue(OutboundGate()) {
+    func testTheExtensionFollowsEveryBookTheAppFollows() throws {
+        try OutboundGate.$scoped.withValue(OutboundGate()) {
             // Online first, so the refusal below can only come from the write.
             PhoneOutbound.changed(["settings": .object(["network": .object(["offline": .bool(false)])])])
             XCTAssertNoThrow(try OutboundMirror.gate(from: suite).require(.cloud, url: events))
