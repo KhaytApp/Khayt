@@ -50,6 +50,7 @@ const SAME_ON_PURPOSE = new Set([
   'set.supplier_ph',    // "+966 5x xxx xxxx" — a Saudi phone mask
   'splug.kind_shelly',  // "Shelly (Gen 1)" — a product and its generation; Arabic and Japanese write their own
   'zatca2.egs_cn',      // "EGS Common Name" — the X.509 term German PKI keeps
+  'ca.app_orca',        // "Khayt for OrcaSlicer" — the plugin's own product name; the signed-off Arabic frame (Figma 132:220) keeps it
 ]);
 
 /** A real sentence, not a cognate. "Material" is German; "Choose CSV file" is not. */
