@@ -96,6 +96,15 @@ extension Shop {
         return op
     }
 
+    /// Who to credit for something done at this Mac: the person signed in, or
+    /// nil when nobody is (the lock is off, or not in force). The activity log
+    /// and a return's "reported by" take this and NOT the book's
+    /// `settings.activeOperatorId`, which is the other app's sign-in.
+    var actorHere: (id: String, name: String)? {
+        guard lockInForce, let who = signedIn else { return nil }
+        return (who.id, who.name)
+    }
+
     /// The sign-in screen stands in front of everything.
     var needsSignIn: Bool { lockInForce && signedIn == nil }
 

@@ -2279,6 +2279,7 @@ extension Shop {
         // cannot answer: did the job step INTO a milestone the customer is
         // told about on WhatsApp (`lib/whatsapp-message.js wouldSend`).
         var wasOrder: JSONValue?
+        let actor = actorHere
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
@@ -2288,7 +2289,8 @@ extension Shop {
                 wasOrder = Self.rows(root, "printLog").first(where: { Self.recordId($0) == id })
                 let out = try await Self.applyMove(
                     to: &root, id: id, stage: stage, engine: engine, words: self.words,
-                    holdReason: holdReason, qcNotes: qcNotes, qcInspector: qcInspector, actuals: actuals)
+                    holdReason: holdReason, qcNotes: qcNotes, qcInspector: qcInspector, actuals: actuals,
+                    actor: actor)
                 undoSnapshot = out.undo; said = out.notices
                 // A quote accepted into a job takes its models off Print
                 // next, in this same write (`clearPrintNext(acceptedFrom:)`).
@@ -2579,7 +2581,10 @@ extension Shop {
                                   engine: KhaytEngine, words: Words,
                                   holdReason: String? = nil, qcNotes: String? = nil,
                                   qcInspector: String? = nil,
-                                  actuals: Actuals? = nil)
+                                  actuals: Actuals? = nil,
+                                  // Nil is nobody this Mac can name, the safe
+                                  // answer; a person's move here passes `actorHere`.
+                                  actor: (id: String, name: String)? = nil)
     async throws -> MoveOutcome {
 
         var orders = rows(root, "printLog")
@@ -2805,7 +2810,7 @@ extension Shop {
         write(&root, "consumables", changed: move.consumables ?? [], before: consumables, into: &undo)
 
         if let text = move.activity {
-            appendActivity(&root, text: text, ref: id, settings: settings, root: root)
+            appendActivity(&root, text: text, ref: id, root: root, actor: actor)
         }
 
         let notices = (move.notices ?? []).map { words.sentence(for: $0) }
@@ -2857,25 +2862,29 @@ extension Shop {
     }
 
     /// The team's activity log — the same collection, shape and cap Khayt uses.
-    /// `actor`: who did it when it was not a person at this Mac — a paired
-    /// slicer plugin (`connector:<id>`, its name). Nil: the operator signed in.
+    ///
+    /// `actor` is WHO DID IT, and the caller says: the person signed in at
+    /// this Mac (`Shop.actorHere`), or a paired slicer plugin
+    /// (`connector:<id>`, its name). Nil is nobody this Mac can name: the lock
+    /// is off, or the write was not a person's here (a phone or an API token
+    /// over the LAN, a recurring order falling due).
+    ///
+    /// NEVER `settings.activeOperatorId`. That field is who is signed in on
+    /// the OTHER app, on another computer; this function read it until Nov
+    /// 2026, so a move made here was logged under whoever was signed in
+    /// there. `settings` is not a parameter any more, so it cannot come back
+    /// by accident.
     nonisolated static func appendActivity(_ root: inout [String: JSONValue], text: String,
-                                       ref: String, settings: [String: JSONValue],
+                                       ref: String,
                                        root snapshot: [String: JSONValue],
                                        action: String = "status",
-                                       actor: (id: String, name: String)? = nil) {
+                                       actor: (id: String, name: String)?) {
         var log = rows(snapshot, "auditLog")
         var operatorId: JSONValue = .null
         var operatorName = ""
         if let actor {
             operatorId = .string(actor.id)
             operatorName = actor.name
-        } else if case .string(let opId)? = settings["activeOperatorId"] {
-            operatorId = .string(opId)
-            if let op = rows(snapshot, "operators").first(where: { recordId($0) == opId }),
-               case .object(let o) = op, case .string(let name)? = o["name"] {
-                operatorName = name
-            }
         }
         log.append(.object([
             "id": .string(uid("AL")),

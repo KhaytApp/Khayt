@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: what you do on the Mac is logged under the person signed in on the Mac.** The activity log, and a return's "reported by", read the book's `activeOperatorId` to name who did something. That field is the Windows/Linux app's sign-in, so a job moved on the Mac could be logged under whoever was signed in on another computer. The Mac now credits its own signed-in person, and nobody when the staff lock is off or the change came from a phone, an API token or a recurring order. Nothing already in the log is changed.
+
 - **Mac: the ledger measures a job's margin without its overhead, as the desktop's Orders Log does, and Recalculate keeps the job's own overhead rate.** These are fixes from the beta.42 release reviews.
   - **Ledger.** It costed a job with its overhead included, so every job carrying overhead read a lower margin on the Mac than on Windows/Linux and than in beta.41. It now uses the same figure as the Orders Log (`jobCost` without overhead). A USD job's cost already reads in the shop's own currency; it is no longer converted at the job's exchange rate.
   - **Recalculate.**
