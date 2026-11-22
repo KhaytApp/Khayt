@@ -8,7 +8,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - **What asks.** Updates (Sparkle, through its own hook, so a refused check fetches no feed), the install count, crash reports and usage statistics, Khayt Cloud, MakerRun, catalogues, off-site storage, messages and alerts, webhooks and connectors, pay-later links, the online store routes, AI assist, exchange rates and model covers.
   - **The shop's own network is never blocked.** Printers, cameras, smart plugs and Spoolman keep working. While the switch is on, an address that leads outside the shop's network is refused.
   - **At launch.** Nothing but the shop's own network is called until the book is read, so a shop that turned the switch on does not leak one call at each start. A launch update check that had to wait is made once the settings are known.
-  - **Turning it on.** Only the owner can, under the staff lock. One sync goes out first so the other computers and the phone learn of it.
+  - **Turning it on.** Only the owner can, under the staff lock, and this Mac stops at once. The native Mac does not send settings to Khayt Cloud, so the other computers are not told by this change; a phone on the shop's Wi-Fi reads the switch from this Mac.
+  - **What is not kept for later.** Crash reports and usage statistics recorded while the switch refuses them are dropped. Queued webhooks and connector events wait and lose no tries.
+  - **The sample book cannot switch it off.** Only the shop's own book tells this Mac; with the sample open, or the book unreadable, it goes by what the book last said.
   - **A guard.** A test fails if a Swift file builds a request or opens a socket without asking.
   - Nothing changes for a shop that has not turned the switch on. The Settings page for it comes next.
 
