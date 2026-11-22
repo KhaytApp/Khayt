@@ -92,7 +92,7 @@ const { isBlockedHost, isAllowedPrinterHost, sanitizeMailgunDomain, resolvesToBl
         sanitizePrinterHost } = require('./lib/host-guard');
 const { sendCustomSmtp } = require('./lib/custom-smtp');
 const {
-  mergePollSuccess, mergePollFailure, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
+  mergePollSuccess, mergePollFailure, failureCode, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
 } = require('./lib/printer-poll-cache');
 const sdcpClient = require('./lib/sdcp-client');
 const KhaytSdcpProtocol = require('./lib/sdcp');
@@ -5613,7 +5613,7 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
         if (completionIsNew(before, printerStatusCache[machine.id])) captured = true;
       } catch(e) {
         printerStatusCache[machine.id] = mergePollFailure(
-          printerStatusCache[machine.id], e.message, Date.now(), e && e.status,
+          printerStatusCache[machine.id], e.message, Date.now(), e && e.status, failureCode(e),
         );
       } finally { printerFullPollOn = null; }
     }
@@ -5652,7 +5652,7 @@ ipcMain.handle('hub:probe-printer', async (_e, machine) => {
   try {
     return mergePollSuccess(before, await fetchPrinterStatus(m), Date.now());
   } catch (e) {
-    return mergePollFailure(before, e.message, Date.now(), e && e.status);
+    return mergePollFailure(before, e.message, Date.now(), e && e.status, failureCode(e));
   }
 });
 
@@ -5796,7 +5796,7 @@ async function sendPrinterCommand(machine, command) {
       init.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     }
     const res = await fetch(`${base}${req.path}`, init);
-    if (res.status >= 300 && res.status < 400) { const e = new Error('Unexpected redirect from printer'); e.fatal = true; throw e; }
+    if (res.status >= 300 && res.status < 400) { const e = new Error('Unexpected redirect from printer'); e.fatal = true; e.code = 'ERR_REDIRECT'; throw e; }
     if (!res.ok) { const e = new Error(`Printer responded ${res.status}`); e.status = res.status; throw e; }
     return res;
   };
@@ -6073,7 +6073,7 @@ async function fetchPrinterStatus(machine) {
       headers: extraHeaders ? { ...headers, ...extraHeaders } : headers,
       redirect: 'manual', signal: AbortSignal.timeout(5000),
     });
-    if (res.status >= 300 && res.status < 400) throw new Error('Unexpected redirect from printer');
+    if (res.status >= 300 && res.status < 400) { const e = new Error('Unexpected redirect from printer'); e.code = 'ERR_REDIRECT'; throw e; }
     // The status is carried on the error rather than only in its text, because
     // the Duet adapter has to tell "you need a session" (401 standalone, 403 SBC)
     // apart from "this surface does not exist here" (404) to pick a transport.

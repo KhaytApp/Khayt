@@ -1069,7 +1069,7 @@ still lists it, and the phone hides it either way:
 
 `progress`, `timeRemaining` (seconds) and the temperatures are rounded integers. A machine never heard from has its `id`, `name` and `hasPrinterApi`, and `null` for the rest.
 
-**When it last answered, and why it is not answering** (native Mac, Nov 2026, draft; the desktop is to match these names):
+**When it last answered, and why it is not answering** (both apps, Nov 2026, draft; the Mac's names):
 
 - `lastOkAt`: when the printer last ANSWERED, ISO 8601, or `null` if it has not since the app started watching it. `lastUpdated` is the last time it was ASKED and moves on a failed poll too, so it cannot say how old the picture is; `lastOkAt` can.
 - `errorCode`: `null` while the printer answers. Otherwise one word that no language changes, to match on instead of `error` (which is a sentence in the shop's language: an Arabic or German shop's "access refused" does not match an English pattern):
@@ -1092,6 +1092,8 @@ still lists it, and the phone hides it either way:
 - `waiting`: why the printer waits for a person, most urgent first (`lib/waiting-at-machine.js waiting`): `[{ reason, since, head? }]`, with `reason` one of `filament-runout`, `printer-attention`, `print-to-take-off`, `bed-to-clear`.
 
 Both are always present on the Mac and empty when nothing is needed. `lib/lan-server.js` does not send them yet, and an older Mac leaves them out: read a missing list as empty. The cloud's live snapshot carries the same rows.
+
+**Who publishes that snapshot.** Khayt Cloud keeps one live snapshot per shop, newest wins, and every unlocked computer of the shop may send one. So a computer publishes only while at least one of its printers ANSWERED it in the last three minutes (`lastOkAt`; `lib/live-snapshot.js hasFreshPoll`), and is silent otherwise, heartbeat included. The owner's laptop at home, which cannot reach the printers, no longer replaces the shop computer's picture with "not heard", and a computer whose polling has stopped no longer keeps saying "Printing 42%". Both apps ask the same rule: the native Mac through its bundled copy, for what a row holds (`cloudRow`: both stamps in epoch milliseconds), what counts as a change (`signature`), when one is due (`due`) and whether to send at all.
 
 ### `POST /api/printer/{machineId}/{pause|resume|stop}`
 

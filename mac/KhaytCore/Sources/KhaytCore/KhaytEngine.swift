@@ -1016,6 +1016,12 @@ public actor KhaytEngine {
         "moonraker-problems",
         "printer-problems",
         "waiting-at-machine",
+        // What each printer needs, as one call (the desktop's live rows are
+        // built with it), and the live snapshot's rules: what is published to
+        // Khayt Cloud, when, and WHETHER this computer may speak for the shop
+        // at all (`hasFreshPoll`). live-snapshot reads printer-needs at load.
+        "printer-needs",
+        "live-snapshot",
         // A U1's RFID spool tags (U1 idea 2) and a time-lapse kept as the
         // customer's proof (U1 idea 3): bundled for the phone and for the
         // screens that follow their frames. Nothing on the Mac calls them yet.
