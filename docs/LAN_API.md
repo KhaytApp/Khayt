@@ -1069,6 +1069,12 @@ still lists it, and the phone hides it either way:
 
 `progress`, `timeRemaining` (seconds) and the temperatures are rounded integers. A machine never heard from has its `id`, `name` and `hasPrinterApi`, and `null` for the rest.
 
+**When it last answered, and why it is not answering** (both apps, Nov 2026, draft; the Mac's names):
+
+- `lastOkAt`: when the printer last ANSWERED, ISO 8601, or `null` if it has not since the app started watching it. `lastUpdated` moves on a failed poll too; `lastOkAt` does not.
+- `errorCode`: `null` while the printer answers, else one word no language changes: `access-refused` (HTTP 401/403, an access code turned down), `http` (any other status; see `httpStatus`), `not-set-up` (no address, a bad port, a missing serial: nothing was asked), `certificate`, `unreadable`, `unreachable`. A client treats a word it does not know as `unreachable`. On the desktop the word comes from `lib/printer-poll-cache.js` `failureCode`, never from `error` (a sentence in the shop's language). Two differences from the Mac: the desktop connects to a Bambu without pinning its certificate, so it never sends `certificate`; and an SDCP (Elegoo) printer that turns the connection down reads `unreachable`, not `access-refused`. A machine that is `not-set-up` is never counted as offline, so it starts no search for a printer that moved.
+- `httpStatus`: the HTTP status of the failed poll when there was one, else `null`.
+
 ### `POST /api/printer/{machineId}/{pause|resume|stop}`
 
 > **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it.

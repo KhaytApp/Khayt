@@ -115,7 +115,7 @@ const { isBlockedHost, isAllowedPrinterHost, sanitizeMailgunDomain, resolvesToBl
         sanitizePrinterHost } = require('./lib/host-guard');
 const { sendCustomSmtp } = require('./lib/custom-smtp');
 const {
-  mergePollSuccess, mergePollFailure, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
+  mergePollSuccess, mergePollFailure, failureCode, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
 } = require('./lib/printer-poll-cache');
 const sdcpClient = require('./lib/sdcp-client');
 const KhaytSdcpProtocol = require('./lib/sdcp');
@@ -1745,6 +1745,49 @@ ipcMain.handle('hub:detect-slicers', async () => {
 // (SSRF-safe). WHAT each printer is asked — which files it runs, the remote
 // name, the request — is `lib/printer-upload.js`, which the Mac app sends with
 // too; this function is the wire.
+// A person's command to a printer: the background poll leaves that printer
+// alone until the reply (lib/poll-yield.js, C6), so a poll read a moment
+// before the command cannot come back after it and undo what the card shows.
+// Every caller below goes through yieldingFor.
+const pollYield = require('./lib/poll-yield.js').createPollYield();
+const yieldingFor = async (machine, fn) => {
+  try { return await pollYield.around(machine && machine.id, fn); }
+  finally { pollPrinterSoon(machine); }
+};
+/* After a command's reply, ask that printer again in a moment rather than
+ * leaving its card on the old state for up to 30 s (correctness review of
+ * #2612; lib/poll-yield.js justSettled). One printer, through the same merge
+ * as the poll, and never beside a full poll: two polls in flight is the
+ * completion race the poll loop guards (printerPollInFlight). */
+const SETTLE_POLL_MS = 1500;
+const printerSoonPolling = new Set();   // ids a soon-poll is reading now
+let printerFullPollOn = null;           // the id the full poll is reading now
+function pollPrinterSoon(machine, tries = 0) {
+  const id = machine && machine.id;
+  if (!id || !machine.printerApi?.type || machine.printerApi.type === 'none' || tries > 5) return;
+  setTimeout(async () => {
+    if (pollYield.yielding(id, Date.now())) return;           // another command went out; its reply polls
+    if (tries === 0 && !pollYield.justSettled(id, Date.now())) return;   // settled long ago: the poll has it
+    // Per printer, not the fleet's flag: holding printerPollInFlight here made
+    // a 30 s tick (or the first poll after start) landing meanwhile skip EVERY
+    // printer (re-review of #2612). Two reads of one printer at once is the
+    // completion race, so this waits while the full poll is on this printer,
+    // and the full poll skips a printer this is reading.
+    if (!printerPollInterval) return;
+    if (printerFullPollOn === id || printerSoonPolling.has(id)) { pollPrinterSoon(machine, tries + 1); return; }
+    printerSoonPolling.add(id);
+    const sent = pollYield.seq(id);
+    try {
+      const status = await fetchPrinterStatus(machine);
+      if (pollYield.seq(id) !== sent || pollYield.yielding(id, Date.now())) return;
+      const before = printerStatusCache[id];
+      printerStatusCache[id] = mergePollSuccess(before, status, Date.now());
+      if (completionIsNew(before, printerStatusCache[id])) persistCompletions().catch(() => {});
+      BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('printer-status-update', printerStatusCache));
+    } catch (_) { /* the next full poll says it */ } finally { printerSoonPolling.delete(id); }
+  }, SETTLE_POLL_MS);
+}
+
 async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
@@ -1826,7 +1869,7 @@ ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startP
   if (!gate.ok) return gate;
   try {
     if (!gcodePath || !fs.existsSync(gcodePath)) return { ok: false, error: 'G-code file not found.' };
-    return await uploadGcodeToPrinter(machine, gcodePath, startPrint);
+    return await yieldingFor(machine, () => uploadGcodeToPrinter(machine, gcodePath, startPrint));
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
@@ -1838,7 +1881,7 @@ ipcMain.handle('hub:slice-and-print', async (_e, { modelPath, slicerPath, args, 
     const r = await runSlice({ modelPath, slicerPath, args });
     if (!r.ok) return r;
     outDir = r.outDir;
-    const up = await uploadGcodeToPrinter(machine, r.gcodePath, startPrint);
+    const up = await yieldingFor(machine, () => uploadGcodeToPrinter(machine, r.gcodePath, startPrint));
     return up.ok ? { ok: true, meta: r.meta, ...up } : up;
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   finally { rmDir(outDir); }
@@ -1854,11 +1897,11 @@ ipcMain.handle('hub:print-order-file', async (_e, { orderFile, machine, slicerPa
   try {
     const full = path.join(orderFilesDir(), path.basename(String(orderFile || '')));
     if (!orderFile || !fs.existsSync(full)) return { ok: false, error: 'Attached file not found.' };
-    if (/\.(gcode|gco|g|nc)$/i.test(full)) return await uploadGcodeToPrinter(machine, full, startPrint);
+    if (/\.(gcode|gco|g|nc)$/i.test(full)) return await yieldingFor(machine, () => uploadGcodeToPrinter(machine, full, startPrint));
     const r = await runSlice({ modelPath: full, slicerPath, args });
     if (!r.ok) return r;
     outDir = r.outDir;
-    const up = await uploadGcodeToPrinter(machine, r.gcodePath, startPrint);
+    const up = await yieldingFor(machine, () => uploadGcodeToPrinter(machine, r.gcodePath, startPrint));
     return up.ok ? { ok: true, meta: r.meta, ...up } : up;
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   finally { rmDir(outDir); }
@@ -5804,8 +5847,19 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
     let captured = false;
     for (const machine of machineList) {
       if (!machine.printerApi?.type || machine.printerApi.type === 'none') continue;
+      // A person's command is on its way to this printer: its reply says
+      // what happened, not a poll that may have been read before it landed.
+      if (pollYield.yielding(machine.id, Date.now())) continue;
+      // Read before the fetch: a command sent while it was in flight makes
+      // what it read stale, and it is dropped rather than written over the
+      // command's effect (correctness review of #2612).
+      const sentBefore = pollYield.seq(machine.id);
+      // A soon-poll is reading this printer right now: its answer stands.
+      if (printerSoonPolling.has(machine.id)) continue;
+      printerFullPollOn = machine.id;
       try {
         const status = await fetchPrinterStatus(machine);
+        if (pollYield.seq(machine.id) !== sentBefore || pollYield.yielding(machine.id, Date.now())) continue;
         const before = printerStatusCache[machine.id];
         printerStatusCache[machine.id] = mergePollSuccess(before, status, Date.now());
         // A job just ended. This is the only moment its figures are true, and
@@ -5813,9 +5867,9 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
         if (completionIsNew(before, printerStatusCache[machine.id])) captured = true;
       } catch(e) {
         printerStatusCache[machine.id] = mergePollFailure(
-          printerStatusCache[machine.id], e.message, Date.now(), e && e.status,
+          printerStatusCache[machine.id], e.message, Date.now(), e && e.status, failureCode(e),
         );
-      }
+      } finally { printerFullPollOn = null; }
     }
     const wins = BrowserWindow.getAllWindows();
     wins.forEach(w => w.webContents.send('printer-status-update', printerStatusCache));
@@ -5852,7 +5906,7 @@ ipcMain.handle('hub:probe-printer', async (_e, machine) => {
   try {
     return mergePollSuccess(before, await fetchPrinterStatus(m), Date.now());
   } catch (e) {
-    return mergePollFailure(before, e.message, Date.now(), e && e.status);
+    return mergePollFailure(before, e.message, Date.now(), e && e.status, failureCode(e));
   }
 });
 
@@ -6000,7 +6054,7 @@ async function sendPrinterCommand(machine, command) {
     }
     // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(`${base}${req.path}`, init);
-    if (res.status >= 300 && res.status < 400) { const e = new Error('Unexpected redirect from printer'); e.fatal = true; throw e; }
+    if (res.status >= 300 && res.status < 400) { const e = new Error('Unexpected redirect from printer'); e.fatal = true; e.code = 'ERR_REDIRECT'; throw e; }
     if (!res.ok) { const e = new Error(`Printer responded ${res.status}`); e.status = res.status; throw e; }
     return res;
   };
@@ -6122,6 +6176,8 @@ ipcMain.handle('hub:printer-plate', async (_e, { machine } = {}) => {
 ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) => {
   const gate = printerGate('control');
   if (!gate.ok) return gate;
+  const yieldToken = pollYield.begin(machine && machine.id, Date.now());
+  try {
   const read = await plateObjects(machine);
   if (!read.ok) return read;
   const req = excludeObject.excludeRequest(name, read.data);
@@ -6137,11 +6193,12 @@ ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) 
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
+  } finally { pollYield.end(machine && machine.id, Date.now(), yieldToken); pollPrinterSoon(machine); }
 });
 
 ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) => {
   const gate = printerGate('control');
-  return gate.ok ? sendPrinterCommand(machine, command) : gate;
+  return gate.ok ? yieldingFor(machine, () => sendPrinterCommand(machine, command)) : gate;
 });
 
 /**
@@ -6167,7 +6224,7 @@ async function sendPrinterControl(machine, control, value) {
 }
 ipcMain.handle('hub:printer-control', async (_e, { machine, control, value } = {}) => {
   const gate = printerGate('control');
-  return gate.ok ? sendPrinterControl(machine, control, value) : gate;
+  return gate.ok ? yieldingFor(machine, () => sendPrinterControl(machine, control, value)) : gate;
 });
 // Read-only: safe to call while the printer is mid-job, which is when a shop is
 // most likely to reach for it.
@@ -6279,7 +6336,7 @@ async function fetchPrinterStatus(machine) {
       headers: extraHeaders ? { ...headers, ...extraHeaders } : headers,
       redirect: 'manual', signal: AbortSignal.timeout(5000),
     });
-    if (res.status >= 300 && res.status < 400) throw new Error('Unexpected redirect from printer');
+    if (res.status >= 300 && res.status < 400) { const e = new Error('Unexpected redirect from printer'); e.code = 'ERR_REDIRECT'; throw e; }
     // The status is carried on the error rather than only in its text, because
     // the Duet adapter has to tell "you need a session" (401 standalone, 403 SBC)
     // apart from "this surface does not exist here" (404) to pick a transport.

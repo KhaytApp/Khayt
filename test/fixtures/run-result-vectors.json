@@ -1,0 +1,269 @@
+{
+ "about": "lib/run-result.js withResult(order, mark): one result per print run (P4). Each case applies its marks in order to a job with three runs (M1 08:00, M2 09:00, M1 12:00 on 2026-11-18); `changed` is whether withResult returned new runs.",
+ "cases": [
+  {
+   "why": "the printer says finished: the latest run on that machine sent before the completion",
+   "steps": [
+    {
+     "mark": {
+      "machineId": "M1",
+      "at": "2026-11-18T14:00:00Z",
+      "result": "finished",
+      "source": "printer"
+     },
+     "changed": true
+    }
+   ],
+   "want": [
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T08:00:00Z",
+     "started": true
+    },
+    {
+     "machineId": "M2",
+     "at": "2026-11-18T09:00:00Z",
+     "started": true
+    },
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T12:00:00Z",
+     "started": true,
+     "result": "finished",
+     "resultSource": "printer",
+     "printerResult": "finished"
+    }
+   ]
+  },
+  {
+   "why": "a re-poll of the same completion changes nothing; a second printer word does not replace the first",
+   "steps": [
+    {
+     "mark": {
+      "machineId": "M1",
+      "at": "2026-11-18T14:00:00Z",
+      "result": "finished",
+      "source": "printer"
+     },
+     "changed": true
+    },
+    {
+     "mark": {
+      "machineId": "M1",
+      "at": "2026-11-18T14:00:00Z",
+      "result": "finished",
+      "source": "printer"
+     },
+     "changed": false
+    },
+    {
+     "mark": {
+      "machineId": "M1",
+      "at": "2026-11-18T14:05:00Z",
+      "result": "failed",
+      "source": "printer"
+     },
+     "changed": false
+    }
+   ],
+   "want": [
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T08:00:00Z",
+     "started": true
+    },
+    {
+     "machineId": "M2",
+     "at": "2026-11-18T09:00:00Z",
+     "started": true
+    },
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T12:00:00Z",
+     "started": true,
+     "result": "finished",
+     "resultSource": "printer",
+     "printerResult": "finished"
+    }
+   ]
+  },
+  {
+   "why": "the shop's failed check beats the printer's \"complete\", which is kept beside it",
+   "steps": [
+    {
+     "mark": {
+      "machineId": "M1",
+      "at": "2026-11-18T14:00:00Z",
+      "result": "finished",
+      "source": "printer"
+     },
+     "changed": true
+    },
+    {
+     "mark": {
+      "machineId": "M1",
+      "at": "2026-11-18T15:00:00Z",
+      "result": "failed",
+      "source": "shop"
+     },
+     "changed": true
+    }
+   ],
+   "want": [
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T08:00:00Z",
+     "started": true
+    },
+    {
+     "machineId": "M2",
+     "at": "2026-11-18T09:00:00Z",
+     "started": true
+    },
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T12:00:00Z",
+     "started": true,
+     "result": "failed",
+     "resultSource": "shop",
+     "printerResult": "finished"
+    }
+   ]
+  },
+  {
+   "why": "a printer word after the shop's mark is kept beside it, never over it",
+   "steps": [
+    {
+     "mark": {
+      "machineId": "M2",
+      "at": "2026-11-18T10:00:00Z",
+      "result": "failed",
+      "source": "shop"
+     },
+     "changed": true
+    },
+    {
+     "mark": {
+      "machineId": "M2",
+      "at": "2026-11-18T10:00:00Z",
+      "result": "cancelled",
+      "source": "printer"
+     },
+     "changed": true
+    }
+   ],
+   "want": [
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T08:00:00Z",
+     "started": true
+    },
+    {
+     "machineId": "M2",
+     "at": "2026-11-18T09:00:00Z",
+     "started": true,
+     "result": "failed",
+     "resultSource": "shop",
+     "printerResult": "cancelled"
+    },
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T12:00:00Z",
+     "started": true
+    }
+   ]
+  },
+  {
+   "why": "the earlier run is found by time, not by being last",
+   "steps": [
+    {
+     "mark": {
+      "machineId": "M1",
+      "at": "2026-11-18T10:00:00Z",
+      "result": "cancelled",
+      "source": "printer"
+     },
+     "changed": true
+    }
+   ],
+   "want": [
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T08:00:00Z",
+     "started": true,
+     "result": "cancelled",
+     "resultSource": "printer",
+     "printerResult": "cancelled"
+    },
+    {
+     "machineId": "M2",
+     "at": "2026-11-18T09:00:00Z",
+     "started": true
+    },
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T12:00:00Z",
+     "started": true
+    }
+   ]
+  },
+  {
+   "why": "nothing to land on: another machine, before any send, or not a result",
+   "steps": [
+    {
+     "mark": {
+      "machineId": "M9",
+      "at": "2026-11-18T14:00:00Z",
+      "result": "finished",
+      "source": "printer"
+     },
+     "changed": false
+    },
+    {
+     "mark": {
+      "machineId": "M1",
+      "at": "2026-11-18T07:00:00Z",
+      "result": "finished",
+      "source": "printer"
+     },
+     "changed": false
+    },
+    {
+     "mark": {
+      "machineId": "M1",
+      "at": "2026-11-18T14:00:00Z",
+      "result": "ok",
+      "source": "printer"
+     },
+     "changed": false
+    },
+    {
+     "mark": {
+      "machineId": "M1",
+      "at": "2026-11-18T14:00:00Z",
+      "result": "finished",
+      "source": "guess"
+     },
+     "changed": false
+    }
+   ],
+   "want": [
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T08:00:00Z",
+     "started": true
+    },
+    {
+     "machineId": "M2",
+     "at": "2026-11-18T09:00:00Z",
+     "started": true
+    },
+    {
+     "machineId": "M1",
+     "at": "2026-11-18T12:00:00Z",
+     "started": true
+    }
+   ]
+  }
+ ]
+}
