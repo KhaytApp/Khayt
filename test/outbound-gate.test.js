@@ -142,7 +142,7 @@ test('cloud with a book on disk that cannot be read: not held back (it is how su
 test('PR 3 wiring: every cloud request asks the gate', () => {
   const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
   const cc = read('lib/cloud-client.js');
-  assert.match(cc, /return async \(\{ method, path, body \}\) => \{\s*\n\s*await askGate\(base \+ path\);/);
+  assert.match(cc, /return async \(\{ method, path, body \}\) => \{\s*\n\s*await askGate\(base \+ path, opts\.purpose === 'storefront' \? 'storefront' : 'cloud'\);/);
   assert.match(cc, /const base = validateCloudBaseUrl\(baseUrl\);\s*\n\s*await askGate\(base\);\s*\n\s*\/\/ outbound: cloud\s*\n\s*const res = await fetch\(`\$\{base\}\/v1\/shops\/\$\{seg\(shopId\)\}\/intake/);
   const main = read('main.js');
   assert.match(main, /cloudClient\.setOutboundGate\(\(purpose, url\) => outboundGate\.gateFor\(purpose, url\)\);/);
@@ -284,4 +284,30 @@ test('round 2 (Nov 22): only the owner changes the switch under the staff lock, 
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
   const h = main.slice(main.indexOf("ipcMain.handle('hub:outbound-set-local'"));
   assert.match(h.slice(0, 400), /if \(!PrinterPermission\.mayChangeNetwork\(lanServerStore\)\) return \{ ok: false, error: 'not_permitted' \};/);
+});
+
+test('round 2 (Nov 22): the online store\'s cloud routes ask `storefront`, every other cloud request `cloud`', async () => {
+  const CC = require('../lib/cloud-client.js');
+  const asked = [];
+  const realFetch = global.fetch;
+  global.fetch = async () => ({ status: 200, json: async () => ({ ok: true, catalog: null, views: 0, carts: 0, orders: 0, items: [] }) });
+  CC.setOutboundGate(async (purpose, url) => { asked.push([purpose, new URL(url).pathname]); });
+  try {
+    const base = 'https://cloud.example.com';
+    await CC.putCatalog(base, 'S1', 't', { items: [] });
+    await CC.getCatalog(base, 'S1', 't');
+    await CC.storefrontStats(base, 'S1', 't');
+    await CC.putLeadTime(base, 'S1', 't', null);
+    await CC.listPublished(base, 'S1', 't');
+    await CC.health(base);
+  } finally {
+    global.fetch = realFetch;
+    CC.setOutboundGate(null);
+  }
+  assert.deepEqual(asked.map((a) => a[0]), ['storefront', 'storefront', 'storefront', 'storefront', 'cloud', 'cloud']);
+  // Kept alone, the online store goes and the cloud does not, and the reverse.
+  const { createOutboundGate } = require('../lib/main/outbound-fetch.js');
+  const g = createOutboundGate({ getSettings: () => ({ network: { offline: true, keep: ['storefront'] } }), readLocal: () => ({}) });
+  assert.equal(g.check('storefront').allowed, true);
+  assert.equal(g.check('cloud').allowed, false);
 });
