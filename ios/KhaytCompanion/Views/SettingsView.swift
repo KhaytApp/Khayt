@@ -496,25 +496,34 @@ struct SettingsNotificationsPage: View {
 struct SettingsPrivacyPage: View {
     @EnvironmentObject private var settings: ConnectionSettings
 
-    /// Only the owner changes the install count (and, when the phone has
-    /// them, the crash and usage opt-ins).
+    /// Anyone may turn the install count OFF; only the owner may turn it ON
+    /// (Turki, Nov 22). Saying no is never gated; saying yes for the shop is
+    /// the owner's.
     static func ownerMayChange(_ effectiveRole: String) -> Bool { effectiveRole == "owner" }
+    static func mayTurn(on: Bool, role effectiveRole: String) -> Bool { !on || ownerMayChange(effectiveRole) }
+
+    /// The toggle's binding: a switch to ON below owner is refused (the
+    /// toggle is disabled then anyway); a switch to OFF always goes through.
+    private var countInstall: Binding<Bool> {
+        Binding(get: { settings.countInstall },
+                set: { on in if Self.mayTurn(on: on, role: settings.effectiveRole) { settings.countInstall = on } })
+    }
 
     var body: some View {
         SettingsPage {
             if ActiveCountSender.ready {
-                // The owner's to change (Turki: "install count and telemetry
-                // owner-only", as #2636/#2642 on the desktop and the Mac). It
-                // stays a value of this phone; below owner it is shown, not
-                // changed.
+                // Off for anyone, on for the owner only (Turki, Nov 22; the
+                // desktop's and the Mac's are owner-only, #2636/#2642). It
+                // stays a value of this phone.
+                let owner = Self.ownerMayChange(settings.effectiveRole)
                 VStack(spacing: 0) {
-                    SettingsPieces.toggle(L10n.tr("settings.count_install"), $settings.countInstall, last: true)
-                        .disabled(!Self.ownerMayChange(settings.effectiveRole))
+                    SettingsPieces.toggle(L10n.tr("settings.count_install"), countInstall, last: true)
+                        .disabled(!owner && !settings.countInstall)
                 }
                 .card()
                 .padding(.top, 12)
                 SettingsPieces.foot(L10n.tr("settings.count_install.hint"))
-                if !Self.ownerMayChange(settings.effectiveRole) {
+                if !owner {
                     SettingsPieces.foot(L10n.tr("settings.count_install.owner_only"))
                 }
             }

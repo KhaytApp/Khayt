@@ -565,7 +565,7 @@
 "settings.live_activities" = "锁定屏幕上的打印";
 "settings.count_install.hint" = "每天一次，仅发送 App 的平台、版本和发布渠道，以及这是否是本周、本月或有史以来的第一天。不含 ID，也不含任何店铺信息。";
 "settings.count_install" = "统计此次安装（匿名）";
-"settings.count_install.owner_only" = "只有店主可以更改此项。";
+"settings.count_install.owner_only" = "只有店主可以开启此项。";
 "settings.privacy" = "隐私";
 "settings.privacy_policy" = "隐私政策";
 "alert.print.finished" = "打印完成";

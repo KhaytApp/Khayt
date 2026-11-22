@@ -565,7 +565,7 @@
 "settings.live_activities" = "Drucke auf dem Sperrbildschirm";
 "settings.count_install.hint" = "Sendet einmal täglich nur Plattform, Version und Release-Kanal der App sowie ob dies der erste Tag dieser Woche, dieses Monats oder überhaupt ist. Keine ID, nichts über deinen Shop.";
 "settings.count_install" = "Diese Installation zählen (anonym)";
-"settings.count_install.owner_only" = "Nur der Inhaber kann das ändern.";
+"settings.count_install.owner_only" = "Nur der Inhaber kann das einschalten.";
 "settings.privacy" = "Datenschutz";
 "settings.privacy_policy" = "Datenschutzerklärung";
 "alert.print.finished" = "Druck abgeschlossen";

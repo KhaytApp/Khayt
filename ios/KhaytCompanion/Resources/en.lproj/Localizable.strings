@@ -565,7 +565,7 @@
 "settings.live_activities" = "Prints on the Lock Screen";
 "settings.count_install.hint" = "Once a day, sends only the app's platform, version and release channel, and whether this is its first day this week, this month or ever. No id, nothing about your shop.";
 "settings.count_install" = "Count this install (anonymous)";
-"settings.count_install.owner_only" = "Only the owner can change this.";
+"settings.count_install.owner_only" = "Only the owner can turn this on.";
 "settings.privacy" = "Privacy";
 "settings.privacy_policy" = "Privacy policy";
 "alert.print.finished" = "Print finished";

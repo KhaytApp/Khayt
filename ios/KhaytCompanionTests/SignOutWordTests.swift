@@ -32,7 +32,7 @@ final class SignOutWordTests: XCTestCase {
             XCTAssertTrue(t["settings.unpair.footer"]?.contains("Khayt Cloud") == true || t["settings.unpair.footer"]?.contains("سحابة خيط") == true,
                           "\(lang): the footer says Khayt Cloud is signed out too")
         }
-        XCTAssertEqual(try table("en")["settings.count_install.owner_only"], "Only the owner can change this.")
+        XCTAssertEqual(try table("en")["settings.count_install.owner_only"], "Only the owner can turn this on.")
     }
 
     func testOnlyTheOwnerChangesTheInstallCount() {
@@ -43,5 +43,17 @@ final class SignOutWordTests: XCTestCase {
         // A phone paired with the PIN before roles is the owner, as it always was.
         XCTAssertTrue(SettingsPrivacyPage.ownerMayChange(DeviceRole.effective(role: nil, pairedByCode: false)))
         XCTAssertFalse(SettingsPrivacyPage.ownerMayChange(DeviceRole.effective(role: nil, pairedByCode: true)))
+    }
+
+    /// Turki, Nov 22: anyone may turn the install count OFF; only the owner
+    /// may turn it ON.
+    func testAnyoneTurnsTheCountOffOnlyTheOwnerTurnsItOn() {
+        for role in ["owner", "manager", "operator", "viewer", ""] {
+            XCTAssertTrue(SettingsPrivacyPage.mayTurn(on: false, role: role), "\(role) may turn it off")
+        }
+        XCTAssertTrue(SettingsPrivacyPage.mayTurn(on: true, role: "owner"))
+        for role in ["manager", "operator", "viewer", ""] {
+            XCTAssertFalse(SettingsPrivacyPage.mayTurn(on: true, role: role), "\(role) may not turn it on")
+        }
     }
 }

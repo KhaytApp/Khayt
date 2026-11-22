@@ -565,7 +565,7 @@
 "settings.live_activities" = "Impressions sur l’écran verrouillé";
 "settings.count_install.hint" = "Une fois par jour, envoie uniquement la plateforme, la version et le canal de diffusion de l’app, et s’il s’agit de son premier jour cette semaine, ce mois-ci ou jamais. Aucun identifiant, rien sur votre atelier.";
 "settings.count_install" = "Compter cette installation (anonyme)";
-"settings.count_install.owner_only" = "Seul le propriétaire peut modifier ce réglage.";
+"settings.count_install.owner_only" = "Seul le propriétaire peut activer ce réglage.";
 "settings.privacy" = "Confidentialité";
 "settings.privacy_policy" = "Politique de confidentialité";
 "alert.print.finished" = "Impression terminée";

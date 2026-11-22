@@ -565,7 +565,7 @@
 "settings.live_activities" = "Impresiones en la pantalla de bloqueo";
 "settings.count_install.hint" = "Una vez al día, envía solo la plataforma, la versión y el canal de publicación de la app, y si es su primer día de esta semana, este mes o en total. Sin ID, nada sobre tu taller.";
 "settings.count_install" = "Contar esta instalación (anónimo)";
-"settings.count_install.owner_only" = "Solo el propietario puede cambiar esto.";
+"settings.count_install.owner_only" = "Solo el propietario puede activar esto.";
 "settings.privacy" = "Privacidad";
 "settings.privacy_policy" = "Política de privacidad";
 "alert.print.finished" = "Impresión terminada";

@@ -565,7 +565,7 @@
 "settings.live_activities" = "ロック画面の印刷状況";
 "settings.count_install.hint" = "1日1回、アプリのプラットフォーム、バージョン、リリースチャンネルと、今週・今月・初めての初日かどうかだけを送信します。IDやお店に関する情報は含まれません。";
 "settings.count_install" = "このインストールをカウント(匿名)";
-"settings.count_install.owner_only" = "これを変更できるのはオーナーだけです。";
+"settings.count_install.owner_only" = "これをオンにできるのはオーナーだけです。";
 "settings.privacy" = "プライバシー";
 "settings.privacy_policy" = "プライバシーポリシー";
 "alert.print.finished" = "印刷完了";
