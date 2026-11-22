@@ -27,6 +27,7 @@ import KhaytCore
 extension Shop {
 
     nonisolated static let offlineHereKey = "network.offlineHere"
+    nonisolated static let offlineHereAtKey = "network.offlineHereAt"
 
     /// The app's first act: the book is unread, and this Mac's own switches
     /// are known already. Never puts a loaded shop back to "starting".
@@ -73,6 +74,7 @@ extension Shop {
         outboundGate.update(local: outboundLocal)
         outboundGate.update(book: .settings(Self.outboundBook(real: source.isReal, settings: settingsDict,
                                                               defaults: outboundDefaults)))
+        outboundRevision &+= 1
     }
 
     /// The settings the gate goes by: the shop's own book's, remembered on
@@ -181,6 +183,7 @@ extension Shop {
         held["network"] = Self.network(held["network"], offline: on, by: name, at: now)
         settingsValue = .object(held)
         if !on, !outboundGate.isOffline { outboundGate.clearCounts() }
+        if !on { outboundNotice = nil }
         await load(source)
         return true
     }
@@ -192,6 +195,7 @@ extension Shop {
         guard permitted("security", "edit") else { return false }
         guard Self.keepable.contains(purpose) else { return false }
         guard await writeNetwork({ Self.network($0, keep: purpose, kept) }) else { return false }
+        if kept { outboundNotice = nil }
         await load(source)
         tellOutboundGate()
         return true
@@ -205,6 +209,9 @@ extension Shop {
         moveProblem = nil
         guard permitted("security", "edit") else { return false }
         outboundDefaults.set(on, forKey: Self.offlineHereKey)
+        // When it was turned on, for the count of days without updates.
+        if on { outboundDefaults.set(Date(), forKey: Self.offlineHereAtKey) }
+        else { outboundDefaults.removeObject(forKey: Self.offlineHereAtKey); outboundNotice = nil }
         tellOutboundGate()
         if !on, !outboundGate.isOffline { outboundGate.clearCounts() }
         return true
@@ -221,7 +228,8 @@ extension Shop {
     /// Called as a refusal is put into words. Set on the next turn of the
     /// main queue: this runs inside whatever is drawing the sentence.
     func noteOutboundRefusal(_ blocked: OutboundBlocked, sentence: String) {
-        guard Self.askedFor.contains(blocked.purpose), blocked.reason != "settings-unknown" else { return }
+        // Never one that names a host: this is drawn on every screen.
+        guard Self.askedFor.contains(blocked.purpose), blocked.reason != "settings-unknown", blocked.host == nil else { return }
         DispatchQueue.main.async { [weak self] in
             MainActor.assumeIsolated { if self?.outboundNotice != sentence { self?.outboundNotice = sentence } }
         }

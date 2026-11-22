@@ -1945,7 +1945,7 @@
  "mac.pair_locked_some": "Ein Gerät in diesem Netzwerk hat zu oft eine falsche PIN eingegeben. Es kann sich erst koppeln, wenn Sie erneut auf „Telefon koppeln“ klicken. Andere Telefone können es weiterhin.",
  "mac.pair_loopback": "Ein Telefon kann diesen Mac noch nicht erreichen. Schalten Sie oben „Auf allen Netzwerkschnittstellen lauschen (LAN)“ ein und speichern Sie.",
  "mac.pair_open": "Telefon koppeln",
- "mac.net_row_on": "Khayt stellt keine Internetverbindungen her.",
+ "mac.net_row_on": "„Keine Internetverbindungen herstellen“ ist eingeschaltet.",
  "mac.net_row_off": "Was Khayt über das Internet sendet, und ein Schalter, um es zu stoppen.",
  "mac.net_title": "Internetnutzung",
  "mac.net_open": "Internetnutzung…",

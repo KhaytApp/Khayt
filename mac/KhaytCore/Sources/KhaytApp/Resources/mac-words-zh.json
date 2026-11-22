@@ -1945,7 +1945,7 @@
  "mac.pair_locked_some": "此网络中的某台设备输入错误 PIN 的次数过多。在你再次点按“配对手机”之前，它无法配对。其他手机不受影响。",
  "mac.pair_loopback": "手机尚无法连接这台 Mac。请打开上方的“监听所有网络接口 (LAN)”并保存。",
  "mac.pair_open": "配对手机",
- "mac.net_row_on": "Khayt 当前不进行任何互联网访问。",
+ "mac.net_row_on": "“不进行任何互联网访问”已开启。",
  "mac.net_row_off": "Khayt 通过互联网发送的内容，以及一个停止它的开关。",
  "mac.net_title": "互联网使用",
  "mac.net_open": "互联网使用…",

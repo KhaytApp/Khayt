@@ -58,7 +58,10 @@ enum InternetUse {
     ///   while the shop is online; while it is offline it answers "offline"
     ///   first, and the row would read Blocked for something the shop never
     ///   turned on. The frames say "Off (its own switch)" in both.
-    static func lines(rows: [OutboundGate.Row], offline: Bool, notSetUp: Set<OutboundPurpose>,
+    /// - `shopOffline`: the SHOP's switch is on. Keep ticks belong to it
+    ///   alone: this Mac's own switch is answered before `keep`, so under it
+    ///   a tick would be drawn, written to the shared book, and ignored.
+    static func lines(rows: [OutboundGate.Row], offline: Bool, shopOffline: Bool? = nil, notSetUp: Set<OutboundPurpose>,
                       ownOff: Set<OutboundPurpose> = [],
                       blocked: [OutboundPurpose: OutboundGate.Blocked]) -> [Line] {
         let byId = Dictionary(rows.map { ($0.purpose, $0) }, uniquingKeysWith: { a, _ in a })
@@ -72,7 +75,7 @@ enum InternetUse {
             else if row.allowed { state = .allowed }
             else { state = .blocked }
             return Line(purpose: purpose, state: state, automatic: row.automatic,
-                        keepShown: offline && purpose != .lan, kept: row.kept,
+                        keepShown: (shopOffline ?? offline) && purpose != .lan, kept: row.kept,
                         blocked: state == .blocked ? blocked[purpose] : nil)
         }
     }
@@ -119,8 +122,13 @@ enum InternetUse {
     /// switch is what stops them. Nil while updates are allowed or kept.
     /// Counted from the last check that went out; a Mac that never checked
     /// counts from when the switch was turned on.
+    ///
+    /// From whichever is LATER: a Mac whose last check was two months ago and
+    /// whose switch went on today has been without them, because of the
+    /// switch, for no days yet. A stamp in the future is read as now.
     static func daysWithoutUpdates(allowed: Bool, lastChecked: Date?, switchedAt: Date?, now: Date) -> Int? {
-        guard !allowed, let since = lastChecked ?? switchedAt else { return nil }
+        guard !allowed else { return nil }
+        guard let since = [lastChecked, switchedAt].compactMap({ $0 }).map({ min($0, now) }).max() else { return nil }
         return max(0, Int(now.timeIntervalSince(since) / 86_400))
     }
 
@@ -137,7 +145,8 @@ enum InternetUse {
 
     static func switchedBy(_ network: [String: JSONValue]) -> String? {
         guard case .string(let name)? = network["changedBy"], !name.isEmpty else { return nil }
-        return name
+        // The book is shared; a name is a name, not a paragraph.
+        return String(name.prefix(60))
     }
 }
 
@@ -153,9 +162,13 @@ extension Shop {
         func filled(_ value: JSONValue?) -> Bool { if case .string(let t)? = value { return !t.isEmpty }; return false }
         var missing: Set<OutboundPurpose> = []
         if !cloudConnected { missing.insert(.cloud) }
-        if CloudLibrary.remoteInUse(s) == .none, !offsite.settings.enabled { missing.insert(.storage) }
+        // A bucket or Drive of the shop's own. The vault is Khayt Cloud's row.
+        let remote = CloudLibrary.remoteInUse(s)
+        if remote != .bucket, remote != .drive, !offsite.settings.enabled { missing.insert(.storage) }
         let ntfy = object("ntfy"), telegram = object("telegram")
-        let messaging = !emailProvider.isEmpty || smsProvider != nil || whatsAppBusinessAccount() != nil
+        // "none" and "mailto" are saved by the email screen and send nothing from here.
+        let emails = !["", "none", "mailto"].contains(emailProvider)
+        let messaging = emails || smsProvider != nil || whatsAppBusinessAccount() != nil
             || (on(ntfy["enabled"]) && filled(ntfy["topic"]))
             || (filled(telegram["botToken"]) && filled(telegram["chatId"]))
         if !messaging { missing.insert(.messaging) }
@@ -179,15 +192,23 @@ extension Shop {
         if !telemetryConsent.usage { ownOff.insert(.usageStats) }
         if outboundLocal.installCountOff { ownOff.insert(.installCount) }
         return InternetUse.lines(rows: outboundGate.rows(), offline: outboundGate.isOffline,
+                          shopOffline: outboundGate.isShopOffline,
                           notSetUp: internetUseNotSetUp(makerRunLinked: makerRunLinked), ownOff: ownOff,
                           blocked: outboundGate.blockedCounts())
     }
 
-    /// Days without an update check, for the row and the banner.
+    /// Days without an update check, for the row and the banner: only while
+    /// one of the two switches is what refuses it (never while the book is
+    /// still unread, and never for a shop that is online).
     func daysWithoutUpdates(now: Date = Date()) -> Int? {
-        InternetUse.daysWithoutUpdates(allowed: outboundGate.verdict(.updates).allowed,
-                                       lastChecked: Updates.shared.lastChecked,
-                                       switchedAt: InternetUse.switchedAt(networkSettings), now: now)
+        let verdict = outboundGate.verdict(.updates)
+        guard !verdict.allowed, verdict.reason == "offline" || verdict.reason == "offline-here" else { return nil }
+        // When the switch that refuses it was turned on: this Mac's own, or the shop's.
+        var switched: [Date] = []
+        if outboundOfflineHere, let at = outboundDefaults.object(forKey: Self.offlineHereAtKey) as? Date { switched.append(at) }
+        if outboundGate.isShopOffline, let at = InternetUse.switchedAt(networkSettings) { switched.append(at) }
+        return InternetUse.daysWithoutUpdates(allowed: false, lastChecked: Updates.shared.lastChecked,
+                                              switchedAt: switched.min(), now: now)
     }
 }
 
@@ -206,10 +227,12 @@ struct InternetUsePage: View {
 
     private var words: Words { shop.words }
     private var lines: [InternetUse.Line] {
-        _ = tick
+        _ = tick; _ = shop.outboundRevision
         return pretend ?? shop.internetUseLines(makerRunLinked: makerRunLinked)
     }
-    private var shopOffline: Bool { shop.networkSettings["offline"].map { $0 != .bool(false) } ?? false }
+    /// The shop's switch as the RULE reads it, so the switch drawn here and
+    /// the rows below it can never disagree.
+    private var shopOffline: Bool { _ = shop.outboundRevision; return shop.outboundGate.isShopOffline }
     private var mayChange: Bool { pretendMayChange ?? shop.mayChangeOutbound }
 
     var body: some View {
@@ -270,6 +293,12 @@ struct InternetUsePage: View {
             if !mayChange {
                 Text(words.callIt("mac.net_owner_only")).font(.system(size: 11)).foregroundStyle(.secondary)
                     .padding(.top, 2)
+            }
+            // A change that was not made says why HERE: the shop window's
+            // banner is behind this sheet.
+            if pretend == nil, let problem = shop.moveProblem {
+                Text(problem).font(.system(size: 12)).foregroundStyle(Khayt.late)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -466,13 +495,14 @@ struct DrawnTick: View {
 struct InternetUseRow: View {
     let shop: Shop
     @State private var open = false
+    private var isOn: Bool { _ = shop.outboundRevision; return shop.outboundGate.isOffline }
 
     var body: some View {
         Section {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(shop.words.callIt("mac.net_title"))
-                    Text(shop.words.callIt(shop.outboundGate.isOffline ? "mac.net_row_on" : "mac.net_row_off"))
+                    Text(shop.words.callIt(isOn ? "mac.net_row_on" : "mac.net_row_off"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -482,7 +512,8 @@ struct InternetUseRow: View {
             }
             .shopSheet(isPresented: $open) {
                 InternetUsePage(shop: shop, done: { open = false })
-                    .frame(width: 880, height: 660)
+                    // Inside the Settings window's own minimum (800 × 640).
+                    .frame(width: 780, height: 600)
             }
             .onChange(of: shop.opensInternetUse) { _, wanted in
                 if wanted { open = true; shop.opensInternetUse = false }
@@ -514,6 +545,7 @@ struct UpdatesBlockedBanner: View {
     var now = Date()
 
     var body: some View {
+        let _ = shop.outboundRevision
         if let days = shop.daysWithoutUpdates(now: now), days >= InternetUse.bannerAfterDays {
             let here = shop.outboundGate.verdict(.updates).reason == "offline-here"
             Banner(text: shop.words.callIt(here ? "mac.net_banner_here" : "mac.net_banner",

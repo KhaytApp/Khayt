@@ -255,6 +255,9 @@ final class Shop {
     var feedsOutboundGate = Shop.inTheApp
     /// Settings ▸ General should open on Internet use (`OpenInternetUse`).
     var opensInternetUse = false
+    /// Moves whenever the gate is told something, so a view that asks the
+    /// gate (which is not observable) is redrawn.
+    var outboundRevision = 0
     /// A refusal of something a person asked for, said on every screen with
     /// a way to the setting (page 27, frame D). Nil when closed.
     var outboundNotice: String?

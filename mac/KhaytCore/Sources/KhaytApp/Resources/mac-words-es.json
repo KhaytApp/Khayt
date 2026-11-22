@@ -1945,7 +1945,7 @@
  "mac.pair_locked_some": "Un dispositivo de esta red introdujo un PIN incorrecto demasiadas veces. No podrá vincularse hasta que hagas clic de nuevo en Vincular un teléfono. Los demás teléfonos sí pueden.",
  "mac.pair_loopback": "Un teléfono aún no puede acceder a este Mac. Activa «Escuchar en todas las interfaces de red (LAN)» arriba y guarda.",
  "mac.pair_open": "Vincular un teléfono",
- "mac.net_row_on": "Khayt no está haciendo llamadas a internet.",
+ "mac.net_row_on": "«No hacer llamadas a internet» está activado.",
  "mac.net_row_off": "Qué envía Khayt por internet, y un interruptor para detenerlo.",
  "mac.net_title": "Uso de internet",
  "mac.net_open": "Uso de internet…",

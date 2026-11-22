@@ -4157,7 +4157,7 @@ final class Words {
         "mac.net_banner_here": ["en": "Khayt has not checked for updates for {n} days, so no security fixes have reached this Mac. This Mac is set to make no internet calls.", "ar": "لم يتحقق خيط من التحديثات منذ {n} يومًا، فلم تصل أي إصلاحات أمنية إلى هذا الـMac. هذا الـMac مضبوط على عدم الاتصال بالإنترنت."],
         "mac.net_keep_updates": ["en": "Keep updates", "ar": "إبقاء التحديثات"],
         "mac.net_open_use": ["en": "Open Internet use", "ar": "فتح استخدام الإنترنت"],
-        "mac.net_row_on": ["en": "Khayt is making no internet calls.", "ar": "خيط لا يجري أي اتصال بالإنترنت."],
+        "mac.net_row_on": ["en": "\"Make no internet calls\" is on.", "ar": "«عدم إجراء أي اتصال بالإنترنت» مُشغَّل."],
         "mac.net_row_off": ["en": "What Khayt sends over the internet, and a switch to stop it.", "ar": "ما يرسله خيط عبر الإنترنت، ومفتاح لإيقافه."],
         "mac.net_blocked_offline": ["en": "Khayt is set to make no internet calls. This needs {what}.", "ar": "خيط مضبوط على عدم إجراء أي اتصال بالإنترنت. هذا يحتاج إلى {what}."],
         "mac.net_blocked_here": ["en": "This Mac is set to make no internet calls. This needs {what}.", "ar": "هذا الـMac مضبوط على عدم إجراء أي اتصال بالإنترنت. هذا يحتاج إلى {what}."],

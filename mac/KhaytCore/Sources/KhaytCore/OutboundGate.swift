@@ -261,6 +261,16 @@ public final class OutboundGate: @unchecked Sendable {
     }
 
     /// Whether this Mac makes no internet calls now: the shop's switch, or its own.
+    /// The SHOP's switch alone, as the rule reads the book (a malformed
+    /// `settings.network` is on; `offline: null` is not), whatever this
+    /// computer's own switch says.
+    public var isShopOffline: Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let rule = rule() else { return true }
+        let ctx: JSONValue = .object(["local": .object(["offline": .bool(false)])])
+        return (try? rule.call2("KhaytOutbound.isOffline(ARG0, ARG1)", [settingsArgument, ctx], as: Bool.self)) ?? true
+    }
+
     public var isOffline: Bool {
         lock.lock(); defer { lock.unlock() }
         guard let rule = rule() else { return true }

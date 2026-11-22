@@ -76,11 +76,68 @@ struct InternetUseTests {
         #expect(online.first { $0.purpose == .cloud }?.state == .allowed)
     }
 
+    @Test("Keep ticks belong to the shop's switch: under this Mac's own switch alone none is drawn, and a kept row is not called Kept")
+    func keepNeedsTheShopSwitch() {
+        // Only this Mac's switch, with something kept in the book from before.
+        let hereOnly = InternetUse.lines(rows: Self.rows(offline: false, keep: ["storage"], local: .init(offline: true)),
+                                         offline: true, shopOffline: false, notSetUp: [], blocked: [:])
+        #expect(!hereOnly.contains { $0.keepShown })
+        #expect(hereOnly.first { $0.purpose == .storage }?.state == .blocked, "this Mac's switch is answered before keep")
+        // Both on: the ticks are the shop's and are drawn; this Mac still blocks.
+        let both = InternetUse.lines(rows: Self.rows(offline: true, keep: ["storage"], local: .init(offline: true)),
+                                     offline: true, shopOffline: true, notSetUp: [], blocked: [:])
+        #expect(both.first { $0.purpose == .storage }?.keepShown == true)
+        #expect(both.first { $0.purpose == .storage }?.state == .blocked)
+    }
+
+    @Test("the shop's switch is read as the rule reads it: malformed is on, null is off, this Mac's own switch is not the shop's")
+    func shopSwitchIsTheRules() {
+        func gate(_ network: JSONValue?, here: Bool = false) -> OutboundGate {
+            let g = OutboundGate()
+            g.update(local: .init(offline: here))
+            g.update(book: .settings(.object(network.map { ["network": $0] } ?? [:])))
+            return g
+        }
+        #expect(!gate(nil).isShopOffline)
+        #expect(gate(.object(["offline": .bool(true)])).isShopOffline)
+        #expect(!gate(.object(["offline": .null])).isShopOffline)
+        #expect(gate(.string("x")).isShopOffline, "a malformed block fails closed, and the switch drawn says so")
+        let here = gate(nil, here: true)
+        #expect(here.isOffline && !here.isShopOffline)
+    }
+
+    @Test("the 30-day count runs only while a switch refuses updates: not for an online shop, not while the book is unread")
+    func bannerOnlyUnderTheSwitch() async {
+        let shop = await OperatorLockTests.shop(on: false)
+        let gate = OutboundGate()
+        shop.outboundGate = gate
+        shop.outboundDefaults = UserDefaults(suiteName: "khayt.outbound.test.\(UUID().uuidString)")!
+        let now = Date()
+        #expect(shop.daysWithoutUpdates(now: now) == nil)
+        gate.update(book: .unread)
+        #expect(shop.daysWithoutUpdates(now: now) == nil, "starting is not a refusal by the switch")
+        gate.update(book: .settings(.object(["network": .object(["offline": .bool(true), "keep": .array([.string("updates")])])])))
+        #expect(shop.daysWithoutUpdates(now: now) == nil, "kept")
+    }
+
+    @Test("a name from the shared book is cut to a name's length; a refusal that names a host is never put on every screen")
+    func bounded() async throws {
+        #expect(InternetUse.switchedBy(["changedBy": .string(String(repeating: "a", count: 500))])?.count == 60)
+        let shop = await OperatorLockTests.shop(on: false)
+        shop.noteOutboundRefusal(.init(purpose: .ai, reason: "lan-host-public", host: "internal.example"), sentence: "x internal.example")
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(shop.outboundNotice == nil)
+    }
+
     @Test("days without updates: nil while allowed; counted from the last check that went out, else from when the switch was turned on")
     func updateDays() {
         let now = Date(timeIntervalSince1970: 1_795_000_000), day = 86_400.0
         #expect(InternetUse.daysWithoutUpdates(allowed: true, lastChecked: now.addingTimeInterval(-40 * day), switchedAt: nil, now: now) == nil)
-        #expect(InternetUse.daysWithoutUpdates(allowed: false, lastChecked: now.addingTimeInterval(-32 * day - 60), switchedAt: now, now: now) == 32)
+        #expect(InternetUse.daysWithoutUpdates(allowed: false, lastChecked: now.addingTimeInterval(-32 * day - 60), switchedAt: now.addingTimeInterval(-40 * day), now: now) == 32)
+        // Last checked two months ago, switch turned on today: no days yet, and no banner at once.
+        #expect(InternetUse.daysWithoutUpdates(allowed: false, lastChecked: now.addingTimeInterval(-60 * day), switchedAt: now, now: now) == 0)
+        // A stamp from the future (another computer's clock) is read as now.
+        #expect(InternetUse.daysWithoutUpdates(allowed: false, lastChecked: nil, switchedAt: now.addingTimeInterval(9 * day), now: now) == 0)
         #expect(InternetUse.daysWithoutUpdates(allowed: false, lastChecked: nil, switchedAt: now.addingTimeInterval(-29.9 * day), now: now) == 29)
         #expect(InternetUse.daysWithoutUpdates(allowed: false, lastChecked: nil, switchedAt: nil, now: now) == nil)
         #expect(InternetUse.daysWithoutUpdates(allowed: false, lastChecked: now.addingTimeInterval(day), switchedAt: nil, now: now) == 0, "a clock set back is not negative days")

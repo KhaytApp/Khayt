@@ -1945,7 +1945,7 @@
  "mac.pair_locked_some": "Um dispositivo nesta rede digitou um PIN errado vezes demais. Ele não pode parear até você clicar em Parear um celular de novo. Os outros celulares ainda podem.",
  "mac.pair_loopback": "Um celular ainda não consegue acessar este Mac. Ative “Escutar em todas as interfaces de rede (LAN)” acima e salve.",
  "mac.pair_open": "Parear um celular",
- "mac.net_row_on": "O Khayt não está fazendo chamadas à internet.",
+ "mac.net_row_on": "“Não fazer chamadas à internet” está ativado.",
  "mac.net_row_off": "O que o Khayt envia pela internet, e um interruptor para parar.",
  "mac.net_title": "Uso da internet",
  "mac.net_open": "Uso da internet…",
