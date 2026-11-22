@@ -18,4 +18,25 @@ extension KhaytEngine {
     public func outboundReasons() throws -> [String] {
         try runtime.call2("KhaytOutbound.REASONS", [], as: [String].self)
     }
+
+    /// A new change's stamp, MONOTONIC (Dev Hub, Nov 22; `lib/network-switch.js`
+    /// `stampAfter`, the same rule on the desktop): this computer's clock, or
+    /// one millisecond after the newest stamp it has seen, whichever is
+    /// later. Another computer whose clock runs a few minutes ahead publishes
+    /// a value stamped in this computer's future; a change made here "now"
+    /// would be stamped before it, refused by the server as stale, and never
+    /// win. `seen` entries that are not strict stamps are ignored.
+    public func networkSwitchStampAfter(now: Date, seen: [String?]) throws -> String {
+        let said = try runtime.call2("(KhaytNetworkSwitch.stampAfter(ARG0, ARG1) || '')",
+                                     [.number((now.timeIntervalSince1970 * 1000).rounded(.down)),
+                                      .array(seen.map { $0.map(JSONValue.string) ?? .null })], as: String.self)
+        guard !said.isEmpty else { throw CocoaError(.coderInvalidValue) }
+        return said
+    }
+
+    /// One millisecond before a stamp (`justBefore`): "at or after" asked of a strict "newer".
+    public func networkSwitchJustBefore(_ stamp: String) throws -> String? {
+        let said = try runtime.call2("(KhaytNetworkSwitch.justBefore(ARG0) || '')", [.string(stamp)], as: String.self)
+        return said.isEmpty ? nil : said
+    }
 }

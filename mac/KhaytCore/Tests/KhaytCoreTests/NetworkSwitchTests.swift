@@ -187,4 +187,32 @@ import Testing
         #expect(!gate(["offline": .bool(true), "via": via], here: true).verdict(.switchSync).allowed, "this computer's own switch stops it too")
         #expect(!gate(["offline": .bool(true), "via": .string("lan")]).verdict(.switchSync).allowed)
     }
+
+    @Test("a change is stamped by the shared rule: the clock, or one millisecond after the newest stamp seen")
+    func monotonicStamp() async throws {
+        let engine = try KhaytEngine()
+        let now = try #require(NetworkSwitch.date("2026-11-22T10:00:00.000Z"))
+        // Nothing seen, something older, or not a stamp: the clock.
+        #expect(try await engine.networkSwitchStampAfter(now: now, seen: []) == "2026-11-22T10:00:00.000Z")
+        #expect(try await engine.networkSwitchStampAfter(now: now, seen: [nil, "2026-11-22T09:59:59.999Z", "not a stamp"]) == "2026-11-22T10:00:00.000Z")
+        // Seen at this very millisecond, or ahead (another computer's clock): one millisecond after the newest.
+        #expect(try await engine.networkSwitchStampAfter(now: now, seen: ["2026-11-22T10:00:00.000Z"]) == "2026-11-22T10:00:00.001Z")
+        #expect(try await engine.networkSwitchStampAfter(now: now, seen: ["2026-11-22T10:05:00.000Z", "2026-11-22T10:04:00.000Z"]) == "2026-11-22T10:05:00.001Z")
+        #expect(try await engine.networkSwitchStampAfter(now: now, seen: ["2026-11-22T10:05:00Z"]) == "2026-11-22T10:05:00.001Z")
+        // What it says is a stamp the Mac's own reader takes, and it survives being written and read.
+        for seen in ["2026-11-22T10:05:00.123Z", "2026-11-22T10:04:59.999Z"] {
+            let stamped = try await engine.networkSwitchStampAfter(now: now, seen: [seen])
+            let seenAt = try #require(NetworkSwitch.date(seen)), at = try #require(NetworkSwitch.date(stamped))
+            #expect(at > seenAt && StoreWriter.iso(at) == stamped, Comment(rawValue: "\(seen) → \(stamped) → \(StoreWriter.iso(at))"))
+        }
+        // Many in a row stay strictly increasing.
+        var last = "2026-11-22T10:05:00.000Z"
+        for _ in 0..<50 {
+            let next = try await engine.networkSwitchStampAfter(now: now, seen: [last])
+            #expect(try #require(NetworkSwitch.date(next)) > (try #require(NetworkSwitch.date(last))))
+            last = next
+        }
+        #expect(try await engine.networkSwitchJustBefore("2026-11-22T10:05:00.000Z") == "2026-11-22T10:04:59.999Z")
+        #expect(try await engine.networkSwitchJustBefore("junk") == nil)
+    }
 }

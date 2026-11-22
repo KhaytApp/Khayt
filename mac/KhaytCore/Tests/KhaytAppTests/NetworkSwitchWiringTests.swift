@@ -975,6 +975,45 @@ struct NetworkSwitchWiringTests {
         #expect(token.lowerBound > read.lowerBound, "made inside the answer's own read")
     }
 
+    @Test("another computer's clock is five minutes ahead: a change made here still wins, and an off that cannot be sent is still retried")
+    func otherClockAhead() async throws {
+        // The shop is offline by a value another computer published, stamped five minutes in THIS Mac's future.
+        let ahead = StoreWriter.iso(Date().addingTimeInterval(300))
+        let (shop, server, book) = await Self.shop(option: true)
+        let theirs = try Self.published(.init(offline: true, keep: [], changedAt: ahead, changedBy: "Noura"))
+        await server.answerGet(200, theirs)
+        await Self.gated(shop) { await shop.checkNetworkSwitch() }
+        #expect(Self.obj(book.network)["offline"] == .bool(true) && shop.networkSwitchHighestSeen == ahead, "heard and applied")
+        // The owner turns it off HERE, now. The stamp is one millisecond after the other computer's, not this Mac's clock.
+        await server.forget()
+        #expect(await Self.gated(shop) { await shop.setOutboundOffline(false) })
+        let mine = try #require({ () -> String? in if case .string(let s)? = Self.obj(book.network)["changedAt"] { return s }; return nil }())
+        let mineAt = try #require(NetworkSwitch.date(mine)), aheadAt = try #require(NetworkSwitch.date(ahead))
+        #expect(mineAt > aheadAt && mineAt.timeIntervalSince(aheadAt) < 0.002, Comment(rawValue: "\(ahead) → \(mine)"))
+        // It is sent with that stamp, which the server takes as newer.
+        let asked = await server.asked
+        #expect(asked.map(\.method) == ["GET", "PUT"])
+        #expect(try Self.sent(asked[1].body, shop).changedAt == mine)
+        #expect(shop.networkSwitchUnsentOff == nil && shop.networkSwitchAsk == nil)
+        // And when it cannot be sent, it is remembered and retried: before, it was stamped
+        // earlier than a value already seen and silently given up.
+        let (later, server2, book2) = await Self.shop(option: true)
+        await server2.answerGet(200, theirs)
+        await Self.gated(later) { await later.checkNetworkSwitch() }
+        await server2.answerPut(503, Data())
+        #expect(await Self.gated(later) { await later.setOutboundOffline(false) })
+        let unsent = try #require(later.networkSwitchUnsentOff)
+        #expect(JSONValue.string(unsent) == Self.obj(book2.network)["changedAt"])
+        #expect(later.unsentOffStillStands(unsent), "not superseded by the stamp it was made after")
+        await server2.answerPut(200, Data(#"{"ok":true}"#.utf8))
+        await server2.forget()
+        #expect(await Self.gated(later) { await later.retryUnsentOff() } == .sent)
+        // Turning it ON again here is stamped after that, too.
+        #expect(await Self.gated(later) { await later.setOutboundOffline(true) })
+        let onStamp = try #require({ () -> String? in if case .string(let s)? = Self.obj(book2.network)["changedAt"] { return s }; return nil }())
+        #expect(try #require(NetworkSwitch.date(onStamp)) > (try #require(NetworkSwitch.date(unsent))))
+    }
+
     @Test("the three sentences are said in words, and the question's buttons wait while the answer reads")
     func answerWords() async throws {
         let (shop, _, _) = await Self.shop(option: true)

@@ -189,7 +189,14 @@ extension Shop {
         outboundChanging = true
         defer { outboundChanging = false }
         let before = networkSettings
-        let next = Self.network(.object(before), offline: on, by: name, at: now)
+        // The stamp is monotonic: never earlier than the newest one this Mac
+        // has seen (the book's own and the highest heard from Khayt Cloud),
+        // so a computer whose clock runs ahead cannot make every change made
+        // here lose. The shared rule says when (`stampAfter`, as on the
+        // desktop); without an engine there is only the clock.
+        let stamped = try? await engine?.networkSwitchStampAfter(now: now, seen: [networkSwitchOwnStamp, networkSwitchHighestSeen])
+        let at = stamped.flatMap(NetworkSwitch.date) ?? now
+        let next = Self.network(.object(before), offline: on, by: name, at: at)
         let changed = Self.offlineOf(.object(before)) != on
         let stamp: String? = { if changed, case .object(let n) = next, case .string(let s)? = n["changedAt"] { return s }; return nil }()
         // What this Mac had seen before this change, for judging what another
@@ -206,7 +213,7 @@ extension Shop {
         // Mac itself published is never taken for another computer's.
         if told, let stamp { sawNetworkSwitchStamp(stamp, now: now) }
         let via: Bool? = changed ? (on && told) : nil
-        guard await writeNetwork({ Self.network($0, offline: on, by: name, at: now, viaCloud: via) }) else { return false }
+        guard await writeNetwork({ Self.network($0, offline: on, by: name, at: at, viaCloud: via) }) else { return false }
         if let stamp { sawNetworkSwitchStamp(stamp, now: now) }
         // TURNED OFF: this Mac is online again; its first calls say so to
         // Khayt Cloud if a value is published there (`Shop+NetworkSwitch`).
