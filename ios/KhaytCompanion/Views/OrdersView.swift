@@ -19,6 +19,7 @@ struct OrdersView: View {
     @EnvironmentObject private var api: KhaytAPIClient
     @EnvironmentObject private var printers: LivePrinters
     @EnvironmentObject private var ordersNav: OrdersNavigationState
+    @EnvironmentObject private var settings: ConnectionSettings
 
     enum Segment: String, CaseIterable, Identifiable {
         case active
@@ -182,13 +183,17 @@ struct OrdersView: View {
         .khaytScreen(title: L10n.tr("tab.orders"))
         .background(KhaytDesign.ground.ignoresSafeArea())
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { showIntake = true } label: { Image(systemName: "tray.and.arrow.down") }
-                    .accessibilityLabel(L10n.tr("intake.title"))
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showNewOrder = true } label: { Image(systemName: "plus") }
-                    .accessibilityLabel(L10n.tr("order.new.title"))
+            // A floor phone takes no customer requests and makes no jobs:
+            // both are customers and prices (D-P6 a).
+            if !settings.isFloorPhone {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showIntake = true } label: { Image(systemName: "tray.and.arrow.down") }
+                        .accessibilityLabel(L10n.tr("intake.title"))
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showNewOrder = true } label: { Image(systemName: "plus") }
+                        .accessibilityLabel(L10n.tr("order.new.title"))
+                }
             }
         }
         .sheet(isPresented: $showIntake) { IntakeView() }
@@ -258,7 +263,8 @@ struct OrdersView: View {
 
     private var segmentPicker: some View {
         HStack(spacing: 3) {
-            ForEach(Segment.allCases) { s in
+            // Quotes are prices: not a floor phone's (frame 255:28).
+            ForEach(Segment.allCases.filter { !settings.isFloorPhone || $0 != .quotes }) { s in
                 let on = s == segment
                 Button {
                     segment = s

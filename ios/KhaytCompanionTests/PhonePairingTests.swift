@@ -328,6 +328,24 @@ final class PhonePairingTests: XCTestCase {
         XCTAssertEqual(s.pin, "1234", "nothing changed")
     }
 
+    /// The role is believed only from an answer the Mac signed: an unsigned
+    /// one, or one whose MAC is over other words, pairs nothing.
+    func testARoleAnswerTheMacDidNotSignIsNotBelieved() async throws {
+        for signing in [StubPairMac.ReplySigning.unsigned, .forged] {
+            StubPairMac.reset()
+            StubPairMac.replySigning = signing
+            StubPairMac.role = "owner"
+            let s = freshSettings()
+            let api = KhaytAPIClient(settings: s, protocols: [StubPairMac.self], withBook: false)
+            guard case .number(let ticket) = await api.startCodePairing(name: "x", version: "1") else { return XCTFail() }
+            StubPairMac.approved = true
+            let done = await api.finishCodePairing(ticket)
+            XCTAssertFalse(done, "\(signing)")
+            XCTAssertNil(s.device, "\(signing)")
+            XCTAssertNil(s.deviceRole, "\(signing)")
+        }
+    }
+
     func testAnOlderMacFallsBackToThePin() async {
         let s = freshSettings()
         StubPairMac.hasRoute = false
@@ -365,6 +383,10 @@ final class StubPairMac: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var key: SymmetricKey?
     nonisolated(unsafe) static var sentPin: String?
     nonisolated(unsafe) static var selfSigned = false
+    /// How the Mac signs its role answer: as #2631 does, not at all, or with
+    /// a MAC that is not over this answer (a forgery).
+    enum ReplySigning { case signed, unsigned, forged }
+    nonisolated(unsafe) static var replySigning = ReplySigning.signed
     static let identity = Curve25519.Signing.PrivateKey()
     nonisolated(unsafe) static var server = Curve25519.KeyAgreement.PrivateKey()
     static let deviceId = "dev_stubCodePhone01"
@@ -374,6 +396,7 @@ final class StubPairMac: URLProtocol, @unchecked Sendable {
     static func reset() {
         hasRoute = true; closed = false; approved = false; enrols = true; role = "operator"; commit = ""; check = ""
         key = nil; sentPin = nil; selfSigned = false; server = Curve25519.KeyAgreement.PrivateKey()
+        replySigning = .signed
     }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-pair-stub.invalid" }
@@ -398,6 +421,7 @@ final class StubPairMac: URLProtocol, @unchecked Sendable {
         let serverPub = Self.server.publicKey.rawRepresentation.base64EncodedString()
         let idPub = Self.identity.publicKey.rawRepresentation.base64EncodedString()
         var answer: (Int, Any) = (404, ["error": "not found"])
+        var replyMacFor: (SymmetricKey, String)?
         switch (request.httpMethod ?? "GET", path) {
         case ("POST", "/api/devices/pair") where Self.hasRoute:
             if Self.closed { answer = (403, ["reason": "pairing-closed"]); break }
@@ -432,11 +456,22 @@ final class StubPairMac: URLProtocol, @unchecked Sendable {
             guard expected == request.value(forHTTPHeaderField: "x-khayt-mac") else { answer = (401, ["reason": "device-auth"]); break }
             Self.selfSigned = true
             answer = (200, ["deviceId": Self.deviceId, "role": Self.role.map { $0 as Any } ?? NSNull()])
+            replyMacFor = (key, request.value(forHTTPHeaderField: "x-khayt-nonce") ?? "")
         default: break
         }
         let data = try! JSONSerialization.data(withJSONObject: answer.1)
+        var fields = ["Content-Type": "application/json"]
+        // The reply MAC as docs/LAN_API.md writes it, worked out here on its
+        // own rather than with the phone's DeviceKey.replyMac.
+        if let (key, nonce) = replyMacFor, Self.replySigning != .unsigned {
+            let signedBody = Self.replySigning == .forged ? Data(#"{"role":"owner"}"#.utf8) : data
+            let hex = SHA256.hash(data: signedBody).map { String(format: "%02x", $0) }.joined()
+            let text = "khayt-reply-v1\n\(nonce)\n\(answer.0)\n\(hex)"
+            fields["x-khayt-reply-mac"] = Data(HMAC<SHA256>.authenticationCode(for: Data(text.utf8), using: key))
+                .base64EncodedString()
+        }
         let response = HTTPURLResponse(url: url, statusCode: answer.0, httpVersion: "HTTP/1.1",
-                                       headerFields: ["Content-Type": "application/json"])!
+                                       headerFields: fields)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)

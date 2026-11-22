@@ -16,6 +16,7 @@ struct JobCard: View {
 
     let order: QueueOrder
     var facts: OrderFacts? = nil
+    @Environment(\.hidesClients) private var hidesClients
     /// The live reading of the machine this job is on, when there is one and
     /// the job is printing — the design's progress row. Nil draws no row: a
     /// bar with nothing behind it would be a figure the phone does not have.
@@ -42,7 +43,7 @@ struct JobCard: View {
     /// many, when the book says. With no book, the printer stands in: on a shop
     /// floor it is the next most useful thing to know.
     var subtitle: String {
-        var parts = [order.displayClient]
+        var parts = hidesClients ? [] : [order.displayClient]
         if let facts {
             if let m = facts.material { parts.append(m) }
             if let q = facts.quantity { parts.append("×" + q.formatted(.number.locale(L10n.locale))) }
