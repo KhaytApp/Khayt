@@ -114,6 +114,10 @@ final class LanConnectorPairing {
     private(set) var deadline: TimeInterval?
     var isOpenNow: Bool { deadline != nil }
     private(set) var lastClosed: Closed?
+    /// How many times this window has shut. `lastClosed` can be the same value
+    /// twice running (two phones of one name, two timeouts), so whoever needs
+    /// to act on EVERY ending watches this.
+    private(set) var closes = 0
     /// The request the owner is looking at; nil while none has come.
     private(set) var pending: Request?
     /// Answers given in this window, by pair id, for the plugin's poll.
@@ -334,6 +338,7 @@ final class LanConnectorPairing {
         if let request = pending { answer(request, .expired) }
         deadline = nil
         lastClosed = why
+        closes += 1
     }
 
     // MARK: - Shared with the plugin

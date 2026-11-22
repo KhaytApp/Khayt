@@ -942,6 +942,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only pairing a phone by code (Figma page 26), on the sample, in
+            // memory (`SnapshotPhonePairing.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_PHONEPAIR"] == "1", let shop = subject {
+                await capturePhonePairing(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_APPS"] == "1", let shop = subject {
                 await captureConnectedApps(shop, into: dir, dark: dark)
                 NSApp.terminate(nil)
