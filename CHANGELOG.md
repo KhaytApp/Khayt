@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Windows/Linux (not on screen yet): a paired phone hears what each printer needs, as from the Mac.** `/api/machines/live` now carries each printer's `problems` (what it says is wrong, worst first) and `waiting` (why it waits for a person: a print to take off, a bed to clear, a runout, attention), always present and empty when nothing is needed. The Mac's shape (#2621), worked out by one shared rule, `lib/printer-needs.js`, so the two computers cannot tell a phone different things. A Bambu's and a Klipper printer's polls now carry the problems they read. (Windows/Linux publishes no live printer snapshot to Khayt Cloud yet; that is its own gap.)
+
 - **Shared rules (printer batch 3, not yet on screen): how each print ended, each printer's success rate, and "waiting at the machine" that survives a restart.**
   - **One result per print.** A printer's finished job now records how it ended (finished, cancelled or failed) when its last word says so (`lib/printer-poll-cache.js`). A Bambu print the shop cancelled ends on "FAILED" too; the cancel code it gives makes it a cancel, so it is not held against the printer. `lib/run-result.js` puts one result on each print run, once. The shop's own mark (a failed check, a scrapped print) beats the printer's "complete", which is kept beside it.
   - **Success rate per printer.** `lib/printer-success.js` counts finished against failed runs per printer, worst first. Cancelled runs are shown but not counted against the printer, and a printer with fewer than five decided runs is flagged as too few to judge.
