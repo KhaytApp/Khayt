@@ -1,0 +1,491 @@
+{
+ "about": "lib/outbound.js allowed(settings, purpose, ctx). Master switch in settings.network (book), stricter-only local override in ctx.local, each purpose's own opt-in after. lan is never blocked but must be a private address or LAN name while offline (or while the book is unread). Decided Nov 22 (D1-D6 as recommended). Mac and iPhone run this file through JSC.",
+ "purposes": [
+  "updates",
+  "install-count",
+  "crash-reports",
+  "usage-stats",
+  "cloud",
+  "makerrun",
+  "catalogues",
+  "storage",
+  "messaging",
+  "webhooks",
+  "payments",
+  "ai",
+  "tax-authority",
+  "exchange-rates",
+  "lookups",
+  "tunnel",
+  "lan"
+ ],
+ "cases": [
+  {
+   "why": "no network block at all is today's behaviour",
+   "settings": {},
+   "purpose": "updates",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
+  },
+  {
+   "why": "the master switch blocks the update check",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "a kept purpose still goes out while offline",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "updates"
+     ]
+    }
+   },
+   "purpose": "updates",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   }
+  },
+  {
+   "why": "keeping one purpose does not keep another",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "updates"
+     ]
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "crash reports stay opt-in even when online",
+   "settings": {
+    "telemetry": {
+     "crashOptIn": false
+    }
+   },
+   "purpose": "crash-reports",
+   "want": {
+    "allowed": false,
+    "reason": "opted-out"
+   }
+  },
+  {
+   "why": "crash reports opted in, online",
+   "settings": {
+    "telemetry": {
+     "crashOptIn": true
+    }
+   },
+   "purpose": "crash-reports",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
+  },
+  {
+   "why": "keeping crash reports does not opt the shop in",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "crash-reports"
+     ]
+    }
+   },
+   "purpose": "crash-reports",
+   "want": {
+    "allowed": false,
+    "reason": "opted-out"
+   }
+  },
+  {
+   "why": "opted in, but offline: the master switch wins and says so",
+   "settings": {
+    "network": {
+     "offline": true
+    },
+    "telemetry": {
+     "usageOptIn": true
+    }
+   },
+   "purpose": "usage-stats",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   }
+  },
+  {
+   "why": "the install count's own per-computer switch",
+   "settings": {},
+   "purpose": "install-count",
+   "want": {
+    "allowed": false,
+    "reason": "opted-out"
+   },
+   "ctx": {
+    "local": {
+     "installCountOff": true
+    }
+   }
+  },
+  {
+   "why": "this computer is stricter than the shop",
+   "settings": {
+    "network": {
+     "offline": false
+    }
+   },
+   "purpose": "webhooks",
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   },
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "no computer is looser than the shop (there is no local online)",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "messaging",
+   "want": {
+    "allowed": false,
+    "reason": "offline"
+   },
+   "ctx": {
+    "local": {
+     "offline": false
+    }
+   }
+  },
+  {
+   "why": "a printer on the LAN is never blocked",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "192.168.1.40"
+   }
+  },
+  {
+   "why": "a hosted Spoolman is internet traffic while offline",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "spoolman.example.com"
+   }
+  },
+  {
+   "why": "lan cannot be put in keep to turn it into a bypass",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "lan"
+     ]
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "8.8.8.8"
+   }
+  },
+  {
+   "why": "the book not read yet: wait, do not send",
+   "settings": null,
+   "purpose": "install-count",
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
+   }
+  },
+  {
+   "why": "an unknown purpose fails closed",
+   "settings": {},
+   "purpose": "telemetry",
+   "want": {
+    "allowed": false,
+    "reason": "unknown-purpose"
+   }
+  },
+  {
+   "why": "offline must be exactly true: 'yes' is not offline",
+   "settings": {
+    "network": {
+     "offline": "yes"
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": true,
+    "reason": "ok"
+   }
+  },
+  {
+   "why": "an unknown id in keep is ignored",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "telemetry",
+      "storage"
+     ]
+    }
+   },
+   "purpose": "storage",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   }
+  },
+  {
+   "why": "IPv6 loopback is on this computer",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "::1"
+   }
+  },
+  {
+   "why": "IPv6 unique-local, bracketed",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "[fd00::12]"
+   }
+  },
+  {
+   "why": "an mDNS name is on the LAN",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "prusa-core-one.local"
+   }
+  },
+  {
+   "why": "a single-label name is the LAN's own DNS",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "octopi"
+   }
+  },
+  {
+   "why": "a public IPv6 address is not",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "2001:4860:4860::8888"
+   }
+  },
+  {
+   "why": "Tailscale's range counts as the shop's own network",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "100.101.102.103"
+   }
+  },
+  {
+   "why": "offline with no host to check: refused",
+   "settings": {
+    "network": {
+     "offline": true
+    }
+   },
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-missing"
+   }
+  },
+  {
+   "why": "online, a lan call to any host is today's behaviour",
+   "settings": {},
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "spoolman.example.com"
+   }
+  },
+  {
+   "why": "this computer offline: lan checks the address too",
+   "settings": {},
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "spoolman.example.com",
+    "local": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "the book not read yet: a printer on the LAN still answers",
+   "settings": null,
+   "purpose": "lan",
+   "want": {
+    "allowed": true,
+    "reason": "lan"
+   },
+   "ctx": {
+    "host": "10.0.0.5"
+   }
+  },
+  {
+   "why": "the book not read yet: not to the internet",
+   "settings": null,
+   "purpose": "lan",
+   "want": {
+    "allowed": false,
+    "reason": "lan-host-public"
+   },
+   "ctx": {
+    "host": "example.com"
+   }
+  },
+  {
+   "why": "this computer offline beats a kept purpose",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "cloud"
+     ]
+    }
+   },
+   "purpose": "cloud",
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   },
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   }
+  },
+  {
+   "why": "a kept shop integration (D1)",
+   "settings": {
+    "network": {
+     "offline": true,
+     "keep": [
+      "messaging"
+     ]
+    }
+   },
+   "purpose": "messaging",
+   "want": {
+    "allowed": true,
+    "reason": "kept"
+   }
+  },
+  {
+   "why": "settings that are not an object",
+   "settings": [],
+   "purpose": "updates",
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
+   }
+  }
+ ]
+}
