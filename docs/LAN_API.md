@@ -1069,6 +1069,57 @@ still lists it, and the phone hides it either way:
 
 `progress`, `timeRemaining` (seconds) and the temperatures are rounded integers. A machine never heard from has its `id`, `name` and `hasPrinterApi`, and `null` for the rest.
 
+**When it last answered, and why it is not answering** (both apps, Nov 2026, draft; the Mac's names):
+
+- `lastOkAt`: when the printer last ANSWERED, ISO 8601, or `null` if it has not since the app started watching it. `lastUpdated` moves on a failed poll too; `lastOkAt` does not.
+- `errorCode`: `null` while the printer answers, else one word no language changes: `access-refused` (HTTP 401/403, an access code turned down), `http` (any other status; see `httpStatus`), `not-set-up` (no address, a bad port, a missing serial: nothing was asked), `certificate`, `unreadable`, `unreachable`. A client treats a word it does not know as `unreachable`. On the desktop the word comes from `lib/printer-poll-cache.js` `failureCode`, never from `error` (a sentence in the shop's language). Two differences from the Mac: the desktop connects to a Bambu without pinning its certificate, so it never sends `certificate`; and an SDCP (Elegoo) printer that turns the connection down reads `unreachable`, not `access-refused`. A machine that is `not-set-up` is never counted as offline, so it starts no search for a printer that moved.
+- `httpStatus`: the HTTP status of the failed poll when there was one, else `null`.
+
+### Khayt Cloud: the same rows away from the shop (`PUT /v1/shops/{shopId}/live/printers`)
+
+> **Published by both apps** (the Mac since Sep 2026, `LivePrinterPublisher.swift`
+> and `LivePrinters.swift`; Windows/Linux since Nov 2026,
+> `lib/main/live-printer-publisher.js` and `lib/live-snapshot.js`). The route is
+> khayt-cloud's: its `docs/api-contract.md`, "Live channel & live printers", is
+> the source of truth. This is what the two publishers share; where they differ it is said below.
+
+Not a LAN route: the computer sends the `/api/machines/live` rows above to Khayt
+Cloud, so a phone or the PWA away from the shop sees the same printers.
+
+- **Request.** `PUT {cloud}/v1/shops/{shopId}/live/printers`,
+  `Authorization: Bearer <the shop's cloud token>` (the token saved with the
+  Khayt Cloud sign-in), body `{ "ciphertext": <envelope object>, "at": "<ISO 8601>" }`.
+  `at` is the computer's time of the snapshot.
+- **Sealed.** `ciphertext` is the store's envelope `{ v, z: "gzip", iv, ct, tag }`
+  (AES-256-GCM under the shop's data key, the one unlocked with the sync
+  passphrase), as an object, not a string of it. The server never reads it.
+- **Plaintext.** `{ "v": 1, "at": <same as the request's>, "printers": [rows] }`.
+  Each row is the `/api/machines/live` row, with `lastUpdated` and `lastOkAt`
+  as epoch **milliseconds** (or `null`), never ISO strings. Every other field,
+  `problems`, `waiting`, `errorCode` and `httpStatus` included, is as above;
+  readers ignore fields they do not know.
+- **Size.** `JSON.stringify(ciphertext)` at most 65,536 characters. Over it, the
+  snapshot is sealed again with `filename` and `error` set to `null` on every
+  row; if that is still over, nothing is sent. No printer is dropped.
+- **Who publishes.** Every unlocked computer of the shop may, and the cloud keeps one snapshot, newest wins. On Windows/Linux a computer publishes only while it is hearing from the printers: at least one row answered in the last 3 minutes. The owner's laptop away from the shop, or a computer whose polling stopped, sends nothing rather than replacing the real picture with "not heard". (The Mac does not check this yet.)
+- **When.** On a change, at most every 2 s (the server's per-shop 429 line);
+  with nothing changed, a heartbeat every 45 s, so a viewer can tell idle from
+  a computer that is off. "Changed" compares the rows without `lastUpdated` and
+  `lastOkAt`: both move on every answered poll, and a healthy printer would
+  otherwise mean a snapshot every poll. A printer that stops answering changes
+  `error` and `errorCode`, so it is a change. Nothing is sent for a book with
+  no machines.
+- **Only while** Khayt Cloud is signed in and unlocked on that computer, for the
+  book's own shop, for a role that may write (a viewer's snapshot is a 403),
+  and while the "make no internet calls" switch allows Khayt Cloud (purpose
+  `cloud`). Locking or signing out stops it; so does quitting.
+- **Answers.** `200 { ok, receivedAt }`: sent. `429 { retryAfter }` (and
+  `Retry-After`): wait that many seconds; Windows/Linux reads only the body and
+  honours at most 5 minutes. `403`: stop for this session. `401`: the Mac treats
+  it as `403`; Windows/Linux stops until the shop signs in to Khayt Cloud again.
+  Anything else (`413`, a `5xx`, a deploy): try again 45 s later. No answer at
+  all: try at the next check.
+
 ### `POST /api/printer/{machineId}/{pause|resume|stop}`
 
 > **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it.
