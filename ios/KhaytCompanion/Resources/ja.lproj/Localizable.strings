@@ -1446,3 +1446,12 @@
 "mac.js_markup_q" = "お客様はこの案件の価格をすでに見ています。新しい上乗せ率で価格を変更しますか？";
 "mac.js_markup_change" = "価格を変更";
 "mac.js_new_total" = "新しい合計";
+
+/* The shop's "Make no internet calls" switch (P8): the desktop's words (#2633), signed off for photos on Nov 22. */
+"outbound.blocked.offline" = "Khayt はインターネット通信をしない設定です。この操作には%@が必要です。";
+"outbound.blocked.settings-unknown" = "Khayt を起動中です。しばらくしてからもう一度お試しください。";
+"outbound.purpose.cloud" = "Khayt Cloud";
+"outbound.purpose.lookups" = "照会";
+"outbound.purpose.webhooks" = "Webhook";
+"photos.blocked.detail" = "この iPhone では写真を表示・追加できません。オーナーは Mac の「インターネット利用」で Khayt Cloud を維持できます。";
+"photos.blocked.nothing_sent" = "何も送信されていません。";

@@ -1446,3 +1446,12 @@
 "mac.js_markup_q" = "客户已看到此作业的价格。要按新的加价率更改吗？";
 "mac.js_markup_change" = "更改价格";
 "mac.js_new_total" = "新合计";
+
+/* The shop's "Make no internet calls" switch (P8): the desktop's words (#2633), signed off for photos on Nov 22. */
+"outbound.blocked.offline" = "Khayt 已设置为不进行任何联网请求。此操作需要%@。";
+"outbound.blocked.settings-unknown" = "Khayt 正在启动。请稍后重试。";
+"outbound.purpose.cloud" = "Khayt Cloud";
+"outbound.purpose.lookups" = "查询";
+"outbound.purpose.webhooks" = "Webhooks";
+"photos.blocked.detail" = "无法在此手机上显示或添加照片。店主可以在 Mac 的“互联网使用”中保留 Khayt Cloud。";
+"photos.blocked.nothing_sent" = "未发送任何内容。";

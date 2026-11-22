@@ -1446,3 +1446,12 @@
 "mac.js_markup_q" = "رأى العميل سعر هذه المهمة. هل تغيّره إلى نسبة الإضافة الجديدة؟";
 "mac.js_markup_change" = "تغيير السعر";
 "mac.js_new_total" = "الإجمالي الجديد";
+
+/* The shop's "Make no internet calls" switch (P8): the desktop's words (#2633), signed off for photos on Nov 22. */
+"outbound.blocked.offline" = "خيط مضبوط على عدم الاتصال بالإنترنت. هذا الإجراء يحتاج إلى %@.";
+"outbound.blocked.settings-unknown" = "خيط قيد التشغيل. حاول مرة أخرى بعد لحظة.";
+"outbound.purpose.cloud" = "سحابة خيط";
+"outbound.purpose.lookups" = "عمليات البحث";
+"outbound.purpose.webhooks" = "Webhooks";
+"photos.blocked.detail" = "لا يمكن عرض الصور أو إضافتها من هذا الهاتف. يمكن للمالك إبقاء سحابة خيط في «استخدام الإنترنت» على الماك.";
+"photos.blocked.nothing_sent" = "لم يُرسَل شيء.";
