@@ -55,11 +55,15 @@ struct UpdateChecksTests {
         let defaults = UserDefaults(suiteName: "khayt.outbound.test.\(UUID().uuidString)")!
         defaults.set(true, forKey: Shop.offlineHereKey)
         let gate = OutboundGate()
-        Shop.outboundBegins(defaults: defaults, gate: gate)
+        Shop.outboundBegins(defaults: defaults, gate: gate, inTheApp: true)
         #expect(gate.currentBook == .unread && gate.currentLocal.offline)
         gate.update(book: .settings(.object([:])))
-        Shop.outboundBegins(defaults: defaults, gate: gate)
+        Shop.outboundBegins(defaults: defaults, gate: gate, inTheApp: true)
         #expect(gate.currentBook == .settings(.object([:])), "a loaded shop is not put back")
+        // A development run has no shop feeding the gate: it is never put to "starting".
+        let dev = OutboundGate()
+        Shop.outboundBegins(defaults: defaults, gate: dev, inTheApp: false)
+        #expect(dev.currentBook == .none)
         let main = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytApp/main.swift"), encoding: .utf8)
         let begins = try #require(main.range(of: "Shop.outboundBegins()"))

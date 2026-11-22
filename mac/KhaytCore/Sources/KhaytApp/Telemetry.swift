@@ -391,10 +391,24 @@ final class Telemetry {
 
     @ObservationIgnored private var lane: Task<Void, Never>?
 
+    /// What "make no internet calls" says about one kind, apart from the
+    /// opt-in (the caller's `consent`, read from the same settings, so the
+    /// rule's own "opted-out" is not a second veto).
+    enum SwitchSays { case allows, refuses, notKnownYet }
+
+    nonisolated static func switchSays(_ purpose: OutboundPurpose) -> SwitchSays {
+        let verdict = OutboundGate.shared.verdict(purpose)
+        if verdict.allowed || verdict.reason == "opted-out" { return .allows }
+        return verdict.reason == "settings-unknown" ? .notKnownYet : .refuses
+    }
+
     private func enqueueNow(_ kind: Kind, _ raw: [String: JSONValue], consent: TelemetryConsent,
                             engine: KhaytEngine, file: TelemetryQueueFile,
                             live: (() -> TelemetryConsent)?) async -> Bool {
         guard kind == .crash ? consent.crash : consent.usage else { return false }
+        // Not recorded at all while the switch refuses this kind: an event
+        // that is never queued cannot be sent later (D5).
+        guard Self.switchSays(kind == .crash ? .crashReports : .usageStats) != .refuses else { return false }
         var raw = raw
         raw["installId"] = .string(consent.installId)
         let payload: [String: JSONValue]?
@@ -480,13 +494,25 @@ final class Telemetry {
         // The opt-in itself is the caller's `consent`, read from the same
         // settings the gate holds; the gate is asked here only for what the
         // switch adds, so its own "opted-out" answer is not a second veto.
-        func switchAllows(_ purpose: OutboundPurpose) -> Bool {
-            let verdict = OutboundGate.shared.verdict(purpose)
-            if verdict.allowed || verdict.reason == "opted-out" { return true }
-            return OutboundGate.shared.allows(purpose)   // refused: counted on its row
+        let crashSwitch = Self.switchSays(.crashReports), usageSwitch = Self.switchSays(.usageStats)
+        let crashOk = consent.crash && crashSwitch == .allows
+        let usageOk = consent.usage && usageSwitch == .allows
+        // DROPPED, NOT KEPT FOR LATER (D5). A kind the switch refuses is taken
+        // out of the queue file here, so nothing recorded while the shop was
+        // offline goes out when the switch is turned off again. While the
+        // book is still unread nothing is dropped: that is not a refusal.
+        var refusedKinds: Set<String> = []
+        if consent.crash, crashSwitch == .refuses { refusedKinds.insert(Kind.crash.rawValue) }
+        if consent.usage, usageSwitch == .refuses { refusedKinds.insert(Kind.usage.rawValue) }
+        if !refusedKinds.isEmpty {
+            let queue = file.read()
+            let kept = queue.filter { item in
+                guard case .object(let o) = item, case .string(let kind)? = o["kind"] else { return true }
+                return !refusedKinds.contains(kind)
+            }
+            if kept.count != queue.count { file.write(kept) }
+            for kind in refusedKinds { _ = OutboundGate.shared.allows(kind == Kind.crash.rawValue ? .crashReports : .usageStats) }
         }
-        let crashOk = consent.crash && switchAllows(.crashReports)
-        let usageOk = consent.usage && switchAllows(.usageStats)
         guard crashOk || usageOk || !(consent.crash || consent.usage) else { return "blocked" }
         var allowed = consent
         allowed.crash = crashOk

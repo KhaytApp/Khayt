@@ -114,6 +114,12 @@ enum SmtpClient {
         guard !host.isEmpty, !relay.from.isEmpty, !mail.to.isEmpty else {
             throw Failure.incomplete
         }
+        // "Make no internet calls", asked before the name is looked up below.
+        // Plainly `messaging`, with no allowance for a relay on the shop's
+        // own network: the check that follows refuses every private address,
+        // so the only relay such an allowance could ever let through is a
+        // local-looking name that resolves to a public one.
+        try OutboundGate.shared.require(.messaging)
         // The same two layers the webhooks get, and for the same reason: the
         // host is typed by the shop, and `127.0.0.1` or a cloud metadata
         // address would make this app into a probe of its own network.
@@ -233,7 +239,7 @@ enum SmtpClient {
                 parameters.defaultProtocolStack.applicationProtocols.insert(options, at: 0)
             }
             let port = NWEndpoint.Port(rawValue: relay.port) ?? 587
-            try OutboundGate.shared.require(.messaging, orLanHost: relay.host)
+            try OutboundGate.shared.require(.messaging)
             let connection = NWConnection(host: .init(relay.host), port: port, using: parameters)
             let wire = Wire(connection)
 

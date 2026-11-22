@@ -936,6 +936,9 @@ public actor MakerRunClient {
 
     private func fetch(_ url: URL, to dest: URL, limit: Int, label: String,
                        timeout: TimeInterval = 120) async throws {
+        // Asked FIRST: the host check below looks the name up, and a refused
+        // download must not make even that query.
+        try OutboundGate.shared.require(.makerrun)
         let guardedSession = session
         let check: @Sendable (URL) -> Bool = { MakerRun.safeDownloadHost($0) }
         // The first hop is checked here, off the main thread (it looks the
@@ -945,7 +948,6 @@ public actor MakerRunClient {
         }
         guard firstOK else { throw MakerRun.Failure("refused", "Refusing a download from a private or non-HTTPS address.") }
         let delegate = RedirectGuard(check: check)
-        try OutboundGate.shared.require(.makerrun)
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "GET"
         let (tmp, response): (URL, URLResponse)

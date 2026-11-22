@@ -57,6 +57,9 @@ enum SpoolmanImport {
             let path = try await engine.spoolmanListPath(offset: n * page, limit: page)
             guard let url = URL(string: base.absoluteString + path) else { throw Problem.noAddress }
             try OutboundGate.shared.require(.lan, url: url)
+            // `printerHostAllowed` accepts any name; while the switch is on
+            // the name must resolve inside the shop's network too.
+            if n == 0 { try await OutboundLan.requireResolved(url.host()) }
             var request = URLRequest(url: url)
             request.timeoutInterval = 20
             let (data, response) = try await (fetch ?? { try await session.data(for: $0) })(request)

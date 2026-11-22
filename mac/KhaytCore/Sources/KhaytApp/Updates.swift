@@ -97,8 +97,15 @@ final class Updates {
     /// so a local build says so by being greyed out rather than by failing.
     var isAvailable: Bool { controller != nil }
 
-    /// When Sparkle last checked, for the Internet use pane's "Last checked".
-    var lastChecked: Date? { controller?.updater.lastUpdateCheckDate }
+    /// When a check last WENT OUT, for the Internet use pane's "Last
+    /// checked". Not Sparkle's `lastUpdateCheckDate`: Sparkle moves that on a
+    /// refused check too (read in `SPUUpdater.m`, `abortUpdateDriver`), so
+    /// under the switch it would always say "just now".
+    nonisolated static let lastAllowedKey = "updates.lastAllowedCheck"
+    var lastChecked: Date? {
+        UserDefaults.standard.object(forKey: Self.lastAllowedKey) as? Date ?? (
+            OutboundGate.shared.verdict(.updates).allowed ? controller?.updater.lastUpdateCheckDate : nil)
+    }
 
     /// The shop's book has been read. A launch check that the switch held
     /// back while the settings were unknown is made now, if they allow it.
@@ -182,6 +189,19 @@ final class LaunchProbe: NSObject, SPUUpdaterDelegate {
     /// alert, in the shop's words; a scheduled one is counted on its row.
     nonisolated func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
         try mayCheck()
+        UserDefaults.standard.set(Date(), forKey: Updates.lastAllowedKey)
+    }
+
+    /// Asked again once an update is found and before it is downloaded: an
+    /// alert left open across turning the switch on must not fetch the
+    /// archive when Install is clicked.
+    nonisolated func updater(_ updater: SPUUpdater, shouldProceedWithUpdate updateItem: SUAppcastItem,
+                             updateCheck: SPUUpdateCheck) throws {
+        do { try OutboundGate.shared.require(.updates) }
+        catch let blocked as OutboundBlocked {
+            throw NSError(domain: "app.khayt.outbound", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: Self.reason(blocked)])
+        }
     }
 
     /// The hook's own answer, apart from Sparkle's types so it can be tested.

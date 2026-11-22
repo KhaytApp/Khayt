@@ -30,7 +30,13 @@ extension Shop {
 
     /// The app's first act: the book is unread, and this Mac's own switches
     /// are known already. Never puts a loaded shop back to "starting".
-    static func outboundBegins(defaults: UserDefaults = .standard, gate: OutboundGate = .app) {
+    ///
+    /// Only in the app itself: a development run (`swift run`, the snapshot
+    /// runner) has no shop feeding the gate, and would stay "starting", so
+    /// offline, for its whole life.
+    static func outboundBegins(defaults: UserDefaults = .standard, gate: OutboundGate = .app,
+                               inTheApp: Bool = Shop.inTheApp) {
+        guard inTheApp else { return }
         gate.update(local: .init(offline: defaults.bool(forKey: offlineHereKey),
                                  installCountOff: defaults.bool(forKey: ActiveCountSender.offKey)))
         if gate.currentBook == .none { gate.update(book: .unread) }
@@ -55,10 +61,52 @@ extension Shop {
 
     /// Tell the gate what this shop's settings and this Mac say now. Called
     /// whenever the settings are set, and after either local switch changes.
+    ///
+    /// ONLY THE SHOP'S OWN BOOK SAYS. The sample book has no switch, so
+    /// opening it (anyone can, from the book menu) would otherwise put an
+    /// offline shop's Mac back online: updates, the install count and public
+    /// addresses typed into a printer would all go out again. While the
+    /// sample is open, and when the shop's book cannot be read, the gate
+    /// keeps what the shop's book last said (`lastKnownKey`).
     func tellOutboundGate() {
         guard feedsOutboundGate else { return }
         outboundGate.update(local: outboundLocal)
-        outboundGate.update(book: .settings(settingsValue))
+        outboundGate.update(book: .settings(Self.outboundBook(real: source.isReal, settings: settingsDict,
+                                                              defaults: outboundDefaults)))
+    }
+
+    /// The settings the gate goes by: the shop's own book's, remembered on
+    /// this Mac as they are read; for any other book, what was remembered.
+    nonisolated static func outboundBook(real: Bool, settings: [String: JSONValue], defaults: UserDefaults) -> JSONValue {
+        guard real else { return lastKnownSettings(defaults, telemetry: settings["telemetry"]) }
+        let network = settings["network"] ?? .object([:])
+        if let data = try? JSONEncoder().encode(network), data != defaults.data(forKey: lastKnownKey) {
+            defaults.set(data, forKey: lastKnownKey)
+        }
+        return .object(settings.filter { OutboundGate.settingsRead.contains($0.key) })
+    }
+
+    /// The shop's `settings.network` as its book last said it, kept on this
+    /// Mac for the moments no book of the shop's is open.
+    nonisolated static let lastKnownKey = "network.lastKnown"
+
+    nonisolated static func lastKnownSettings(_ defaults: UserDefaults, telemetry: JSONValue? = nil) -> JSONValue {
+        var settings: [String: JSONValue] = [:]
+        if let data = defaults.data(forKey: lastKnownKey), let network = try? JSONDecoder().decode(JSONValue.self, from: data) {
+            settings["network"] = network
+        }
+        if let telemetry { settings["telemetry"] = telemetry }
+        return .object(settings)
+    }
+
+    /// The shop's book could not be read. The gate must not stay "starting"
+    /// for ever (nothing but the shop's network would ever be called, not
+    /// even the cloud the shop would restore from): it goes by what the book
+    /// last said, which for a Mac that never had the switch on is online.
+    func outboundLoadFailed() {
+        guard feedsOutboundGate, outboundGate.currentBook == .unread else { return }
+        outboundGate.update(local: outboundLocal)
+        outboundGate.update(book: .settings(Self.lastKnownSettings(outboundDefaults)))
     }
 
     /// May whoever is here change either switch, or a Keep tick? Asks, says nothing.
@@ -115,25 +163,25 @@ extension Shop {
 
     /// Turn the shop's switch on or off. The owner's alone.
     ///
-    /// TURNING IT ON LETS ONE SYNC GO OUT FIRST. The switch lives in the book,
-    /// and the other computers and the phone learn it by sync: a switch that
-    /// blocked its own announcement would leave them calling out for ever
-    /// (the sync trap, design 1.4). So the book is written, one push is made
-    /// while the gate still holds the old settings, and only then is the gate
-    /// told. If that push fails, this Mac is offline all the same and the
-    /// others learn at their next sync with any computer that has it.
+    /// THIS MAC STOPS AT ONCE: the gate is told as soon as the book is
+    /// written. Nothing is sent first. The native Mac never sends settings
+    /// to Khayt Cloud and never takes them from it (`cloud-outbox.js`: a
+    /// setting is one object, with nowhere to go in a change), so there is no
+    /// announcement it could make; a phone reads the switch from this Mac's
+    /// own book over the shop's network. How the other computers learn is not
+    /// decided here (an open question on the draft).
     @discardableResult
     func setOutboundOffline(_ on: Bool, now: Date = Date()) async -> Bool {
         moveProblem = nil
         guard permitted("security", "edit") else { return false }
         let name: String? = lockInForce ? signedIn?.name : nil
         guard await writeNetwork({ Self.network($0, offline: on, by: name, at: now) }) else { return false }
-        if on, Self.cloudConnected(settingsDict), cloudUnlocked {
-            await sendToCloud(byPerson: false)
-        }
-        if !on { outboundGate.clearCounts() }
+        // Before the reload, which awaits: told now from what was written.
+        var held = settingsDict
+        held["network"] = Self.network(held["network"], offline: on, by: name, at: now)
+        settingsValue = .object(held)
+        if !on, !outboundGate.isOffline { outboundGate.clearCounts() }
         await load(source)
-        tellOutboundGate()
         return true
     }
 
@@ -157,8 +205,8 @@ extension Shop {
         moveProblem = nil
         guard permitted("security", "edit") else { return false }
         outboundDefaults.set(on, forKey: Self.offlineHereKey)
-        if !on, !outboundGate.isOffline { outboundGate.clearCounts() }
         tellOutboundGate()
+        if !on, !outboundGate.isOffline { outboundGate.clearCounts() }
         return true
     }
 

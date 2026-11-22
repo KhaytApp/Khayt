@@ -32,6 +32,9 @@ enum Ntfy {
         if !token.isEmpty, url.scheme?.lowercased() != "https" { throw Failure.tokenNeedsHTTPS }
         // A self-hosted ntfy on the shop's own network still works while the switch is on.
         try OutboundGate.shared.require(.messaging, orLan: url)
+        // Let through as the shop's own server, not as messaging: then its
+        // name must also resolve inside the shop's network (`OutboundLan`).
+        if !OutboundGate.shared.verdict(.messaging).allowed { try await OutboundLan.requireResolved(url.host()) }
         var r = URLRequest(url: url)
         r.httpMethod = "POST"
         r.timeoutInterval = 10

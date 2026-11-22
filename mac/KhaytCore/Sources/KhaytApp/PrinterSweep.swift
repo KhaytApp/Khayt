@@ -163,7 +163,7 @@ enum PrinterSweep {
     static func ask(_ host: String, port: Int, path: String,
                     type: String) async -> (String, String, Int, Data)? {
         guard let request = request(host, port: port, path: path) else { return nil }
-        let session = URLSession(configuration: .ephemeral)
+        let session = URLSession(configuration: .ephemeral, delegate: RefuseRedirects.shared, delegateQueue: nil)
         session.configuration.timeoutIntervalForRequest = perHost
         defer { session.finishTasksAndInvalidate() }
         guard let (data, response) = try? await session.data(for: request),
