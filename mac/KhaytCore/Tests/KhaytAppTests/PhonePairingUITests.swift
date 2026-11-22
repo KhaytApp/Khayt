@@ -312,12 +312,18 @@ struct PhonePairingUITests {
             #expect(line.contains("sign") && !line.lowercased().contains("remove"), Comment(rawValue: key))
             #expect(!line.contains("إزال") && !line.contains("أزل"), Comment(rawValue: key + " (ar)"))
         }
+        // A paired slicer too: one word for taking any paired device off.
+        #expect(words.contains(#""mac.apps_remove": ["en": "Sign out", "ar": "تسجيل الخروج"]"#))
+        #expect(words.contains(#""mac.apps_remove_q": ["en": "Sign out “{name}”?""#))
         let folder = sources.appending(path: "Resources")
         let gone = ["Entfernen", "entfernen", "Quitar", "quítalo", "quites", "Retirer", "retirez", "retiriez", "削除", "Remover", "remova", "removê", "Kaldır", "kaldır", "移除"]
         for lang in ["de", "es", "fr", "ja", "pt-BR", "tr", "zh"] {
             let data = try Data(contentsOf: folder.appending(path: "mac-words-\(lang).json"))
             let table = try #require(try JSONSerialization.jsonObject(with: data) as? [String: String])
             #expect(table["mac.phones_remove"] == nil && table["mac.phones_remove_q"] == nil, Comment(rawValue: lang))
+            // The slicer's button says what the phone's does, word for word.
+            #expect(table["mac.apps_remove"] == table["mac.phones_sign_out"], Comment(rawValue: lang))
+            #expect(table["mac.apps_remove_q"] == table["mac.phones_sign_out_q"], Comment(rawValue: lang))
             for key in ["mac.phones_roles_note", "mac.phones_roles_manager", "mac.phones_role_pin"] {
                 let said = try #require(table[key], Comment(rawValue: lang + " " + key))
                 #expect(!gone.contains { said.contains($0) }, Comment(rawValue: "\(lang) \(key): \(said)"))
