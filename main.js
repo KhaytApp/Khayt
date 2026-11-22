@@ -5490,6 +5490,13 @@ registerLanServer({
   // The library's own folders, so a paired phone can price a model without
   // the file leaving this computer. Rehydrate fetches back a tiered model.
   printLibrary: { itemDir: printLibItemDir, rehydrate: printLibRehydrate },
+  // Pairing a phone by a code, with a role (lib/main/phone-pairing.js). OFF
+  // until the phone ships it, as on the Mac: on only for a developer who
+  // starts Khayt with KHAYT_PHONE_PAIRING_BY_CODE=1. Read here, in main, so
+  // nothing the window sends can switch it on.
+  phonePairing: require('./lib/main/phone-pairing').createPhonePairing({
+    enabled: () => process.env.KHAYT_PHONE_PAIRING_BY_CODE === '1',
+  }),
 });
 
 /**

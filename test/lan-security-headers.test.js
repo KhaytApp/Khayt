@@ -33,7 +33,7 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', 'lib', 'lan-server.js'), 
  * `withSignedBody`, which reads a signed request's body before handing on.
  */
 function handlerPreamble() {
-  const i = SRC.indexOf('withSignedBody(rawReq, res, (req, device) => {');
+  const i = SRC.indexOf('withSignedBody(rawReq, res, (req, device, signedBody) => {');
   assert.ok(i > 0, 'could not find the LAN request handler — this guard has rotted');
   const start = SRC.indexOf('{', SRC.indexOf('=> {', i));
   return SRC.slice(start, start + 2000);

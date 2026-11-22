@@ -225,7 +225,46 @@ Two answers carry `x-khayt-reply-mac` = base64 `HMAC-SHA256(key, "khayt-reply-v1
 
 - **`GET /api/status?format=json` from a paired phone** (GET only, and only once this computer has read the book: an unread book answers the plain counts, never a signed "online") also answers `"network": {"offline": true|false, "keep": [...]}`, the shop's "make no internet calls" switch as `lib/outbound.js` reads the book (`isOffline(settings, {})`, `keptOf`), with `Cache-Control: no-store`. This happens only when the request's device signature verifies, a LAN PIN of full length is set and the `Host` is local. Anyone else, an unsigned request, or a signature that does not verify gets the public counts only, with no `network` and no MAC.
 - **`401 {"reason":"device-revoked"}` is signed** with the key the phone had, when the request's own signature verifies under that key inside the clock skew. A forged request naming the phone's id gets the same 401 unsigned. The old keys are kept for this only (they open nothing), for the 256 most recent sign-outs, with the ids. `device-unknown` (a PIN change, an id never seen) is never signed. A body over the size limit is refused before it is read (413 `too-large`), unsigned.
-- **Every phone paired with this computer is the owner** (enrolled with the owner PIN). The desktop has no pairing by code and no roles yet (`lib/device-roles.js` is not used here), so a phone in a floor role cannot be paired to Windows or Linux today. The `network` block is there so the phone has one way to read the switch on both computers.
+- **`GET /api/devices/self` and every `role-scope` 403 are signed** the same way (next section).
+
+### A paired phone's role, and pairing a phone by code (both apps, Nov 2026, draft)
+
+> **Served by both apps.** The native Mac (`LanServer.swift`) and `lib/lan-server.js` (Windows/Linux, not on screen yet: the desktop's screens wait for their Figma sign-off; main exposes the window over IPC). The rule is shared: [`lib/device-roles.js`](../lib/device-roles.js). The desktop's window and state machine are [`lib/main/phone-pairing.js`](../lib/main/phone-pairing.js).
+
+A paired phone carries a **role**: owner, manager, operator or viewer. The role is a set of scopes, and the server checks it on **every request the phone signs**, before the route runs. The phone's screens follow its role as a convenience; the server's answer is the check.
+
+- A request the role does not cover is answered **403** `{"reason":"role-scope","required":"<scope>"}`, the shape an API token gets for a scope it lacks. `required` is `owner` for a route the table does not name.
+- The check uses the path the server routes on (on the desktop, the parsed URL path: `/v1` read as `/api`, a trailing slash dropped, dot segments already folded by the URL parser, so the rule is asked about the route that will run). A segment that decodes to a slash, a backslash, a dot segment or a control character is owner-only.
+- A phone paired with the owner PIN has no role and is the **owner**, as it was. It holds the PIN, so it cannot be given a lesser role: remove it and pair it again by code.
+- A phone paired by code whose stored role is missing or not one this build knows is read as a **viewer**, never the owner (`roleOf`).
+- A role holds whether the staff lock is on or off. The owner PIN and API tokens are unchanged.
+- **Pricing through a job update is `quote:write`.** A write to `/api/orders` or `/api/orders/<id>` that carries a `price`, creates a job as a quote, or sends a `status` for a job that is a quote now needs `quote:write`, whatever the route's own scope.
+- **The role answers are signed back** (`x-khayt-reply-mac`, as above), and only when the request's own signature passed.
+
+| Role | Scopes |
+|---|---|
+| viewer | `queue:read`, `machines:read`, `orders:read`, `inventory:read` |
+| operator | viewer + `orders:write`, `inventory:write`, `waste:write`, `machines:control` |
+| manager | operator + `clients:read`, `clients:write`, `expense:write`, `quote:write`, `book:read` |
+| owner | everything, including `book:write` and every route not listed |
+
+#### `GET /api/devices/self`
+
+Signed by a paired device. Answers `{"deviceId":"dev_…","role":"operator","scopes":["queue:read", …]}`, signed. A request with the owner PIN and no device signature is 403 `{"reason":"device-auth"}`.
+
+#### `POST /api/devices/pair` (pairing by code; **off** until the phone ships it)
+
+The slicer plugin's commit-then-reveal flow (`POST /api/connectors/pair`, below) with the phone's own prefixes: `khayt-phone-commit-v1`, `khayt-enrol-phone-v1` and `khayt-phone-check-v1`. No PIN is sent. Shared vectors: [`phone-pair.vectors.json`](phone-pair.vectors.json).
+
+- **404** `{"error":"not_found"}` while pairing by code is off. On the Mac it is the `phonePairingByCode` defaults switch; on Windows/Linux, main reads `KHAYT_PHONE_PAIRING_BY_CODE=1` from the environment at launch (nothing the window sends can switch it on).
+- **421** `{"error":"host-not-local"}` for a `Host` that is not this computer. On the desktop a request through the tunnel is refused too.
+- `POST /api/devices/pair` with `{v:2, commit, name, app, version}` → **200** `{pairId, pollSecret, deviceId, publicKey, sig, identity}`. Only while a person has opened the window (120 s on a monotonic clock, at most 3 offers): **403** `{"reason":"pairing-closed",…}` outside it, **409** `{"reason":"pairing-busy",…}` while another request waits, **400** `{"error":"commit"}` for a body without `"v":2` and a 32-byte `commit` (spends no offer).
+- `POST /api/devices/pair/<pairId>/reveal` with `{publicKey, nonce}` and `x-khayt-poll` → **200** `{"state":"waiting"}`. A mismatch (constant time), a nonce under 16 bytes, an unusable or all-zero key, or a reveal later than 30 s → **403** `{"state":"expired","reason":"bad-reveal"}`; no number is ever worked out for it. A second reveal **409** `{"reason":"already-revealed"}`; the wrong secret **404** `{"state":"unknown"}` and spends nothing.
+- `GET /api/devices/pair/<pairId>` with `x-khayt-poll` → **200** `{"state":"waiting"|"approved"|"denied"|"expired"}`, **404** `{"state":"unknown"}`.
+- `DELETE /api/devices/pair/<pairId>` with `x-khayt-poll` → **200** `{"state":"cancelled"}` (a later GET answers `expired`), **409** `{"state":"approved"|"denied"|"expired"}` when already answered, **404** `{"state":"unknown"}`. The offer stays counted.
+- A person compares the number, picks a role (Operator by default) and approves the request they were shown. **Who may:** the owner gives any role, a manager up to Manager, anyone else none and may not open the window (`grantable`). On the desktop, who is at the computer is main's own reading of the book (`lib/main/printer-permission.js activeRole`): the lock off, the owner; on, whoever is signed in; nobody, refused. The device is enrolled with that role and no PIN tag.
+
+**Signing out.** A phone paired by code holds no tag of the PIN: a PIN change does not sign it out. The server still needs a LAN PIN of at least 8 characters to answer anyone: with the PIN cleared or too short, a phone paired by code is refused like everyone else until one is set. **Remove** does (`device-revoked`, signed). A phone paired with the owner PIN is still signed out by a PIN change.
 
 ### `POST /api/connectors/pair` — a slicer plugin pairs without the PIN (native Mac only)
 

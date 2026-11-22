@@ -377,6 +377,8 @@ jobs:
 
       - name: E2E smoke (sign out one paired phone)
         run: xvfb-run -a npm run test:e2e:phones
+      - name: E2E smoke (pair a phone by code, with a role)
+        run: xvfb-run -a npm run test:e2e:phonepair
 
       - name: E2E smoke (pause, resume, cancel on the machine card)
         run: xvfb-run -a npm run test:e2e:printerctl

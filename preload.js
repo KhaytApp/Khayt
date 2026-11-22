@@ -403,6 +403,14 @@ const hubAPI = {
   getLanUrl:      ()       => ipcRenderer.invoke('hub:get-lan-url'),
   listLanDevices: ()       => ipcRenderer.invoke('hub:lan-devices-list'),
   removeLanDevice: (id)    => ipcRenderer.invoke('hub:lan-device-remove', id),
+  // Pairing a phone by a code, with a role (lib/main/phone-pairing.js). No
+  // screen calls these yet; main decides who may, and the switch is main's.
+  phonePairState: ()       => ipcRenderer.invoke('hub:phone-pair-state'),
+  phonePairOpen: ()        => ipcRenderer.invoke('hub:phone-pair-open'),
+  phonePairClose: ()       => ipcRenderer.invoke('hub:phone-pair-close'),
+  phonePairApprove: (arg)  => ipcRenderer.invoke('hub:phone-pair-approve', arg),
+  phonePairDeny: ()        => ipcRenderer.invoke('hub:phone-pair-deny'),
+  setLanDeviceRole: (arg)  => ipcRenderer.invoke('hub:lan-device-role', arg),
 
   // iOS companion: live reload when phone adds a spool or changes an order
   onLanSpoolAdded:      (() => { let _cb=null; ipcRenderer.on('lan-spool-added',      (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
