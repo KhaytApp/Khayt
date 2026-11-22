@@ -798,6 +798,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Resume any webhook retries left pending by a previous run (durable retry queue).
   try { if (typeof resumePendingWebhooks === 'function') resumePendingWebhooks(); } catch (e) { console.error('resumePendingWebhooks:', e); }
   try { if (typeof resumePluginOutbox === 'function') resumePluginOutbox(); } catch (e) { console.error('resumePluginOutbox:', e); }
+  try { if (typeof watchPluginInstallLinks === 'function') watchPluginInstallLinks(); } catch (e) { console.error('watchPluginInstallLinks:', e); }
   try { if (typeof retryFailedAccountingPushes === 'function') retryFailedAccountingPushes(); } catch (e) { console.error('retryFailedAccountingPushes:', e); }
 
   window.hubAPI?.onLanIntakeSubmitted?.((entry) => {

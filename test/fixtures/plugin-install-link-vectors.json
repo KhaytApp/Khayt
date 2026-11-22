@@ -1,0 +1,34 @@
+{
+  "_about": "khayt://plugin/install links: the Mac's PluginInstallLinkTests.shape cases (Mac PR #2622), 2 accepted and 17 refused. lib/plugin-install-link.js parse() is held to these by test/plugin-install-link.test.js.",
+  "accepted": [
+    {
+      "url": "khayt://plugin/install?id=app.khayt.samples.lamha&version=1.1.1",
+      "id": "app.khayt.samples.lamha",
+      "version": "1.1.1"
+    },
+    {
+      "url": "KHAYT://Plugin/install?version=2.0.0-beta.1&id=com.example.ship",
+      "id": "com.example.ship",
+      "version": "2.0.0-beta.1"
+    }
+  ],
+  "refused": [
+    "khayt://plugin/install",
+    "khayt://plugin/install?id=app.khayt.samples.lamha",
+    "khayt://plugin/install?version=1.0.0",
+    "khayt://plugin/install?id=app.khayt.samples.lamha&version=1.0.0&url=https://evil.example/m.json",
+    "khayt://plugin/install?id=app.khayt.samples.lamha&id=com.evil.x&version=1.0.0",
+    "khayt://plugin/install?id=app.khayt.samples.lamha&version=1.0.0#frag",
+    "khayt://plugin/install/now?id=app.khayt.samples.lamha&version=1.0.0",
+    "khayt://plugin/remove?id=app.khayt.samples.lamha&version=1.0.0",
+    "khayt://plugins/install?id=app.khayt.samples.lamha&version=1.0.0",
+    "https://plugin/install?id=app.khayt.samples.lamha&version=1.0.0",
+    "khayt://plugin/install?id=Lamha&version=1.0.0",
+    "khayt://plugin/install?id=../../etc/passwd&version=1.0.0",
+    "khayt://plugin/install?id=app.khayt.samples.lamha&version=latest",
+    "khayt://plugin/install?id=app.khayt.samples.lamha&version=1.0.0%0A2",
+    "khayt://plugin/install?id=app.khayt.samples.lamha&version=",
+    "khayt://plugin/install?id=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bb&version=1.0.0",
+    "khayt://user:pw@plugin/install?id=app.khayt.samples.lamha&version=1.0.0"
+  ]
+}

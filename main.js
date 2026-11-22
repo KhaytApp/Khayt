@@ -7437,6 +7437,7 @@ ipcMain.handle('hub:plugin-send', async (_e, req) => {
 // connectors' own switch.
 const CONNECTOR_UPDATES_ON = CONNECTORS_ON && process.env.KHAYT_CONNECTOR_UPDATES === '1';
 const connectorUpdates = require('./lib/main/connector-updates');
+const PluginInstallLinkMain = require('./lib/main/plugin-install-link');
 async function connectorFetchBytes(url, maxBytes) {
   if (!/^https:\/\//.test(String(url))) throw new Error('https only');
   const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
@@ -7712,13 +7713,19 @@ function buildMenu() {
 // instead of opening a second window; macOS delivers the URL via 'open-url'. Also gives Khayt one instance
 // (one data store), which is the desired behaviour for a business app.
 const makerrunAccount = require('./lib/makerrun-account');
+const PluginInstallLink = require('./lib/plugin-install-link');
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   return;
 }
 // Only the Bed Ready flavor owns the bedready:// scheme — Khayt has no MakerRun-account UI and must
 // not claim the scheme (it would cold-launch Khayt and write a token file it can't use).
-if (isBedReady) { try { app.setAsDefaultProtocolClient('bedready'); } catch { /* unpackaged/dev — fine */ } }
+// Khayt claims khayt:// (the directory's "Install in Khayt" link) on Windows and Linux, packaged
+// only; Bed Ready never does, and on macOS the scheme is the native Mac app's
+// (lib/plugin-install-link.js protocolSchemes).
+for (const scheme of PluginInstallLink.protocolSchemes({ isBedReady, isPackaged: app.isPackaged, platform: process.platform })) {
+  try { app.setAsDefaultProtocolClient(scheme); } catch { /* unpackaged/dev — fine */ }
+}
 
 function handleBedreadyLink(url) {
   if (!isBedReady) return; // defence in depth — never link a MakerRun account on the Khayt flavor
@@ -7748,15 +7755,55 @@ function handleBedreadyLink(url) {
 const isBedreadyLink = (a) => typeof a === 'string' && a.indexOf('bedready://') === 0;
 let pendingBedreadyLink = process.argv.find(isBedreadyLink) || null; // cold-start (Windows/Linux) via argv
 
+// ── khayt://plugin/install?id=…&version=… ("Install in Khayt", Mac #2622) ──
+// The link names a connector; it installs nothing. Main keeps the last one
+// handed to the app and pings the window; the window asks for it
+// (hub:plugin-install-link-take) once its book is loaded, and main decides
+// there — the gate first, then Khayt's own signed index and a manifest Khayt
+// signed (lib/main/plugin-install-link.js). The window gets the manifest for
+// the same consent sheet as a hand install, or the reason it may not.
+let pendingInstallLink = isBedReady ? null : (process.argv.map(PluginInstallLink.parse).find(Boolean) || null);
+function receiveKhaytUrl(url) {
+  if (isBedReady) return; // Bed Ready never follows khayt:// links
+  const link = PluginInstallLink.parse(url);
+  if (!link) return;      // not exactly the shape: not a link at all
+  pendingInstallLink = link;
+  if (mainWindow && !mainWindow.isDestroyed()) { try { mainWindow.webContents.send('plugin-install-link'); } catch { /* window gone */ } }
+}
+
 app.on('second-instance', (_e, argv) => {
   const win = mainWindow || BrowserWindow.getAllWindows()[0];
   if (win) { try { if (win.isMinimized()) win.restore(); win.focus(); } catch { /* window gone */ } }
   const link = (argv || []).find(isBedreadyLink);
   if (link) handleBedreadyLink(link);
+  const khaytLink = (argv || []).find(PluginInstallLink.isKhaytUrl);
+  if (khaytLink) receiveKhaytUrl(khaytLink);
 });
 app.on('open-url', (event, url) => { // macOS
   event.preventDefault();
+  if (PluginInstallLink.isKhaytUrl(url)) { receiveKhaytUrl(url); return; }
   if (mainWindow) handleBedreadyLink(url); else pendingBedreadyLink = url;
+});
+ipcMain.handle('hub:plugin-install-link-take', async () => {
+  const link = pendingInstallLink;
+  pendingInstallLink = null;
+  if (!link) return { none: true };
+  const refused = (refusal) => ({ ok: false, refusal, id: link.id, version: link.version });
+  try {
+    if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+    const canWrite = !(typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION);
+    const no = PluginInstallLinkMain.gate({ connectorsOn: CONNECTORS_ON, fetchOn: CONNECTOR_UPDATES_ON, store: lanServerStore, canWrite });
+    if (no) return refused(no);
+    const U = require('./lib/plugin-update.js');
+    const r = await PluginInstallLinkMain.offer(link, {
+      fetchBytes: connectorFetchBytes,
+      nowMs: Date.now(),
+      lastSerial: U.lastSerial(lanServerStore.settings),
+    });
+    return r.ok ? { ok: true, id: link.id, version: link.version, manifest: r.manifest } : refused(r.refusal);
+  } catch (_) {
+    return refused('index');
+  }
 });
 
 

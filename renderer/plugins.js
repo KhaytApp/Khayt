@@ -275,6 +275,43 @@ async function installPluginManifest(manifest) {
   return true;
 }
 
+/* ── "Install in Khayt" (khayt://plugin/install?id=…&version=…) ─────────── */
+
+/**
+ * A link names a connector; main reads it, checks who is asking, reads
+ * Khayt's own signed index and a manifest Khayt signed
+ * (lib/main/plugin-install-link.js), and hands this window the manifest —
+ * or the reason it may not. The manifest goes through the SAME door as a
+ * hand install: Settings ▸ Integrations, main's check again, the consent
+ * sheet, and nothing stored until Install. Same as the Mac (#2622).
+ */
+async function takePluginInstallLink() {
+  if (!window.hubAPI?.pluginInstallLinkTake) return;
+  let r;
+  try { r = await window.hubAPI.pluginInstallLinkTake(); } catch (_) { return; }
+  if (!r || r.none) return;
+  const vars = { id: String(r.id || ''), v: String(r.version || '') };
+  // Main decided who may; the window's own lock is asked as well.
+  const refusal = r.ok && typeof settingsReadOnly === 'function' && settingsReadOnly() ? 'notAllowed' : (r.ok ? null : r.refusal);
+  if (refusal) {
+    const key = 'plg.pil_' + (['off', 'notAllowed', 'index', 'unlisted', 'otherVersion', 'withdrawn', 'manifest'].includes(refusal) ? refusal : 'index');
+    toast(t(key, vars), 'error', 8000);
+    return;
+  }
+  if (typeof openSettingsSection === 'function') openSettingsSection('connections');
+  if (!pluginsOn) await loadPluginsEnabled();
+  await installPluginManifest(r.manifest);
+}
+
+let _pluginInstallLinksWatched = false;
+/** At launch: a link that started the app, then each one handed to it while it runs. */
+function watchPluginInstallLinks() {
+  if (_pluginInstallLinksWatched) return;
+  _pluginInstallLinksWatched = true;
+  window.hubAPI?.onPluginInstallLink?.(() => { takePluginInstallLink(); });
+  takePluginInstallLink();
+}
+
 /**
  * The consent sheet: one row per host with the fields that go there and the
  * kind of data each is, then the scopes. `readOnly` shows the same thing
