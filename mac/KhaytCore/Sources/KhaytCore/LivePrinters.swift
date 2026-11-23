@@ -24,8 +24,11 @@ public enum LivePrinters {
 
     static func cloudRow(_ row: JSONValue) -> JSONValue {
         guard case .object(var o) = row else { return row }
-        if case .string(let iso)? = o["lastUpdated"] {
-            o["lastUpdated"] = epochMs(iso).map { .number($0) } ?? .null
+        // Both stamps in the one unit the cloud contract uses: a row with an
+        // ISO string beside epoch milliseconds is how a phone's whole list
+        // once failed to decode.
+        for key in ["lastUpdated", "lastOkAt"] {
+            if case .string(let iso)? = o[key] { o[key] = epochMs(iso).map { .number($0) } ?? .null }
         }
         return .object(o)
     }
@@ -69,6 +72,10 @@ public enum LivePrinters {
         rows.map { row in
             guard case .object(var o) = row else { return row }
             o.removeValue(forKey: "lastUpdated")
+            // `lastOkAt` moves on every poll that is ANSWERED, which is every
+            // poll of a healthy printer. Still not a change a person can see:
+            // the heartbeat carries it.
+            o.removeValue(forKey: "lastOkAt")
             return .object(o)
         }
     }

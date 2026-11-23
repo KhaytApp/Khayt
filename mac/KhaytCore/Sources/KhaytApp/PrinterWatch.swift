@@ -52,6 +52,51 @@ final class PrinterWatch {
         /// polls. Nil for a printer that has never answered — which is the
         /// whole difference between a wifi hiccup and a printer that is off.
         var lastGood: KhaytEngine.PrinterStatus? = nil
+        /// When this printer last ANSWERED. `at` moves on a failed poll too,
+        /// so it cannot say how stale the picture is. Nil: never, since this
+        /// Mac started watching.
+        var lastOkAt: Date? = nil
+        /// WHY there is no status, in a word no language changes
+        /// (`PrinterWatch.failure`), and the HTTP status when there was one.
+        /// `problem` is a sentence in the shop's language; a phone cannot
+        /// match on that.
+        var problemCode: String? = nil
+        var httpStatus: Int? = nil
+    }
+
+    /// A failed poll as a word a program can match, whatever language the
+    /// shop reads. The live rows carry it as `errorCode`.
+    ///
+    ///   access-refused   the printer answered and said no: HTTP 401 or 403,
+    ///                    a handshake or an access code turned down
+    ///   http             any other HTTP status (`httpStatus` says which)
+    ///   not-set-up       no address, a bad port, a missing serial or mainboard id: nothing was asked
+    ///   certificate      a Bambu's certificate is not the one expected
+    ///   unreadable       it answered with something that is not its protocol
+    ///   unreachable      no answer: off, asleep, another network, hung up
+    nonisolated static func failure(_ error: any Error) -> (code: String, http: Int?) {
+        if let refusal = error as? Refusal {
+            switch refusal {
+            case .http(let code, _): return (code == 401 || code == 403 ? "access-refused" : "http", code)
+            case .handshakeRefused: return ("access-refused", nil)
+            case .noHost, .notALanAddress, .badPort, .needsSerial, .needsMainboardId: return ("not-set-up", nil)
+            case .notJSON, .unreadable, .redirected: return ("unreadable", nil)
+            default: return ("unreachable", nil)
+            }
+        }
+        if let trouble = error as? SdcpSocket.Trouble {
+            if case .refused = trouble { return ("access-refused", nil) }
+            return ("unreachable", nil)
+        }
+        if let trouble = error as? BambuMqtt.Trouble {
+            switch trouble {
+            case .refused: return ("access-refused", nil)
+            case .certificateChanged, .notBambu, .otherPrinter: return ("certificate", nil)
+            case .malformed: return ("unreadable", nil)
+            default: return ("unreachable", nil)
+            }
+        }
+        return ("unreachable", nil)
     }
 
     /// How many failed polls in a row a printer that has answered before is
@@ -98,6 +143,9 @@ final class PrinterWatch {
         // cancelled (0300_400C / 0500_400E) from one that failed — without
         // it every cancelled Bambu print would alert as an error.
         if let fault = status.fault, !fault.isEmpty { entry["fault"] = .string(fault) }
+        // The printer's own sentence, which the problem rule reads beside the
+        // state word (`lib/printer-problems.js` fromStatus).
+        if let said = status.message, !said.isEmpty { entry["message"] = .string(said) }
         return entry
     }
 
@@ -496,7 +544,9 @@ final class PrinterWatch {
         for machine in lane {
             if Task.isCancelled { return false }
             guard let engine = shop.engine else { continue }
-            let answer = await hear(machine, engine: engine, shop: shop)
+            // Left alone while a person's command is on its way, and dropped
+            // when one went out while this was in flight (`poll-yield`).
+            guard let answer = await hearUnlessCommanded(machine, engine: engine, shop: shop) else { continue }
             // One at a time, whichever lane it came from (`inTurn`).
             await inTurn { [weak self] in await self?.record(machine, answer, shop: shop) }
         }
@@ -628,7 +678,55 @@ final class PrinterWatch {
 
     private func poll(_ machine: Machine, shop: Shop) async {
         guard let engine = shop.engine else { return }
-        await record(machine, await hear(machine, engine: engine, shop: shop), shop: shop)
+        guard let answer = await hearUnlessCommanded(machine, engine: engine, shop: shop) else { return }
+        await record(machine, answer, shop: shop)
+    }
+
+    // MARK: - Stepping aside for a person's command (C6, lib/poll-yield.js)
+
+    /// Ask one machine, unless a person's command is on its way to it; nil
+    /// when the printer was left alone, or when a command went out while the
+    /// answer was in flight. That answer was read before the command landed:
+    /// recording it drew "Printing" again after Pause was pressed.
+    private func hearUnlessCommanded(_ machine: Machine, engine: KhaytEngine, shop: Shop) async -> Heard? {
+        let before = try? await engine.pollYieldState(machine.id)
+        if before?.yielding == true { return nil }
+        let answer = await hear(machine, engine: engine, shop: shop)
+        if let before, let after = try? await engine.pollYieldState(machine.id),
+           after.yielding || after.seq != before.seq { return nil }
+        return answer
+    }
+
+    /// How long after a command's reply the printer is asked again.
+    static let settlePoll: Duration = .milliseconds(1500)
+
+    /// Run a person's command to `machine`: the poll leaves that printer
+    /// alone until the reply (or the failure), and asks it again a moment
+    /// after, rather than leaving its card on the old state until the next
+    /// sweep. A command that never answers releases its printer by the
+    /// rule's own limit, so a lost reply cannot freeze a card.
+    func commanding<T>(_ machine: Machine, shop: Shop,
+                                 _ command: () async throws -> T) async throws -> T {
+        let engine = shop.engine
+        let token = try? await engine?.pollYieldBegin(machine.id)
+        let result: Result<T, Error>
+        do { result = .success(try await command()) } catch { result = .failure(error) }
+        try? await engine?.pollYieldEnd(machine.id, token: token ?? nil)
+        pollSoon(machine, shop: shop)
+        return try result.get()
+    }
+
+    /// One more ask, a moment after a command settled, through the same
+    /// recording as every poll. Skipped when another command went out since.
+    private func pollSoon(_ machine: Machine, shop: Shop) {
+        Task { @MainActor [weak self, weak shop] in
+            try? await Task.sleep(for: Self.settlePoll)
+            guard let self, let shop, machine.inService, let engine = shop.engine,
+                  let state = try? await engine.pollYieldState(machine.id),
+                  !state.yielding, state.justSettled else { return }
+            guard let answer = await self.hearUnlessCommanded(machine, engine: engine, shop: shop) else { return }
+            await self.inTurn { [weak self] in await self?.record(machine, answer, shop: shop) }
+        }
     }
 
     /// The machines to ask, grouped by the address they are at.
@@ -682,7 +780,7 @@ final class PrinterWatch {
     /// why there is none.
     private enum Heard: Sendable {
         case status(KhaytEngine.PrinterStatus)
-        case problem(String)
+        case problem(String, code: String, http: Int?)
     }
 
     /// Ask one machine and hand back what it said, or why it did not.
@@ -706,7 +804,8 @@ final class PrinterWatch {
         do {
             return .status(try await asking(machine, engine, key, accessCode))
         } catch {
-            return .problem(Self.say(error, shop.words))
+            let why = Self.failure(error)
+            return .problem(Self.say(error, shop.words), code: why.code, http: why.http)
         }
     }
 
@@ -715,8 +814,9 @@ final class PrinterWatch {
         switch answer {
         case .status(let status):
             let loadedBefore = readings[machine.id]?.status?.loaded ?? []
-            readings[machine.id] = Reading(status: status, problem: nil, at: Date(),
-                                           consecutiveFailures: 0, lastGood: status)
+            let now = Date()
+            readings[machine.id] = Reading(status: status, problem: nil, at: now,
+                                           consecutiveFailures: 0, lastGood: status, lastOkAt: now)
             // A spool swapped on the machine changes what the library can call
             // ready on it. Only then: a recount on every poll would be every
             // few seconds for nothing.
@@ -729,11 +829,13 @@ final class PrinterWatch {
             // screen should not wait on a store write to see its printer's
             // progress move. This is the only thing that notices a job ending.
             await capture(machine.id, status: status, shop: shop)
-        case .problem(let why):
+        case .problem(let why, let code, let http):
             let before = readings[machine.id]?.consecutiveFailures ?? 0
             let last = readings[machine.id]?.status ?? readings[machine.id]?.lastGood
             readings[machine.id] = Reading(status: nil, problem: why, at: Date(),
-                                           consecutiveFailures: before + 1, lastGood: last)
+                                           consecutiveFailures: before + 1, lastGood: last,
+                                           lastOkAt: readings[machine.id]?.lastOkAt,
+                                           problemCode: code, httpStatus: http)
         }
     }
 
@@ -1051,7 +1153,12 @@ final class PrinterWatch {
             // 2026 (`moonrakerSensors` in main.js); the Mac passed nothing, so
             // `filamentOut` was always null and a runout raised no alert.
             let watching = await Self.watching(machine, base: base, engine: engine, get: get)
-            let query = try await engine.moonrakerQuery(watching: watching)
+            var query = try await engine.moonrakerQuery(watching: watching)
+            // What the printer says is wrong (U1 idea 5): two more objects in
+            // the same read, only for a printer that listed them.
+            for name in Self.discovered[Self.discoveryKey(machine, base: base)]?.problemObjects ?? [] {
+                query += "&" + name
+            }
             let reply = try await get("/printer/objects/query?" + query)
             // Only the machines that need it pay for the second request, and a
             // failure there keeps toolhead zero's reading rather than nothing.
@@ -1110,6 +1217,10 @@ final class PrinterWatch {
         var watch: KhaytEngine.MoonrakerWatch
         var ok: Bool
         var at: Date
+        /// The printer's problem objects (a Snapmaker U1's exception list and
+        /// power-loss flag), when its own objects list names them. Asked for
+        /// only then: a Klipper printer without them is never asked.
+        var problemObjects: [String] = []
     }
     // Internal, not private: a test says what the poller has already learned.
     static var discovered: [String: Discovery] = [:]
@@ -1133,7 +1244,8 @@ final class PrinterWatch {
         do {
             let list = try await get("/printer/objects/list")
             let watch = try await engine.moonrakerDiscover(list)
-            discovered[key] = Discovery(watch: watch, ok: true, at: now)
+            discovered[key] = Discovery(watch: watch, ok: true, at: now,
+                                        problemObjects: KhaytEngine.moonrakerProblemObjects(in: list))
             return watch
         } catch {
             discovered[key] = Discovery(watch: .nothing, ok: false, at: now)

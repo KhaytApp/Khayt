@@ -1,0 +1,261 @@
+{
+ "about": "lib/printer-success.js successRates(input): per printer, finished / (finished + failed) from run results (P6). Synthetic book.",
+ "cases": [
+  {
+   "why": "worst first; cancelled and unknown counted but not in the rate; too few decided runs is not \"enough\"; a deleted job is left out",
+   "input": {
+    "machines": [
+     {
+      "id": "A"
+     },
+     {
+      "id": "B"
+     },
+     {
+      "id": "C"
+     }
+    ],
+    "orders": [
+     {
+      "id": "1",
+      "printRuns": [
+       {
+        "machineId": "A",
+        "at": "2026-11-01",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-02",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-03",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-04",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-05",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-06",
+        "result": "finished",
+        "resultSource": "printer"
+       }
+      ]
+     },
+     {
+      "id": "2",
+      "printRuns": [
+       {
+        "machineId": "B",
+        "at": "2026-11-01",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "B",
+        "at": "2026-11-02",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "B",
+        "at": "2026-11-03",
+        "result": "cancelled",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "B",
+        "at": "2026-11-04"
+       }
+      ]
+     },
+     {
+      "id": "3",
+      "deleted": true,
+      "printRuns": [
+       {
+        "machineId": "A",
+        "at": "2026-11-07",
+        "result": "failed",
+        "resultSource": "printer"
+       }
+      ]
+     }
+    ]
+   },
+   "want": [
+    {
+     "machineId": "B",
+     "finished": 1,
+     "failed": 1,
+     "cancelled": 1,
+     "unknown": 1,
+     "rate": 0.5,
+     "enough": false
+    },
+    {
+     "machineId": "A",
+     "finished": 5,
+     "failed": 1,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": 0.833,
+     "enough": true
+    },
+    {
+     "machineId": "C",
+     "finished": 0,
+     "failed": 0,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": null,
+     "enough": false
+    }
+   ]
+  },
+  {
+   "why": "a date window on the send date",
+   "input": {
+    "machines": [
+     {
+      "id": "A"
+     },
+     {
+      "id": "B"
+     },
+     {
+      "id": "C"
+     }
+    ],
+    "orders": [
+     {
+      "id": "1",
+      "printRuns": [
+       {
+        "machineId": "A",
+        "at": "2026-11-01",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-02",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-03",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-04",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-05",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-06",
+        "result": "finished",
+        "resultSource": "printer"
+       }
+      ]
+     },
+     {
+      "id": "2",
+      "printRuns": [
+       {
+        "machineId": "B",
+        "at": "2026-11-01",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "B",
+        "at": "2026-11-02",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "B",
+        "at": "2026-11-03",
+        "result": "cancelled",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "B",
+        "at": "2026-11-04"
+       }
+      ]
+     },
+     {
+      "id": "3",
+      "deleted": true,
+      "printRuns": [
+       {
+        "machineId": "A",
+        "at": "2026-11-07",
+        "result": "failed",
+        "resultSource": "printer"
+       }
+      ]
+     }
+    ],
+    "from": "2026-11-03",
+    "to": "2026-11-04"
+   },
+   "want": [
+    {
+     "machineId": "A",
+     "finished": 1,
+     "failed": 1,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": 0.5,
+     "enough": false
+    },
+    {
+     "machineId": "B",
+     "finished": 0,
+     "failed": 0,
+     "cancelled": 1,
+     "unknown": 1,
+     "rate": null,
+     "enough": false
+    },
+    {
+     "machineId": "C",
+     "finished": 0,
+     "failed": 0,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": null,
+     "enough": false
+    }
+   ]
+  }
+ ]
+}

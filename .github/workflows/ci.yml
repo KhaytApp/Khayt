@@ -226,6 +226,9 @@ jobs:
 
       - name: E2E smoke (the update gate holds until accepted)
         run: xvfb-run -a npm run test:e2e:consent
+
+      - name: E2E smoke (the update's items at the first launch, for Store and manual installs)
+        run: xvfb-run -a npm run test:e2e:launchgate
       - name: E2E job customer (Edit Order picker, option C)
         run: xvfb-run -a npm run test:e2e:jobcustomer
       - name: E2E split keeps the job's currency
@@ -374,6 +377,8 @@ jobs:
 
       - name: E2E smoke (sign out one paired phone)
         run: xvfb-run -a npm run test:e2e:phones
+      - name: E2E smoke (pair a phone by code, with a role)
+        run: xvfb-run -a npm run test:e2e:phonepair
 
       - name: E2E smoke (pause, resume, cancel on the machine card)
         run: xvfb-run -a npm run test:e2e:printerctl
@@ -407,6 +412,9 @@ jobs:
       - name: E2E smoke (Settings read-only for a manager)
         run: xvfb-run -a npm run test:e2e:settingsro
 
+      - name: E2E smoke (the PIN pad opens at start under the lock with nobody signed in)
+        run: xvfb-run -a npm run test:e2e:lockpin
+
       - name: E2E smoke (a filed VAT return keeps its figures)
         run: xvfb-run -a npm run test:e2e:vatfiled
 
@@ -425,10 +433,19 @@ jobs:
       - name: E2E smoke (one-time crash-report ask)
         run: xvfb-run -a npm run test:e2e:telemetry-ask
 
+      - name: E2E smoke (sharing switches are the owner's under the lock)
+        run: xvfb-run -a npm run test:e2e:privacy-owner
+
       # CI has no printers on its network, so this proves the IPC contract and the
       # timeout bound; on a developer LAN it additionally validates real results.
       - name: E2E smoke (printer discovery)
         run: xvfb-run -a npm run test:e2e:discovery
+
+      - name: E2E smoke (Internet use settings)
+        run: xvfb-run -a npm run test:e2e:internetuse
+
+      - name: E2E smoke (the switch through Khayt Cloud, frames F1–F3 and G)
+        run: xvfb-run -a npm run test:e2e:netswitchcloud
 
       - name: E2E smoke (quit flushes pending save)
         run: xvfb-run -a npm run test:e2e:quitflush
@@ -542,7 +559,7 @@ jobs:
           # fixtures and vectors are read by named Mac tests.
           # test/ci-mac-relevant.test.js checks that every repo path the Mac tests
           # name matches this pattern, so a new one can't be missed silently.
-          pattern='^(mac/|lib/|main\.js$|renderer/(app-state\.js|index\.html|inventory\.js|invoice\.css|labels\.js|order-flows\.js|locales/)|test/fixtures/|docs/lan-device-keys\.vectors\.json$|ios/KhaytCompanion/Services/BookWriter\.swift$|\.github/workflows/ci\.yml$)'
+          pattern='^(mac/|lib/|main\.js$|renderer/(app-state\.js|index\.html|inventory\.js|invoice\.css|labels\.js|order-flows\.js|locales/)|test/fixtures/|docs/lan-device-keys\.vectors\.json$|docs/phone-pair\.vectors\.json$|docs/LAN_API\.md$|ios/KhaytCompanion/Services/BookWriter\.swift$|\.github/workflows/ci\.yml$)'
           # A here-string, not `printf | grep -q`: under pipefail grep's early
           # exit can SIGPIPE printf on a long list and flip the answer.
           if grep -qE "$pattern" <<< "$files"; then run=true; else run=false; fi

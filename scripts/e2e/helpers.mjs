@@ -30,6 +30,15 @@ export function makeUserDataDir() {
   // same way the suites dismiss the setup wizard.
   fs.writeFileSync(path.join(dir, 'khayt-keychain-ok.flag'), '1');
 
+  // And this computer has seen this version already, so a suite that writes
+  // its own book before launch is not held by the first-launch "Before you
+  // update" items (lib/main/launch-gate.js). e2e-launch-gate-smoke.mjs writes
+  // or removes this file itself.
+  try {
+    const { version } = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+    fs.writeFileSync(path.join(dir, 'last-run-version.json'), JSON.stringify({ lastRun: version }));
+  } catch (_) { /* no package.json: nothing to seed */ }
+
   return dir;
 }
 

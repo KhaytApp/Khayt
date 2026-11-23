@@ -158,9 +158,10 @@ module.exports = {
   // Drop the appx target — the Microsoft Store package needs a signing cert we
   // don't ship for the public beta. Bed Ready's Windows download is the NSIS
   // installer + a portable .exe (neither needs a cert to produce).
-  win: { ...(base.win || {}), icon: 'assets/bedready-512.png', target: ['nsis', 'portable'] },
+  win: { ...(base.win || {}), icon: 'assets/bedready-512.png', target: ['nsis', 'portable'], protocols: [] },   // khayt:// is Khayt's, never Bed Ready's
   linux: {
     ...(base.linux || {}), icon: 'assets/bedready-512.png', target: ['AppImage', 'deb'],
+    protocols: [],   // khayt:// is Khayt's, never Bed Ready's
     category: 'Graphics',
     description: 'Desktop 3D-printing maker app — convert, recolour, preview and queue your prints.',
     artifactName: 'BedReady-${version}-linux-${arch}.${ext}',

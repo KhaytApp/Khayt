@@ -383,7 +383,9 @@ test('every writer of the whole book is guarded or main\'s own (ratchet; the lis
     'main.js': {
       'atomicWriteStore(': ["ipcMain.handle('hub:save-store'"],                 // after guardWindowStore
       'restoreSnapshotToDisk(': ['function restoreSnapshotForWindow('],          // after restoreAllowed + guardSave
-      'writeStoreToDisk(': ['async function migrateLegacyOwnerOnDisk('],   // main's own, one-time owner migration
+      // main's own lock-field changes at load go through the write chain now
+      // (updateStoreOnDiskAllowingLock), so nothing in main.js writes the whole book this way.
+      'writeStoreToDisk(': [],
     },
     'lib/updater.js': { 'writeStoreToDisk(': ["ipcMain.handle('hub:install-update'"] },   // after guardStore
     // MAIN-originated: the LAN server's own generated tokens and PIN.
@@ -425,11 +427,13 @@ test('every field writer (updateStoreOnDisk / persistLanStoreUpdate) that touche
       if (!/\bsettings\b|\boperators\b/.test(body)) continue;
       const ok = (LISTED[file] || []).some((k) => body.includes(k));
       assert.ok(ok, `${file}: an unlisted writer touches settings/operators at line ${src.slice(0, m.index).split('\n').length}`);
-      assert.doesNotMatch(body, /\boperators\b|operatorLockEnabled|activeOperatorId|roleLimits/, `${file}: a field writer names the lock or operators`);
+      assert.doesNotMatch(body, /\boperators\b|operatorLockEnabled|activeOperatorId|roleLimits|\.network\b/, `${file}: a field writer names the lock, operators or the outbound switch`);
     }
   }
   const io = fs.readFileSync(path.join(root, 'lib', 'store-io.js'), 'utf8');
-  assert.match(io, /const changed = lockFieldsChanged\(current, next\);\s*if \(changed\) throw new Error\('mutator may not change ' \+ changed\);/);
+  assert.match(io, /const changed = lockFieldsChanged\(current, next, allowed\);\s*if \(changed\) throw new Error\('mutator may not change ' \+ changed\);/);
+  // The ordinary writer allows no lock field at all (re-review of #2608).
+  assert.match(io, /async function updateStoreOnDisk\(mutate\) \{\s*return chainedUpdate\(mutate, \[\]\);/);
 });
 
 /* ── #2592 release review MED-1: the shop always keeps an owner ─────────── */
@@ -575,4 +579,29 @@ test('a refusal reloads the book at most once at a time, so it can never loop (s
   await new Promise((r) => setImmediate(r));
   assert.equal(loads, 1, 'one reload');
   assert.equal(toasts, 3, 'every refusal is still said');
+});
+
+test('re-review of #2608: lock fields change outside a window save only in main\'s own load-time steps, inside the write chain', () => {
+  const root = path.join(__dirname, '..');
+  const main = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
+  const fns = [];
+  let i = -1;
+  while ((i = main.indexOf('updateStoreOnDiskAllowingLock(', i + 1)) !== -1) {
+    const head = main.slice(0, i);
+    // The outbound switch's own writer (#2645): `settings.network` and nothing else.
+    if (head.endsWith('updateNetwork: (fn) => ')) {
+      const call = main.slice(i, main.indexOf('\n  notify:', i));
+      assert.match(call, /\}, \['settings\.network'\]\),$/, 'the switch writer may change settings.network only');
+      continue;
+    }
+    const at = head.lastIndexOf('\nasync function ');
+    fns.push(at >= 0 ? main.slice(at + 16, main.indexOf('(', at + 16)) : '?');
+  }
+  const uses = fns;
+  for (const f of uses) assert.ok(['migrateLegacyOwnerOnDisk', 'signOutAtStartOnDisk', 'upgradeLegacyPinsOnDisk'].includes(f), 'called from ' + f);
+  assert.ok(uses.includes('signOutAtStartOnDisk'));
+  // And the chain itself: a write queued first is kept.
+  const io = fs.readFileSync(path.join(root, 'lib', 'store-io.js'), 'utf8');
+  assert.match(io, /async function updateStoreOnDiskAllowingLock\(mutate, allowed\)/);
+  assert.match(io, /if \(next === current\) return current;/);
 });

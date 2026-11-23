@@ -410,6 +410,13 @@ struct MachineCard: View {
                             .labelStyle(.titleAndIcon).lineLimit(1)
                     }
                 }
+                // What the printer is doing, in one chip (C2): the shared
+                // rule's seven states. Only for a machine in service that
+                // Khayt polls; under service or retired is said just below.
+                if machine.inService, let chip = shop.machineChips[machine.id] {
+                    Spacer(minLength: 8)
+                    MachineStateChip(chip: chip, words: shop.words)
+                }
             }
             // Under service or retired, said in words with its reason and
             // date — never colour alone.
@@ -1910,7 +1917,7 @@ private struct Live: View {
                 }
             }
             .buttonStyle(.bordered).controlSize(.small)
-            .disabled(!shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
+            .disabled(!shop.canMoveJobs || !shop.printerAllows("control"))
             if let problem = shop.plugProblem[machine.id] {
                 Text(problem).font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1958,7 +1965,11 @@ private struct Live: View {
         let step = shop.printStep(machine, paused: isPaused(status.state))
         let canStep = step != nil
         let canCancel = PrinterControl.offers(.cancel, known)
-        let canDrop = type == "moonraker"
+        // What this MODEL cannot do is left out (`lib/printer-capabilities.js`):
+        // a resin printer has no object to skip, a Bambu P1P has no light
+        // without its kit. A model nobody has said anything about is shown.
+        let hidden = shop.machineHiddenControls[machine.id] ?? []
+        let canDrop = type == "moonraker" && !hidden.contains("exclude-object")
         VStack(alignment: .leading, spacing: 6) {
             if canStep || canCancel || canDrop {
                 HStack(spacing: 8) {
@@ -1982,7 +1993,7 @@ private struct Live: View {
                     }
                     // A Bambu's speed preset (confirmed — it changes a running print)
                     // and its chamber light (straight through — it changes nothing).
-                    if type == "bambu" {
+                    if type == "bambu", !hidden.contains("speed") {
                         Menu(shop.words.callIt("mac.printer_speed")) {
                             ForEach(1...4, id: \.self) { level in
                                 Button(shop.words.callIt("mac.printer_speed_\(level)")) {
@@ -1991,6 +2002,8 @@ private struct Live: View {
                             }
                         }
                         .fixedSize()
+                    }
+                    if type == "bambu", !hidden.contains("light") {
                         Menu(shop.words.callIt("mac.printer_light")) {
                             Button(shop.words.callIt("mac.printer_light_on")) {
                                 Task { await shop.control(machine, .light(true)) }
@@ -2005,7 +2018,7 @@ private struct Live: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .disabled(busy || !shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
+                .disabled(busy || !shop.canMoveJobs || !shop.printerAllows("control"))
             } else if known != nil {
                 // Said, not left blank: a card with no buttons under a running
                 // print reads as a missing feature somebody forgot to draw.

@@ -87,8 +87,25 @@
     // Work in flight, whatever the word says: a partial report or a word that
     // reads idle while the job is at 40% must never be given a second job
     // (#2594 review). 100% is a finished print, left to the bed check below.
+    //
+    // But a printer KEEPS its last progress after a cancel (octoprint.js
+    // reads job.progress.completion, and Moonraker's progress stays until the
+    // next print), so a cancelled printer stayed "busy" for ever (pre-cut
+    // review, MED1). A word saying the job ENDED (finished, stopped,
+    // cancelled) is believed: the bed check below holds that printer until
+    // someone clears it, and says so. A word saying IDLE with progress is
+    // still taken as busy, unless someone said the bed was clear after the
+    // printer last changed what it was doing AND its progress has not moved
+    // since: a person has looked at it, and nothing has started under the
+    // idle word after they did (correctness review of #2607: a print started
+    // outside Khayt at 40% under "idle" was given a second job).
     const progress = Math.round(+status.progress || 0);
-    if (progress > 0 && progress < 100) return 'ad.busy';
+    const ended = !!(st && st.cls === 'finished');
+    const clearedMs = Date.parse(text(machine.bedClearedAt));
+    const looked = clearedMs > Number(status.lastActivityAt)
+      && Number.isFinite(Number(status.progressChangedAt)) && clearedMs > Number(status.progressChangedAt);
+    const resting = !!(st && st.activity === 'idle') && looked;
+    if (progress > 0 && progress < 100 && !ended && !resting) return 'ad.busy';
     if (st && st.word !== undefined && st.cls) {
       if (st.link !== 'online') return 'ad.no_reading';           // "Offline" in its own state text
       if (st.activity === 'error') return 'ad.printer_error';     // failed, attention, halted
@@ -110,32 +127,7 @@
     // `clearsOwnBed: true` on the machine says so, and then "idle" is taken as
     // empty. Only `true` counts — a string or a 1 written by something else is
     // not the shop saying it.
-    if (machine && machine.clearsOwnBed === true) return null;
-    const cleared = Date.parse(text(machine.bedClearedAt));
-    // A JOB THAT ENDED and wrote no completedAt (stopped, cancelled; and
-    // complete/finished seen before the job is recorded): the bed is clear
-    // only if the shop said so AFTER the printer last changed what it was
-    // doing (printer-poll-cache lastActivityAt). Main had this hole for
-    // complete, finished and cancelled already (#2594 review).
-    const endedWord = st && st.cls === 'finished';
-    const lastActivity = Number(status.lastActivityAt);
-    if (endedWord && Number.isFinite(lastActivity) && !(Number.isFinite(cleared) && cleared > lastActivity)) {
-      return Number.isFinite(cleared) ? 'ad.bed_not_clear' : 'ad.bed_unknown';
-    }
-    // WHEN IT LAST FINISHED. Nothing in Khayt writes `lastFinishedAt` on a
-    // machine, and few pollers report one — so on a real book "the bed is clear"
-    // said once stayed true for ever, and a machine marked clear on Monday was
-    // offered work on Friday over four parts. The book knows better: the latest
-    // `completedAt` of a job on this machine (`options.lastFinishedByMachine`,
-    // which plan() works out) is a print that left something on the plate.
-    const finishedAt = [status.lastFinishedAt, machine.lastFinishedAt]
-      .map((v) => Date.parse(text(v)))
-      .concat([Number(options.lastFinishedByMachine && options.lastFinishedByMachine[machine.id])])
-      .filter(Number.isFinite);
-    const finished = finishedAt.length ? Math.max(...finishedAt) : NaN;
-    if (!Number.isFinite(cleared)) return 'ad.bed_unknown';
-    if (Number.isFinite(finished) && cleared < finished) return 'ad.bed_not_clear';
-    return null;
+    return bedState(machine, status, options);
   }
 
   /** Every material a job needs, lower-cased and deduplicated. */
@@ -301,8 +293,50 @@
     };
   }
 
+  /**
+   * Is the bed known to be clear? `null` when it is (or the machine clears its
+   * own), else `'ad.bed_not_clear'` (cleared, but before the printer last
+   * stopped or finished) or `'ad.bed_unknown'` (nobody has said so). The one
+   * bed rule: machineBlocked uses it for dispatch, and lib/send-checks.js for
+   * a file sent by hand (Turki's uncleared-bed incident, Nov 19, was a manual
+   * send). `live` is the poll entry ({ state, lastActivityAt, lastFinishedAt }).
+   */
+  function bedState(machine, live, options = {}) {
+    const status = live || {};
+    const PA = activity();
+    const api = machine && machine.printerApi;
+    const st = PA && status.state ? PA.machineStatus({ printerApi: api || {} }, { state: status.state }) : null;
+    if (!machine) return 'ad.bed_unknown';
+    if (machine.clearsOwnBed === true) return null;
+    const cleared = Date.parse(text(machine.bedClearedAt));
+    // A JOB THAT ENDED and wrote no completedAt (stopped, cancelled; and
+    // complete/finished seen before the job is recorded): the bed is clear
+    // only if the shop said so AFTER the printer last changed what it was
+    // doing (printer-poll-cache lastActivityAt). Main had this hole for
+    // complete, finished and cancelled already (#2594 review).
+    const endedWord = st && st.cls === 'finished';
+    const lastActivity = Number(status.lastActivityAt);
+    if (endedWord && Number.isFinite(lastActivity) && !(Number.isFinite(cleared) && cleared > lastActivity)) {
+      return Number.isFinite(cleared) ? 'ad.bed_not_clear' : 'ad.bed_unknown';
+    }
+    // WHEN IT LAST FINISHED. Nothing in Khayt writes `lastFinishedAt` on a
+    // machine, and few pollers report one — so on a real book "the bed is clear"
+    // said once stayed true for ever, and a machine marked clear on Monday was
+    // offered work on Friday over four parts. The book knows better: the latest
+    // `completedAt` of a job on this machine (`options.lastFinishedByMachine`,
+    // which plan() works out) is a print that left something on the plate.
+    const finishedAt = [status.lastFinishedAt, machine.lastFinishedAt]
+      .map((v) => Date.parse(text(v)))
+      .concat([Number(options.lastFinishedByMachine && options.lastFinishedByMachine[machine.id])])
+      .filter(Number.isFinite);
+    const finished = finishedAt.length ? Math.max(...finishedAt) : NaN;
+    if (!Number.isFinite(cleared)) return 'ad.bed_unknown';
+    if (Number.isFinite(finished) && cleared < finished) return 'ad.bed_not_clear';
+    return null;
+  }
+
   const api = {
-    plan, machineBlocked, jobBlocked, materialsOf, coloursOf, queueOrder,
+    plan, machineBlocked, bedState, jobBlocked, materialsOf, coloursOf, queueOrder,
     changeoverCost, IDLE_STATES, DISPATCHABLE,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

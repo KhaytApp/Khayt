@@ -44,6 +44,7 @@
     "test:e2e:webhooks": "node scripts/e2e-webhook-bus-smoke.mjs",
     "test:e2e:lots": "node scripts/e2e-lot-recall-smoke.mjs",
     "test:e2e:phones": "node scripts/e2e-paired-phones-smoke.mjs",
+    "test:e2e:phonepair": "node scripts/e2e-phone-pairing-smoke.mjs",
     "test:e2e:printerctl": "node scripts/e2e-printer-controls-smoke.mjs",
     "test:e2e:pricekeep": "node scripts/e2e-product-price-keep-smoke.mjs",
     "test:e2e:statuspalette": "node scripts/e2e-status-palette-smoke.mjs",
@@ -57,12 +58,14 @@
     "test:e2e:simplepanes": "node scripts/e2e-simple-panes-smoke.mjs",
     "test:e2e:plainfixes": "node scripts/e2e-plain-fixes-smoke.mjs",
     "test:e2e:settingsro": "node scripts/e2e-settings-readonly-smoke.mjs",
+    "test:e2e:lockpin": "node scripts/e2e-lock-pin-at-boot-smoke.mjs",
     "test:e2e:vatfiled": "node scripts/e2e-vat-filed-smoke.mjs",
     "test:e2e:wabcampaign": "node scripts/e2e-whatsapp-business-campaign-smoke.mjs",
     "test:e2e:planpicker": "node scripts/e2e-cloud-plan-picker-smoke.mjs",
     "test:e2e:takedown": "node scripts/e2e-erase-takedown-smoke.mjs",
     "test:e2e:activecount": "node scripts/e2e-active-count-smoke.mjs",
     "test:e2e:telemetry-ask": "node scripts/e2e-telemetry-ask-smoke.mjs",
+    "test:e2e:privacy-owner": "node scripts/e2e-privacy-owner-only-smoke.mjs",
     "test:e2e:telemetry": "node scripts/e2e-telemetry-smoke.mjs",
     "test:e2e:sentry": "node scripts/e2e-sentry-consent-smoke.mjs",
     "test:e2e:webhookretry": "node scripts/e2e-webhook-durable-smoke.mjs",
@@ -96,6 +99,8 @@
     "capture:bedready": "node scripts/capture-bedready-screenshots.mjs",
     "capture:modes": "node scripts/capture-mode-showcase.mjs",
     "test:e2e:discovery": "node scripts/e2e-discovery-smoke.mjs",
+    "test:e2e:internetuse": "node scripts/e2e-internet-use-smoke.mjs",
+    "test:e2e:netswitchcloud": "node scripts/e2e-network-switch-cloud-smoke.mjs",
     "test:e2e:quitflush": "node scripts/e2e-quit-flush-smoke.mjs",
     "test:e2e:screens": "node scripts/e2e-populated-screens-smoke.mjs",
     "test:ios-contract": "bash scripts/ios-contract.sh",
@@ -117,6 +122,8 @@
     "test:e2e:package": "node scripts/e2e-package-a-group-smoke.mjs",
     "test:e2e:biglib": "node scripts/e2e-big-library-smoke.mjs",
     "test:e2e:consent": "node scripts/e2e-update-consent-smoke.mjs",
+    "test:e2e:launchgate": "node scripts/e2e-launch-gate-smoke.mjs",
+    "release:gates": "node scripts/write-release-gates.js",
     "test:e2e:dedupe": "node scripts/e2e-model-dedupe-smoke.mjs",
     "test:e2e:filelink": "node scripts/e2e-order-file-link-smoke.mjs",
     "test:e2e:estimator": "node scripts/e2e-estimator-settings-smoke.mjs",
@@ -262,7 +269,15 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "protocols": [
+        {
+          "name": "Khayt",
+          "schemes": [
+            "khayt"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -299,7 +314,15 @@
       ],
       "icon": "assets/icon_preview.png",
       "category": "Office",
-      "description": "3D printing production management, invoicing & analytics"
+      "description": "3D printing production management, invoicing & analytics",
+      "protocols": [
+        {
+          "name": "Khayt",
+          "schemes": [
+            "khayt"
+          ]
+        }
+      ]
     }
   }
 }

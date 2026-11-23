@@ -491,6 +491,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.textContent = 'Checking…';
       if (msg) msg.textContent = '';
       try {
+        // outbound-exempt: ipc — main's hub:check-for-updates asks the gate (lib/updater.js)
         const res = await window.hubAPI.checkForUpdates();
         await handleManualUpdateCheckResult(res, { currentVersion, statusEl: msg });
       } catch (e) {
@@ -525,6 +526,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // iOS companion: react to spools/orders changed via LAN API from phone
   // Quit handshake: persist the debounced save before the app exits. Without this, any
   // edit made within saveAll()'s ~300ms debounce of Cmd+Q or a window close was lost.
+  // A restore main kept only in part (the role guard put some of it back).
+  window.hubAPI?.onRestoreRefused?.((refused) => { if (typeof _restoreRefused === 'function') _restoreRefused(refused); });
+
   if (window.hubAPI?.onFlushSaveRequest) {
     window.hubAPI.onFlushSaveRequest(() => {
       Promise.resolve()
@@ -626,6 +630,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+  if (window.hubAPI?.onLanMachineBedCleared) {
+    window.hubAPI.onLanMachineBedCleared((payload) => {
+      // A paired phone said a plate is empty. The server wrote it to disk;
+      // take the stamp into the window's copy, or its next saveAll() would
+      // write the machine back without it. Never an older stamp over a newer.
+      const id = payload && payload.id, at = payload && payload.bedClearedAt;
+      if (!id || typeof at !== 'string' || typeof machines === 'undefined') return;
+      const m = machines.find((x) => x && x.id === id);
+      if (!m || (Date.parse(m.bedClearedAt || '') || 0) >= (Date.parse(at) || 0)) return;
+      m.bedClearedAt = at;
+      saveAll();
+      if (typeof renderMachineQueues === 'function') renderMachineQueues();   // draws Next up too
+    });
+  }
   if (window.hubAPI?.onLanWasteLogged) {
     window.hubAPI.onLanWasteLogged((payload) => {
       // Phone logged a failed print. The server has already written it to disk;
@@ -666,6 +684,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       saveAll();
       renderLogs();
       toast('📱 ' + t('phonephoto.added', { job: order.project || order.jobNumber || order.id }), 'success', 4000);
+    });
+  }
+  // Main noted how much filament each head used on a job after a U1 print,
+  // with each head's colour and material (lib/main/head-actuals.js). The
+  // record is already on disk; this copy of the book takes the three fields
+  // too, or the next save would write the job back without them. Once per
+  // print: a job that already holds a split keeps it. Nothing on screen.
+  if (window.hubAPI?.onPrinterHeadActuals) {
+    window.hubAPI.onPrinterHeadActuals((payload) => {
+      const f = payload && payload.fields;
+      if (!f || typeof f !== 'object' || !Array.isArray(f.actualHeads) || !f.actualHeadsJobId) return;
+      const order = printLog.find((o) => o && o.id === payload.id);
+      if (!order || order.actualHeadsJobId != null) return;
+      order.actualHeads = f.actualHeads;
+      order.actualHeadsJobId = f.actualHeadsJobId;
+      order.actualHeadsBasis = f.actualHeadsBasis;
+      saveAll();
     });
   }
   if (window.hubAPI?.onLanOrderUpdated) {
@@ -798,6 +833,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Resume any webhook retries left pending by a previous run (durable retry queue).
   try { if (typeof resumePendingWebhooks === 'function') resumePendingWebhooks(); } catch (e) { console.error('resumePendingWebhooks:', e); }
   try { if (typeof resumePluginOutbox === 'function') resumePluginOutbox(); } catch (e) { console.error('resumePluginOutbox:', e); }
+  try { if (typeof watchPluginInstallLinks === 'function') watchPluginInstallLinks(); } catch (e) { console.error('watchPluginInstallLinks:', e); }
   try { if (typeof retryFailedAccountingPushes === 'function') retryFailedAccountingPushes(); } catch (e) { console.error('retryFailedAccountingPushes:', e); }
 
   window.hubAPI?.onLanIntakeSubmitted?.((entry) => {
@@ -864,6 +900,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Business Mode setup wizard (new first-run experience)
   initWizard();
+
+  // A major change reached this computer without the update dialog (the
+  // Microsoft Store, an installer run by hand): its items, held until read.
+  if (typeof showLaunchGateIfNeeded === 'function') showLaunchGateIfNeeded().catch((e) => console.error('launch gate:', e));
+
+  // The staff lock is on and nobody is signed in: the window is a viewer until
+  // someone is (P5, #2592), so ask who it is now rather than leave the shop to
+  // find "Switch operator" (pre-cut review MED2). Not over the first-run
+  // wizard, which sets the lock up itself.
+  if (settings.operatorLockEnabled && typeof openPinPadModal === 'function'
+      && !(typeof shouldShowSetupWizard === 'function' && shouldShowSetupWizard())) {
+    const signedIn = settings.activeOperatorId
+      && (operators || []).some((o) => o && o.id === settings.activeOperatorId && o.active !== false);
+    if (!signedIn) setTimeout(() => { try { openPinPadModal(); } catch (e) { console.error('PIN pad at start:', e); } }, 0);
+  }
+
+  // "Make no internet calls": the General entry's line and, after 30 days
+  // without an update check while updates are blocked, the banner (D2).
+  window.KhaytInternetUse?.refresh?.().catch?.(() => {});
 
   // The search shortcut is drawn as Ctrl K, the key on Windows and Linux; a
   // macOS build shows its own symbol (preload tags <html> platform-darwin).

@@ -10,7 +10,7 @@ try {
   else tag();
 } catch { /* non-DOM context; ignore */ }
 
-contextBridge.exposeInMainWorld('hubAPI', {
+const hubAPI = {
   // QR + meta
   generateQR: (text, options) => ipcRenderer.invoke('hub:generate-qr', text, options),
   appVersion: () => ipcRenderer.invoke('hub:app-version'),
@@ -234,6 +234,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   webcamDetect:   (o)     => ipcRenderer.invoke('hub:webcam-detect', o),
   discoverPrinters: (o)   => ipcRenderer.invoke('hub:discover-printers', o),
   relocatePrinters: (o)   => ipcRenderer.invoke('hub:relocate-printers', o),
+  foundPrinters: ()       => ipcRenderer.invoke('hub:found-printers'),
+  forgetFoundPrinters: () => ipcRenderer.invoke('hub:found-printers-forget'),
   // Installed themes live in userData, not beside the app — see lib/theme-store.js.
   themesList:      ()     => ipcRenderer.invoke('hub:themes-list'),
   themesInstall:   (o)    => ipcRenderer.invoke('hub:themes-install', o),
@@ -242,11 +244,25 @@ contextBridge.exposeInMainWorld('hubAPI', {
   themesRemove:    (o)    => ipcRenderer.invoke('hub:themes-remove', o),
   webcamProbe: (o)        => ipcRenderer.invoke('hub:webcam-probe', o),
   // Quit handshake: main asks the renderer to flush its debounced save before exiting.
+  launchGate:           () => ipcRenderer.invoke('hub:launch-gate'),
+  launchGateAccept:     () => ipcRenderer.invoke('hub:launch-gate-accept'),
+  launchGateAcceptedInUpdate: (version) => ipcRenderer.invoke('hub:launch-gate-accepted-in-update', String(version || '')),
   onFlushSaveRequest:   (cb) => { ipcRenderer.on('hub:flush-save-request', () => { try { cb(); } catch { /* noop */ } }); },
+  onRestoreRefused:     (cb) => { ipcRenderer.on('hub:restore-refused', (_e, refused) => { try { cb(Array.isArray(refused) ? refused.map(String) : []); } catch { /* noop */ } }); },
   flushSaveDone:        ()   => ipcRenderer.send('hub:flush-save-done'),
   telemetryPurge: ()      => ipcRenderer.invoke('hub:telemetry-purge'),
   telemetryRecord: (o)    => ipcRenderer.invoke('hub:telemetry-record', o),
   activeCountGet: ()      => ipcRenderer.invoke('hub:active-count-get'),
+  outboundDescribe: ()    => ipcRenderer.invoke('hub:outbound-describe'),
+  outboundSetLocal: (p)   => ipcRenderer.invoke('hub:outbound-set-local', p),
+  // The switch through Khayt Cloud (lib/main/network-switch-sync.js).
+  networkSwitchState: ()       => ipcRenderer.invoke('hub:network-switch-state'),
+  networkSwitchShare: (on)     => ipcRenderer.invoke('hub:network-switch-share', on === true),
+  networkSwitchAnswer: (apply) => ipcRenderer.invoke('hub:network-switch-answer', apply === true),
+  networkSwitchConflict: (choice) => ipcRenderer.invoke('hub:network-switch-conflict', choice === 'keep' ? 'keep' : 'adopt'),
+  networkSwitchPublish: (o)    => ipcRenderer.invoke('hub:network-switch-publish', o),
+  onNetworkSwitchChanged: (cb) => { ipcRenderer.on('hub:network-switch-changed', () => { try { cb(); } catch { /* noop */ } }); },
+  onNetworkApplied: (cb) => { ipcRenderer.on('hub:network-applied', (_e, n) => { try { cb(n && typeof n === 'object' ? n : null); } catch { /* noop */ } }); },
   activeCountSet: (on)    => ipcRenderer.invoke('hub:active-count-set', !!on),
   requestFullWipe: ()     => ipcRenderer.invoke('hub:request-full-wipe'),
   verifyOperatorPin: (opts) => ipcRenderer.invoke('hub:verify-operator-pin', opts),
@@ -376,6 +392,10 @@ contextBridge.exposeInMainWorld('hubAPI', {
   // Connector updates: the check (off unless KHAYT_CONNECTOR_UPDATES=1) and the shop's answers.
   connectorUpdatesCheck: () => ipcRenderer.invoke('hub:connector-updates-check'),
   connectorUpdate: (req) => ipcRenderer.invoke('hub:connector-update', req),
+  // khayt://plugin/install?id=…&version=…: main says a link arrived; the window
+  // takes it once its book is loaded, as a manifest for the consent sheet or a refusal.
+  pluginInstallLinkTake: () => ipcRenderer.invoke('hub:plugin-install-link-take'),
+  onPluginInstallLink: (cb) => { ipcRenderer.on('plugin-install-link', () => { try { cb(); } catch { /* noop */ } }); },
 
   // Round 12: Embedded LAN REST API
   startLanServer: (config) => ipcRenderer.invoke('hub:start-lan-server', config),
@@ -383,14 +403,42 @@ contextBridge.exposeInMainWorld('hubAPI', {
   getLanUrl:      ()       => ipcRenderer.invoke('hub:get-lan-url'),
   listLanDevices: ()       => ipcRenderer.invoke('hub:lan-devices-list'),
   removeLanDevice: (id)    => ipcRenderer.invoke('hub:lan-device-remove', id),
+  // Pairing a phone by a code, with a role (lib/main/phone-pairing.js). No
+  // screen calls these yet; main decides who may, and the switch is main's.
+  phonePairState: ()       => ipcRenderer.invoke('hub:phone-pair-state'),
+  phonePairOpen: ()        => ipcRenderer.invoke('hub:phone-pair-open'),
+  phonePairClose: ()       => ipcRenderer.invoke('hub:phone-pair-close'),
+  phonePairApprove: (arg)  => ipcRenderer.invoke('hub:phone-pair-approve', arg),
+  phonePairDeny: ()        => ipcRenderer.invoke('hub:phone-pair-deny'),
+  setLanDeviceRole: (arg)  => ipcRenderer.invoke('hub:lan-device-role', arg),
+  // A paired slicer plugin, its prices, the "From slicer" inbox and the
+  // OctoPrint upload (lib/main/connector-*.js, slicer-*.js). No screen calls
+  // these yet; main decides who may, and the switches are main's.
+  connectorPairState: ()       => ipcRenderer.invoke('hub:connector-pair-state'),
+  connectorPairOpen: ()        => ipcRenderer.invoke('hub:connector-pair-open'),
+  connectorPairClose: ()       => ipcRenderer.invoke('hub:connector-pair-close'),
+  connectorPairApprove: (arg)  => ipcRenderer.invoke('hub:connector-pair-approve', arg),
+  connectorPairDeny: ()        => ipcRenderer.invoke('hub:connector-pair-deny'),
+  connectorPricesState: ()     => ipcRenderer.invoke('hub:connector-prices-state'),
+  setConnectorPrices: (arg)    => ipcRenderer.invoke('hub:connector-prices-set', arg),
+  setConnectorGrant: (arg)     => ipcRenderer.invoke('hub:connector-grant-set', arg),
+  slicerInboxList: ()          => ipcRenderer.invoke('hub:slicer-inbox-list'),
+  slicerInboxRead: (id)        => ipcRenderer.invoke('hub:slicer-inbox-read', id),
+  slicerInboxDiscard: (id)     => ipcRenderer.invoke('hub:slicer-inbox-discard', id),
+  slicerUploadState: ()        => ipcRenderer.invoke('hub:slicer-upload-state'),
+  setSlicerUpload: (arg)       => ipcRenderer.invoke('hub:slicer-upload-set', arg),
+  regenerateSlicerKey: ()      => ipcRenderer.invoke('hub:slicer-upload-regenerate'),
 
   // iOS companion: live reload when phone adds a spool or changes an order
   onLanSpoolAdded:      (() => { let _cb=null; ipcRenderer.on('lan-spool-added',      (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanSpoolUpdated:    (() => { let _cb=null; ipcRenderer.on('lan-spool-updated',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanSpoolDeleted:    (() => { let _cb=null; ipcRenderer.on('lan-spool-deleted',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanWasteLogged:     (() => { let _cb=null; ipcRenderer.on('lan-waste-logged',     (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
+  onLanMachineBedCleared: (() => { let _cb=null; ipcRenderer.on('lan-machine-bed-cleared', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanExpenseAdded:    (() => { let _cb=null; ipcRenderer.on('lan-expense-added',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanOrderPhotoAdded: (() => { let _cb=null; ipcRenderer.on('lan-order-photo-added', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
+  // Main noted filament used per head on a job after a U1 print (lib/main/head-actuals.js).
+  onPrinterHeadActuals: (() => { let _cb=null; ipcRenderer.on('printer-head-actuals', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanOrderUpdated:    (() => { let _cb=null; ipcRenderer.on('lan-order-updated',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanOrderCreated:    (() => { let _cb=null; ipcRenderer.on('lan-order-created',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanWaitingUpdated:  (() => { let _cb=null; ipcRenderer.on('lan-waiting-updated',  (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
@@ -455,4 +503,48 @@ contextBridge.exposeInMainWorld('hubAPI', {
   onUpdateDownloadProgress: (() => { let _cb=null; ipcRenderer.on('update-download-progress', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onUpdateDownloaded:       (() => { let _cb=null; ipcRenderer.on('update-downloaded',        (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onUpdateError:            (() => { let _cb=null; ipcRenderer.on('update-error',             (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
-});
+};
+
+/* ── "Make no internet calls": every refused reply is reported (P8 PR 5) ──
+ *
+ * Main refuses a call the switch blocks in one of a few shapes: a reply with
+ * `blocked: {purpose, reason}` (most handlers, the updater's status
+ * 'blocked'), or an error whose text is OutboundBlocked's "outbound blocked:
+ * <purpose> (<reason>)" (a library that throws, or a handler that passes
+ * e.message on). Rather than teach every screen each shape, every hubAPI reply
+ * is looked at here, and a refusal is handed to the window as one event
+ * (renderer/internet-use.js), which says it only when a person acted a moment
+ * before: automatic calls are counted on their row, never toasted. The reply
+ * itself is returned unchanged. */
+// Anchored: only OutboundBlocked's own message (as main passed it on, or as
+// Electron wraps a rejected invoke), never the same words inside some other
+// text a remote server sent back (review of #2633).
+const BLOCKED_TEXT = /^(?:Error invoking remote method '[^']{1,80}': (?:[A-Za-z]*Error: )?)?outbound blocked: ([a-z-]{1,40}) \(([a-z-]{1,40})\)/;
+function blockedOf(v) {
+  try {
+    if (!v) return null;
+    if (typeof v === 'object' && v.blocked && typeof v.blocked === 'object' && typeof v.blocked.purpose === 'string') {
+      return { purpose: String(v.blocked.purpose), reason: String(v.blocked.reason || 'offline'), host: v.blocked.host ? String(v.blocked.host) : undefined };
+    }
+    const text = typeof v === 'string' ? v : (typeof v === 'object' ? String(v.error || v.message || '') : '');
+    const m = text.slice(0, 400).match(BLOCKED_TEXT);
+    return m ? { purpose: m[1], reason: m[2] } : null;
+  } catch (_) { return null; }
+}
+function reportBlocked(b, method) {
+  b = Object.assign({}, b, { method: String(method) });
+  try { window.dispatchEvent(new CustomEvent('khayt:outbound-blocked', { detail: JSON.stringify(b) })); } catch (_) { /* no window */ }
+}
+for (const k of Object.keys(hubAPI)) {
+  const fn = hubAPI[k];
+  if (typeof fn !== 'function' || /^on[A-Z]/.test(k)) continue;
+  hubAPI[k] = function (...args) {
+    const r = fn.apply(this, args);
+    if (!r || typeof r.then !== 'function') return r;
+    // The method's name goes with it: the window toasts only a person's call.
+    return r.then((v) => { const b = blockedOf(v); if (b) reportBlocked(b, k); return v; },
+      (e) => { const b = blockedOf(e); if (b) reportBlocked(b, k); throw e; });
+  };
+}
+
+contextBridge.exposeInMainWorld('hubAPI', hubAPI);

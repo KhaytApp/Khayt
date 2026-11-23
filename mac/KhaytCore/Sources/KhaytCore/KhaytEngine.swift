@@ -371,6 +371,14 @@ public actor KhaytEngine {
         // `printerCompletions`, which is how this app can offer a measured
         // figure without polling a printer itself.
         "printer-poll-cache",
+        // The background poll steps aside while a person's command is on
+        // its way to a printer (C6): one instance, held in the runtime.
+        "poll-yield",
+        // One result per print run (P4), and which controls a model has on
+        // top of what its protocol can send (C5). printer-capabilities reads
+        // printer-commands at call time.
+        "run-result",
+        "printer-capabilities",
         // A printer that changed address is not a printer that went away. Reads
         // the cache above to decide which machines have actually gone quiet.
         "printer-relocate",
@@ -951,6 +959,15 @@ public actor KhaytEngine {
         // `public-quote`, whose `materialBasis` it calls.
         "quote-sheet",
         "gcode-parse",
+        // What to tell a shop before a file goes to a printer (C8): reads
+        // gcode-parse, print-fit, printer-upload, loaded-colours and
+        // color-mix at call time, so it only has to come after them.
+        // Where a sliced file's models sit on the bed (`file.bounds` for the
+        // bed rows of send-checks). gcode-geometry first: the reader falls
+        // back to it for a file with no object list.
+        "gcode-geometry",
+        "gcode-placed-extents",
+        "send-checks",
         // Which customers are worth keeping.
         // Whether the shop can take another job, and when it would start.
         // How many quotes turn into work, and how much of the money does.
@@ -992,6 +1009,10 @@ public actor KhaytEngine {
         "mdns",
         "printer-discovery",
         "printer-sweep",
+        // Printers a scan found, remembered for a few days so a printer that
+        // was asleep during one scan is still in the list. The rule only; the
+        // file is this computer's, outside the book (`FoundPrintersStore`).
+        "found-printers",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
         // Swift's, because `lib/sdcp-client.js` cannot leave Node.
@@ -1001,6 +1022,18 @@ public actor KhaytEngine {
         // The report itself is read by `BambuReport` (a Swift port); the
         // faults are a table, and a table is not worth porting twice.
         "bambu-faults",
+        // What is wrong with a printer and what to do (C3), a U1's own
+        // exceptions and power loss (U1 idea 5), and whether it waits for a
+        // person (C4). printer-problems reads bambu-faults, moonraker-problems
+        // and printer-activity at call time.
+        "moonraker-problems",
+        "printer-problems",
+        "waiting-at-machine",
+        // A U1's RFID spool tags (U1 idea 2) and a time-lapse kept as the
+        // customer's proof (U1 idea 3): bundled for the phone and for the
+        // screens that follow their frames. Nothing on the Mac calls them yet.
+        "rfid-tray",
+        "timelapse-attach",
         "report-records",
         // A report a shop named, kept in one shape for both apps.
         // What the machine itself remembers. The nozzle-wear counter reads
@@ -1140,6 +1173,9 @@ public actor KhaytEngine {
         "slicers",
         "slicer-presets",
         "rbac",
+        // What a paired PHONE's role opens on the LAN server (C9): role →
+        // scopes, and the scope each route needs. Unknown is owner-only.
+        "device-roles",
         // When this shop could have a new order printed, finished and posted —
         // and the snapshot a storefront quotes that from.
         //
@@ -4679,6 +4715,26 @@ public actor KhaytEngine {
         public let areas: [String]
         public let actions: [String]
         public let matrix: [String: [String: [String: Bool]]]
+        /// `KhaytRbac.PRINTER_VERBS`: what a person does to a printer (send,
+        /// control, connection, unlink) → the `printers` action it needs.
+        /// Empty when decoded from data that predates it: every verb refused.
+        public let printerVerbs: [String: String]
+
+        public init(roles: [String], areas: [String], actions: [String],
+                    matrix: [String: [String: [String: Bool]]], printerVerbs: [String: String] = [:]) {
+            self.roles = roles; self.areas = areas; self.actions = actions
+            self.matrix = matrix; self.printerVerbs = printerVerbs
+        }
+
+        private enum CodingKeys: String, CodingKey { case roles, areas, actions, matrix, printerVerbs }
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            roles = try c.decode([String].self, forKey: .roles)
+            areas = try c.decode([String].self, forKey: .areas)
+            actions = try c.decode([String].self, forKey: .actions)
+            matrix = try c.decode([String: [String: [String: Bool]]].self, forKey: .matrix)
+            printerVerbs = try c.decodeIfPresent([String: String].self, forKey: .printerVerbs) ?? [:]
+        }
 
         /// `KhaytRbac.can`: lock off means everything; an unknown role is the
         /// least privileged; an unknown area or action is refused.
@@ -4688,11 +4744,30 @@ public actor KhaytEngine {
             let r = matrix[key] != nil ? key : (roles.last ?? "viewer")
             return matrix[r]?[area.lowercased()]?[action.lowercased()] == true
         }
+
+        /// `KhaytRbac.canPrinter` (P5): may `role` do `verb` to a printer?
+        /// The matrix's `printers` area, then the shop's own tightening
+        /// (`settings.roleLimits`: `{ role: { printers: { verb: false } } }`).
+        /// A limit only takes a right away, and never from the owner. The
+        /// lookup is held to the module over every role, verb and limit by
+        /// `PrinterRolesTests`.
+        public func canPrinter(role: String, verb: String, lockEnabled: Bool, limits: JSONValue? = nil) -> Bool {
+            if !lockEnabled { return true }
+            guard let action = printerVerbs[verb] else { return false }
+            let key = role.lowercased()
+            let r = matrix[key] != nil ? key : (roles.last ?? "viewer")
+            guard can(role: r, area: "printers", action: action, lockEnabled: true) else { return false }
+            if r == "owner" { return true }
+            guard case .object(let all)? = limits, case .object(let mine)? = all[r],
+                  case .object(let row)? = mine["printers"] else { return true }
+            return row[verb] != .bool(false)
+        }
     }
 
     public func rbac() throws -> Rbac {
         try runtime.call2("""
-            ({ roles: KhaytRbac.ROLES, areas: KhaytRbac.AREAS, actions: KhaytRbac.ACTIONS, matrix: KhaytRbac.MATRIX })
+            ({ roles: KhaytRbac.ROLES, areas: KhaytRbac.AREAS, actions: KhaytRbac.ACTIONS, matrix: KhaytRbac.MATRIX,
+               printerVerbs: KhaytRbac.PRINTER_VERBS })
             """, [], as: Rbac.self)
     }
 
@@ -4700,6 +4775,12 @@ public actor KhaytEngine {
     public func rbacCan(role: String, area: String, action: String, lockEnabled: Bool) throws -> Bool {
         try runtime.call2("KhaytRbac.can(ARG0, ARG1, ARG2, { lockEnabled: ARG3 })",
                           [.string(role), .string(area), .string(action), .bool(lockEnabled)], as: Bool.self)
+    }
+
+    /// `KhaytRbac.canPrinter`, asked of the module itself — for the parity test.
+    public func rbacCanPrinter(role: String, verb: String, lockEnabled: Bool, limits: JSONValue?) throws -> Bool {
+        try runtime.call2("KhaytRbac.canPrinter(ARG0, ARG1, { lockEnabled: ARG2, limits: ARG3 })",
+                          [.string(role), .string(verb), .bool(lockEnabled), limits ?? .null], as: Bool.self)
     }
 
     /// A legacy free-text role ("Admin", "Technician") as a role key.
@@ -5498,10 +5579,12 @@ public actor KhaytEngine {
     /// finished job, no machine). A `plannedMachineId` of `.null` means the
     /// key comes OFF the record.
     public func printRunFields(order: JSONValue, machineId: String, at: String,
-                               started: Bool, file: String) throws -> [String: JSONValue]? {
+                               started: Bool, file: String, sentAs: String = "") throws -> [String: JSONValue]? {
         try runtime.call2("globalThis.KhaytPrintRuns.fields(ARG0, ARG1)",
                           [order, .object(["machineId": .string(machineId), "at": .string(at),
-                                           "started": .bool(started), "file": .string(file)])],
+                                           "started": .bool(started), "file": .string(file),
+                                           // The name it was given on the printer (`PrinterSend.Sent.remoteName`).
+                                           "sentAs": .string(sentAs)])],
                           as: [String: JSONValue]?.self)
     }
 
@@ -11791,6 +11874,11 @@ public actor KhaytEngine {
         (function () {
           var s = KhaytMoonraker.readStatus(ARG0, ARG1, ARG2, ARG4, ARG3);
           s.actuals = KhaytPrinterActuals.extractActuals('moonraker', ARG0, {});
+          // What the printer says is wrong (lib/printer-problems.js), from the
+          // same reply: a U1's exceptions and power loss when they were asked
+          // for, else the print's own state and message.
+          var st = (ARG0 && ARG0.result && ARG0.result.status) || {};
+          s.problems = KhaytPrinterProblems.problemsFor('moonraker', st);
           return s;
         })()
         """#,
@@ -12271,6 +12359,10 @@ public actor KhaytEngine {
         /// What is loaded, head by head, when the machine reports it (a
         /// Snapmaker U1 does). Nil or empty means it cannot say.
         public let loaded: [LoadedSlot]?
+        /// What the printer says is wrong, as `lib/printer-problems.js`
+        /// findings, when the poll worked them out (Moonraker). Nil for a
+        /// protocol whose problems are read from its state word instead.
+        public var problems: [JSONValue]? = nil
         /// What the printer says is wrong, in words, with the code to look it
         /// up by — a Bambu's `print_error` / HMS notices (`lib/bambu-faults.js`).
         /// Nil when nothing is, and for every protocol that does not say.

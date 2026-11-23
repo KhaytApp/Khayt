@@ -29,6 +29,10 @@ struct SendToPrinterSheet: View {
     @State private var started = false
     /// The chosen file is a model, and the shop has a slicer to slice it with.
     @State private var slicesFirst = false
+    /// The shared rule's findings for this file on this printer (C8).
+    @State private var findings: [KhaytEngine.SendFinding] = []
+    /// The same answer whole: the size the bed rows were judged on.
+    @State private var check = KhaytEngine.SendCheck()
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
     /// Only one the sheet offers: a retired or under-service printer the job
@@ -76,18 +80,28 @@ struct SendToPrinterSheet: View {
                         .font(.callout).foregroundStyle(Khayt.attention)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // Checked against this printer (page 23, frames 1 and 1b). A
+                // model that is sliced on the way is checked after slicing,
+                // not here: there is no sliced file to read yet.
+                if !slicesFirst, let machine {
+                    SendChecksRows(findings: findings,
+                                   fits: SendChecks.fitsLine(check, bed: Self.bed(machine), words: shop.words),
+                                   printer: machine.name, bounds: check.bounds, bed: Self.bed(machine), words: shop.words)
+                }
             }
 
             HStack {
                 Spacer()
                 Button(shop.words.callIt("common.cancel")) { shop.clearQuestion() }
                     .keyboardShortcut(.cancelAction)
-                Button(shop.words.callIt(slicesFirst ? (start ? "slicer.send_title" : "mac.slice_send_only")
-                                                     : (start ? "mac.send_and_start" : "mac.send_only")),
+                Button(shop.words.callIt(Self.sendKey(slicesFirst: slicesFirst, start: start, findings: findings)),
                        action: commit)
                     .keyboardShortcut(.defaultAction)
                     .disabled(file == nil || machine == nil || !(fit?.ok == true || slicesFirst)
-                              || shop.slicingFor != nil)
+                              || shop.slicingFor != nil
+                              // A stop, not a warning: the button stays off.
+                              || (!slicesFirst && SendChecks.holds(findings))
+                              || !shop.printerAllows("send"))
             }
         }
         .padding(18)
@@ -122,9 +136,50 @@ struct SendToPrinterSheet: View {
         }
     }
 
+    /// The button's words: "Send anyway" when the checks found something to
+    /// look at and nothing that holds the send.
+    static func sendKey(slicesFirst: Bool, start: Bool, findings: [KhaytEngine.SendFinding]) -> String {
+        if slicesFirst { return start ? "slicer.send_title" : "mac.slice_send_only" }
+        if SendChecks.asksAnyway(findings) { return "mac.send_anyway" }
+        return start ? "mac.send_and_start" : "mac.send_only"
+    }
+
+    /// What is loaded, for the checks: what the printer itself reported on
+    /// its last poll (a Snapmaker U1's `print_task_config`) when it reported
+    /// anything, else what the shop recorded on the machine.
+    static func loaded(live: [KhaytEngine.LoadedSlot]?, record: JSONValue?) -> JSONValue? {
+        guard let live, !live.isEmpty else { return record }
+        return .array(live.map { .object(["slot": .number(Double($0.slot)), "hex": .string($0.hex), "material": .string($0.material)]) })
+    }
+
+    static func bed(_ machine: Machine) -> KhaytEngine.SendFinding.Size? {
+        guard let bed = machine.bed else { return nil }
+        return .init(x: bed.x, y: bed.y, z: bed.z)
+    }
+
+    /// The shared rule's findings for this file on this printer. Nothing is
+    /// assumed: a file whose text cannot be read, or a printer with nothing
+    /// recorded as loaded, simply has fewer findings.
+    private func recheck() async {
+        guard let file, let machine, let engine = shop.engine,
+              let row = shop.machineRows.first(where: { Shop.asObject($0)?["id"] == .string(machine.id) }) else {
+            findings = []; check = .init(); return
+        }
+        let asked = (file, machine.id)
+        let read = await SendChecks.gcode(file)
+        let loaded = Self.loaded(live: shop.printers.readings[machine.id]?.status?.loaded, record: Shop.asObject(row)?["loaded"])
+        let found = (try? await engine.sendCheck(fileName: file.lastPathComponent, gcodeText: read?.text,
+                                                 wholeFile: read?.whole ?? false, machine: row, loaded: loaded)) ?? .init()
+        // The answer to a question the sheet has stopped asking is dropped.
+        guard asked.0 == self.file, asked.1 == machineId else { return }
+        check = found
+        findings = found.findings
+    }
+
     /// Asked again whenever the printer or the file changes.
     private func refit() async {
         slicesFirst = false
+        await recheck()
         guard let file, let type = machine?.printerApi?.type, let engine = shop.engine else { fit = nil; return }
         var answer = try? await engine.printerUploadCheck(type: type, fileName: file.lastPathComponent)
         // Bambu passes the rule but is not spoken from this app yet.

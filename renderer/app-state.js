@@ -763,22 +763,36 @@ function explainRefusal(code) {
   if (c === 'not_permitted') return t('err.not_permitted');
   if (c === 'settings_missing') return t('err.settings_missing');
   if (c === 'store_unreadable') return t('err.store_unreadable');
+  if (c === 'connection_unsaved') return t('err.connection_unsaved');
   if (/_guard_failed$/.test(c)) return t('err.guard_failed');
   return c;
 }
 
 /** Saved, but main put some of it back (the role on disk may not change it). */
 let _reloadingAfterRefusal = false;
-function _saveRefused(refused) {
+/** "Not saved: …" for the paths main put back, in the shop's language. */
+function _sayRefused(refused) {
   const parts = new Set();
   for (const r of refused) {
     const s = String(r);
     if (s === 'activeOperatorId') parts.add(t('err.refused_signin'));
+    // "Make no internet calls" is the owner's, under the lock: said as itself,
+    // not as "the shop lock" (P8 PR 5).
+    else if (s === 'settings.network') parts.add(t('err.refused_network'));
+    // The crash and usage opt-ins: the owner's under the lock (Nov 22).
+    else if (s === 'settings.telemetry') parts.add(t('err.refused_telemetry'));
     else if (s.startsWith('settings.') || s === 'settings') parts.add(t('err.refused_lock'));
     else if (s.startsWith('operators')) parts.add(t('err.refused_people'));
     else if (s.startsWith('machines.')) parts.add(t('err.refused_printer'));
   }
   toast('⚠ ' + t('err.refused', { what: [...parts].join(' · ') || t('err.refused_lock') }), 'error', 12000);
+}
+/** A restore main kept only in part: said, no reload (the window loads what main returned). */
+function _restoreRefused(refused) {
+  if (Array.isArray(refused) && refused.length) _sayRefused(refused);
+}
+function _saveRefused(refused) {
+  _sayRefused(refused);
   // The window shows what is really saved: the book main kept, not the edit.
   // ONE reload: a refusal that arrives while it runs (or straight after, from
   // the save the reload itself triggers) is said, never reloaded again, so a
@@ -788,6 +802,8 @@ function _saveRefused(refused) {
   Promise.resolve(window.hubAPI && window.hubAPI.loadStore ? window.hubAPI.loadStore() : null).then((data) => {
     if (data && !data.__corrupt && typeof replaceStoreFromSnapshot === 'function' && replaceStoreFromSnapshot(data)) {
       if (typeof initialRender === 'function') initialRender();
+      // Internet use draws what main kept, not the edit it put back.
+      try { window.KhaytInternetUse?.refresh?.(); } catch (_) { /* not loaded (Bed Ready) */ }
       if (typeof applyOperatorPermissions === 'function') applyOperatorPermissions();
     }
   }).catch((e) => console.error('reload after a refused save failed:', e))
@@ -1102,6 +1118,8 @@ function pruneExpiredNotifs() {
     syncScopeToShop,
     // Called bare from machines.js and kanban.js: a refusal said in the shop's language.
     explainRefusal,
+    // Called from app-boot.js when main kept a restore only in part.
+    _restoreRefused,
     applyStoreFromSnapshot,
     replaceStoreFromSnapshot,
     ensureOrderTrackingTokens,

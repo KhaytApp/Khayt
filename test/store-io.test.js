@@ -1083,3 +1083,22 @@ test('updateStoreOnDisk reads the disk when main\'s copy is still the boot {} (#
     assert.deepEqual(d.expenses, [{ id: 'E1' }]);
   } finally { fs.rmSync(tmp2, { recursive: true, force: true }); }
 });
+
+test('a window save that missed the per-head push never erases what main wrote (actualHeads*); its own split, and a deletion, stand', async () => {
+  const io = makeStoreIo({ encryption: false });
+  const split = { actualHeads: [{ head: 0, grams: 9, estimateG: 10, hex: '#080A0D', material: 'PLA', colourFrom: 'rfid' }], actualHeadsJobId: '0000A7', actualHeadsBasis: 'proportional' };
+  // Main wrote the split on J1 (head-actuals); the window never got the push.
+  await fs.promises.writeFile(io.dataFilePath(), JSON.stringify(io.encryptForDisk({
+    settings: {}, printLog: [{ id: 'J1', status: 'printing', ...split }, { id: 'J2', status: 'post', actualHeadsJobId: 'B9', actualHeads: [], actualHeadsBasis: 'proportional' }, { id: 'J3', status: 'post' }],
+  })), 'utf8');
+  // The window's next save: J1 without the fields (moved on to post meanwhile), J2 deleted, J3 untouched.
+  const merged = io.mergeStoreSecretsFromDisk({ settings: {}, printLog: [{ id: 'J1', status: 'post', notes: 'from the window' }, { id: 'J3', status: 'qc' }] });
+  const j1 = merged.printLog.find((j) => j.id === 'J1');
+  assert.deepEqual([j1.actualHeadsJobId, j1.actualHeadsBasis, j1.actualHeads], [split.actualHeadsJobId, split.actualHeadsBasis, split.actualHeads]);
+  assert.deepEqual([j1.status, j1.notes], ['post', 'from the window'], 'the window\'s own edits stand');
+  assert.equal(merged.printLog.some((j) => j.id === 'J2'), false, 'a job the window deleted stays deleted');
+  assert.equal(merged.printLog.find((j) => j.id === 'J3').actualHeadsJobId, undefined, 'nothing invented');
+  // A window job that already holds a split keeps its own.
+  const own = io.mergeStoreSecretsFromDisk({ settings: {}, printLog: [{ id: 'J1', actualHeadsJobId: 'MAC', actualHeads: [], actualHeadsBasis: 'proportional' }] });
+  assert.equal(own.printLog[0].actualHeadsJobId, 'MAC');
+});

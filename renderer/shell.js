@@ -603,7 +603,8 @@ function openSettingsSection(section) {
     panel.scrollTop = 0;
     return;
   }
-  const navItem = $(`.settings-nav-item[data-settings-section="${section}"]`);
+  // A detail page lights the pane it belongs to (Internet use is under General).
+  const navItem = $(`.settings-nav-item[data-settings-section="${section === 'internet' ? 'general' : section}"]`);
   navItem?.classList.add('active');
   navItem?.setAttribute('aria-current', 'page');
   navItem?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
@@ -614,6 +615,7 @@ function openSettingsSection(section) {
   }
   // The intake form and LAN cards it fills sit in Online Store and Connections now.
   if (['online', 'store', 'connections'].includes(section) && typeof renderOnlineSettings === 'function') renderOnlineSettings();
+  if (section === 'internet') window.KhaytInternetUse?.refresh?.();
 }
 
 function switchTab(tabId) {

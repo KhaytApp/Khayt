@@ -76,13 +76,36 @@
     }
     if (!actuals) return p.lastCompleted || null;
 
-    return {
+    const out = {
       at: now,
       // The job these figures belong to, so the shop is not offered last week's
       // numbers for today's order.
       filename: (status && status.filename) || p.filename || '',
       actuals,
     };
+    // How it ended, when the printer's word says (P4): finished, cancelled or
+    // failed. A printer that went straight back to "idle" did not say, and
+    // the shop's mark decides (lib/run-result.js).
+    const result = endedAs(status && status.state, status && status.fault);
+    if (result) out.result = result;
+    return out;
+  }
+
+  /* Bambu's two "cancelled" print_error codes (lib/bambu-faults.js, the same
+   * test as lib/printer-alerts.js). A Bambu printer ends a print the shop
+   * cancelled on FAILED, and only `fault` (the decoded print_error) tells it
+   * from one that went wrong: without this every cancel counted against the
+   * printer's success rate (correctness review of #2613). */
+  const CANCELLED_FAULT = /\((?:0300_400C|0500_400E)\)/;
+
+  /** 'finished' | 'cancelled' | 'failed' | null from the word a job ended on
+   *  and, for Bambu, the fault it named. */
+  function endedAs(state, fault) {
+    const cls = activityClass(state);
+    const w = String(state || '').trim().toLowerCase();
+    if (cls === 'finished') return /cancel|stopp/.test(w) ? 'cancelled' : 'finished';
+    if (cls === 'person') return CANCELLED_FAULT.test(String(fault || '')) ? 'cancelled' : 'failed';
+    return null;
   }
 
   /* ── HOW LONG A BAMBU JOB TOOK, BY WATCHING IT ───────────────────────────
@@ -181,6 +204,10 @@
 
   /** A poll that answered. Fresh object — a previous `error` must not survive. */
   function mergePollSuccess(prev, status, now) {
+    // "Not set up" (no address, a bad port, a missing serial: nothing was
+    // asked) comes back as { ok: false, error } rather than a throw. It is
+    // not an answer: it must not stamp lastOkAt (the Mac's not-set-up).
+    if (status && status.ok === false && status.error) return mergePollFailure(prev, status.error, now, null, 'not-set-up');
     const p = prev || {};
     const lastCompleted = captureCompletion(prev, status, now);
     // captureCompletion hands back the PREVIOUS completion when nothing finished,
@@ -201,6 +228,13 @@
     const cls = activityClass(status && status.state);
     const keep = p.activityClass === cls && Number.isFinite(p.lastActivityAt);
     const lastActivityAt = keep ? p.lastActivityAt : now;
+    // And when its PROGRESS last moved. A cancelled job keeps its last
+    // progress under an idle word; a print started outside Khayt can climb
+    // under one. Only the second moves, and the dispatcher needs to tell them
+    // apart after a "bed cleared" (correctness review of #2607).
+    const pct = status && Number.isFinite(+status.progress) ? +status.progress : null;
+    const prevPct = p && Number.isFinite(+p.progress) ? +p.progress : null;
+    const progressChangedAt = pct === prevPct && Number.isFinite(p.progressChangedAt) ? p.progressChangedAt : now;
 
     return {
       ...(status || {}),
@@ -212,6 +246,7 @@
       lastUpdated: now,
       activityClass: cls,
       lastActivityAt,
+      progressChangedAt,
     };
   }
 
@@ -278,13 +313,43 @@
    * (lib/printer-activity.js); absent otherwise, and dropped from an earlier
    * failure. A good poll builds a fresh entry, so it never outlives one.
    */
-  function mergePollFailure(prev, message, now, status) {
+  /* WHY there is no status, in a word no language changes: the Mac's
+   * PrinterWatch.failure, carried on the live rows as `errorCode`
+   * (docs/LAN_API.md). `error` is a sentence in the shop's language; a phone
+   * cannot match on that. A client treats a word it does not know as
+   * `unreachable`. */
+  const ERROR_CODES = ['access-refused', 'http', 'not-set-up', 'certificate', 'unreadable', 'unreachable'];
+  /** A failed poll's Error as one of ERROR_CODES, from its status and code, never its words. */
+  function failureCode(err) {
+    const e = err || {};
+    const st = Number(e.status);
+    if (Number.isInteger(st) && st >= 100 && st <= 599) return st === 401 || st === 403 ? 'access-refused' : 'http';
+    const code = String(e.code || '');
+    const msg = String(e.message || '');
+    // A Bambu CONNACK: 4 (bad user name or password) and 5 (not authorised)
+    // are the access code turned down; any other code (3: server
+    // unavailable, …) is the printer not taking connections now.
+    const connack = /CONNACK (\d+)/.exec(msg);
+    if (connack) return connack[1] === '4' || connack[1] === '5' ? 'access-refused' : 'unreachable';
+    if (code === 'ERR_REDIRECT') return 'unreadable';                      // the Mac's .redirected
+    if (/^(CERT_|ERR_TLS_CERT|DEPTH_ZERO_SELF_SIGNED|SELF_SIGNED|UNABLE_TO_VERIFY)/.test(code)) return 'certificate';
+    if (e.name === 'SyntaxError' || code === 'ERR_INVALID_JSON') return 'unreadable';
+    return 'unreachable';
+  }
+
+  function mergePollFailure(prev, message, now, status, errorCode) {
     const p = prev || {};
     const code = Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
-    const { httpStatus: _old, ...rest } = p;
+    const { httpStatus: _old, errorCode: _oldCode, ...rest } = p;
+    // A config error is not a printer that moved: an old "found it at X"
+    // hint must not show in place of it (Test connection with a bad port).
+    if (errorCode === 'not-set-up') delete rest.relocated;
+    const why = ERROR_CODES.includes(errorCode) ? errorCode
+      : (code ? (code === 401 || code === 403 ? 'access-refused' : 'http') : 'unreachable');
     return {
       ...rest,
       ...(code ? { httpStatus: code } : {}),
+      errorCode: why,
       error: message,
       consecutiveFailures: (p.consecutiveFailures || 0) + 1,
       // Only stamp lastOkAt from lastUpdated on the FIRST failure — after that
@@ -301,6 +366,9 @@
    */
   function isOffline(entry, threshold) {
     if (!entry || !entry.error) return false;
+    // Not set up is not "gone quiet": nothing was asked, so there is nothing
+    // to look for on the network (no relocation scan, no "offline").
+    if (entry.errorCode === 'not-set-up') return false;
     return (entry.consecutiveFailures || 0) >= threshold;
   }
 
@@ -407,7 +475,7 @@
   }
 
   const api = {
-    mergePollSuccess, mergePollFailure, isOffline, captureCompletion,
+    mergePollSuccess, mergePollFailure, failureCode, ERROR_CODES, isOffline, captureCompletion, endedAs,
     isPrintingState, isInJob, findCompletion, mergePersisted, COMPLETIONS_KEPT,
     completionsToPersist, restoreCompletions, completionIsNew,
     tickJobClock, observedDurationS, CLOCK_START_MAX_PCT, CLOCK_MAX_GAP_MS,

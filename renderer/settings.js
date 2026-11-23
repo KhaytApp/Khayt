@@ -4448,11 +4448,18 @@ async function renderLanPairedPhones() {
   if (!box) return;
   const res = await window.hubAPI?.listLanDevices?.().catch(() => null);
   const devices = res?.devices || [];
+  const day = (iso) => { try { return new Date(iso).toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return ''; } };
+  // Each phone's role, Pair a phone, and who may (renderer/phone-pairing.js,
+  // frames P5/P6 signed off Nov 22). Main decides; this draws its answer.
+  if (window.KhaytPhonePairing) {
+    await window.KhaytPhonePairing.renderList(box, document.getElementById('lanPairedPhonesFoot'), devices,
+      { day, canSignOut: canSignOutPhones(), refresh: renderLanPairedPhones });
+    return;
+  }
   if (!devices.length) {
     box.innerHTML = `<div style="color:var(--text-muted);">${escapeHtml(t('lan.phones_none'))}</div>`;
     return;
   }
-  const day = (iso) => { try { return new Date(iso).toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return ''; } };
   const canSignOut = canSignOutPhones();
   box.innerHTML = devices.map((d) => `
     <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">
@@ -4591,6 +4598,7 @@ function renderLanApiSettings() {
     <div style="margin:12px 0;">
       <label>${escapeHtml(t('lan.phones_title'))}</label>
       <div id="lanPairedPhones" style="font-size:13px;"></div>
+      <div id="lanPairedPhonesFoot"></div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${escapeHtml(t('lan.phones_hint'))}</div>
     </div>
     <div id="lanWebhookSection" style="display:${lan.enabled && lan.webhookToken ? 'block' : 'none'};margin:10px 0;">
@@ -5191,8 +5199,25 @@ const API_TOKEN_SCOPES = ['orders:read', 'orders:write', 'clients:read', 'client
 // SEPARATELY, revocable without restart — opting out purges the local queue and clears
 // the install id so nothing identifying survives.
 /** The two consents — the Settings switches and the one-time card both land here. */
+/** Under the staff lock only the owner changes what Khayt shares (Turki, Nov 22).
+ *  Main decides (the save guard, hub:active-count-set); this only says so first. */
+function _privacyOwnerOnly() {
+  if (!settings.operatorLockEnabled) return false;
+  return !(typeof currentOperatorRoleKey === 'function' && currentOperatorRoleKey() === 'owner');
+}
+
 async function setTelemetryConsent(crash, usage) {
   const prev = settings.telemetry || {};
+  // A change the owner has to make is not made, and said in its own words.
+  // Pressing "No thanks" on the card over opt-ins already off changes nothing,
+  // so it is never refused.
+  if ((prev.crashOptIn === true) !== !!crash || (prev.usageOptIn === true) !== !!usage) {
+    if (_privacyOwnerOnly()) {
+      toast('⚠ ' + t('err.refused', { what: t('err.refused_telemetry') }), 'error', 9000);
+      renderTelemetrySettings();
+      return false;
+    }
+  }
   const anyOn = crash || usage;
   let installId = prev.installId || '';
   if (anyOn && !installId) {
@@ -5210,6 +5235,7 @@ async function setTelemetryConsent(crash, usage) {
   if (!anyOn) { try { await window.hubAPI?.telemetryPurge?.(); } catch (_) {} }
   renderTelemetrySettings();
   renderTelemetryAsk();
+  return true;
 }
 
 // The one-time ask, as the Mac's TelemetryCard: a card across the top of the
@@ -5282,8 +5308,11 @@ function renderTelemetryAsk() {
   });
   card.querySelector('[data-tel-ask="share"]').addEventListener('click', async () => {
     const usage = !!card.querySelector('#telemetryAskUsage')?.checked;
+    // Refused for a staff member under the lock: the card stays, so the owner
+    // is still asked on this computer (Nov 22).
+    if (await setTelemetryConsent(true, usage) === false) return;
     markTelemetryAsked();
-    await setTelemetryConsent(true, usage);
+    renderTelemetryAsk();
     toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
   });
 }
@@ -5307,8 +5336,15 @@ async function renderActiveCountRow(el) {
       <span style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('tel.active_hint'))}</span></span>
     </label>`;
   row.querySelector('#tel_active')?.addEventListener('change', async (e) => {
-    const r = await window.hubAPI?.activeCountSet?.(e.target.checked).catch(() => null);
+    const box = e.target;
+    const refuse = () => {
+      box.checked = !box.checked;   // what is really set
+      toast('⚠ ' + t('err.refused', { what: t('err.refused_active_count') }), 'error', 9000);
+    };
+    if (_privacyOwnerOnly()) return refuse();
+    const r = await window.hubAPI?.activeCountSet?.(box.checked).catch(() => null);
     if (r?.ok) toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
+    else if (r && r.error === 'not_permitted') refuse();
   });
 }
 
@@ -5335,7 +5371,8 @@ function renderTelemetrySettings() {
     </div>`;
 
   const persist = async () => {
-    await setTelemetryConsent(!!el.querySelector('#tel_crash')?.checked, !!el.querySelector('#tel_usage')?.checked);
+    // Refused (the owner's, under the lock): said already, and not "saved" too (review LOW-3).
+    if (await setTelemetryConsent(!!el.querySelector('#tel_crash')?.checked, !!el.querySelector('#tel_usage')?.checked) === false) return;
     toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
   };
   renderActiveCountRow(el);
@@ -6364,7 +6401,8 @@ async function openOffsiteRestoreModal() {
       applyTheme(settings.theme);
       i18n.set(settings.lang);
       refreshCurrencyLabels();
-      toast(t('offsite.restored', { name: chosen.value }), 'success');
+      // Parts the staff lock put back were already said (re-review of #2609).
+      if (!(Array.isArray(data && data.__refused) && data.__refused.length)) toast(t('offsite.restored', { name: chosen.value }), 'success');
       return true;
     },
   });
@@ -6443,7 +6481,9 @@ async function openRestoreBackupModal() {
         applyTheme(settings.theme);
         i18n.set(settings.lang);
         refreshCurrencyLabels();
-        toast(t('set.restore_success'), 'success');
+        // Parts put back as they were for this role were already said (the
+        // refused toast); "Restore successful" over them would contradict it.
+        if (!(Array.isArray(data && data.__refused) && data.__refused.length)) toast(t('set.restore_success'), 'success');
         return true;
       } catch (e) {
         console.error('restore backup failed', e);
@@ -6491,9 +6531,10 @@ async function openRestorePointsModal() {
         await forgetCloudServerView();
       // Refuse a snapshot that failed validation — replaceStoreFromSnapshot leaves the
       // existing data untouched when it returns false, so do NOT save or report success.
-        if (!replaceStoreFromSnapshot(safeJsonParse(json))) { toast(t('set.restore_error') || 'Restore failed', 'error'); return; }
+        const point = safeJsonParse(json);
+        if (!replaceStoreFromSnapshot(point)) { toast(t('set.restore_error') || 'Restore failed', 'error'); return; }
         saveAll(); initialRender(); loadSettingsIntoForm(); applyTheme(settings.theme); i18n.set(settings.lang); refreshCurrencyLabels();
-        toast(t('set.restore_success') || 'Restored', 'success');
+        if (!(Array.isArray(point && point.__refused) && point.__refused.length)) toast(t('set.restore_success') || 'Restored', 'success');
         modal.querySelector('.modal-close')?.click();
       } catch (e) { console.error('restore point failed', e); toast(t('set.restore_error') || 'Restore failed', 'error'); }
     }));

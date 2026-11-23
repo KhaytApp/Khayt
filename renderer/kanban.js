@@ -1333,7 +1333,11 @@ function renderMachineQueues() {
       toast(t('slicer.sent', { name: machine.name }), 'success');
       // The print has started: a failure to note it must not read as a failed
       // send, or the shop sends it a second time.
-      try { recordPrintRun(order.id, machine.id, !!r.started, file.originalName || file.filename); }
+      // `r.filename` is the name the file was given ON THE PRINTER
+      // (khayt-<time>.gcode): the only name it says back when the print
+      // ends, so it is what lets the per-head figures find this job
+      // (printRuns[].sentAs, lib/printer-actuals.js actualsJob).
+      try { recordPrintRun(order.id, machine.id, !!r.started, file.originalName || file.filename, r.filename); }
       catch (e) { console.warn('[kanban] could not record the print run', e); }
     } catch (e) { toast(`${t('slicer.fail')} ${explainRefusal(e.message)}`, 'error'); }
   }
@@ -1341,10 +1345,10 @@ function renderMachineQueues() {
   // The job records the machine it was sent to (lib/print-runs.js), the same
   // fields the Mac writes, so either app can say where a job printed. Re-found
   // by id after the await: the order may have moved in the log meanwhile.
-  function recordPrintRun(orderId, machineId, started, fileName) {
+  function recordPrintRun(orderId, machineId, started, fileName, sentAs) {
     if (typeof KhaytPrintRuns === 'undefined') return;
     const order = printLog.find(o => o && o.id === orderId);
-    const f = order && KhaytPrintRuns.fields(order, { machineId, at: new Date().toISOString(), started, file: fileName });
+    const f = order && KhaytPrintRuns.fields(order, { machineId, at: new Date().toISOString(), started, file: fileName, sentAs });
     if (!f) return;
     order.machineId = f.machineId;
     order.printRuns = f.printRuns;

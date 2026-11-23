@@ -43,8 +43,14 @@ const SENTRY_DSN = process.env.SENTRY_DSN
 let sentry = null;
 const SentryConsent = require('./lib/main/sentry-consent.js');
 if (!isBedReady && SENTRY_DSN && (app.isPackaged || process.env.SENTRY_DSN)
-    && SentryConsent.crashConsentAtStartup(require('fs'), require('path').join(app.getPath('userData'), 'khayt-store.json'))) {
+    && SentryConsent.crashConsentAtStartup(require('fs'), require('path').join(app.getPath('userData'), 'khayt-store.json'))
+    // And not while the shop (or this computer) makes no internet calls (P8):
+    // read from disk here too, since the book is not in memory yet.
+    && !require('./lib/main/outbound-fetch.js').offlineAtStartup(require('fs'),
+      require('path').join(app.getPath('userData'), 'khayt-store.json'),
+      require('path').join(app.getPath('userData'), 'network-local.json'))) {
   try {
+    // outbound: crash-reports (started only with consent and online; beforeSend asks again)
     sentry = require('@sentry/electron/main');
     sentry.init({
       dsn: SENTRY_DSN,
@@ -56,6 +62,23 @@ if (!isBedReady && SENTRY_DSN && (app.isPackaged || process.env.SENTRY_DSN)
       // pass through beforeSend, so a consent turned OFF mid-session could not
       // stop them.
       integrations: (defaults) => SentryConsent.withoutSessions(defaults),
+      // EVERY envelope asks the gate, not only events (security review of
+      // #2627): client reports (counts of dropped events) and the offline
+      // transport's retries of envelopes queued earlier never pass
+      // beforeSend. So the BASE transport is wrapped, which every send and
+      // every retry goes through; a refused envelope reads as sent and is
+      // dropped, not kept (D5). And no client reports at all.
+      sendClientReports: false,
+      transport: sentry.makeElectronOfflineTransport((options) => {
+        const base = sentry.makeElectronTransport(options);
+        return Object.assign({}, base, {
+          send: (envelope) => {
+            let ok = false;
+            try { ok = telemetryConsent().crash === true; } catch (_) { ok = false; }
+            return ok ? base.send(envelope) : Promise.resolve({});
+          },
+        });
+      }),
       // Crash reporting is OPT-IN. Settings offers it as a checkbox that
       // defaults to off, and the app tells the user "Khayt sends nothing by
       // default" — but Sentry was initialised purely on app.isPackaged and
@@ -92,7 +115,7 @@ const { isBlockedHost, isAllowedPrinterHost, sanitizeMailgunDomain, resolvesToBl
         sanitizePrinterHost } = require('./lib/host-guard');
 const { sendCustomSmtp } = require('./lib/custom-smtp');
 const {
-  mergePollSuccess, mergePollFailure, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
+  mergePollSuccess, mergePollFailure, failureCode, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
 } = require('./lib/printer-poll-cache');
 const sdcpClient = require('./lib/sdcp-client');
 const KhaytSdcpProtocol = require('./lib/sdcp');
@@ -168,6 +191,9 @@ const { resolvePrinterTarget } = require('./lib/main/printer-target');
 const printerUpload = require('./lib/printer-upload');
 const { sendSms, sendWhatsappTemplate, checkWhatsapp } = require('./lib/sms');
 const cloudClient = require('./lib/cloud-client');
+// Every Khayt Cloud request asks the "make no internet calls" gate (P8 PR 3).
+// Called at request time, so the gate (defined below) exists by then.
+cloudClient.setOutboundGate((purpose, url) => outboundGate.gateFor(purpose, url));
 const { summarizeBranch, totalBranches } = require('./lib/branch-summary');
 const aiTools = require('./lib/ai-tools');
 const aiPrivacy = require('./lib/ai-privacy');
@@ -198,6 +224,103 @@ const ENTRY_HTML = isBedReady ? 'bedready.html' : 'index.html';
 
 let mainWindow;
 let lanServerStore = {};
+
+/* ── "Make no internet calls" (P8; lib/outbound.js decides) ───────────────
+ * One gate for every call this process makes to the internet. It reads the
+ * book's settings.network from main's own copy (`{}` until the book loads,
+ * which reads as "not known yet": automatic calls wait a tick), this
+ * computer's stricter-only switch (network-local.json) and the install
+ * count's own per-computer switch (D3). */
+let outboundReadingDisk = false;
+const NETWORK_LOCAL_FILE = () => path.join(app.getPath('userData'), 'network-local.json');
+const outboundGate = require('./lib/main/outbound-fetch.js').createOutboundGate({
+  // The book from disk when main's copy is not loaded yet, as printerAllowed
+  // does (reviews of #2627): otherwise the 12 s update check and the install
+  // count met `settings-unknown` on a slow start and skipped. A fresh install
+  // with no book has no switch: `{}`, today's behaviour.
+  getSettings: () => {
+    const has = () => lanServerStore && lanServerStore.settings && typeof lanServerStore.settings === 'object' && !Array.isArray(lanServerStore.settings);
+    // Guarded: syncing calls onStoreUpdated, which observes, which asks again.
+    if (!has() && !outboundReadingDisk) {
+      outboundReadingDisk = true;
+      try { syncLanServerStoreFromDisk(); } catch (_) { /* unreadable: unknown below */ } finally { outboundReadingDisk = false; }
+    }
+    if (has()) return lanServerStore.settings;
+    try { if (!fs.existsSync(dataFilePath())) return {}; } catch (_) { /* unknown */ }
+    return null;
+  },
+  bookUnreadable: () => {
+    try { return fs.existsSync(dataFilePath()) && !(lanServerStore && lanServerStore.settings); } catch (_) { return false; }
+  },
+  // The switch turned on (the shop's or this computer's): the crash and usage
+  // queue saved BEFORE it is purged, so it cannot leave the day the switch is
+  // turned off again (D5; security review of #2627).
+  onOffline: () => {
+    try { fs.unlinkSync(TELEMETRY_QUEUE_FILE()); } catch (_) { /* none */ }
+    noSpellcheckDownloads();
+  },
+  readLocal: () => { try { return JSON.parse(fs.readFileSync(NETWORK_LOCAL_FILE(), 'utf8')); } catch (_) { return {}; } },
+  writeLocal: (v) => {
+    const f = NETWORK_LOCAL_FILE();
+    fs.writeFileSync(f + '.tmp', JSON.stringify(v));
+    fs.renameSync(f + '.tmp', f);
+  },
+  readInstallCountOff: () => readActiveCount().off === true,
+  lookup: (host) => require('dns').promises.lookup(host, { all: true, verbatim: true }),
+  // What the switch read as the app started, for the belt until the book loads.
+  startupOffline: (() => { try { return require('./lib/main/outbound-fetch.js').offlineAtStartup(fs, path.join(app.getPath('userData'), 'khayt-store.json'), path.join(app.getPath('userData'), 'network-local.json')); } catch (_) { return true; } })(),
+});
+// THE RUNTIME BELT (design §2.2): what the source test missed fails loudly
+// here instead of leaking. While this computer is offline, a global fetch to
+// a host that is neither on the shop's network nor one a gated call just
+// asked for is refused as 'unrouted' and logged. Online it passes everything.
+{
+  // outbound-exempt: gate — the belt wraps the global fetch; it adds a refusal, never a call
+  const rawGlobalFetch = globalThis.fetch;
+  if (typeof rawGlobalFetch === 'function') {
+    // outbound-exempt: gate — see above
+    globalThis.fetch = function outboundBelt(input, init) {
+      let ok = true;
+      try { ok = outboundGate.beltAllows(input); } catch (_) { ok = true; }
+      if (!ok) {
+        const OB = require('./lib/main/outbound-fetch.js').OutboundBlocked;
+        console.warn('[outbound] refused an unrouted request while offline:', (() => { try { return new URL(String(input && input.url ? input.url : input)).hostname; } catch (_) { return '?'; } })());
+        return Promise.reject(new OB('unrouted', 'offline'));
+      }
+      // A call to the shop's own network while offline follows no redirect:
+      // a NAS or a self-hosted service answering 307 to a public host would
+      // otherwise carry the request out (review of #2629).
+      try {
+        if (outboundGate.beltOffline()) {
+          const h = new URL(String(input && input.url ? input.url : input)).hostname;
+          if (require('./lib/outbound.js').isLanHost(h)) init = Object.assign({}, init || {}, { redirect: 'manual' });
+        }
+      } catch (_) { /* a relative URL: not the internet */ }
+      return rawGlobalFetch.call(this, input, init);
+    };
+  }
+}
+// Every library module's internet call asks the same gate (lib/outbound-hook.js).
+require('./lib/outbound-hook.js').setOutboundGate((purpose, url) => outboundGate.gateFor(purpose, url));
+/* Chromium downloads spellcheck dictionaries from Google on Windows and Linux
+ * (review of #2629): while offline it is pointed at an address that answers
+ * nothing. Back online, the next start uses the default again. */
+function noSpellcheckDownloads() {
+  try {
+    const { session } = require('electron');
+    // outbound-exempt: local-file — points Chromium's dictionary download at nothing while offline
+    if (app.isReady() && session && session.defaultSession) session.defaultSession.setSpellCheckerDictionaryDownloadURL('http://127.0.0.1:9/');
+  } catch (_) { /* not ready, or no spellcheck: nothing downloads either way */ }
+}
+app.whenReady().then(() => { if (outboundGate.beltOffline()) noSpellcheckDownloads(); }).catch(() => {});
+
+/** A person-started call the switch refuses: the reply the window turns into words (P8 PR 5). */
+async function outboundRefusal(purpose, url) {
+  try { await outboundGate.gateFor(purpose, url); return null; } catch (e) {
+    if (e && e.code === 'outbound.blocked') return { ok: false, error: 'outbound.blocked', blocked: { purpose: e.purpose, reason: e.reason } };
+    throw e;
+  }
+}
 
 /** Only the main app window may invoke privileged hub:* IPC (blocks stray webContents). */
 function isTrustedRenderer(event) {
@@ -240,6 +363,7 @@ const {
   isEncryptionAvailable,
   persistLanStoreUpdate,
   updateStoreOnDisk,
+  updateStoreOnDiskAllowingLock,
   resolveStoreSecret,
   resolveStoreSecretFor,
   isStoreSecretMasked,
@@ -252,7 +376,7 @@ const {
   safeStorage,
   safeJsonParse,
   crypto,
-  onStoreUpdated(data) { lanServerStore = data; },
+  onStoreUpdated(data) { lanServerStore = data; try { outboundGate.observe(); } catch (_) { /* before the gate exists */ } },
   // Read INSIDE the write chain, so a read-modify-write always sees the result of
   // every write queued ahead of it. See updateStoreOnDisk.
   getStore: () => lanServerStore,
@@ -314,9 +438,10 @@ const { registerPrinterDiscovery } = require('./lib/main/printer-discovery.js');
 const { registerWebcamProxy } = require('./lib/main/webcam-proxy.js');
 const { registerPaymentLinks } = require('./lib/main/payment-links.js');
 const { registerQuotePayLink } = require('./lib/main/quote-pay-link-sign.js');
-const { registerUpdater } = require('./lib/updater');
+const { registerUpdater, isVersionNewer } = require('./lib/updater');
 const { setupAutoUpdater } = registerUpdater({
   app,
+  outbound: outboundGate,
   fs,
   ipcMain,
   BrowserWindow,
@@ -482,6 +607,9 @@ ipcMain.handle('hub:fetch-exchange-rates', async (_e, base) => {
   const code = String(base || 'SAR').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
   if (code.length !== 3) return { ok: false, error: 'Invalid base currency' };
   try {
+    const refusal = await outboundRefusal('exchange-rates', `https://open.er-api.com/v6/latest/${code}`);
+    if (refusal) return refusal;
+    // outbound: exchange-rates
     const res = await fetch(`https://open.er-api.com/v6/latest/${code}`, {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(10000),
@@ -901,6 +1029,7 @@ ipcMain.handle('hub:share-whatsapp', async (_e, { phone, message, pdfPath }) => 
   const clean = (String(phone || '').replace(/[^\d]/g, ''));
   const text = encodeURIComponent(String(message || '').slice(0, 4096));
   const url = clean ? `https://wa.me/${clean}?text=${text}` : `https://wa.me/?text=${text}`;
+  // outbound-exempt: browser — hands the address to the person's own browser
   await shell.openExternal(url);
   // Path-confinement: only reveal files inside userData or known download locations
   if (pdfPath) {
@@ -1018,6 +1147,22 @@ function writePreWipeBackup() {
 }
 
 // --- Daily auto-backup (new in 1.3) ---
+/* A backup or restore point the WINDOW wrote is restored by the owner, so what
+ * it holds must be what this role may write: a manager's file carrying the
+ * lock, people's roles, the outbound switch or the sharing opt-ins would
+ * otherwise reach the book the day the owner restores it (security review of
+ * #2636, LOW-2). The same guard as a save, against the book on disk; no
+ * sign-in is spent on it. Lock off on disk: unchanged. Null: refuse. */
+function guardedSnapshot(parsed) {
+  let disk = null;
+  try { disk = readStoreDecryptedFromDisk(); } catch (_) { disk = null; }
+  if (!disk || !disk.settings) return parsed;
+  try {
+    const g = PrinterPermission.guardSave(parsed, disk, { verified: () => false, consume: () => {} });
+    return g.store || null;
+  } catch (_) { return null; }
+}
+
 ipcMain.handle('hub:write-backup', async (event, jsonString) => {
   if (!jsonString || typeof jsonString !== 'string' || jsonString.length > MAX_STORE_BYTES) {
     return { ok: false, error: 'Backup data too large or invalid' };
@@ -1029,6 +1174,8 @@ ipcMain.handle('hub:write-backup', async (event, jsonString) => {
   const fullPath = path.join(backupsDir(), filename);
   let parsed;
   try { parsed = safeJsonParse(jsonString); } catch (e) { return { ok: false, error: 'Invalid JSON in backup data' }; }
+  parsed = guardedSnapshot(parsed);
+  if (!parsed) return { ok: false, error: 'Invalid JSON in backup data' };
   const encrypted = JSON.stringify(encryptForDisk(parsed));
   await fs.promises.writeFile(fullPath, encrypted, 'utf8');
   // Keep only the most recent 30 backups
@@ -1088,6 +1235,7 @@ function restoreAllowed() {
 }
 
 async function restoreSnapshotForWindow(parsed, event, label) {
+  let refused = [];
   if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
     console.error(`${label}: the store on disk is from a newer ${FLAVOR_NAME}; not restoring over it`);
     return null;
@@ -1110,6 +1258,14 @@ async function restoreSnapshotForWindow(parsed, event, label) {
     const g = PrinterPermission.guardSave(parsed, disk, { verified: operatorVerified, consume: consumeVerified });
     if (!g.store) { console.error(`${label}: refused, the backup has no settings`); return null; }
     parsed = g.store;
+    // What the guard put back as it is on disk is said in the window, as a
+    // refused save is; it used to be dropped here, and the restore reported
+    // success over parts it never restored (pre-cut review LOW).
+    if (g.refused && g.refused.length) {
+      console.warn(`${label}: refused for this role:`, g.refused.join(', '));
+      refused = g.refused.slice();
+      try { event.sender.send('hub:restore-refused', g.refused.slice()); } catch (_) { /* window gone */ }
+    }
   } catch (e) { console.error(`${label}: role guard failed:`, e && e.message); return null; }
   // Decrypting the backup and sealing it again are both keychain work. Explain once first.
   await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
@@ -1117,7 +1273,10 @@ async function restoreSnapshotForWindow(parsed, event, label) {
   if (!r.ok) { console.error(`${label}:`, r.error); return null; }
   machineSecrets.forget();          // a printer's key may have changed with it
   _diskStoreVersion = typeof r.masked.version === 'number' ? r.masked.version : _diskStoreVersion;
-  return JSON.stringify(r.masked);
+  // `__refused` travels with the book (normalizeStoreSnapshot drops keys it
+  // does not know), so the window can skip "Restore successful" over a
+  // restore that put parts back as they were (correctness review of #2609).
+  return JSON.stringify(refused.length ? Object.assign({}, r.masked, { __refused: refused }) : r.masked);
 }
 
 ipcMain.handle('hub:restore-backup', async (event, backupPath) => {
@@ -1144,6 +1303,8 @@ ipcMain.handle('hub:create-restore-point', async (_e, { json, label } = {}) => {
   if (!json || typeof json !== 'string' || json.length > MAX_STORE_BYTES) return { ok: false, error: 'Invalid data' };
   let parsed;
   try { parsed = safeJsonParse(json); } catch (e) { return { ok: false, error: 'Invalid JSON' }; }
+  parsed = guardedSnapshot(parsed);
+  if (!parsed) return { ok: false, error: 'Invalid data' };
   const safeLabel = sanitizeRpLabel(label);
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `${stamp}__${safeLabel.replace(/\s+/g, '_')}.json`;
@@ -1596,8 +1757,53 @@ ipcMain.handle('hub:detect-slicers', async () => {
 // (SSRF-safe). WHAT each printer is asked — which files it runs, the remote
 // name, the request — is `lib/printer-upload.js`, which the Mac app sends with
 // too; this function is the wire.
+// A person's command to a printer: the background poll leaves that printer
+// alone until the reply (lib/poll-yield.js, C6), so a poll read a moment
+// before the command cannot come back after it and undo what the card shows.
+// Every caller below goes through yieldingFor.
+const pollYield = require('./lib/poll-yield.js').createPollYield();
+const yieldingFor = async (machine, fn) => {
+  try { return await pollYield.around(machine && machine.id, fn); }
+  finally { pollPrinterSoon(machine); }
+};
+/* After a command's reply, ask that printer again in a moment rather than
+ * leaving its card on the old state for up to 30 s (correctness review of
+ * #2612; lib/poll-yield.js justSettled). One printer, through the same merge
+ * as the poll, and never beside a full poll: two polls in flight is the
+ * completion race the poll loop guards (printerPollInFlight). */
+const SETTLE_POLL_MS = 1500;
+const printerSoonPolling = new Set();   // ids a soon-poll is reading now
+let printerFullPollOn = null;           // the id the full poll is reading now
+function pollPrinterSoon(machine, tries = 0) {
+  const id = machine && machine.id;
+  if (!id || !machine.printerApi?.type || machine.printerApi.type === 'none' || tries > 5) return;
+  setTimeout(async () => {
+    if (pollYield.yielding(id, Date.now())) return;           // another command went out; its reply polls
+    if (tries === 0 && !pollYield.justSettled(id, Date.now())) return;   // settled long ago: the poll has it
+    // Per printer, not the fleet's flag: holding printerPollInFlight here made
+    // a 30 s tick (or the first poll after start) landing meanwhile skip EVERY
+    // printer (re-review of #2612). Two reads of one printer at once is the
+    // completion race, so this waits while the full poll is on this printer,
+    // and the full poll skips a printer this is reading.
+    if (!printerPollInterval) return;
+    if (printerFullPollOn === id || printerSoonPolling.has(id)) { pollPrinterSoon(machine, tries + 1); return; }
+    printerSoonPolling.add(id);
+    const sent = pollYield.seq(id);
+    try {
+      const status = await fetchPrinterStatus(machine);
+      if (pollYield.seq(id) !== sent || pollYield.yielding(id, Date.now())) return;
+      const before = printerStatusCache[id];
+      printerStatusCache[id] = mergePollSuccess(before, status, Date.now());
+      if (completionIsNew(before, printerStatusCache[id])) persistCompletions().catch(() => {});
+      noteHeadActuals(machine, before, printerStatusCache[id]);
+      BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('printer-status-update', printerStatusCache));
+    } catch (_) { /* the next full poll says it */ } finally { printerSoonPolling.delete(id); }
+  }, SETTLE_POLL_MS);
+}
+
 async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
@@ -1642,6 +1848,7 @@ async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
     body = bytes;
   }
   try {
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(`http://${printerHost}:${portNum}${req.path}`,
       { method: req.method, headers: req.headers, body, signal: AbortSignal.timeout(60000) });
     return printerUpload.accepted(res.status)
@@ -1676,7 +1883,7 @@ ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startP
   if (!gate.ok) return gate;
   try {
     if (!gcodePath || !fs.existsSync(gcodePath)) return { ok: false, error: 'G-code file not found.' };
-    return await uploadGcodeToPrinter(machine, gcodePath, startPrint);
+    return await yieldingFor(machine, () => uploadGcodeToPrinter(machine, gcodePath, startPrint));
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
@@ -1688,7 +1895,7 @@ ipcMain.handle('hub:slice-and-print', async (_e, { modelPath, slicerPath, args, 
     const r = await runSlice({ modelPath, slicerPath, args });
     if (!r.ok) return r;
     outDir = r.outDir;
-    const up = await uploadGcodeToPrinter(machine, r.gcodePath, startPrint);
+    const up = await yieldingFor(machine, () => uploadGcodeToPrinter(machine, r.gcodePath, startPrint));
     return up.ok ? { ok: true, meta: r.meta, ...up } : up;
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   finally { rmDir(outDir); }
@@ -1704,11 +1911,11 @@ ipcMain.handle('hub:print-order-file', async (_e, { orderFile, machine, slicerPa
   try {
     const full = path.join(orderFilesDir(), path.basename(String(orderFile || '')));
     if (!orderFile || !fs.existsSync(full)) return { ok: false, error: 'Attached file not found.' };
-    if (/\.(gcode|gco|g|nc)$/i.test(full)) return await uploadGcodeToPrinter(machine, full, startPrint);
+    if (/\.(gcode|gco|g|nc)$/i.test(full)) return await yieldingFor(machine, () => uploadGcodeToPrinter(machine, full, startPrint));
     const r = await runSlice({ modelPath: full, slicerPath, args });
     if (!r.ok) return r;
     outDir = r.outDir;
-    const up = await uploadGcodeToPrinter(machine, r.gcodePath, startPrint);
+    const up = await yieldingFor(machine, () => uploadGcodeToPrinter(machine, r.gcodePath, startPrint));
     return up.ok ? { ok: true, meta: r.meta, ...up } : up;
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   finally { rmDir(outDir); }
@@ -1800,14 +2007,55 @@ async function maybeShowKeychainExplanation(win) {
  * admin the lock made gets roleKey 'owner'. Never runs on a book that has an
  * owner, so it changes nothing twice.
  */
+/** btoa operator PINs become real hashes, on disk, once (#2609 security
+ * review). Returns id → new hash, so what the window gets matches the disk:
+ * a window holding the old value would save it straight back. */
+async function upgradeLegacyPinsOnDisk() {
+  // Inside the write chain (re-review of #2608/#2609): a write queued ahead
+  // of this is kept.
+  let out = null;
+  await updateStoreOnDiskAllowingLock((cur) => {
+    const r = PrinterPermission.upgradeLegacyPins(cur, hashPinSalted);
+    if (!r.changed) return cur;
+    console.warn('PIN upgrade:', r.count, 'operator PIN(s) from the first releases now hashed');
+    out = new Map();
+    for (const o of r.store.operators) if (o && o.id) out.set(o.id, o.pinHash);
+    return r.store;
+  }, ['operators']);
+  return out;
+}
+
 async function migrateLegacyOwnerOnDisk() {
-  const disk = readStoreDecryptedFromDisk();
-  if (!disk || !disk.settings) return false;
-  const m = PrinterPermission.migrateLegacyOwner(disk);
-  if (!m.changed) return false;
-  await writeStoreToDisk(m.store);
-  console.warn('owner migration: operator', m.operatorId, 'is the owner by roleKey now (a lock older than #2264)');
+  // Inside the write chain (lib/store-io.js updateStoreOnDiskAllowingLock).
+  let operatorId = null;
+  await updateStoreOnDiskAllowingLock((cur) => {
+    const m = PrinterPermission.migrateLegacyOwner(cur);
+    if (!m.changed) return cur;
+    operatorId = m.operatorId;
+    return m.store;
+  }, ['operators']);
+  if (!operatorId) return false;
+  console.warn('owner migration: operator', operatorId, 'is the owner by roleKey now (a lock older than #2264)');
   return true;
+}
+
+// Once per process, before the first window reads the book: under the lock,
+// nobody stays signed in across a restart (lib/main/printer-permission.js
+// signedOutAtStart, #2608 security review).
+let signedOutThisStart = false;
+async function signOutAtStartOnDisk() {
+  if (signedOutThisStart) return false;
+  signedOutThisStart = true;
+  // Inside the write chain: a write queued ahead of this (a LAN order
+  // arriving as the window loads) is kept (re-review of #2608).
+  let changed = false;
+  await updateStoreOnDiskAllowingLock((cur) => {
+    const r = PrinterPermission.signedOutAtStart(cur);
+    if (!r.changed) return cur;
+    changed = true;
+    return r.store;
+  }, ['settings.activeOperatorId']);
+  return changed;
 }
 
 ipcMain.handle('hub:load-store', async (event) => {
@@ -1849,8 +2097,19 @@ ipcMain.handle('hub:load-store', async (event) => {
     // A lock older than roleKey: its translated admin becomes the owner, once,
     // on disk and in what the window gets (#2592 data review, MED-3).
     try { await migrateLegacyOwnerOnDisk(); } catch (e) { console.error('hub:load-store: owner migration failed:', e && e.message); }
+    // The PIN upgrade runs BEFORE the sign-out: hashed first, so the pad can
+    // check the person signed out next (#2608 + #2609).
+    let upgradedPins = null;
+    try { upgradedPins = await upgradeLegacyPinsOnDisk(); } catch (e) { console.error('hub:load-store: PIN upgrade failed:', e && e.message); }
+    let signedOut = false;
+    try { signedOut = await signOutAtStartOnDisk(); } catch (e) { console.error('hub:load-store: sign-out at start failed:', e && e.message); }
     let { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
     if (normalized) normalized = PrinterPermission.migrateLegacyOwner(normalized).store;
+    if (normalized && upgradedPins && Array.isArray(normalized.operators)) {
+      normalized.operators = normalized.operators.map((o) => (o && upgradedPins.has(o.id) && o.pinHash !== upgradedPins.get(o.id)
+        && require('./lib/pin-hash').decodeLegacyBtoaPin(o.pinHash) !== null ? { ...o, pinHash: upgradedPins.get(o.id) } : o));
+    }
+    if (normalized && signedOut) normalized = PrinterPermission.signedOutAtStart(normalized).store;
     if (!normalized) {
       console.error('hub:load-store: unrecoverable store shape:', errors.join('; '));
       return { __corrupt: true, error: errors[0] || 'Invalid store' };
@@ -2108,6 +2367,7 @@ require('./lib/main/offsite-backup.js').registerOffsiteBackup({
 // Backing library models up into the Khayt Vault (lib/main/vault-backup.js):
 // the Mac's library backup, to the same vault objects. Writes no record field.
 const vaultBackup = require('./lib/main/vault-backup.js').createVaultBackup({
+  outboundFetch: outboundGate.for('cloud'),
   app,
   readBook: () => { try { return readStoreDecryptedFromDisk(); } catch (_) { return null; } },
   getDek: () => (cloudBackend ? cloudDek : null),
@@ -2125,6 +2385,7 @@ ipcMain.handle('hub:vault-backup', async (_e, { recordIds } = {}) => {
 // Khayt Vault share links (lib/main/vault-links.js): the Mac's share sheet and
 // links sheet, for files already in the vault. Needs Khayt Cloud unlocked.
 require('./lib/main/vault-links.js').registerVaultLinks({
+  outboundFetch: outboundGate.for('cloud'),
   app, ipcMain, safeStorage,
   readBook: () => { try { return readStoreDecryptedFromDisk(); } catch (_) { return null; } },
   getDek: () => (cloudBackend ? cloudDek : null),
@@ -2139,6 +2400,21 @@ const machineSecrets = require('./lib/main/machine-secrets.js').createMachineSec
 
 // A printer's smart plug (lib/main/smart-plug.js): read, switch, and the
 // auto-off after a cooled print. Same LAN pinning and secret fill as printers.
+// The "Before you update" items on the first launch of a new version, for the
+// installs the update dialog never sees: the Microsoft Store and installers
+// run by hand (lib/main/launch-gate.js).
+require('./lib/main/launch-gate.js').registerLaunchGate({
+  ipcMain,
+  userDataDir: () => app.getPath('userData'),
+  current: app.getVersion(),
+  gates: (() => { try { return require('./lib/release-gates.json').gates || {}; } catch (_) { return {}; } })(),
+  // Asked once, as the app starts: the window writes a fresh install's first
+  // book before it asks for the gate, and that is not an upgrade.
+  hasBook: (() => { let had = false; try { had = fs.existsSync(dataFilePath()); } catch (_) { had = false; } return () => had; })(),
+  isNewer: (a, b) => isVersionNewer(String(a), String(b)),
+  offeredVersion: () => require('./lib/updater').offeredUpdateVersion(),
+});
+
 require('./lib/main/smart-plug.js').registerSmartPlug({
   ipcMain,
   // Switching a printer's power is controlling it (P5); reading it is not.
@@ -2165,7 +2441,18 @@ const TELEMETRY_QUEUE_FILE = () => path.join(app.getPath('userData'), 'telemetry
 
 function telemetryConsent() {
   const tm = (lanServerStore && lanServerStore.settings && lanServerStore.settings.telemetry) || {};
-  return { crash: !!tm.crashOptIn, usage: !!tm.usageOptIn, installId: tm.installId || '' };
+  // The opt-in AND the "make no internet calls" switch (lib/outbound.js: the
+  // switch can only take away). Blocked is DROPPED, never queued (D5):
+  // enqueueTelemetry stores nothing a stream may not send, and the sender's
+  // backoff does not grow, since it never tries.
+  // The opt-in first: a shop that never opted in is not "blocked" by the
+  // switch, and must not show hundreds of blocks in the Settings list.
+  let crash = false, usage = false;
+  try {
+    crash = tm.crashOptIn === true && outboundGate.check('crash-reports').allowed;
+    usage = tm.usageOptIn === true && outboundGate.check('usage-stats').allowed;
+  } catch (_) { crash = false; usage = false; }
+  return { crash, usage, installId: tm.installId || '' };
 }
 
 function readTelemetryQueue() {
@@ -2191,6 +2478,8 @@ function enqueueTelemetry(kind, rawPayload) {
 }
 
 // Opt-out purges everything queued locally, immediately.
+// No role check on purpose: emptying this computer's queue can only mean LESS
+// is sent, never more (security review of #2636, NIT).
 ipcMain.handle('hub:telemetry-purge', async () => {
   try { fs.unlinkSync(TELEMETRY_QUEUE_FILE()); } catch (_) {}
   return { ok: true };
@@ -2221,7 +2510,8 @@ async function flushTelemetry() {
       readQueue: readTelemetryQueue,
       writeQueue: (q) => fs.writeFileSync(TELEMETRY_QUEUE_FILE(), JSON.stringify(q), 'utf8'),
       consent: telemetryConsent(),
-      fetchImpl: (...a) => fetch(...a),
+      // outbound: usage-stats (and crash-reports: telemetryConsent checks both)
+      fetchImpl: (...a) => { outboundGate.noteHost(a[0]); return fetch(...a); },
       appVersion: app.getVersion(),
       backoffMs: telemetryBackoffMs,
       nextAttemptAt: telemetryNextAttempt,
@@ -2237,6 +2527,7 @@ async function flushTelemetry() {
 const ActiveCount = require('./lib/active-count.js');
 const ACTIVE_COUNT_FILE = () => path.join(app.getPath('userData'), 'active-count.json');
 let activeCountSending = false;
+let activeCountWaits = 0;
 // scripts/e2e-active-count-smoke.mjs points the sender at its own loopback
 // server. Honoured for 127.0.0.1 only, so it can never redirect a real count.
 const ACTIVE_COUNT_E2E = /^http:\/\/127\.0\.0\.1:\d+\//.test(process.env.KHAYT_ACTIVE_COUNT_E2E || '')
@@ -2262,6 +2553,20 @@ function writeActiveCount(s) {
 
 async function sendActiveCount() {
   if (activeCountSending) return;
+  // The shop's switch, this computer's, and the count's own (D3). Checked
+  // before due(), so a blocked count is not marked as tried.
+  const gate = outboundGate.check('install-count');
+  if (!gate.allowed) {
+    // The book not read yet (a count due 30 s after launch can beat it on a
+    // slow start): ask again shortly rather than an hour later. A few times
+    // only; the hourly timer covers the rest.
+    if (gate.reason === 'settings-unknown' && activeCountWaits < 12) {
+      activeCountWaits += 1;
+      setTimeout(() => { sendActiveCount().catch(() => {}); }, 5000).unref?.();
+    }
+    return;
+  }
+  activeCountWaits = 0;
   const today = ActiveCount.utcDay(Date.now());
   const state = readActiveCount();
   if (!ActiveCount.due(state, today, activeCountReady())) return;
@@ -2273,6 +2578,8 @@ async function sendActiveCount() {
     // Node's fetch, not Chromium's: no cookie jar and no OS locale. The two
     // headers it does add are pinned to the Mac's fixed values, so every app's
     // count looks the same and says nothing about the machine.
+    outboundGate.noteHost(ACTIVE_COUNT_E2E || ActiveCount.ENDPOINT);   // a kept count passes the belt
+    // outbound: install-count
     const res = await fetch(ACTIVE_COUNT_E2E || ActiveCount.ENDPOINT, {
       method: 'POST',
       credentials: 'omit',
@@ -2297,8 +2604,62 @@ function startActiveCount() {
   setInterval(() => { sendActiveCount().catch(() => {}); }, 60 * 60 * 1000).unref?.();
 }
 
+// The Settings list (P8 PR 5 draws it): every purpose, its state and how
+// often the switch has refused it this session. And this computer's own
+// stricter switch, which is not in the book.
+ipcMain.handle('hub:outbound-describe', async () => {
+  const st = (lanServerStore && lanServerStore.settings) || {};
+  const net = st.network && typeof st.network === 'object' && !Array.isArray(st.network) ? st.network : {};
+  const loc = outboundGate.local();
+  let lastChecked = null, blockedSince = null;
+  try { const U = require('./lib/updater'); lastChecked = U.lastUpdateCheckAt(); blockedSince = U.updatesBlockedSince(); } catch (_) { /* none */ }
+  let library = false;
+  try { library = !!printLibS3() || !!printLibDrive(); } catch (_) { library = false; }
+  return {
+    rows: outboundGate.describe(),
+    local: { offline: loc.offline === true, changedAt: loc.changedAt || null },
+    // The shop's switch as MAIN reads it from the saved book, so the page never
+    // shows a change a refused or failed save did not keep (review of #2633).
+    shop: {
+      offline: require('./lib/outbound.js').isOffline(st, { local: {} }),
+      keep: require('./lib/outbound.js').keptOf(st),
+      changedAt: typeof net.changedAt === 'string' ? net.changedAt : null,
+      changedBy: typeof net.changedBy === 'string' ? net.changedBy : null,
+    },
+    // For the Updates row's "Last checked" and the 30-day red row and banner (D2).
+    updatesLastCheckedAt: lastChecked,
+    updatesBlockedSince: blockedSince,
+    // Set up where only main can see it: the library's own bucket or Drive.
+    setup: { storageLibrary: library },
+  };
+});
+ipcMain.handle('hub:outbound-set-local', async (_e, patch) => {
+  // Only the owner changes the switch under the staff lock, this computer's
+  // own included (Turki, Nov 22 round 2). The book's settings.network is held
+  // by the save guard (PrinterPermission SECURITY_SETTINGS).
+  if (!PrinterPermission.mayChangeNetwork(bookForPrivacyCheck())) return { ok: false, error: 'not_permitted' };
+  try { return { ok: true, local: outboundGate.setLocal(patch) }; } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
+/* The book the owner-only switches are judged against. Main's copy is `{}`
+ * until a window loads the book, and on a fresh install nothing loads it
+ * before the first save, so `{}` read as "locked, nobody signed in" and
+ * refused even with no lock (security review of #2636, LOW-1). The disk when
+ * main has not read it yet; no book at all is no lock. */
+function bookForPrivacyCheck() {
+  if (lanServerStore && lanServerStore.settings) return lanServerStore;
+  let disk = null;
+  try { disk = readStoreDecryptedFromDisk(); } catch (_) { disk = null; }
+  if (disk && disk.settings) return disk;
+  try { if (fs.existsSync(dataFilePath())) return null; } catch (_) { return null; }   // a book we cannot read: refused
+  return { settings: {} };
+}
+
 ipcMain.handle('hub:active-count-get', async () => ({ ready: activeCountReady(), on: !readActiveCount().off }));
 ipcMain.handle('hub:active-count-set', async (_e, on) => {
+  // Owner-only under the staff lock, like the outbound switch (Turki, Nov 22).
+  // It is this computer's own file, so no save guard sees it: the check is here.
+  if (!PrinterPermission.mayChangePrivacy(bookForPrivacyCheck())) return { ok: false, error: 'not_permitted' };
   // Off keeps the dates, so turning it back on does not count this as new.
   writeActiveCount({ ...readActiveCount(), off: !on });
   if (on) sendActiveCount().catch(() => {});
@@ -2402,6 +2763,18 @@ function guardWindowStore(normalized) {
     console.error('store guard: role guard failed:', e && e.message);
     return { error: 'role_guard_failed' };
   }
+  // A switch main applied from Khayt Cloud is not moved back by a window
+  // still holding the older one (lib/network-switch.js keepNewerNetwork).
+  try {
+    const kept = require('./lib/network-switch.js').keepNewerNetwork(merged, guardDisk, Date.now());
+    if (kept !== merged) {
+      // The window held an older switch: it is told the kept one, so it does
+      // not show what was not saved (correctness review of #2645, L2).
+      const n = kept.settings && kept.settings.network;
+      setImmediate(() => BrowserWindow.getAllWindows().forEach((w) => { try { w.webContents.send('hub:network-applied', n); } catch (_) { /* gone */ } }));
+    }
+    merged = kept;
+  } catch (e) { console.error('store guard: network guard failed:', e && e.message); }
   // What was put back as it is on disk: the window reloads and says so
   // (#2592 review), instead of showing an edit that was never kept.
   return { store: merged, refused };
@@ -2461,6 +2834,7 @@ ipcMain.handle('hub:save-store', async (event, data) => {
     // Atomic + durable: fsync'd temp swap, with a one-generation .prev rollback.
     await atomicWriteStore(serialized);
     lanServerStore = merged;  // keep LAN server in sync (plaintext in-memory)
+    try { outboundGate.observe({ fromSave: true }); } catch (_) { /* the switch's last sync: see lib/main/outbound-fetch.js */ }
     return guarded.refused && guarded.refused.length ? { ok: true, refused: guarded.refused } : { ok: true };
   } catch (e) {
     console.error('hub:save-store error:', e);
@@ -3149,6 +3523,7 @@ const GDRIVE_AUTH_TIMEOUT_MS = 600000;
  */
 function gdriveAuthorize(cfg) {
   return new Promise((resolve) => {
+    // outbound-exempt: inbound-server — the Drive sign-in's one-shot loopback listener
     const http = require('node:http');
     const { verifier, challenge } = GD.pkcePair();
     // Binds the redirect to THIS attempt. Without it the loopback server would
@@ -3195,7 +3570,8 @@ function gdriveAuthorize(cfg) {
       if (!code) { reply('Not connected', 'Google did not return an authorisation code.'); finish({ ok: false, error: 'No authorisation code.' }); return; }
 
       try {
-        const tok = await GD.exchangeCode(globalThis.fetch, {
+        // outbound: storage (the Drive sign-in's code exchange, through the gate)
+        const tok = await GD.exchangeCode(outboundGate.for('storage'), {
           clientId: cfg.clientId, clientSecret: cfg.clientSecret, code, verifier, redirectUri,
         });
         if (!tok.refresh_token) {
@@ -3221,6 +3597,7 @@ function gdriveAuthorize(cfg) {
     // which can resolve to ::1 and produce a redirect_uri Google will not match.
     server.listen(0, '127.0.0.1', () => {
       redirectUri = `http://127.0.0.1:${server.address().port}/callback`;
+      // outbound-exempt: browser — hands the address to the person's own browser
       shell.openExternal(GD.authUrl({ clientId: cfg.clientId, redirectUri, challenge, state }))
         .catch((e) => finish({ ok: false, error: `Could not open the browser: ${e.message}` }));
     });
@@ -5114,6 +5491,46 @@ registerLanServer({
   // The library's own folders, so a paired phone can price a model without
   // the file leaving this computer. Rehydrate fetches back a tiered model.
   printLibrary: { itemDir: printLibItemDir, rehydrate: printLibRehydrate },
+  // Pairing a phone by a code, with a role (lib/main/phone-pairing.js). OFF
+  // until the phone ships it, as on the Mac: on only for a developer who
+  // starts Khayt with KHAYT_PHONE_PAIRING_BY_CODE=1. Read here, in main, so
+  // nothing the window sends can switch it on.
+  phonePairing: require('./lib/main/phone-pairing').createPhonePairing({
+    enabled: () => process.env.KHAYT_PHONE_PAIRING_BY_CODE === '1',
+  }),
+  // Pairing a slicer plugin (Khayt for OrcaSlicer) and its /api/connectors/*
+  // routes (lib/main/connector-pairing.js, connector-routes.js). OFF, as the
+  // Mac's `connectorPairing` defaults switch: on only for a developer who
+  // starts Khayt with KHAYT_CONNECTOR_PAIRING=1. Read here, in main, so
+  // nothing the window sends can switch it on.
+  connectorPairing: require('./lib/main/connector-pairing').createConnectorPairing({
+    enabled: () => process.env.KHAYT_CONNECTOR_PAIRING === '1',
+  }),
+  // "Show prices in OrcaSlicer", "Accept files from slicers" and the
+  // OctoPrint key: this computer's own, in userData, never in the book.
+  connectorLocal: require('./lib/main/connector-local').createConnectorLocal({
+    fs,
+    settingsPath: path.join(app.getPath('userData'), 'khayt-slicer-settings.json'),
+    keyPath: path.join(app.getPath('userData'), 'khayt-slicer-upload.key'),
+    seal: (s) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(s) : null),
+    unseal: (b) => safeStorage.decryptString(b),
+  }),
+  // The "From slicer" inbox and a plugin's slice records beside it.
+  ...(() => {
+    const root = path.join(app.getPath('userData'), require('./lib/main/slicer-inbox').FOLDER_NAME);
+    const slicerInbox = require('./lib/main/slicer-inbox').createSlicerInbox({ fs, root });
+    return {
+      slicerInbox,
+      connectorSlices: require('./lib/main/connector-slices').createConnectorSlices({ fs, dir: slicerInbox.slices }),
+    };
+  })(),
+  // _khayt._tcp over mDNS, only while the LAN server runs bound to the network.
+  lanAdvertiser: require('./lib/main/lan-advertise').createLanAdvertiser({
+    // outbound-exempt: inbound-server — announces this computer's own LAN server over mDNS (224.0.0.251), never off the network
+    createSocket: () => require('dgram').createSocket({ type: 'udp4', reuseAddr: true }),
+    interfaces: () => require('os').networkInterfaces(),
+    hostname: () => require('os').hostname(),
+  }),
 });
 
 /**
@@ -5187,6 +5604,7 @@ function isAppIndexNavigation(navigationUrl) {
 ipcMain.handle('hub:open-external', async (_e, url) => {
   const s = String(url || '');
   if (!isAllowedExternalUrl(s)) return { ok: false, error: 'Blocked URL' };
+  // outbound-exempt: browser — hands the address to the person's own browser
   await shell.openExternal(s);
   return { ok: true };
 });
@@ -5550,18 +5968,30 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
     let captured = false;
     for (const machine of machineList) {
       if (!machine.printerApi?.type || machine.printerApi.type === 'none') continue;
+      // A person's command is on its way to this printer: its reply says
+      // what happened, not a poll that may have been read before it landed.
+      if (pollYield.yielding(machine.id, Date.now())) continue;
+      // Read before the fetch: a command sent while it was in flight makes
+      // what it read stale, and it is dropped rather than written over the
+      // command's effect (correctness review of #2612).
+      const sentBefore = pollYield.seq(machine.id);
+      // A soon-poll is reading this printer right now: its answer stands.
+      if (printerSoonPolling.has(machine.id)) continue;
+      printerFullPollOn = machine.id;
       try {
         const status = await fetchPrinterStatus(machine);
+        if (pollYield.seq(machine.id) !== sentBefore || pollYield.yielding(machine.id, Date.now())) continue;
         const before = printerStatusCache[machine.id];
         printerStatusCache[machine.id] = mergePollSuccess(before, status, Date.now());
         // A job just ended. This is the only moment its figures are true, and
         // now the only moment they are written down.
         if (completionIsNew(before, printerStatusCache[machine.id])) captured = true;
+        noteHeadActuals(machine, before, printerStatusCache[machine.id]);
       } catch(e) {
         printerStatusCache[machine.id] = mergePollFailure(
-          printerStatusCache[machine.id], e.message, Date.now(), e && e.status,
+          printerStatusCache[machine.id], e.message, Date.now(), e && e.status, failureCode(e),
         );
-      }
+      } finally { printerFullPollOn = null; }
     }
     const wins = BrowserWindow.getAllWindows();
     wins.forEach(w => w.webContents.send('printer-status-update', printerStatusCache));
@@ -5572,6 +6002,9 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
     // Deliberately not awaited: a LAN scan takes seconds and polling must not
     // stall behind it. It pushes its own update when it finds something.
     diagnoseMovedPrinters(machineList).catch(() => { /* never break polling */ });
+    // What the printers said, to Khayt Cloud when it is due (never throws,
+    // never awaited: a slow cloud must not hold the next poll).
+    livePrinterPublisher.tick();
   };
   await poll();
   // A later start took over while this one's first poll ran: it owns the interval.
@@ -5598,7 +6031,7 @@ ipcMain.handle('hub:probe-printer', async (_e, machine) => {
   try {
     return mergePollSuccess(before, await fetchPrinterStatus(m), Date.now());
   } catch (e) {
-    return mergePollFailure(before, e.message, Date.now(), e && e.status);
+    return mergePollFailure(before, e.message, Date.now(), e && e.status, failureCode(e));
   }
 });
 
@@ -5624,28 +6057,14 @@ ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
  */
 async function fetchPrinterHistory(machine, limit) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
-  const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
+  const type = machine && machine.printerApi && machine.printerApi.type;
   if (type !== 'moonraker') {
     return { ok: false, error: `Only Klipper/Moonraker printers keep a job history ${FLAVOR_NAME} can read` };
   }
-  // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
-  // address the name resolved to, never to the name looked up again.
-  const target = await resolvePrinterTarget(host);
-  if (!target.ok) return { ok: false, error: target.error };
-  const printerHost = target.urlHost;
-  const portNum = parseInt(port || defaultPrinterPort(type), 10);
-  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
-    return { ok: false, error: 'Invalid port number' };
-  }
   const n = Number.isInteger(limit) && limit > 0 && limit <= 1000 ? limit : 500;
-  const headers = {};
-  if (apiKey) headers['X-Api-Key'] = apiKey;
   try {
-    const res = await fetch(`http://${printerHost}:${portNum}/server/history/list?limit=${n}`, {
-      headers, redirect: 'manual', signal: AbortSignal.timeout(30000),
-    });
-    if (!res.ok) return { ok: false, error: `Printer answered HTTP ${res.status}` };
-    const body = await res.json();
+    const body = await moonrakerRead(machine, `/server/history/list?limit=${n}`, 30000);
     const raw = (body && body.result) || {};
     // Mapped in the main process so the renderer never sees the slicer's
     // thumbnails: a hundred base64 previews would land in the store file, which
@@ -5656,6 +6075,71 @@ async function fetchPrinterHistory(machine, limit) {
   }
 }
 
+/**
+ * One read-only GET on a Moonraker printer, JSON back; throws on any failure.
+ * The secrets come from main (machineSecrets.fill), the address is resolved
+ * and pinned (resolvePrinterTarget), the key goes as X-Api-Key only when set,
+ * and a redirect is a failure: the same guards as the poll.
+ */
+async function moonrakerRead(machine, pathAndQuery, timeoutMs) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) throw new Error('connection_unsaved');
+  const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
+  if (type !== 'moonraker') throw new Error('not a Moonraker printer');
+  // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
+  // address the name resolved to, never to the name looked up again.
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) throw new Error(target.error);
+  const portNum = parseInt(port || defaultPrinterPort(type), 10);
+  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) throw new Error('Invalid port number');
+  const headers = {};
+  if (apiKey) headers['X-Api-Key'] = apiKey;
+  // outbound: lan (a printer: resolvePrinterTarget keeps it on the LAN)
+  const res = await fetch(`http://${target.urlHost}:${portNum}${pathAndQuery}`, {
+    headers, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs || 10000),
+  });
+  if (!res.ok) throw new Error(`Printer answered HTTP ${res.status}`);
+  // At most MOONRAKER_READ_MAX: a device at the printer's address cannot
+  // stream hundreds of MB into this process (review).
+  const declared = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MOONRAKER_READ_MAX) throw new Error('Printer answer too large');
+  const chunks = []; let size = 0;
+  for await (const c of res.body) {
+    size += c.length;
+    if (size > MOONRAKER_READ_MAX) throw new Error('Printer answer too large');   // leaving the loop cancels the stream
+    chunks.push(Buffer.from(c));
+  }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+const MOONRAKER_READ_MAX = 1024 * 1024;
+
+/* Filament used per head after a finished U1 (Moonraker) print, with each
+ * head's colour and material, on the job (lib/main/head-actuals.js; the Mac's
+ * HeadActuals.swift). Two read-only GETs on the printer, a write through
+ * updateStoreOnDisk, and the window told so its next save keeps the fields. */
+const headActuals = require('./lib/main/head-actuals.js').createHeadActuals({
+  read: (machine, p) => moonrakerRead(machine, p, 10000),
+  readBook: () => {
+    if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+    return lanServerStore;
+  },
+  updateStoreOnDisk: (mutate) => updateStoreOnDisk(mutate),
+  // A look 20 s or 90 s after the print ends does not run into a quit or
+  // after printer polling was switched off.
+  stopped: () => _quittingNow || _flushedForQuit || !printerPollInterval,
+  notify: (id, fields) => {
+    BrowserWindow.getAllWindows().forEach((w) => {
+      if (!w.isDestroyed()) w.webContents.send('printer-head-actuals', { id, fields });
+    });
+  },
+});
+function noteHeadActuals(machine, before, after) {
+  try {
+    const p = headActuals.noteEdge(machine, before, after, Date.now());
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_) { /* never break polling */ }
+}
+
 // Bambu's `sequence_id`: "incremented by 1 on each request" (OpenBambuAPI).
 // Each command opens its own connection here, so it only has to be distinct
 // enough to match the reply; seeded from the clock so a restart does not reuse.
@@ -5664,6 +6148,7 @@ function nextBambuSequence() { _bambuSeq = (_bambuSeq + 1) % 1e9; return String(
 
 async function sendPrinterCommand(machine, command) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey, printerSlug, accessCode, serial } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
@@ -5694,6 +6179,7 @@ async function sendPrinterCommand(machine, command) {
     if (req.unsupported) return { ok: false, error: req.unsupported };
     try {
       await sdcpClient.askOnce({
+        // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
         connect: (url) => new WebSocket(url),
         url: KhaytSdcpProtocol.websocketUrl(printerHost),
         request: JSON.parse(req.sdcp.frame),
@@ -5722,6 +6208,7 @@ async function sendPrinterCommand(machine, command) {
   let jobId = null;
   if (printerCommands.requiresJobId(type)) {
     try {
+      // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
       const res = await fetch(`${base}/api/v1/job`, { headers, redirect: 'manual', signal: AbortSignal.timeout(5000) });
       if (!res.ok) return { ok: false, error: 'No job is running on this printer' };
       jobId = (await res.json())?.id ?? null;
@@ -5741,8 +6228,9 @@ async function sendPrinterCommand(machine, command) {
       // send `"M25"` to a firmware expecting `M25`.
       init.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     }
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(`${base}${req.path}`, init);
-    if (res.status >= 300 && res.status < 400) { const e = new Error('Unexpected redirect from printer'); e.fatal = true; throw e; }
+    if (res.status >= 300 && res.status < 400) { const e = new Error('Unexpected redirect from printer'); e.fatal = true; e.code = 'ERR_REDIRECT'; throw e; }
     if (!res.ok) { const e = new Error(`Printer responded ${res.status}`); e.status = res.status; throw e; }
     return res;
   };
@@ -5779,6 +6267,7 @@ async function sendPrinterCommand(machine, command) {
             // Only a refusal earns the handshake. A password-less standalone
             // Duet — the common case — pays nothing for this branch.
             if (e.fatal || !isHttpStatus(e, KhaytDuet.ENDPOINTS[flavour].unauthorized)) throw e;
+            // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
             const raw = await (await fetch(`${base}${KhaytDuet.ENDPOINTS[flavour].connect(password)}`, {
               headers, redirect: 'manual', signal: AbortSignal.timeout(10000),
             })).json();
@@ -5825,6 +6314,7 @@ async function sendPrinterCommand(machine, command) {
  */
 async function plateObjects(machine) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
     return { ok: false, error: 'Only Klipper/Moonraker printers can drop one object' };
@@ -5842,6 +6332,7 @@ async function plateObjects(machine) {
   if (apiKey) headers['X-Api-Key'] = apiKey;
   const base = `http://${printerHost}:${portNum}`;
   try {
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(`${base}/printer/objects/query?${excludeObject.QUERY}`, {
       headers, redirect: 'manual', signal: AbortSignal.timeout(10000),
     });
@@ -5862,11 +6353,14 @@ ipcMain.handle('hub:printer-plate', async (_e, { machine } = {}) => {
 ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) => {
   const gate = printerGate('control');
   if (!gate.ok) return gate;
+  const yieldToken = pollYield.begin(machine && machine.id, Date.now());
+  try {
   const read = await plateObjects(machine);
   if (!read.ok) return read;
   const req = excludeObject.excludeRequest(name, read.data);
   if (req.refused) return { ok: false, error: req.refused };
   try {
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(read.base + req.path, {
       method: req.method, headers: read.headers,
       redirect: 'manual', signal: AbortSignal.timeout(10000),
@@ -5876,11 +6370,12 @@ ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) 
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
+  } finally { pollYield.end(machine && machine.id, Date.now(), yieldToken); pollPrinterSoon(machine); }
 });
 
 ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) => {
   const gate = printerGate('control');
-  return gate.ok ? sendPrinterCommand(machine, command) : gate;
+  return gate.ok ? yieldingFor(machine, () => sendPrinterCommand(machine, command)) : gate;
 });
 
 /**
@@ -5890,6 +6385,7 @@ ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) => {
  */
 async function sendPrinterControl(machine, control, value) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
   if (type !== 'bambu') return { ok: false, error: `${control} is not available for this printer type` };
   const target = await resolvePrinterTarget(host);
@@ -5906,7 +6402,7 @@ async function sendPrinterControl(machine, control, value) {
 }
 ipcMain.handle('hub:printer-control', async (_e, { machine, control, value } = {}) => {
   const gate = printerGate('control');
-  return gate.ok ? sendPrinterControl(machine, control, value) : gate;
+  return gate.ok ? yieldingFor(machine, () => sendPrinterControl(machine, control, value)) : gate;
 });
 // Read-only: safe to call while the printer is mid-job, which is when a shop is
 // most likely to reach for it.
@@ -5958,6 +6454,7 @@ function stockOptsFor(machine) {
 
 async function fetchPrinterStatus(machine) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, apiKey, accessCode, printerSlug, serial } = machine.printerApi || {};
   // sanitizePrinterHost runs inside resolvePrinterTarget (no @, / or : injection).
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
@@ -5989,6 +6486,7 @@ async function fetchPrinterStatus(machine) {
     const board = String(serial || printerSlug || '').trim();
     if (!board) return { ok: false, error: 'SDCP needs the printer’s mainboard ID — run a network scan to find it.' };
     return sdcpClient.fetchStatus({
+      // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
       connect: (url) => new WebSocket(url),
       ip: printerHost,
       mainboardId: board,
@@ -6012,11 +6510,12 @@ async function fetchPrinterStatus(machine) {
   const get = async (p, extraHeaders) => {
     // redirect:'manual' so a compromised/misconfigured printer host can't 302 the poller off the
     // validated LAN address to loopback/metadata (the response here IS returned to the renderer).
+    // outbound: lan (a printer: resolvePrinterTarget / isAllowedPrinterHost keep it on the LAN)
     const res = await fetch(`${baseUrl}${p}`, {
       headers: extraHeaders ? { ...headers, ...extraHeaders } : headers,
       redirect: 'manual', signal: AbortSignal.timeout(5000),
     });
-    if (res.status >= 300 && res.status < 400) throw new Error('Unexpected redirect from printer');
+    if (res.status >= 300 && res.status < 400) { const e = new Error('Unexpected redirect from printer'); e.code = 'ERR_REDIRECT'; throw e; }
     // The status is carried on the error rather than only in its text, because
     // the Duet adapter has to tell "you need a session" (401 standalone, 403 SBC)
     // apart from "this surface does not exist here" (404) to pick a transport.
@@ -6254,6 +6753,9 @@ ipcMain.handle('hub:send-email', async (event, { to, subject, body, smtpConfig }
   cfg.apiKey = resolveStoreSecret(cfg.apiKey, d => d?.settings?.emailConfig?.apiKey);
   if (cfg?.provider === 'sendgrid' && cfg?.apiKey) {
     try {
+      const refusal = await outboundRefusal('messaging', 'https://api.sendgrid.com/v3/mail/send');
+      if (refusal) return refusal;
+      // outbound: messaging
       const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
@@ -6277,6 +6779,9 @@ ipcMain.handle('hub:send-email', async (event, { to, subject, body, smtpConfig }
         from: `${cfg.fromName||'Khayt'} <mailgun@${mgDomain}>`,
         to, subject, html: body
       });
+      const refusal = await outboundRefusal('messaging', 'https://api.mailgun.net/');
+      if (refusal) return refusal;
+      // outbound: messaging
       const res = await fetch(`https://api.mailgun.net/v3/${mgDomain}/messages`, {
         method: 'POST',
         headers: { 'Authorization': `Basic ${Buffer.from(`api:${cfg.apiKey}`).toString('base64')}` },
@@ -6455,11 +6960,14 @@ ipcMain.handle('hub:ai-extract', async (_e, { apiKey, model, system, request, im
 
   // Retry transient faults (429/529/5xx) with backoff. Raw fetch gives us none
   // of this for free, so a single rate-limit reply used to kill the feature.
+  const refusal = await outboundRefusal('ai', shaped.url);
+  if (refusal) return refusal;
   const MAX_ATTEMPTS = 3;
   let lastError = 'AI request failed';
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     let res;
     try {
+      // outbound: ai
       res = await fetch(shaped.url, {
         method: 'POST',
         headers: shaped.headers,
@@ -6510,6 +7018,91 @@ let cloudBackend = null;
 // The shop's data key while Khayt Cloud is unlocked here, for the off-site
 // backup to seal with (lib/main/offsite-backup.js). Cleared on lock.
 let cloudDek = null;
+// Where the unlocked session talks to, for the network-switch route (the
+// token resolved for that server's origin). Cleared with the key.
+let cloudSessionInfo = null;
+
+/* The shop's switch through Khayt Cloud (khayt-cloud #223; Turki, Nov 22):
+ * GET at unlock and every 15 min, apply a value that opens with the shop key
+ * and passes lib/network-switch.js, and publish the owner's change here.
+ * This computer's own option and stamps: userData/network-switch-cloud.json. */
+const NETWORK_SWITCH_FILE = () => path.join(app.getPath('userData'), 'network-switch-cloud.json');
+const networkSwitchSync = require('./lib/main/network-switch-sync.js').createNetworkSwitchSync({
+  client: cloudClient,
+  crypto: require('./lib/sync-crypto.js'),
+  // Only the book's OWN cloud (security review of #2645, MED-2): an unlock the
+  // window pointed at another server or shop never reads or writes the switch.
+  session: () => {
+    if (!cloudBackend || !cloudDek || !cloudSessionInfo) return null;
+    let cloud = null;
+    try { const b = readStoreDecryptedFromDisk(); cloud = b && b.settings && b.settings.cloud; } catch (_) { cloud = null; }
+    if (!cloud || typeof cloud !== 'object') return null;
+    const NSS = require('./lib/main/network-switch-sync.js');
+    const scope = NSS.scopeOf(cloudSessionInfo.url, cloudSessionInfo.shopId);
+    if (!scope || scope !== NSS.scopeOf(cloud.url, cloud.shopId)) return null;
+    // The token's role, a hint only: the server refuses a non-owner write.
+    // No role recorded is NOT the owner (security review of #2645, LOW-1): it
+    // fails closed, so the share option greys and nothing is published.
+    return Object.assign({}, cloudSessionInfo, { dek: cloudDek, role: typeof cloud.role === 'string' && cloud.role ? cloud.role : null, scope });
+  },
+  // Who may change the switch here: the staff lock's rule, as for the switch
+  // itself (security review of #2645, MED-1).
+  mayChange: () => PrinterPermission.mayChangeNetwork(bookForPrivacyCheck()),
+  getSettings: () => (lanServerStore && lanServerStore.settings) || null,
+  // Through the write chain, with `network` the one lock field it may change.
+  updateNetwork: (fn) => updateStoreOnDiskAllowingLock((cur) => {
+    const before = (cur.settings && cur.settings.network && typeof cur.settings.network === 'object') ? cur.settings.network : {};
+    const next = fn(before);
+    if (next === before) return cur;
+    return Object.assign({}, cur, { settings: Object.assign({}, cur.settings, { network: next }) });
+  }, ['settings.network']),
+  notify: (network) => BrowserWindow.getAllWindows().forEach((w) => { try { w.webContents.send('hub:network-applied', network); } catch (_) { /* gone */ } }),
+  // A question or a conflict appeared or went: the window asks state() again (frame G).
+  changed: () => BrowserWindow.getAllWindows().forEach((w) => { try { w.webContents.send('hub:network-switch-changed'); } catch (_) { /* gone */ } }),
+  // "Keep it on this computer only" (frame G, turning ON only): this computer's own switch, stricter-only.
+  setLocalOffline: () => outboundGate.setLocal({ offline: true }),
+  // The one person-started switch-sync GET of "Use the newer setting" (Dev Hub, Nov 22).
+  allowSwitchSyncOnce: () => outboundGate.allowSwitchSyncOnce(),
+  readMine: () => { try { return JSON.parse(fs.readFileSync(NETWORK_SWITCH_FILE(), 'utf8')); } catch (_) { return {}; } },
+  writeMine: (v) => { const f = NETWORK_SWITCH_FILE(); fs.writeFileSync(f + '.tmp', JSON.stringify(v)); fs.renameSync(f + '.tmp', f); },
+});
+/* Each printer's live state to Khayt Cloud (PUT /live/printers), for the phone
+ * and the PWA away from the shop: the Mac's LivePrinterPublisher, rule for rule
+ * (lib/main/live-printer-publisher.js, lib/live-snapshot.js). Only while Khayt
+ * Cloud is unlocked here for the book's OWN shop, the role may write, and the
+ * gate allows `cloud`. Started at unlock; stopped at lock and at quit. */
+const livePrinterPublisher = require('./lib/main/live-printer-publisher.js').createLivePrinterPublisher({
+  session: () => {
+    if (!cloudBackend || !cloudDek || !cloudSessionInfo) return null;
+    // The book in memory, not a decrypt from disk every 15 s.
+    const cloud = lanServerStore && lanServerStore.settings && lanServerStore.settings.cloud;
+    if (!cloud || typeof cloud !== 'object' || cloud.enabled === false) return null;
+    const NSS = require('./lib/main/network-switch-sync.js');
+    const scope = NSS.scopeOf(cloudSessionInfo.url, cloudSessionInfo.shopId);
+    if (!scope || scope !== NSS.scopeOf(cloud.url, cloud.shopId)) return null;
+    return { url: cloudSessionInfo.url, shopId: cloudSessionInfo.shopId, token: cloudSessionInfo.token, dek: cloudDek,
+      role: typeof cloud.role === 'string' ? cloud.role : null, scope };
+  },
+  rows: () => require('./lib/live-snapshot.js').liveRows(lanServerStore || {}, printerStatusCache),
+  allowed: () => outboundGate.check('cloud').allowed === true,
+  put: (s, body) => cloudClient.putLivePrinters(s.url, s.shopId, s.token, body),
+  seal: (plain, dek) => require('./lib/sync-crypto.js').encryptStore(plain, dek),
+  log: (msg) => { try { console.warn(msg); } catch (_) { /* no console */ } },
+});
+app.on('will-quit', () => { try { livePrinterPublisher.stop(); } catch (_) { /* quitting */ } });
+ipcMain.handle('hub:network-switch-state', () => networkSwitchSync.state());
+ipcMain.handle('hub:network-switch-share', (_e, on) => networkSwitchSync.setShare(on === true));
+ipcMain.handle('hub:network-switch-answer', (_e, apply) => networkSwitchSync.answerPending(apply === true));
+ipcMain.handle('hub:network-switch-conflict', (_e, choice) => networkSwitchSync.answerConflict(choice === 'keep' ? 'keep' : 'adopt'));
+// The owner changed the switch here: `on` BEFORE the window saves it (the last
+// call, while still online), `off` AFTER (the first call back). The network
+// sent is the window's; main reads nothing else from it.
+ipcMain.handle('hub:network-switch-publish', async (_e, { offline, network } = {}) => {
+  try {
+    const n = network && typeof network === 'object' && !Array.isArray(network) ? network : null;
+    return await networkSwitchSync.publish({ offline: offline === true, network: n });
+  } catch (e) { return { ok: false, why: 'error' }; }
+});
 
 // The shop's cloud token, for the server it was saved for. Every handler below
 // takes the URL from the window; a saved token goes only to the saved server's
@@ -6766,6 +7359,7 @@ ipcMain.handle('hub:bedready-open-signin', () => {
     bedreadyLinkArmedAt = Date.now(); // arm: the next bedready:// link is user-initiated and expected
     bedreadyLinkNonce = crypto.randomBytes(16).toString('hex'); // bind the handshake to this click
     const url = makerrunLibrary.signInUrl() + '?state=' + encodeURIComponent(bedreadyLinkNonce);
+    // outbound-exempt: browser — hands the address to the person's own browser
     require('electron').shell.openExternal(url);
     return { ok: true };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
@@ -6902,6 +7496,7 @@ if (isBedReady) {
 
   // age_required: the website's /age page is the only place an account can confirm its age.
   ipcMain.handle('hub:makerrun-open-age', async () => {
+    // outbound-exempt: browser — hands the address to the person's own browser
     try { await shell.openExternal(MAKERRUN_BASE + '/age'); return { ok: true }; }
     catch (e) { return MRV1.toIpcError(e); }
   });
@@ -6911,6 +7506,7 @@ if (isBedReady) {
   ipcMain.handle('hub:makerrun-open-page', async (_e, { slug } = {}) => {
     try {
       if (!mrCatalog.validSlug(slug)) return { ok: false, error: 'That is not a MakerRun design id.', code: 'bad_request' };
+      // outbound-exempt: browser — hands the address to the person's own browser
       await shell.openExternal(MAKERRUN_BASE + '/designs/' + encodeURIComponent(slug));
       return { ok: true };
     } catch (e) { return MRV1.toIpcError(e); }
@@ -7142,6 +7738,7 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
     token = cloudToken(token, url);
     const dek = cloudClient.unlockWithPassphrase(String(passphrase || ''), keyset);
     cloudDek = dek;
+    cloudSessionInfo = { url, shopId, token };
     cloudBackend = cloudClient.backendFor(url, shopId, token, dek, {
       // Warm launch: let this session start from the server view the last one
       // left behind, so the first pull asks for a slice instead of the base and
@@ -7158,8 +7755,14 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
         try { return recoverStoreRaw(MAX_STORE_BYTES).data || null; } catch (e) { return null; }
       },
     });
+    // This computer's printers, to the phone away from the shop (a new unlock
+    // forgets what the last session learned, a 401 included).
+    livePrinterPublisher.stop();
+    livePrinterPublisher.start();
+    // The key exists now: hear the switch at once, then every 15 minutes.
+    networkSwitchSync.start();
     return { ok: true };
-  } catch (e) { cloudBackend = null; cloudDek = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
+  } catch (e) { networkSwitchSync.stop(); livePrinterPublisher.stop(); cloudBackend = null; cloudDek = null; cloudSessionInfo = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
 });
 
 /* ── Organisations (multi-shop) ───────────────────────────────────────────────
@@ -7324,16 +7927,18 @@ ipcMain.handle('hub:org-members', async (_e, { url, shopId, token } = {}) => {
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
-ipcMain.handle('hub:cloud-lock', () => { cloudBackend = null; cloudDek = null; clearOrgSession(); return { ok: true }; });
+ipcMain.handle('hub:cloud-lock', () => { networkSwitchSync.stop(); livePrinterPublisher.stop(); cloudBackend = null; cloudDek = null; cloudSessionInfo = null; clearOrgSession(); return { ok: true }; });
+// The push right after "make no internet calls" is turned on still goes out,
+// once, so other computers and the phone hear about it (design §1.4).
 ipcMain.handle('hub:cloud-push', async (_e, snapshot) => {
   if (!cloudBackend) return { ok: false, error: 'locked' };
-  try { return { ok: true, ...(await cloudBackend.push(snapshot)) }; }
+  try { return { ok: true, ...(await outboundGate.lastPush(() => cloudBackend.push(snapshot))) }; }
   catch (e) { return { ok: false, error: String(e && e.message || e), status: (e && e.status) || null }; }
 });
 
 ipcMain.handle('hub:cloud-pull', async () => {
   if (!cloudBackend) return { ok: false, error: 'locked' };
-  try { return { ok: true, ...(await cloudBackend.pull()) }; }
+  try { return { ok: true, ...(await outboundGate.lastPull(() => cloudBackend.pull())) }; }
   catch (e) {
     return { ok: false, error: String(e && e.message || e), status: (e && e.status) || null,
       code: (e && e.code) || null, seen: (e && e.seen) ?? null, got: (e && e.got) ?? null };
@@ -7419,6 +8024,7 @@ ipcMain.handle('hub:plugin-send', async (_e, req) => {
     const out = await pluginSend.send({ entry, trigger, records: r.records || {}, delivery: r.delivery, settings: disk && disk.settings });
     if (out.ok && out.method === 'OPEN') {
       if (!isAllowedExternalUrl(out.url)) return { ok: false, refused: 'url' };
+      // outbound-exempt: browser — hands the address to the person's own browser
       await shell.openExternal(out.url);
     }
     return out;
@@ -7437,8 +8043,11 @@ ipcMain.handle('hub:plugin-send', async (_e, req) => {
 // connectors' own switch.
 const CONNECTOR_UPDATES_ON = CONNECTORS_ON && process.env.KHAYT_CONNECTOR_UPDATES === '1';
 const connectorUpdates = require('./lib/main/connector-updates');
+const PluginInstallLinkMain = require('./lib/main/plugin-install-link');
 async function connectorFetchBytes(url, maxBytes) {
   if (!/^https:\/\//.test(String(url))) throw new Error('https only');
+  await outboundGate.gateFor('catalogues', url);
+  // outbound: catalogues
   const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const buf = Buffer.from(await res.arrayBuffer());
@@ -7545,7 +8154,10 @@ ipcMain.handle('hub:send-ntfy', async (_e, { type, title, body } = {}) => {
   for (const k of ['Title']) {
     if (/[^\x20-\x7e]/.test(headers[k] || '')) headers[k] = `=?UTF-8?B?${Buffer.from(headers[k], 'utf8').toString('base64')}?=`;
   }
+  const refusal = await outboundRefusal('messaging', req.url);   // a self-hosted ntfy on the LAN is lan
+  if (refusal) return refusal;
   try {
+    // outbound: messaging
     const res = await fetch(req.url, { method: 'POST', headers, body: req.body, redirect: 'manual', signal: AbortSignal.timeout(10000) });
     if (res.status >= 300 && res.status < 400) return { ok: false, error: 'The ntfy server redirected; check the address' };
     if (!res.ok) return { ok: false, status: res.status, error: res.status === 401 || res.status === 403 ? 'The ntfy server refused the access token' : `ntfy answered ${res.status}` };
@@ -7579,7 +8191,10 @@ ipcMain.handle('hub:send-telegram', async (_e, { botToken, chatId, message } = {
   if (isBlockedHost('api.telegram.org')) return { ok: false, error: 'Host is blocked' };
   const url = `https://api.telegram.org/bot${encodeURIComponent(botToken)}/sendMessage`;
   const body = JSON.stringify({ chat_id: chatIdStr, text: message.slice(0, 4096) });
+  const refusal = await outboundRefusal('messaging', 'https://api.telegram.org/');
+  if (refusal) return refusal;
   try {
+    // outbound: messaging
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -7638,9 +8253,11 @@ function createWindow() {
     if (url.startsWith('https://')) {
       try {
         const parsed = new URL(url);
+        // outbound-exempt: browser — hands the address to the person's own browser
         if (!isBlockedHost(parsed.hostname)) shell.openExternal(url);
       } catch { /* invalid URL — deny */ }
     } else if (url.startsWith('mailto:')) {
+      // outbound-exempt: browser — hands the address to the person's own browser
       shell.openExternal(url);
     }
     return { action: 'deny' };
@@ -7680,6 +8297,7 @@ function openHelpLink(url) {
     console.error('refusing to open a non-https help link:', target);
     return;
   }
+  // outbound-exempt: browser — hands the address to the person's own browser
   shell.openExternal(target).catch((e) => console.error('help link failed:', e));
 }
 
@@ -7712,13 +8330,19 @@ function buildMenu() {
 // instead of opening a second window; macOS delivers the URL via 'open-url'. Also gives Khayt one instance
 // (one data store), which is the desired behaviour for a business app.
 const makerrunAccount = require('./lib/makerrun-account');
+const PluginInstallLink = require('./lib/plugin-install-link');
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   return;
 }
 // Only the Bed Ready flavor owns the bedready:// scheme — Khayt has no MakerRun-account UI and must
 // not claim the scheme (it would cold-launch Khayt and write a token file it can't use).
-if (isBedReady) { try { app.setAsDefaultProtocolClient('bedready'); } catch { /* unpackaged/dev — fine */ } }
+// Khayt claims khayt:// (the directory's "Install in Khayt" link) on Windows and Linux, packaged
+// only; Bed Ready never does, and on macOS the scheme is the native Mac app's
+// (lib/plugin-install-link.js protocolSchemes).
+for (const scheme of PluginInstallLink.protocolSchemes({ isBedReady, isPackaged: app.isPackaged, platform: process.platform })) {
+  try { app.setAsDefaultProtocolClient(scheme); } catch { /* unpackaged/dev — fine */ }
+}
 
 function handleBedreadyLink(url) {
   if (!isBedReady) return; // defence in depth — never link a MakerRun account on the Khayt flavor
@@ -7748,15 +8372,56 @@ function handleBedreadyLink(url) {
 const isBedreadyLink = (a) => typeof a === 'string' && a.indexOf('bedready://') === 0;
 let pendingBedreadyLink = process.argv.find(isBedreadyLink) || null; // cold-start (Windows/Linux) via argv
 
+// ── khayt://plugin/install?id=…&version=… ("Install in Khayt", Mac #2622) ──
+// The link names a connector; it installs nothing. Main keeps the last one
+// handed to the app and pings the window; the window asks for it
+// (hub:plugin-install-link-take) once its book is loaded, and main decides
+// there — the gate first, then Khayt's own signed index and a manifest Khayt
+// signed (lib/main/plugin-install-link.js). The window gets the manifest for
+// the same consent sheet as a hand install, or the reason it may not.
+let pendingInstallLink = isBedReady ? null : (process.argv.map(PluginInstallLink.parse).find(Boolean) || null);
+function receiveKhaytUrl(url) {
+  if (isBedReady) return; // Bed Ready never follows khayt:// links
+  const link = PluginInstallLink.parse(url);
+  if (!link) return;      // not exactly the shape: not a link at all
+  pendingInstallLink = link;
+  if (mainWindow && !mainWindow.isDestroyed()) { try { mainWindow.webContents.send('plugin-install-link'); } catch { /* window gone */ } }
+}
+
 app.on('second-instance', (_e, argv) => {
   const win = mainWindow || BrowserWindow.getAllWindows()[0];
   if (win) { try { if (win.isMinimized()) win.restore(); win.focus(); } catch { /* window gone */ } }
   const link = (argv || []).find(isBedreadyLink);
   if (link) handleBedreadyLink(link);
+  const khaytLink = (argv || []).find(PluginInstallLink.isKhaytUrl);
+  if (khaytLink) receiveKhaytUrl(khaytLink);
 });
 app.on('open-url', (event, url) => { // macOS
   event.preventDefault();
+  if (PluginInstallLink.isKhaytUrl(url)) { receiveKhaytUrl(url); return; }
   if (mainWindow) handleBedreadyLink(url); else pendingBedreadyLink = url;
+});
+ipcMain.handle('hub:plugin-install-link-take', async () => {
+  const link = pendingInstallLink;
+  pendingInstallLink = null;
+  if (!link) return { none: true };
+  const refused = (refusal) => ({ ok: false, refusal, id: link.id, version: link.version });
+  try {
+    if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+    const canWrite = !(typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION);
+    const no = PluginInstallLinkMain.gate({ connectorsOn: CONNECTORS_ON, fetchOn: CONNECTOR_UPDATES_ON, store: lanServerStore, canWrite });
+    if (no) return refused(no);
+    const U = require('./lib/plugin-update.js');
+    const r = await PluginInstallLinkMain.offer(link, {
+      fetchBytes: connectorFetchBytes,
+      nowMs: Date.now(),
+      lastSerial: U.lastSerial(lanServerStore.settings),
+      platform: 'desktop', appVersion: app.getVersion(), schema: U.SCHEMA,
+    });
+    return r.ok ? { ok: true, id: link.id, version: link.version, manifest: r.manifest } : refused(r.refusal);
+  } catch (_) {
+    return refused('index');
+  }
 });
 
 

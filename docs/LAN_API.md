@@ -206,7 +206,7 @@ computer refuses, with **401**:
 | Body | When | The phone |
 |---|---|---|
 | `{"reason":"device-unknown"}` | no such device, or removed | forgets it, retries once with the PIN, enrols again |
-| `{"reason":"device-revoked"}` | the shop signed this phone out (Mac: Settings → Online → Paired phones; Windows and Linux: Settings → Online → LAN API → Paired phones) | forgets its key AND the PIN, and asks the person to pair again; never enrols by itself |
+| `{"reason":"device-revoked"}` | the shop signed this phone out (Mac: Settings → Online → Paired phones; Windows and Linux: Settings → Online → LAN API → Paired phones) | **signed** (its `x-khayt-reply-mac` verifies over the nonce just sent; see "Signed answers a phone can trust"): forgets its key AND the PIN and asks the person to pair again. **Unsigned, or not verified**: wipes nothing, stops showing the book as live and asks the person to pair again. Never enrols by itself either way |
 | `{"reason":"device-clock","now":<unix seconds>}` | `time` more than 120 s from the computer's clock | keeps the difference and retries once |
 | `{"reason":"device-replay"}` | the nonce was seen for this device in the last 300 s | fails the request |
 | `{"reason":"device-auth"}` | anything else: a bad MAC, missing or malformed headers | fails the request |
@@ -219,7 +219,66 @@ Shared test values for all three implementations are in
 and Ed25519 keys, the derived key, an enrolment signature and two signed
 requests. Each side's tests should reproduce every value in it.
 
-### `POST /api/connectors/pair` — a slicer plugin pairs without the PIN (native Mac only)
+### Signed answers a phone can trust (Windows and Linux, Nov 2026, draft; the Mac's are #2640 and #2643)
+
+Two answers carry `x-khayt-reply-mac` = base64 `HMAC-SHA256(key, "khayt-reply-v1\n" + the request's x-khayt-nonce + "\n" + status + "\n" + hex(sha256(body)))`, the connector's reply MAC (vectors: [`connector-routes.vectors.json`](connector-routes.vectors.json) `reply`). `key` is the device's key. A phone acts on these answers only when the MAC verifies over the nonce it just sent.
+
+- **`GET /api/status?format=json` from a paired phone** (GET only, and only once this computer has read the book: an unread book answers the plain counts, never a signed "online") also answers `"network": {"offline": true|false, "keep": [...]}`, the shop's "make no internet calls" switch as `lib/outbound.js` reads the book (`isOffline(settings, {})`, `keptOf`), with `Cache-Control: no-store`. This happens only when the request's device signature verifies, a LAN PIN of full length is set and the `Host` is local. Anyone else, an unsigned request, or a signature that does not verify gets the public counts only, with no `network` and no MAC.
+- **`401 {"reason":"device-revoked"}` is signed** with the key the phone had, when the request's own signature verifies under that key inside the clock skew. A forged request naming the phone's id gets the same 401 unsigned. The old keys are kept for this only (they open nothing), for the 256 most recent sign-outs, with the ids. `device-unknown` (a PIN change, an id never seen) is never signed. A body over the size limit is refused before it is read (413 `too-large`), unsigned.
+- **`GET /api/devices/self` and every `role-scope` 403 are signed** the same way (next section).
+
+### A paired phone's role, and pairing a phone by code (both apps, Nov 2026, draft)
+
+> **Served by both apps.** The native Mac (`LanServer.swift`) and `lib/lan-server.js` (Windows/Linux, not on screen yet: the desktop's screens wait for their Figma sign-off; main exposes the window over IPC). The rule is shared: [`lib/device-roles.js`](../lib/device-roles.js). The desktop's window and state machine are [`lib/main/phone-pairing.js`](../lib/main/phone-pairing.js).
+
+A paired phone carries a **role**: owner, manager, operator or viewer. The role is a set of scopes, and the server checks it on **every request the phone signs**, before the route runs. The phone's screens follow its role as a convenience; the server's answer is the check.
+
+- A request the role does not cover is answered **403** `{"reason":"role-scope","required":"<scope>"}`, the shape an API token gets for a scope it lacks. `required` is `owner` for a route the table does not name.
+- The check uses the path the server routes on (on the desktop, the parsed URL path: `/v1` read as `/api`, a trailing slash dropped, dot segments already folded by the URL parser, so the rule is asked about the route that will run). A segment that decodes to a slash, a backslash, a dot segment or a control character is owner-only.
+- A phone paired with the owner PIN has no role and is the **owner**, as it was. It holds the PIN, so it cannot be given a lesser role: remove it and pair it again by code.
+- A phone paired by code whose stored role is missing or not one this build knows is read as a **viewer**, never the owner (`roleOf`).
+- A role holds whether the staff lock is on or off. The owner PIN and API tokens are unchanged.
+- **Pricing through a job update is `quote:write`.** A write to `/api/orders` or `/api/orders/<id>` that carries a `price`, creates a job as a quote, or sends a `status` for a job that is a quote now needs `quote:write`, whatever the route's own scope.
+- **The role answers are signed back** (`x-khayt-reply-mac`, as above), and only when the request's own signature passed.
+
+| Role | Scopes |
+|---|---|
+| viewer | `queue:read`, `machines:read`, `orders:read`, `inventory:read` |
+| operator | viewer + `orders:write`, `inventory:write`, `waste:write`, `machines:control` |
+| manager | operator + `clients:read`, `clients:write`, `expense:write`, `quote:write`, `book:read` |
+| owner | everything, including `book:write` and every route not listed |
+
+#### `GET /api/devices/self`
+
+Signed by a paired device. Answers `{"deviceId":"dev_…","role":"operator","scopes":["queue:read", …]}`, signed. A request with the owner PIN and no device signature is 403 `{"reason":"device-auth"}`.
+
+#### `POST /api/devices/pair` (pairing by code; **off** until the phone ships it)
+
+The slicer plugin's commit-then-reveal flow (`POST /api/connectors/pair`, below) with the phone's own prefixes: `khayt-phone-commit-v1`, `khayt-enrol-phone-v1` and `khayt-phone-check-v1`. No PIN is sent. Shared vectors: [`phone-pair.vectors.json`](phone-pair.vectors.json).
+
+- **404** `{"error":"not_found"}` while pairing by code is off. On the Mac it is the `phonePairingByCode` defaults switch; on Windows/Linux, main reads `KHAYT_PHONE_PAIRING_BY_CODE=1` from the environment at launch (nothing the window sends can switch it on).
+- **421** `{"error":"host-not-local"}` for a `Host` that is not this computer. On the desktop a request through the tunnel is refused too.
+- `POST /api/devices/pair` with `{v:2, commit, name, app, version}` → **200** `{pairId, pollSecret, deviceId, publicKey, sig, identity}`. Only while a person has opened the window (120 s on a monotonic clock, at most 3 offers): **403** `{"reason":"pairing-closed",…}` outside it, **409** `{"reason":"pairing-busy",…}` while another request waits, **400** `{"error":"commit"}` for a body without `"v":2` and a 32-byte `commit` (spends no offer).
+- `POST /api/devices/pair/<pairId>/reveal` with `{publicKey, nonce}` and `x-khayt-poll` → **200** `{"state":"waiting"}`. A mismatch (constant time), a nonce under 16 bytes, an unusable or all-zero key, or a reveal later than 30 s → **403** `{"state":"expired","reason":"bad-reveal"}`; no number is ever worked out for it. A second reveal **409** `{"reason":"already-revealed"}`; the wrong secret **404** `{"state":"unknown"}` and spends nothing.
+- `GET /api/devices/pair/<pairId>` with `x-khayt-poll` → **200** `{"state":"waiting"|"approved"|"denied"|"expired"}`, **404** `{"state":"unknown"}`.
+- `DELETE /api/devices/pair/<pairId>` with `x-khayt-poll` → **200** `{"state":"cancelled"}` (a later GET answers `expired`), **409** `{"state":"approved"|"denied"|"expired"}` when already answered, **404** `{"state":"unknown"}`. The offer stays counted.
+- A person compares the number, picks a role (Operator by default) and approves the request they were shown. **Who may:** the owner gives any role, a manager up to Manager, anyone else none and may not open the window (`grantable`). On the desktop, who is at the computer is main's own reading of the book (`lib/main/printer-permission.js activeRole`): the lock off, the owner; on, whoever is signed in; nobody, refused. The device is enrolled with that role and no PIN tag.
+
+**Signing out.** A phone paired by code holds no tag of the PIN: a PIN change does not sign it out. The server still needs a LAN PIN of at least 8 characters to answer anyone: with the PIN cleared or too short, a phone paired by code is refused like everyone else until one is set. **Remove** does (`device-revoked`, signed). A phone paired with the owner PIN is still signed out by a PIN change.
+
+### `POST /api/connectors/pair` — a slicer plugin pairs without the PIN (both apps)
+
+> **Served by both apps.** The native Mac (`LanConnectorPairing`, `LanServer+Connector`)
+> and `lib/lan-server.js` (Windows/Linux, not on screen yet: main exposes the window over
+> IPC, `hub:connector-pair-*`). The desktop's window is the phone's state machine
+> ([`lib/main/phone-pairing.js`](../lib/main/phone-pairing.js)) with the connector's
+> prefixes ([`lib/main/connector-pairing.js`](../lib/main/connector-pairing.js)); its
+> routes are [`lib/main/connector-routes.js`](../lib/main/connector-routes.js).
+> **Off by default on both.** On the Mac, the `connectorPairing` defaults switch; on
+> Windows/Linux, main reads `KHAYT_CONNECTOR_PAIRING=1` from the environment at launch
+> (nothing the window sends can switch it on). While it is off the desktop answers
+> every `/api/connectors/*` path, the pairing included, with the ordinary **404**; the
+> Mac answers the pairing `403 pairing-closed` and the rest 404.
 
 A **connector** (Khayt for OrcaSlicer) signs its requests exactly as a phone
 does, but its key opens `/api/connectors/*` and nothing else: any other route
@@ -283,7 +342,7 @@ and the nonce base64, standard and padded, of the raw bytes), joined with
    a change of the LAN PIN signs connectors out with the phones
    (`device-unknown`).
 
-### The connector's own routes — a paired plugin sends its slices (native Mac only)
+### The connector's own routes — a paired plugin sends its slices (both apps)
 
 All dark (the ordinary 404) while "Pair a slicer" is off. Exact paths, a
 connector's signed request only: unsigned is 401, a phone's key, the PIN or an
@@ -301,7 +360,7 @@ verify. Per connector: 600 requests, 30 announces and 30 files an hour (429 with
 | `PUT /api/connectors/slices/{sliceId}/file` | the raw file, exact `Content-Length`, `x-khayt-content-sha256` | 201 `{sliceId, state:"in-inbox"}`; 422 `hash-mismatch` (`retry` once) |
 | `GET /api/connectors/slices/{sliceId}` | none | `{sliceId, state}`: `awaiting-file`, `in-inbox`, `left-inbox`, `expired` |
 | `GET /api/connectors/queue` | none | 200 sealed `{v, at, shop:{name}, jobs:[{id, number, stage, machine, file}], machines:[{id, name, state}], inbox:{waiting}, more?}` with `ETag`; 304 on a matching `If-None-Match`; 1 per 10 s |
-| `POST /api/connectors/price` | sealed slice facts, ≤ 8 KB opened: `{v, qty, timeSec, filaments:[{type, colour, grams}], printer:{preset}}` | 200 sealed `{prices:"off"}` when the shop's "Show prices in OrcaSlicer" is off or this device has no grant; `{prices:"on", currency, qty, unit, total, rounded, basis}` for the `price` grant, plus `cost:{unit, total}` and `margin:{pct}` for `cost`; `{prices:"on", unpriced:"no-material"\|"no-currency"\|"bad-facts"}`; 120 an hour |
+| `POST /api/connectors/price` | sealed slice facts, ≤ 8 KB opened: `{v, qty, timeSec, filaments:[{type, colour, grams}], printer:{preset}}` | 200 sealed `{prices:"off"}` when the shop's "Show prices in OrcaSlicer" is off or this device has no grant; `{prices:"on", currency, qty, unit, total, rounded, basis}` for the `price` grant, with `round:{step}` only when `rounded` is true; plus `cost:{unit, total}` and `margin:{pct, pctOnCost, amount}` for `cost` (`pctOnCost` is absent when the cost shows as 0.00; `amount` is `total − cost.total` to the cent); `{prices:"on", unpriced:"no-material"\|"no-currency"\|"bad-facts"}`; 120 an hour |
 
 **Sealed capture.** `{"v":1,"alg":"A256GCM","nonce":b64(12 bytes),"ct":b64(ciphertext ‖ 16-byte tag)}`
 under `HKDF-SHA256(K, salt "khayt-connector-seal-v1", info connectorId)`, AAD
@@ -341,7 +400,15 @@ the grant is per device (none, `price`, `cost`), and the route passes only an
 allow-list of keys for it: the rule always works out the cost and margin, and a
 `price` device never sees them. `GET /api/connectors/self` lists `price:read`
 (and `cost:read`) only while both hold.
-Vectors: `docs/connector-routes.vectors.json`. The desktop (`lib/lan-server.js`) has none of this yet.
+Vectors: `docs/connector-routes.vectors.json`. The desktop (`lib/lan-server.js`,
+`lib/main/connector-routes.js`) answers the same routes with the same statuses; its
+inbox is `<userData>/From slicer/` ([`lib/main/slicer-inbox.js`](../lib/main/slicer-inbox.js)),
+its slice records `From slicer/.slices/` ([`lib/main/connector-slices.js`](../lib/main/connector-slices.js)),
+and "Show prices in OrcaSlicer" is this computer's own file in userData, default off
+([`lib/main/connector-local.js`](../lib/main/connector-local.js)); a grant is set over
+IPC (`hub:connector-grant-set`) by whoever may edit security, `cost` only with
+reports. The desktop reads a plain G-code's own figures into the item; a
+`.gcode.3mf` or `.bgcode` is filed without them, and no activity row is written.
 
 ### `GET /api/library`, its thumbnails, and `POST /api/library/{id}/estimate` — pricing a model from the phone
 
@@ -478,22 +545,27 @@ Active kanban orders (`pending`, `printing`, `post`, `qc`). **Requires owner PIN
 
 ### Discovery — `_khayt._tcp`
 
-The native Mac app advertises itself over Bonjour whenever its LAN API is bound
-to the network, so a client does not have to be told an address.
+Both apps advertise themselves whenever the LAN API is bound to the network, so a
+client does not have to be told an address: the native Mac over Bonjour, Windows/Linux
+over multicast DNS ([`lib/main/lan-advertise.js`](../lib/main/lan-advertise.js), the
+packet [`lib/mdns.js`](../lib/mdns.js) `encodeAdvertisement`), announced at start and
+withdrawn with a goodbye (TTL 0) when the server stops.
 
 | | |
 |---|---|
 | Service type | `_khayt._tcp` |
 | Service name | the shop's own name (`settings.shopName`), truncated to 63 **bytes** |
 | `TXT v` | the LAN API version — `1` |
-| `TXT store` | `1` when this server implements `GET /api/store`; absent means no |
+| `TXT store` | `1` when this server implements `GET /api/store`; absent means no (the desktop sends none) |
 
 **Only when bound to the LAN.** A loopback-only server is not advertised, because
 a client that found it could never connect to it.
 
 `TXT store` is the one thing worth knowing before pairing: it separates a Mac that
 can hand over the book — so the client keeps working away from the desk — from one
-that cannot. The Electron desktop does not advertise at all.
+that cannot. The Electron desktop advertises without it, because it serves no `/api/store`.
+Its host record is a name of its own (`<hostname>-khayt.local`), so it never claims the
+system's own name, and it does not probe for a clash of instance names as Bonjour does.
 
 **The PIN is deliberately not advertised.** It can change while the server is up,
 and a stale "no PIN needed" is a client confidently telling a shop something
@@ -1048,6 +1120,45 @@ Machine list glance. **Requires owner PIN.**
 ]
 ```
 
+### A paired phone's role (native Mac, Nov 2026, draft)
+
+> **Native Mac only for now.** `lib/lan-server.js` follows in the desktop lane. The rule is shared: `lib/device-roles.js`.
+
+A phone paired with this Mac carries a **role**: owner, manager, operator or viewer. The role is a set of scopes, and the Mac checks it on **every request the phone signs**. The phone's screens follow its role as a convenience; the server's answer is the check.
+
+- A request the role does not cover is answered **403** `{"reason":"role-scope","required":"<scope>"}`, the shape an API token gets for a scope it lacks. `required` is `owner` for a route the table does not name.
+- The check uses the path the server routes on. A segment that decodes to a slash, a dot segment or a control character is owner-only.
+- A phone paired with the owner PIN before roles existed has no role and is the **owner**, as it was.
+- A role holds whether the staff lock is on or off.
+- The owner PIN and API tokens are unchanged.
+- **Pricing through a job update is `quote:write`.** A write to `/api/orders` or `/api/orders/<id>` that carries a `price`, creates a job as a quote, or sends a `status` for a job that is a quote now (which accepts it) needs `quote:write`, whatever the route's own scope. An operator moves jobs; it does not price them.
+- **The role answers are signed back.** `GET /api/devices/self` and every `role-scope` 403 carry `x-khayt-reply-mac` (the connector's: `HMAC(key, "khayt-reply-v1\n" + request nonce + "\n" + status + "\n" + sha256hex(body))`, base64), and only when the request's own signature passed. A phone should act on a role answer only when the MAC checks out. Other routes' answers are not signed yet.
+- **A phone paired with the owner PIN is always the owner.** It holds the PIN, so it could send the PIN instead of its key; it cannot be given a lesser role. Remove it and pair it again by code.
+
+| Role | Scopes |
+|---|---|
+| viewer | `queue:read`, `machines:read`, `orders:read`, `inventory:read` |
+| operator | viewer + `orders:write`, `inventory:write`, `waste:write`, `machines:control` |
+| manager | operator + `clients:read`, `clients:write`, `expense:write`, `quote:write`, `book:read` |
+| owner | everything, including `book:write` and every route not listed |
+
+#### `GET /api/devices/self`
+
+Signed by a paired device. Answers what that device is: `{"deviceId":"dev_…","role":"operator","scopes":["queue:read", …]}`. A request with the owner PIN and no device signature is 403 `device-auth`. A role change takes effect on the next request; nothing is re-keyed.
+
+#### `POST /api/devices/pair` (pairing by code; **off** until the phone ships it)
+
+The slicer plugin's commit-then-reveal flow (`POST /api/connectors/pair`) with the phone's own prefixes: `khayt-phone-commit-v1` (the commitment), `khayt-enrol-phone-v1` (what the Mac's identity signs in its offer) and `khayt-phone-check-v1` (the 6-digit check number). A commitment, an offer or a number made for one kind can never stand for the other. No PIN is sent.
+
+- `POST /api/devices/pair` with `{v:2, commit, name, app, version}` → `{pairId, pollSecret, deviceId, publicKey, sig, identity}`. Only while a person has opened **Pair a phone** (120 s, 3 offers). 404 while the Mac has pairing by code off.
+- `POST /api/devices/pair/<pairId>/reveal` with `{publicKey, nonce}` and `x-khayt-poll` → `{"state":"waiting"}`. A mismatch expires the offer; no number is ever shown for it.
+- `GET /api/devices/pair/<pairId>` with `x-khayt-poll` → `{"state":"waiting"|"approved"|"denied"|"expired"}`.
+- `DELETE /api/devices/pair/<pairId>` with `x-khayt-poll` → `{"state":"cancelled"}`: the phone gives its own request up, and the Mac goes back to waiting. A later `GET` answers `expired`. `409 {"state":"approved"|"denied"|"expired"}` when it was already answered (an approval is not undone here), `404 {"state":"unknown"}` for a wrong id or secret. The offer stays counted.
+- Shared vectors: `docs/phone-pair.vectors.json` (the commitment, the signed offer, the check number, the derived key, and the reveals each side must refuse).
+- A person at the Mac compares the number, picks a role (Operator by default; only the owner may give Owner, a manager up to Manager) and approves. The device is enrolled with that role.
+
+**Signing out.** A phone paired by code holds no tag of the PIN: a PIN change does not sign it out. The server still needs a LAN PIN of at least 8 characters to answer anyone: with the PIN cleared or too short, a phone paired by code is refused like everyone else until one is set. **Remove** does (`device-revoked`). A phone paired with the owner PIN is still signed out by a PIN change.
+
 ### `GET /api/machines/live`
 
 > **Served by both apps.** `lib/lan-server.js` and the native Mac's
@@ -1068,6 +1179,68 @@ still lists it, and the phone hides it either way:
 ```
 
 `progress`, `timeRemaining` (seconds) and the temperatures are rounded integers. A machine never heard from has its `id`, `name` and `hasPrinterApi`, and `null` for the rest.
+
+**When it last answered, and why it is not answering** (both apps, Nov 2026, draft; the Mac's names):
+
+- `lastOkAt`: when the printer last ANSWERED, ISO 8601, or `null` if it has not since the app started watching it. `lastUpdated` moves on a failed poll too; `lastOkAt` does not.
+- `errorCode`: `null` while the printer answers. Otherwise one word that no language changes, to match on instead of `error` (a sentence in the shop's language):
+
+  | `errorCode` | Meaning |
+  |---|---|
+  | `access-refused` | the printer answered and said no: HTTP 401 or 403, a handshake or an access code turned down |
+  | `http` | any other HTTP status; `httpStatus` says which |
+  | `not-set-up` | no address, a bad port, or a missing serial or mainboard id: nothing was asked |
+  | `certificate` | a Bambu's certificate is not the one expected |
+  | `unreadable` | it answered with something that is not its protocol |
+  | `unreachable` | no answer: off, asleep, on another network, or it hung up |
+
+  A client must treat a word it does not know as `unreachable`. On the desktop the word comes from `lib/printer-poll-cache.js` `failureCode`, never from `error` (a sentence in the shop's language). Two differences from the Mac: the desktop connects to a Bambu without pinning its certificate, so it never sends `certificate`; and an SDCP (Elegoo) printer that turns the connection down reads `unreachable`, not `access-refused`. A machine that is `not-set-up` is never counted as offline, so it starts no search for a printer that moved.
+- `httpStatus`: the HTTP status of the failed poll when there was one, else `null`.
+
+### Khayt Cloud: the same rows away from the shop (`PUT /v1/shops/{shopId}/live/printers`)
+
+> **Published by both apps** (the Mac since Sep 2026, `LivePrinterPublisher.swift`
+> and `LivePrinters.swift`; Windows/Linux since Nov 2026,
+> `lib/main/live-printer-publisher.js` and `lib/live-snapshot.js`). The route is
+> khayt-cloud's: its `docs/api-contract.md`, "Live channel & live printers", is
+> the source of truth. This is what the two publishers share; where they differ it is said below.
+
+Not a LAN route: the computer sends the `/api/machines/live` rows above to Khayt
+Cloud, so a phone or the PWA away from the shop sees the same printers.
+
+- **Request.** `PUT {cloud}/v1/shops/{shopId}/live/printers`,
+  `Authorization: Bearer <the shop's cloud token>` (the token saved with the
+  Khayt Cloud sign-in), body `{ "ciphertext": <envelope object>, "at": "<ISO 8601>" }`.
+  `at` is the computer's time of the snapshot.
+- **Sealed.** `ciphertext` is the store's envelope `{ v, z: "gzip", iv, ct, tag }`
+  (AES-256-GCM under the shop's data key, the one unlocked with the sync
+  passphrase), as an object, not a string of it. The server never reads it.
+- **Plaintext.** `{ "v": 1, "at": <same as the request's>, "printers": [rows] }`.
+  Each row is the `/api/machines/live` row, with `lastUpdated` and `lastOkAt`
+  as epoch **milliseconds** (or `null`), never ISO strings. Every other field,
+  `problems`, `waiting`, `errorCode` and `httpStatus` included, is as above;
+  readers ignore fields they do not know.
+- **Size.** `JSON.stringify(ciphertext)` at most 65,536 characters. Over it, the
+  snapshot is sealed again with `filename` and `error` set to `null` on every
+  row; if that is still over, nothing is sent. No printer is dropped.
+- **Who publishes.** Every unlocked computer of the shop may, and the cloud keeps one snapshot, newest wins. On Windows/Linux a computer publishes only while it is hearing from the printers: at least one row answered in the last 3 minutes. The owner's laptop away from the shop, or a computer whose polling stopped, sends nothing rather than replacing the real picture with "not heard". (The Mac does not check this yet.)
+- **When.** On a change, at most every 2 s (the server's per-shop 429 line);
+  with nothing changed, a heartbeat every 45 s, so a viewer can tell idle from
+  a computer that is off. "Changed" compares the rows without `lastUpdated` and
+  `lastOkAt`: both move on every answered poll, and a healthy printer would
+  otherwise mean a snapshot every poll. A printer that stops answering changes
+  `error` and `errorCode`, so it is a change. Nothing is sent for a book with
+  no printer Khayt polls (no machine with a printer connection).
+- **Only while** Khayt Cloud is signed in and unlocked on that computer, for the
+  book's own shop, for a role that may write (a viewer's snapshot is a 403),
+  and while the "make no internet calls" switch allows Khayt Cloud (purpose
+  `cloud`). Locking or signing out stops it; so does quitting.
+- **Answers.** `200 { ok, receivedAt }`: sent. `429 { retryAfter }` (and
+  `Retry-After`): wait that many seconds; Windows/Linux reads only the body and
+  honours at most 5 minutes. `403`: stop for this session. `401`: the Mac treats
+  it as `403`; Windows/Linux stops until the shop signs in to Khayt Cloud again.
+  Anything else (`413`, a `5xx`, a deploy): try again 45 s later. No answer at
+  all: try at the next check.
 
 ### `POST /api/printer/{machineId}/{pause|resume|stop}`
 
@@ -1091,6 +1264,32 @@ unset or short PIN is `401`.
 | 409 | `not-connected`, `not-watched` (under service / retired / another app's protocol), `unsupported` (this protocol has no such verb), `no-job` |
 | 502 | `refused`: the printer said no, and `message` is what it said |
 | 503 | `busy`: the app is starting |
+
+### `POST /api/printer/{machineId}/bed-clear`
+
+> **Served by both apps** (Nov 2026, drafts): the native Mac app and
+> `lib/lan-server.js` (Windows/Linux), through the shared rule
+> `lib/lan-rest.js` `machineBedClear`. The desktop has no sample book, so it
+> never answers `409 read-only`.
+
+A paired phone saying a machine's plate is empty: the phone's **"Bed is clear"** (leftovers from a print that ended badly) and **"Taken off"** (a finished print). Both write the same thing, and the same thing as the Mac's own "Bed is clear" button: `bedClearedAt` on the machine, stamped now. The shared rules read it (`lib/auto-dispatch.js`: the printer may be offered again; `lib/waiting-at-machine.js`: `print-to-take-off` and `bed-to-clear` end). The body is empty. The printer itself is told nothing.
+
+**Requires a signed, enrolled phone**, as the commands above do: the owner PIN sent bare is `403 {"ok":false,"reason":"device-key-required"}`.
+
+**Role:** `machines:control` in `lib/device-roles.js` (`allowsRequest`): an operator's, a manager's or the owner's phone. A viewer's phone is refused with the usual `403 {"reason":"role-scope","required":"machines:control"}`, signed back.
+
+**Response 200:** `{"ok":true,"bedClearedAt":"2026-11-22T14:07:05.120Z"}`.
+
+**Refusals:** `{"ok":false,"reason":…,"message"?:…}`
+
+| Status | `reason` |
+|---|---|
+| 404 | `not-found`: no machine in use with that id (a retired printer is not one) |
+| 409 | `read-only`: this Mac is showing the sample book |
+| 500 | `not-saved`: the write failed (another computer holds the book, for one), and `message` says why |
+| 503 | `busy`: the app is starting |
+
+It is not refused while the printer is printing: a stamp made before a print ends is simply older than that print's end, and the rules ignore it. Sending it twice writes a newer stamp and changes nothing else.
 
 ### `POST /api/orders/{id}/photos`
 
@@ -1172,10 +1371,14 @@ Answers `{ "ok": true, "event", "advanced" }`.
 
 ### `GET /api/version` and `POST /api/files/local` — Khayt as a printer in the slicer
 
-> **Served by the native Mac app only**, and only while the shop has switched
-> on Settings → Online → "Accept files from slicers (OctoPrint upload)". Off
-> (the default), both are the ordinary **404**. `lib/lan-server.js` does not
-> implement them.
+> **Served by both apps**, and only while the shop has switched on "Accept files
+> from slicers (OctoPrint upload)": on the Mac, Settings → Online; on Windows/Linux
+> (not on screen yet) main's `hub:slicer-upload-set`, kept in userData with the key
+> ([`lib/main/connector-local.js`](../lib/main/connector-local.js), sealed with the OS
+> keychain). Off (the default), both are the ordinary **404**. The desktop's routes
+> are [`lib/main/slicer-upload.js`](../lib/main/slicer-upload.js): the body is parsed as
+> it streams and only the file part is written, into the same inbox and the same
+> SHA-256 dedupe as a paired plugin's file.
 
 The two OctoPrint routes a slicer's "Send" uses (OrcaSlicer, PrusaSlicer,
 Bambu Studio: a physical printer of host type OctoPrint, with the Mac's LAN
@@ -1188,6 +1391,12 @@ same shapes `lib/printer-upload.js` sends to a real OctoPrint.
   wrong key **403**, ten wrong keys from one visitor **429** for a minute (its
   own bucket — it never locks the owner PIN). Not accepted in the query.
 - **`GET /api/version`** → `200 {"api":"0.1","server":"1.10.0","text":"OctoPrint 1.10.0 (Khayt)"}`.
+- **On the desktop (Windows/Linux), both routes:**
+  - The shop's network only: `421 {"error":"host-not-local"}` through the tunnel or for a `Host` that is not this computer, as the connector routes.
+  - At most 30 uploads an hour from one address, then `429` with `Retry-After`.
+  - An upload is ended after 60 s with no bytes (the Mac's idle read timeout), never by its total length of time, so a slow 1 GB file from a slicer is not cut off while it still flows. Every other request keeps a 300 s whole-request limit.
+  - A failed spool (a full or read-only disk) answers `500` and frees its upload slot.
+  - File names are made safe for Windows and ext4: `< > : " | ? *` become `_`, trailing dots and spaces go, a device name (`CON`, `NUL`, `COM1`, …) gets a leading `_`, and a name is cut to 200 UTF-8 bytes, keeping its extension.
 - **`POST /api/files/local`** — `multipart/form-data`, the file in the field
   `file`. Taken: `.gcode`, `.gco`, `.g`, `.bgcode`, `.gcode.3mf` (else
   **415**); no file part **400**. The key, the `Content-Length` and the cap are
@@ -1203,8 +1412,8 @@ same shapes `lib/printer-upload.js` sends to a real OctoPrint.
      "refs":{"resource":"http://<host>/api/files/local/plate.gcode",
              "download":"http://<host>/downloads/files/local/plate.gcode"}}}}
   ```
-- **Where it goes:** the "From slicer" inbox beside the book
-  (`<book folder>/From slicer/<id>/`), with the slicer's own grams, time,
+- **Where it goes:** the "From slicer" inbox beside the book on the Mac
+  (`<book folder>/From slicer/<id>/`; on Windows/Linux `<userData>/From slicer/<id>/`), with the slicer's own grams, time,
   material and slicer name read off the file. The shop adds it to the library,
   or starts a job or a quote from it, in the app.
 

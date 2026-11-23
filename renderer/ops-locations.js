@@ -476,11 +476,15 @@ function openPinPadModal(afterUnlock) {
         enteredPin = '';
         return;
       }
-      // Support legacy btoa PINs (migration: clear them and prompt re-set)
+      // A legacy btoa PIN cannot be checked. It used to be CLEARED here, which
+      // under the lock is a lock-field change main refuses and puts back (P5),
+      // so the pad said "PIN reset" while nothing was; and had it gone
+      // through, the operator would have had no PIN at all, a free switch for
+      // anyone at the pad (pre-cut review LOW). Main now hashes every one it
+      // can decode as the book loads (#2609 security review), so only a value
+      // that does not decode is left here, and the owner sets a new one.
       if (isLegacyPin(op.pinHash)) {
-        op.pinHash = '';
-        saveAll();
-        if (errEl) errEl.textContent = 'PIN reset for security upgrade — please set a new PIN in Settings.';
+        if (errEl) errEl.textContent = t('op.pin_legacy');
         enteredPin = '';
         return;
       }
@@ -491,9 +495,7 @@ function openPinPadModal(afterUnlock) {
       // the window then showed someone main never signed in (#2592 review).
       const verified = await window.hubAPI?.verifyOperatorPin?.({ operatorId: selectedOpId, pin: enteredPin });
       if (verified?.error === 'legacy_pin') {
-        op.pinHash = '';
-        saveAll();
-        if (errEl) errEl.textContent = 'PIN reset for security upgrade — please set a new PIN in Settings.';
+        if (errEl) errEl.textContent = t('op.pin_legacy');
         enteredPin = '';
         return;
       }

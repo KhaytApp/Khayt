@@ -26,7 +26,10 @@ test('the sidebar lists the 14 panes in the Mac\'s order, with its three group h
 });
 
 test('every pane has a panel, a title and a Save button, and nothing else is a panel', () => {
-  const panels = [...html.matchAll(/class="settings-panel[^"]*" id="settings-panel-([^"]+)"/g)].map((m) => m[1]);
+  // Detail pages open from a pane and have no nav item or Save of their own
+  // (General › Internet use, P8 PR 5: it saves as you change it).
+  const DETAIL = ['internet'];
+  const panels = [...html.matchAll(/class="settings-panel[^"]*" id="settings-panel-([^"]+)"/g)].map((m) => m[1]).filter((p) => !DETAIL.includes(p));
   assert.deepEqual(panels, PANES);
   for (const p of PANES) {
     const start = html.indexOf(`id="settings-panel-${p}"`);

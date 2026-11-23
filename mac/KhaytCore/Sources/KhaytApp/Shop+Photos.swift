@@ -154,6 +154,11 @@ extension Shop {
     /// shop's to fix at the moment a print ends. The photo can always be added
     /// by hand.
     func printEnded(_ machine: Machine, edge: KhaytEngine.FinishTrack) async {
+        // Asked NOW, of the book as the print ends, before anything moves the
+        // job on: which job this print's filament figures may go on. Not the
+        // photo's job (`HeadActuals`).
+        let figuresJob: String? = (try? await engine?.headActualsJob(printLog: orderRows, machineId: machine.id,
+                                                                     filename: edge.filename)) ?? nil
         var (ended, photo) = await FinishCamera.finish(machine, edge: edge, printLog: orderRows,
                                                        shop: self) { jobId, data in
             await self.attachFinishPhoto(jobId: jobId, data: data)
@@ -168,9 +173,14 @@ extension Shop {
         }
         FinishCamera.lastOutcome[machine.id] = photo
         await printFinished(ended)
+        // How the run ended, on the run itself, once (`RunResults`).
+        await noteRunResult(ended)
         // The printer's timelapse, written a little after the end — looked
         // for on its own, so the event above is not held for minutes.
         Task { await self.noteTimelapse(ended, machine: machine) }
+        // And how much filament each head used, from the printer's history
+        // (a Snapmaker U1): one record per print (`HeadActuals`).
+        Task { await self.noteHeadActuals(ended, machine: machine, jobId: figuresJob) }
     }
 
     /// ── THE FINISH SEAM ───────────────────────────────────────────────────

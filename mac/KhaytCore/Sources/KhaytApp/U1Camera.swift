@@ -287,7 +287,7 @@ extension Camera {
     /// Switch it. Gated like every other printer control (`orders`/`edit`,
     /// see `Shop.control`), and never while a switch is already on its way.
     func setLight(_ machine: Machine, on: Bool, shop: Shop) async {
-        guard shop.permitted("orders", "edit") else { return }
+        guard shop.permittedPrinter("control") else { return }
         if case .switching = lights[machine.id] { return }
         let was: Bool
         switch lights[machine.id] {

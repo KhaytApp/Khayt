@@ -36,7 +36,7 @@ misleading:
 
 3. **The phone finds the Mac by itself.** The Mac advertises `_khayt._tcp` under
    the shop's own name, so pairing is a list to tap rather than an IP to type.
-   Typing an address by hand is still there, demoted, because the Electron
+   Typing an address by hand is still there, demoted, because an older Electron
    desktop does not advertise and some networks block Bonjour.
 
 **The two desktops do not serve the same routes.** `lib/lan-server.js` (Electron)
@@ -50,7 +50,7 @@ which; do not assume a route exists on both.
 
 | Area | Features |
 |------|----------|
-| **Pairing** | Pick the shop off the Wi-Fi (Bonjour `_khayt._tcp`), then the owner PIN. Manual address entry kept for desktops that do not advertise |
+| **Pairing** | Pick the shop off the Wi-Fi (Bonjour `_khayt._tcp`), then the owner PIN. Manual address entry kept for older desktops that do not advertise |
 | **Home** | Queue stats, kanban strip, completed today, low-stock & overdue alerts, quick actions, order preview |
 | **Orders** | Active queue + filters (status, overdue) + recent history; detail sheet; advance / set status; **assign machine**; haptics |
 | **New order** | Create an order from the app (client, item, material, qty, due date) — posts to the queue |

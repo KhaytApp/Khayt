@@ -1185,7 +1185,7 @@ function openMachineEditor(machineId = null) {
                   ? KhaytPrinterRelocate.relocationHint(s) : null;
                 resultEl.textContent = hint
                   ? t('mach.moved_found', { host: hint.to })
-                  : t('mach.api_fail') + ': ' + s.error;
+                  : t('mach.api_fail') + ': ' + explainRefusal(s.error);
                 resultEl.style.color = hint ? 'var(--warning)' : 'var(--danger)';
               } else if (s) {
                 resultEl.textContent = t('mach.api_ok') + ' — ' + (s.state || '');

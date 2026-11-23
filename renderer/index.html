@@ -220,6 +220,8 @@
       </div>
 
       <main class="khayt-scroll content" id="mainContent" tabindex="-1">
+        <!-- Updates blocked for 30+ days by "Make no internet calls" (D2; Figma 113:947). renderer/internet-use.js -->
+        <div id="updatesOffBanner" class="iu-banner" role="alert" style="display:none;"></div>
 
 
 
@@ -1673,6 +1675,15 @@
         <div id="telemetrySection"></div>
         </div>
 
+        <!-- "Make no internet calls" (P8 PR 5): a detail page under General, beside crash reports and usage (Figma 111:1041). -->
+        <div class="card settings-card">
+        <div class="settings-section-head" data-i18n="iu.title">Internet use</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <span id="internetUseEntryState" style="font-size:13px;color:var(--text-muted);"></span>
+          <button type="button" class="btn small" id="btnOpenInternetUse" data-i18n="iu.open">Open Internet use</button>
+        </div>
+        </div>
+
         <div class="card settings-card">
         <div class="settings-section-head" data-i18n="set.updates_section">Updates</div>
         <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; margin-top:0;">
@@ -1701,6 +1712,14 @@
       </div>
 
       <!-- ─── SHOP ────────────────────────────────────────────── -->
+      <!-- ─── GENERAL › INTERNET USE (Figma 111:1041, signed off Nov 22) ── -->
+      <div class="settings-panel" id="settings-panel-internet">
+        <button type="button" class="iu-back" id="btnInternetUseBack"><span class="iu-chev" aria-hidden="true">‹</span> <span data-i18n="set.pane_general">General</span></button>
+        <h2 class="settings-panel-title" data-i18n="iu.title">Internet use</h2>
+        <p class="settings-panel-hint" data-i18n="iu.hint">Choose what Khayt may send over the internet. Printers, cameras and phones on your shop’s network always keep working.</p>
+        <div id="internetUseBody"></div>
+      </div>
+
       <div class="settings-panel" id="settings-panel-shop">
         <h2 class="settings-panel-title" data-i18n="set.pane_shop">Shop</h2>
 
@@ -2965,6 +2984,7 @@
 <script src="../lib/intake-view.js"></script>
 <script src="../lib/printer-actuals.js"></script>
 <script src="../lib/printer-poll-cache.js"></script>
+<script src="../lib/run-result.js"></script>
 <script src="../lib/print-setups.js"></script>
 <script src="../lib/geometry-key.js"></script>
 <script src="../lib/model-identity.js"></script>
@@ -3212,6 +3232,7 @@
 <script src="invoicing.js"></script>
 <script src="app-exports.js"></script>
 <script src="logs.js"></script>
+<script src="phone-pairing.js"></script>
 <script src="settings.js"></script>
 <script src="ops-locations.js"></script>
 <script src="integrations.js"></script>
@@ -3243,6 +3264,8 @@
 <script src="coach-tips.js"></script>
 <script src="wire-events.js"></script>
 <script src="update-ui.js"></script>
+<script src="../lib/network-switch.js"></script>
+<script src="internet-use.js"></script>
 <script src="app-boot.js"></script>
 <script src="app.js"></script>
 </body>
