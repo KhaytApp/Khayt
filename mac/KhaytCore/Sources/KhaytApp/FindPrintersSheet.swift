@@ -20,7 +20,9 @@ struct FindPrintersSheet: View {
     @State private var started = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // The house frame: the sheet never grows past the screen, and its
+        // buttons stay put while what is above them scrolls.
+        SheetFrame(width: 460) {
             Text(shop.words.callIt("mac.find_printers")).font(.headline)
 
             if looking {
@@ -72,6 +74,7 @@ struct FindPrintersSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+        } footer: {
             HStack {
                 // Asks nothing: it empties this computer's own list, and the
                 // next scan starts it again.
@@ -88,8 +91,6 @@ struct FindPrintersSheet: View {
                     .keyboardShortcut(.cancelAction)
             }
         }
-        .padding(18)
-        .frame(width: 460)
         .task {
             guard !started else { return }
             started = true
@@ -151,10 +152,12 @@ struct FindPrintersSheet: View {
     /// "Seen 2 hours ago. It may be asleep or busy." or, for a printer whose
     /// address moved, "Seen yesterday, at another address before: 192.168.1.50".
     @MainActor static func seen(_ find: EarlierFind, now: Date, words: Words) -> String {
-        var style = Date.RelativeFormatStyle(presentation: .named, unitsStyle: .wide)
-        style.locale = words.locale
+        // How long ago, as of `now`, said from the present: a relative style
+        // has no "as of", so the same span is laid back from this instant.
         // Never "in 3 seconds": a clock that moved does not put a sighting in the future.
-        let when = min(find.lastSeen, now).formatted(style)
+        let ago = max(0, now.timeIntervalSince(find.lastSeen))
+        let when = Date().addingTimeInterval(-ago)
+            .formatted(Date.RelativeFormatStyle(presentation: .named, unitsStyle: .wide).locale(words.locale))
         if let was = find.previousHost {
             return words.callIt("mac.find_seen_moved", ["when": .string(when), "host": .string(was)])
         }
