@@ -126,6 +126,8 @@ const hubAPI = {
   slice:     (opts) => ipcRenderer.invoke('hub:slice', opts),
   sliceAndPrint: (opts) => ipcRenderer.invoke('hub:slice-and-print', opts),
   printerSendGcode: (opts) => ipcRenderer.invoke('hub:printer-send-gcode', opts),
+  // Send checks (Figma 129): facts about a file just picked, before it goes.
+  printerSendFacts: (opts) => ipcRenderer.invoke('hub:printer-send-facts', opts),
   printOrderFile: (opts) => ipcRenderer.invoke('hub:print-order-file', opts),
   sliceTest: (opts) => ipcRenderer.invoke('hub:slice-test', opts),
   detectSlicers: () => ipcRenderer.invoke('hub:detect-slicers'),
@@ -349,6 +351,7 @@ const hubAPI = {
   startPrinterPolling: (machines) => ipcRenderer.invoke('hub:start-printer-polling', machines),
   stopPrinterPolling:  ()         => ipcRenderer.invoke('hub:stop-printer-polling'),
   getPrinterStatus:    ()         => ipcRenderer.invoke('hub:get-printer-status'),
+  printerNeeds:        ()         => ipcRenderer.invoke('hub:printer-needs'),
   probePrinter:        (machine)  => ipcRenderer.invoke('hub:probe-printer', machine),
   // Pause / resume / cancel the running job. Main validates the host and the
   // command name; nothing here is trusted.
@@ -357,6 +360,7 @@ const hubAPI = {
   // What is on the plate, and dropping one of it. Klipper only, and the drop
   // cannot be undone — see lib/exclude-object.js.
   printerPlate:        (machine) => ipcRenderer.invoke('hub:printer-plate', { machine }),
+  printerSpoolTags:    (machine) => ipcRenderer.invoke('hub:printer-spool-tags', { machine }),
   printerExcludeObject: (machine, name) => ipcRenderer.invoke('hub:printer-exclude-object', { machine, name }),
   printerHistory: (payload) => ipcRenderer.invoke('hub:printer-history', payload),
   spoolmanFetch: (payload) => ipcRenderer.invoke('hub:spoolman-fetch', payload),
@@ -439,6 +443,11 @@ const hubAPI = {
   onLanOrderPhotoAdded: (() => { let _cb=null; ipcRenderer.on('lan-order-photo-added', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   // Main noted filament used per head on a job after a U1 print (lib/main/head-actuals.js).
   onPrinterHeadActuals: (() => { let _cb=null; ipcRenderer.on('printer-head-actuals', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
+  onPrinterTimelapse:   (() => { let _cb=null; ipcRenderer.on('printer-timelapse', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
+  onTimelapseProgress:  (() => { let _cb=null; ipcRenderer.on('timelapse-progress', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
+  timelapseKeep:        (jobId) => ipcRenderer.invoke('hub:timelapse-keep', { jobId }),
+  timelapseCancel:      (jobId) => ipcRenderer.invoke('hub:timelapse-cancel', { jobId }),
+  timelapseOpen:        (jobId) => ipcRenderer.invoke('hub:timelapse-open', { jobId }),
   onLanOrderUpdated:    (() => { let _cb=null; ipcRenderer.on('lan-order-updated',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanOrderCreated:    (() => { let _cb=null; ipcRenderer.on('lan-order-created',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanWaitingUpdated:  (() => { let _cb=null; ipcRenderer.on('lan-waiting-updated',  (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),

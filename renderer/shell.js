@@ -707,6 +707,7 @@ function switchTab(tabId) {
   if (tabId === 'logs-tab')       renderLogs();
   if (tabId === 'portfolio-tab')  renderPortfolio();
   if (tabId === 'waste-tab')      renderWasteLog();
+  if (tabId === 'connectedapps-tab' && typeof renderConnectedApps === 'function') renderConnectedApps();
   if (tabId === 'inventory-tab')  { renderInventory(); renderPurchaseOrders(); renderConsumables(); renderSuppliers(); }
   if (tabId === 'settings-tab') {
     // Activate the first sidebar nav item if none is active
