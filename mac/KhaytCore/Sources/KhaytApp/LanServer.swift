@@ -1501,7 +1501,11 @@ final class LanServer {
         // shows "Done" only when this Mac really said so.
         case (_, false) where request.method == "POST" && host.networkSwitch != nil && path == Self.networkSwitchPath:
             if let refused = await pinGate(request) { return refused }
-            guard LanDevices.isSigned(request.headers), let id = request.headers["x-khayt-device"] else {
+            // NOT an API token: `pinGate` lets a token-scoped request through
+            // without verifying any device signature, and `isSigned` only
+            // says the header is THERE. No token scope names this route today;
+            // this keeps it so if one ever does (review, Nov 23).
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers), let id = request.headers["x-khayt-device"] else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.networkSwitch!(request.body, host.devices.name(of: id) ?? "")

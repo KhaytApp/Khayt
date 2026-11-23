@@ -249,7 +249,7 @@ extension Shop {
     /// is said and never silently obeyed or overridden.
     @discardableResult
     func tellOthersSwitchedOn(_ network: JSONValue) async -> Bool {
-        // lock: callers — setOutboundOffline
+        // lock: callers — changeOutboundOffline
         // Turned on again: an "off" still waiting to be sent is superseded.
         forgetUnsentOff()
         guard outboundTellsOthers, let value = NetworkSwitch.value(of: network, purposes: outboundPurposeIds) else { return false }
@@ -313,7 +313,7 @@ extension Shop {
     /// this Mac online against the shop until somebody answered (review).
     @discardableResult
     func tellOthersSwitchedOff(_ network: JSONValue, seenBefore: String?, retry: Bool = false) async -> ToldOff {
-        // lock: callers — setOutboundOffline, retryUnsentOff
+        // lock: callers — changeOutboundOffline, retryUnsentOff
         guard let value = NetworkSwitch.value(of: network, purposes: outboundPurposeIds), !value.offline,
               let mine = NetworkSwitch.date(value.changedAt) else {
             forgetUnsentOff()

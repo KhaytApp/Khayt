@@ -150,7 +150,7 @@ struct PhoneNetworkSwitchTests {
             #expect(got.0 == 400 && got.1 == "bad-body", Comment(rawValue: bad))
         }
         // Unknown, never-kept and non-string entries are refused, not dropped.
-        for keep in [#"["nonsense"]"#, #"["lan"]"#, #"["switch-sync"]"#, #"["tunnel"]"#, #"["cloud",7]"#] {
+        for keep in [#"["nonsense"]"#, #"["lan"]"#, #"["switch-sync"]"#, #"["cloud",7]"#] {
             let got = await ask(#"{"offline":true,"keep":\#(keep)}"#)
             #expect(got.0 == 400 && got.1 == "bad-keep", Comment(rawValue: keep))
         }
@@ -162,6 +162,79 @@ struct PhoneNetworkSwitchTests {
         #expect(await ask(#"{"offline":true,"keep":[]}"#).0 == 200)
         guard case .object(let n)? = book.network else { Issue.record("not written"); return }
         #expect(n["keep"] == .array([]))
+    }
+
+    @Test("what another app ticked is neither refused nor wiped: the tunnel, and a purpose only a newer app knows")
+    func othersKeeps() async throws {
+        // The Windows/Linux app kept the tunnel; a newer one kept a purpose this Mac has never heard of.
+        let (shop, _, book) = await NetworkSwitchWiringTests.shop(option: false, network: .object([
+            "offline": .bool(false), "keep": .array([.string("tunnel"), .string("cloud"), .string("from-the-future")]),
+            "changedAt": .string("2026-11-22T14:12:00.000Z")]))
+        // The phone is shown what this Mac knows, the tunnel included, and not the unknown id.
+        guard case .object(let shown) = shop.networkForPhone(), case .array(let keep)? = shown["keep"] else { Issue.record("shape"); return }
+        #expect(Set(keep) == [.string("tunnel"), .string("cloud")])
+        // It sends back the list it showed: accepted, not `bad-keep`.
+        var (status, text) = await shop.phoneSetOutbound(body: Self.body(#"{"offline":true,"keep":["tunnel","cloud"]}"#), deviceName: "Phone")
+        #expect(status == 200, Comment(rawValue: text))
+        // It unticks cloud: the tunnel stays because the phone kept it, the unknown one because it was never the phone's to untick.
+        (status, text) = await shop.phoneSetOutbound(body: Self.body(#"{"offline":true,"keep":["tunnel"]}"#), deviceName: "Phone")
+        #expect(status == 200, Comment(rawValue: text))
+        guard case .object(let n)? = book.network, case .array(let stored)? = n["keep"] else { Issue.record("not written"); return }
+        #expect(Set(stored) == [.string("tunnel"), .string("from-the-future")], "another app's tick was wiped: \(stored)")
+    }
+
+    @Test("a Keep ticked at the Mac meanwhile is not wiped by a phone that says what it was showing")
+    func keepIsNotLost() async throws {
+        let (shop, _, book) = await NetworkSwitchWiringTests.shop(option: false, network: .object([
+            "offline": .bool(true), "keep": .array([.string("cloud")]), "changedAt": .string("2026-11-22T14:12:00.000Z")]))
+        // The owner ticks Keep on updates at the Mac. `changedAt` does not move: the switch was not flipped.
+        #expect(await shop.setOutboundKeep(.updates, true))
+        // The phone, still showing ["cloud"], sends its list with the right `seen`.
+        let stale = await shop.phoneSetOutbound(
+            body: Self.body(#"{"offline":true,"keep":["cloud"],"seen":"2026-11-22T14:12:00.000Z","seenKeep":["cloud"]}"#), deviceName: "Phone")
+        #expect(stale.0 == 409 && stale.1.contains(#""reason":"changed""#), Comment(rawValue: stale.1))
+        guard case .object(let n)? = book.network, case .array(let keep)? = n["keep"] else { Issue.record("shape"); return }
+        #expect(Set(keep) == [.string("cloud"), .string("updates")], "the Mac's tick was wiped")
+        // Showing what is true now, it goes through.
+        let ok = await shop.phoneSetOutbound(
+            body: Self.body(#"{"offline":true,"keep":["cloud"],"seen":"2026-11-22T14:12:00.000Z","seenKeep":["updates","cloud"]}"#), deviceName: "Phone")
+        #expect(ok.0 == 200, Comment(rawValue: ok.1))
+        #expect(await shop.phoneSetOutbound(body: Self.body(#"{"offline":true,"seenKeep":"cloud"}"#), deviceName: "Phone").0 == 400)
+    }
+
+    @Test("`seen` is the same moment however it is written, and a failure is the phone's to hear, not the Mac's screen")
+    func seenIsAnInstant() async throws {
+        let (shop, _, _) = await NetworkSwitchWiringTests.shop(option: false, network: .object([
+            "offline": .bool(false), "keep": .array([]), "changedAt": .string("2026-11-22T14:12:00.000Z")]))
+        // Without its milliseconds, as a phone's date formatter writes it.
+        #expect(await shop.phoneSetOutbound(body: Self.body(#"{"offline":true,"seen":"2026-11-22T14:12:00Z"}"#), deviceName: "Phone").0 == 200)
+        // A refused change leaves whatever the Mac's screen was showing as it was.
+        shop.moveProblem = "something the person at the Mac was reading"
+        shop.outboundChanging = true          // another change is in flight
+        let busy = await shop.phoneSetOutbound(body: Self.body(#"{"offline":false}"#), deviceName: "Phone")
+        shop.outboundChanging = false
+        #expect(busy.0 == 409 && busy.1.contains("not-saved"))
+        #expect(shop.moveProblem == "something the person at the Mac was reading")
+    }
+
+    @Test("an API token never reaches the switch, with or without made-up device headers")
+    func tokenIsNotAPhone() async throws {
+        let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let server = try String(contentsOf: app.appending(path: "LanServer.swift"), encoding: .utf8)
+        let at = try #require(server.range(of: "path == Self.networkSwitchPath:"))
+        let route = server[at.upperBound...].prefix(900)
+        #expect(route.contains("guard !request.tokenScoped, LanDevices.isSigned(request.headers)"),
+                "a token-scoped request skips the signature check in pinGate; the route must refuse it itself")
+        // And over the wire: a bearer token with a made-up device id is not let in.
+        let bench = try await PhoneRolesTests.bench()
+        defer { bench.stop() }
+        let owner = try PhoneRolesTests.codePaired(bench.devices, role: "owner", name: "Owner")
+        let reply = try await bench.post(Self.path, json: #"{"offline":false}"#,
+                                         headers: ["authorization": "Bearer khayt_made_up_token", "x-khayt-device": owner.id,
+                                                   "x-khayt-nonce": String(repeating: "ab", count: 16), "x-khayt-time": "1", "x-khayt-mac": "AAAA"])
+        #expect(reply.status != 200 && bench.switchCalls.calls.isEmpty, "\(reply.status)")
+        #expect(reply.headers["x-khayt-reply-mac"] == nil, "an answer was signed for a request nobody verified")
     }
 
     @Test("the sample book is not changed, and a long device name is cut")
@@ -176,6 +249,11 @@ struct PhoneNetworkSwitchTests {
                                             deviceName: "  " + String(repeating: "n", count: 300) + "  ").0 == 200)
         guard case .object(let n)? = book.network, case .string(let by)? = n["changedBy"] else { Issue.record("no name"); return }
         #expect(by.count == 80)
+        // No control or direction-changing characters reach the book, where other computers show the name.
+        let (other, _, otherBook) = await NetworkSwitchWiringTests.shop(option: false)
+        #expect(await other.phoneSetOutbound(body: Self.body(#"{"offline":true}"#), deviceName: "Sara\u{202E}enohPi\u{0007}\n").0 == 200)
+        guard case .object(let m)? = otherBook.network else { Issue.record("not written"); return }
+        #expect(m["changedBy"] == .string("SaraenohPi"))
     }
 
     @Test("with “tell my other computers” on, a flip from the phone is told to Khayt Cloud like one made at the Mac")

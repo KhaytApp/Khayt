@@ -1297,10 +1297,11 @@ An **owner's phone** turning the shop's "Make no internet calls" on or off (iPho
 ```
 
 - `offline` (boolean, required): the switch.
-- `keep` (array, optional): the purposes kept while it is on, replacing the list. Omitted or `null`: left as it is. Each entry must be a purpose this computer lets a shop keep (not `lan`, not `switch-sync`, and on the Mac not `tunnel`). **An entry it does not know is refused (`bad-keep`), not dropped**, so a phone with a newer list learns it is talking to an older computer.
-- `seen` (string, optional): the `changedAt` the phone was showing when the person tapped. If the book's differs, nothing is changed and the answer is `409` with the current value, so two people flipping it at once never overwrite each other blind. A phone that has seen no `changedAt` sends none.
+- `keep` (array, optional): the purposes kept while it is on, replacing the list. Omitted or `null`: left as it is. Each entry must be a purpose the rule lets a shop keep: any of `lib/outbound.js` `PURPOSES` but `lan` and `switch-sync` (`tunnel` included, which the Windows/Linux app can tick). **An entry this computer does not know is refused (`bad-keep`), not dropped**, so a phone with a newer list learns it is talking to an older computer. A purpose already in the book that this computer does not know is left there: it was never this request's to untick, and the phone is not shown it.
+- `seen` (string, optional): the `changedAt` the phone was showing when the person tapped. If the book's is a different moment, nothing is changed and the answer is `409` with the current value, so two people flipping it at once never overwrite each other blind. Compared as instants, so the same moment written without its milliseconds is the same. A phone that has seen no `changedAt` sends none.
+- `seenKeep` (array of strings, optional): the `keep` list the phone was showing. `changedAt` moves only when the switch itself is flipped, so a Keep ticked at the computer meanwhile is invisible to `seen`; with `seenKeep`, a list that is no longer what the computer holds is a `409` too, and that tick is not wiped. **A phone that sends `keep` should send `seenKeep`.**
 
-**Answers.** The `200`, the `409`s and the role `403` carry `x-khayt-reply-mac`, as `/api/devices/self` does: a phone shows "Done" only when the MAC verifies.
+**Answers.** Every answer to a request whose signature verified carries `x-khayt-reply-mac`, as `/api/devices/self` does (the `200`, the `400`s, the `409`s, the `503` and the role `403`): a phone shows "Done" only when the MAC verifies. Before that, the usual gate answers apply and are not signed, except `device-revoked`: `401` (no PIN or a wrong one, `device-auth`, `device-clock`, `device-replay`, `device-revoked`), `421` (a `Host` that is not local), `429`. An API token is not a phone: `403 device-key-required`, whatever headers come with it.
 
 | Status | Body |
 |---|---|
@@ -1310,7 +1311,7 @@ An **owner's phone** turning the shop's "Make no internet calls" on or off (iPho
 | 409 | `{"ok":false,"reason":"changed","network":{…}}`: `seen` is stale. `"not-saved"` with `network`: another change is in flight or this computer cannot save the book now. `"read-only"`: the sample book |
 | 503 | `{"ok":false,"reason":"busy"}`: the app is starting |
 
-`changedBy` is the phone's name as the shop sees it in Paired phones (cut at 80 characters). `changedAt` only ever moves forward.
+`changedBy` is the phone's name as the shop sees it in Paired phones, without control or direction-changing characters, cut at 80 characters. `changedAt` is never earlier than the newest stamp this computer has seen, unless that stamp is more than ten minutes ahead of its clock (a mistake already in the book), which is not followed.
 
 **How a phone knows the route is there.** `GET /api/devices/self` carries `"can": ["network-switch"]` for an owner's phone on a computer that serves this route (see below). No `can`, or a list without it: show the switch read-only.
 

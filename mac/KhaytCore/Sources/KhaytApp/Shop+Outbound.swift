@@ -180,9 +180,22 @@ extension Shop {
     nonisolated static func network(_ network: JSONValue?, keepAll kept: [OutboundPurpose]) -> JSONValue {
         var n: [String: JSONValue] = { if case .object(let o)? = network { return o }; return [:] }()
         let wanted = Set(kept.map(\.rawValue))
-        n["keep"] = .array(keepable.map(\.rawValue)
-            .filter { wanted.contains($0) && !NetworkSwitch.neverKept.contains($0) }.map(JSONValue.string))
+        let mine = Set(phoneKeepable.map(\.rawValue))
+        // What is in the book that this list does not speak for stays: a
+        // purpose only a newer app knows, ticked there, is not this request's
+        // to untick.
+        let others: [JSONValue] = { if case .array(let a)? = n["keep"] { return a.filter { if case .string(let s) = $0 { !mine.contains(s) } else { false } } }; return [] }()
+        n["keep"] = .array(phoneKeepable.map(\.rawValue).filter { wanted.contains($0) }.map(JSONValue.string) + others)
         return .object(n)
+    }
+
+    /// The purposes a PHONE may send in `keep`: every purpose the rule lets a
+    /// shop keep, which is all of them but `lan` and the switch-sync call.
+    /// Wider than the Mac's own rows (`keepable` leaves out the tunnel, which
+    /// the Mac does not have): the Windows/Linux app can tick it, the phone is
+    /// then shown it, and a phone must be able to send back the list it showed.
+    nonisolated static let phoneKeepable: [OutboundPurpose] = OutboundPurpose.allCases.filter {
+        !NetworkSwitch.neverKept.contains($0.rawValue)
     }
 
     /// The purposes a shop may tick Keep on, on the Mac.
