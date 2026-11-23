@@ -111,6 +111,15 @@ const KNOWN_ABSENT = {
     ['KhaytMeridianShell', 'renderer/themes.js'],
     ['KhaytPrivacy', 'renderer/settings.js'],
     ['KhaytTelemetryScrub', 'renderer/settings.js'],
+    // The desktop train (#2671): the "make no internet calls" screens and
+    // pairing a phone by code are Khayt's, not yet Bed Ready's. Every read is
+    // guarded, so Bed Ready simply has neither until its lane decides; main's
+    // outbound gate applies to both flavours whatever the screen shows.
+    ['KhaytInternetUse', 'renderer/app-state.js'],
+    ['KhaytInternetUse', 'renderer/shell.js'],
+    ['KhaytInternetUse', 'renderer/update-ui.js'],
+    ['KhaytInternetUse', 'renderer/app-boot.js'],
+    ['KhaytPhonePairing', 'renderer/settings.js'],
   ],
 };
 
