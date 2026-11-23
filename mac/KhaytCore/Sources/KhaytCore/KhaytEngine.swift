@@ -1009,6 +1009,10 @@ public actor KhaytEngine {
         "mdns",
         "printer-discovery",
         "printer-sweep",
+        // The "Before you update" items a computer has not read yet, at the
+        // first start after a version change (`KhaytEngine+LaunchGate`). The
+        // rule only; what this Mac last ran is this Mac's own record.
+        "launch-gate",
         // Printers a scan found, remembered for a few days so a printer that
         // was asleep during one scan is still in the list. The rule only; the
         // file is this computer's, outside the book (`FoundPrintersStore`).

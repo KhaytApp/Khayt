@@ -31,6 +31,17 @@ say()  { printf '\n== %s\n' "$*"; }
 fail() { printf '\nSTOPPED: %s\n' "$*" >&2; exit 1; }
 
 # ── BEFORE TEN MINUTES OF BUILDING, EVERYTHING THAT CAN REFUSE ──────────
+# ── THE "BEFORE YOU UPDATE" ITEMS SHIP INSIDE THE APP ────────────────────
+# The first-launch sheet ("Khayt was updated") reads this release's items
+# from lib/release-gates.json, generated from CHANGELOG.md. A cut whose file
+# was not regenerated ships a sheet that says nothing about this release.
+command -v node >/dev/null 2>&1 || fail "node is needed to check lib/release-gates.json"
+node scripts/write-release-gates.js --check \
+  || fail "lib/release-gates.json is stale — run 'npm run release:gates', commit it with the cut, and start again"
+bash mac/sync-js.sh >/dev/null
+git diff --quiet -- mac/KhaytCore/Sources/KhaytCore/JS/release-gates.json \
+  || fail "the bundled release-gates.json is not lib's — commit what mac/sync-js.sh just wrote and start again"
+
 say "checking what this needs"
 command -v gh >/dev/null   || fail "needs the gh CLI, signed in"
 command -v node >/dev/null || fail "needs node"
