@@ -46,6 +46,73 @@ struct FoundPrintersTests {
         #expect(try await Self.engine.rememberFound(list: .string("junk"), found: [], nowMs: t0, source: "mdns").isEmpty)
     }
 
+    // MARK: - The sheet (page 28, frame A)
+
+    static func earlier(_ fields: [String: JSONValue]) -> EarlierFind? { EarlierFind(.object(fields)) }
+
+    @Test("an earlier find is a row the rule marked not seen now, in the shape Add takes")
+    func earlierFind() throws {
+        let seen = 1_795_000_000_000.0
+        let find = try #require(Self.earlier(["name": .string("Saturn 4"), "host": .string("192.168.1.41"), "port": .number(3030),
+                                              "vendor": .string("Elegoo"), "serial": .string(""), "connection": .null,
+                                              "seenNow": .bool(false), "lastSeen": .number(seen), "previousHost": .string("192.168.1.40")]))
+        #expect(find.printer.name == "Saturn 4" && find.printer.host == "192.168.1.41" && find.printer.port == 3030)
+        #expect(find.printer.vendor == "Elegoo" && find.printer.serial == nil, "an empty string is not a serial")
+        #expect(find.printer.connection == nil, "a printer Khayt cannot talk to still says so")
+        #expect(find.lastSeen == Date(timeIntervalSince1970: seen / 1000) && find.previousHost == "192.168.1.40")
+        // This scan's own printers are not earlier finds; nor is a row with no address or no time.
+        #expect(Self.earlier(["name": .string("U1"), "host": .string("192.168.1.20"), "seenNow": .bool(true), "lastSeen": .number(seen)]) == nil)
+        #expect(Self.earlier(["name": .string("U1"), "seenNow": .bool(false), "lastSeen": .number(seen)]) == nil)
+        #expect(Self.earlier(["name": .string("U1"), "host": .string("192.168.1.20"), "seenNow": .bool(false)]) == nil)
+        #expect(EarlierFind(.string("junk")) == nil)
+        // No name: the address stands in. The same address before and now is not a move.
+        let bare = try #require(Self.earlier(["host": .string("192.168.1.9"), "seenNow": .bool(false), "lastSeen": .number(seen),
+                                              "previousHost": .string("192.168.1.9")]))
+        #expect(bare.printer.name == "192.168.1.9" && bare.previousHost == nil)
+    }
+
+    @Test("when it was seen is said in words, and a printer that moved says where it was")
+    func seenWords() async throws {
+        let shop = await OperatorLockTests.shop(on: false)
+        let now = Date(timeIntervalSince1970: 1_795_000_000)
+        let two = try #require(Self.earlier(["name": .string("A"), "host": .string("10.0.0.2"), "seenNow": .bool(false),
+                                             "lastSeen": .number((now.timeIntervalSince1970 - 2 * 3600) * 1000)]))
+        #expect(FindPrintersSheet.seen(two, now: now, words: shop.words) == "Seen 2 hours ago. It may be asleep or busy.")
+        let moved = try #require(Self.earlier(["name": .string("B"), "host": .string("10.0.0.3"), "seenNow": .bool(false),
+                                               "lastSeen": .number((now.timeIntervalSince1970 - 26 * 3600) * 1000),
+                                               "previousHost": .string("10.0.0.9")]))
+        #expect(FindPrintersSheet.seen(moved, now: now, words: shop.words) == "Seen yesterday, at another address before: 10.0.0.9")
+        // A sighting stamped after "now" (a clock that moved) is never in the future.
+        let ahead = try #require(Self.earlier(["name": .string("C"), "host": .string("10.0.0.4"), "seenNow": .bool(false),
+                                               "lastSeen": .number((now.timeIntervalSince1970 + 600) * 1000)]))
+        #expect(!FindPrintersSheet.seen(ahead, now: now, words: shop.words).contains("in "))
+    }
+
+    @Test("the sheet is today's with nothing earlier; the second list, its note and Forget come with earlier finds")
+    func sheetWiring() throws {
+        let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let sheet = try String(contentsOf: app.appending(path: "FindPrintersSheet.swift"), encoding: .utf8)
+        // The scan first (it remembers), then what it missed.
+        let scan = try #require(sheet.range(of: "found = await shop.findPrinters()"))
+        let missed = try #require(sheet.range(of: "earlier = await shop.earlierFinds(notIn: found)"))
+        #expect(scan.upperBound < missed.lowerBound)
+        // One list and no headings when nothing was seen earlier.
+        #expect(sheet.contains("if earlier.isEmpty {\n                        ForEach(found) { row($0, when: nil, primary: true) }"))
+        for word in ["mac.find_now", "mac.find_earlier", "mac.find_kept_here", "mac.find_forget", "common.done"] {
+            #expect(sheet.contains("callIt(\"\(word)\")"), Comment(rawValue: word))
+        }
+        // Forget asks nothing and empties the list on screen at once.
+        #expect(sheet.contains("shop.forgetFoundPrinters()\n                        earlier = []"))
+        // Adding an earlier find is adding a found printer: no second path.
+        #expect(sheet.components(separatedBy: "await shop.addFound(printer)").count == 3)
+        // The frame's words.
+        let words = try String(contentsOf: app.appending(path: "Words.swift"), encoding: .utf8)
+        #expect(words.contains(#""mac.find_earlier": ["en": "Seen earlier, not in this scan", "ar": "شوهدت سابقًا، وليست في هذا البحث"]"#))
+        #expect(words.contains(#""mac.find_forget": ["en": "Forget earlier finds", "ar": "نسيان ما وُجد سابقًا"]"#))
+        #expect(words.contains("Printers found in the last 3 days are kept on this computer only. They are not in your book and are never sent anywhere."))
+    }
+
     @Test("the sample book remembers nothing and writes no file")
     func sample() async throws {
         let shop = Shop()
@@ -146,6 +213,17 @@ extension LibraryEditPerfTests {
             let u1 = FoundPrintersTests.obj(try #require(after.first { FoundPrintersTests.obj($0)["serial"] == .string("SN1") }))
             #expect(u1["host"] == .string("192.168.1.77") && u1["previousHost"] == .string("192.168.1.20"))
             #expect(u1["vendor"] == .string("Snapmaker"), "a find that did not say the vendor blanked it")
+
+            // WHAT THE SHEET SHOWS UNDER "SEEN EARLIER": a scan that sees only the Mini is told about the U1.
+            let onlyMini = try JSONDecoder().decode([KhaytEngine.FoundPrinter].self,
+                                                    from: Data(#"[{"name":"Mini","host":"192.168.1.21","port":80}]"#.utf8))
+            let missed = await shop.earlierFinds(notIn: onlyMini, now: later.addingTimeInterval(180))
+            #expect(missed.map(\.printer.name).contains("U1") && !missed.map(\.printer.name).contains("Mini"))
+            let u1Row = try #require(missed.first { $0.printer.name == "U1" })
+            #expect(u1Row.printer.host == "192.168.1.77" && u1Row.previousHost == "192.168.1.20" && u1Row.printer.serial == "SN1")
+            // A scan that sees everything has nothing under it, and older than three days is gone.
+            #expect(await shop.earlierFinds(notIn: moved + onlyMini, now: later.addingTimeInterval(180)).allSatisfy { $0.printer.name == "Theirs" })
+            #expect(await shop.earlierFinds(notIn: [], now: later.addingTimeInterval(5 * 86400)).isEmpty)
 
             // Forget.
             shop.forgetFoundPrinters()
