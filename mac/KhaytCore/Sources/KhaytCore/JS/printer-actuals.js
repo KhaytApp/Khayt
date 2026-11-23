@@ -369,7 +369,11 @@ const leafOf = (name) => (String(name == null ? '' : name).trim().toLowerCase().
  * STRICTER THAN THE FINISH PHOTO'S RULE (lib/print-finish-photo.js jobFor),
  * on purpose. A photo on a likely job is harmless and can be removed; grams
  * are money, written once and never replaced. So only: a job on THIS machine,
- * still `printing`, with a part whose `fileRef` is the file that finished.
+ * still `printing`, that names the file that finished: a part whose `fileRef`
+ * is it, or a send to this machine that uploaded it under that name
+ * (`printRuns[].sentAs`; Khayt uploads as `khayt-<time>.gcode`, so for a print
+ * Khayt itself sent that is the ONLY name the printer says back, and without
+ * it no Khayt-sent print would ever get its figures).
  * Never "the only printing job" (a calibration print started at the printer's
  * own screen would land on it) and never a job already moved on. Two such
  * jobs is null, not a guess.
@@ -380,7 +384,9 @@ function actualsJob(printLog, machineId, filename) {
   if (!id || !key) return null;
   const hits = (Array.isArray(printLog) ? printLog : []).filter((j) => j && typeof j === 'object'
     && String(j.machineId || '') === id && j.status === 'printing'
-    && (Array.isArray(j.parts) ? j.parts : []).some((p) => p && leafOf(p.fileRef) === key));
+    && ((Array.isArray(j.parts) ? j.parts : []).some((p) => p && leafOf(p.fileRef) === key)
+      || (Array.isArray(j.printRuns) ? j.printRuns : []).some((r) => r && typeof r === 'object'
+        && String(r.machineId || '') === id && leafOf(r.sentAs) === key)));
   return hits.length === 1 && hits[0].id ? String(hits[0].id) : null;
 }
 
@@ -403,7 +409,8 @@ function historyRun(jobs, filename, endedAtS, opts = {}) {
   let bestGap = Infinity;
   for (const row of (Array.isArray(jobs) ? jobs : []).slice(0, 200)) {
     if (!row || typeof row !== 'object' || row.filename !== filename || row.status !== 'completed') continue;
-    const end = Number(row.end_time);
+    // A missing end time is not "1970": Number(null) and Number('') are 0.
+    const end = row.end_time === null || row.end_time === '' || typeof row.end_time === 'boolean' ? NaN : Number(row.end_time);
     if (!Number.isFinite(end)) continue;
     const id = row.job_id != null ? String(row.job_id).trim() : '';
     if (!RUN_ID.test(id) || taken.has(id)) continue;
@@ -468,7 +475,10 @@ function perHeadActuals(job, opts = {}) {
   return { jobId, status: typeof job.status === 'string' ? job.status : null, totalG: r1(totalG), heads, basis: 'proportional', weighed };
 }
 
-const HEX6 = /^#?([0-9a-f]{6})$/i;
+// Six digits, or eight (RRGGBBAA: the alpha is dropped), as lib/loaded-colours.js reads a colour.
+const HEX6 = /^#?([0-9a-f]{6})(?:[0-9a-f]{2})?$/i;
+/** At most 40 characters, counted as characters: a cut never splits one in two. */
+const short40 = (s) => Array.from(String(s == null ? '' : s).trim()).slice(0, 40).join('');
 const hex6 = (v) => { const m = typeof v === 'string' ? HEX6.exec(v.trim()) : null; return m ? '#' + m[1].toUpperCase() : null; };
 
 /**
@@ -476,9 +486,14 @@ const hex6 = (v) => { const m = typeof v === 'string' ? HEX6.exec(v.trim()) : nu
  *
  *   at.trays   lib/rfid-tray.js trays(filament_detect): per head, the spool's
  *              own tag or null. A tag that was READ wins: `colourFrom: 'rfid'`.
- *   at.loaded  the machine's `loaded` list ({ slot, hex, material }, slot is
- *              the head's index): what the shop or the printer's own report
- *              said was loaded. `colourFrom: 'loaded'`.
+ *   at.loaded  what is loaded, { slot, hex, material } with slot the head's
+ *              index: the printer's own report when it makes one (a U1's
+ *              print_task_config, which also covers spools with no tag),
+ *              else what the shop typed on the machine. `colourFrom: 'loaded'`.
+ *
+ * The host reads both shortly AFTER the print ends (the history row it needs
+ * is only written then), so a spool swapped in that first minute or two is
+ * what gets stamped. Said here so nobody reads the stamp as more than it is.
  *
  * Null when neither names a colour for this head: nothing is guessed, and an
  * empty head's white (the U1 reports #FFFFFF with no tag) is never a tag.
@@ -494,7 +509,7 @@ function headColour(head, at) {
     const hex = hex6(tray.colours[0]);
     if (hex) {
       const material = [tray.material, tray.sub].filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim()).join(' ');
-      return { hex, material: material.slice(0, 40), colourFrom: 'rfid' };
+      return { hex, material: short40(material), colourFrom: 'rfid' };
     }
   }
   const rows = Array.isArray(at.loaded) ? at.loaded.slice(0, 16) : [];
@@ -503,9 +518,11 @@ function headColour(head, at) {
     if (!row || typeof row !== 'object') continue;
     const slot = Number.isInteger(row.slot) ? row.slot : i;
     if (slot !== head) continue;
-    const hex = hex6(row.hex);
-    if (!hex) return null;
-    return { hex, material: (typeof row.material === 'string' ? row.material.trim() : '').slice(0, 40), colourFrom: 'loaded' };
+    // A row whose colour is not one is no row (normalizeLoaded drops it too);
+    // a later row for the same head may still say.
+    const hex = hex6(row.hex || row.color || row.colour);
+    if (!hex) continue;
+    return { hex, material: short40(typeof row.material === 'string' ? row.material : ''), colourFrom: 'loaded' };
   }
   return null;
 }

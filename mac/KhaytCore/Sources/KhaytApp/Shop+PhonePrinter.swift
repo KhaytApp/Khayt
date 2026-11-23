@@ -76,13 +76,18 @@ extension Shop {
             if let message { body["message"] = .string(message) }
             return (status, Self.json(body))
         }
+        // Still starting: the machines are not read yet, and "no such
+        // printer" would be untrue (a phone reads a 404 as final).
+        guard engine != nil else { return refuse(503, "busy") }
         guard let machine = machinesInUse.first(where: { $0.id == machineId }) else {
             return refuse(404, "not-found")
         }
         // The sample book has nowhere to write: said, not a 200 for nothing.
         guard source.build != nil else { return refuse(409, "read-only") }
         do {
-            let at = try await stampBedClear(machine.id, at: now)
+            // Nil: the book on disk no longer has this machine (another
+            // computer removed it since this Mac last read). Not a 200.
+            guard let at = try await stampBedClear(machine.id, at: now) else { return refuse(404, "not-found") }
             return (200, Self.json(["ok": .bool(true), "bedClearedAt": .string(at)]))
         } catch {
             return refuse(500, "not-saved", said(error))

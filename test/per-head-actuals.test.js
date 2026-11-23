@@ -14,6 +14,23 @@ for (const c of V.cases) test(c.why, () => assert.deepEqual(P.perHeadActuals(c.j
 const byId = (id) => P.perHeadActuals(V.cases.find((c) => c.job.job_id === id).job);
 for (const c of V.patch) test('patch: ' + c.why, () => assert.deepEqual(P.perHeadPatch(c.order, byId(c.split)), c.want));
 
+for (const c of V.colour) test('colour: ' + c.why, () => assert.deepEqual(P.headColour(c.head, c.at), c.want));
+test('patch: ' + V.patchWithColour.why, () => {
+  const c = V.patchWithColour;
+  assert.deepEqual(P.perHeadPatch(c.order, byId(c.split), c.at), c.want);
+  // Without what the printer held, the patch is what it always was: old callers and old jobs are unchanged.
+  assert.deepEqual(P.perHeadPatch(c.order, byId(c.split)), V.patch[0].want);
+});
+test('colour: the real U1 reading (two tagged heads, two empty) through rfid-tray', () => {
+  const U1 = require('./fixtures/u1-filament-detect.json');
+  const fd = (U1.result && U1.result.status && U1.result.status.filament_detect) || U1.filament_detect || (U1.status && U1.status.filament_detect);
+  const trays = require('../lib/rfid-tray.js').trays(fd);
+  assert.equal(trays.length, 4);
+  assert.equal(P.headColour(0, { trays }).colourFrom, 'rfid');
+  assert.match(P.headColour(0, { trays }).hex, /^#[0-9A-F]{6}$/);
+  assert.equal(P.headColour(2, { trays }), null, 'an empty head reports white and is not a colour');
+  assert.equal(P.headColour(3, { trays }), null);
+});
 for (const c of V.actualsJob) test('job: ' + c.why, () => assert.equal(P.actualsJob(c.printLog, c.machineId, c.filename), c.want));
 for (const c of V.historyRun) test('run: ' + c.why, () => {
   const got = P.historyRun(c.jobs, c.filename, c.endedAt, { taken: c.taken });
