@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 import Network
 
 /// The conversation with an RTSP camera: DESCRIBE, SETUP, PLAY, one keyframe,
@@ -107,6 +108,7 @@ actor RtspSession {
     }
 
     private func connect() async throws {
+        try OutboundGate.shared.require(.lan, host: "\(host)")
         let c = NWConnection(host: host, port: port, using: .tcp)
         connection = c
         try await withCheckedThrowingContinuation { (k: CheckedContinuation<Void, Error>) in

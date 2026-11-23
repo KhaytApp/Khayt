@@ -14,6 +14,28 @@ struct MoveBanners: View {
     let shop: Shop
 
     var body: some View {
+        // NO UPDATE CHECK FOR 30 DAYS under "make no internet calls" (page
+        // 27, frame C). Not closable: no security fix can reach this Mac, and
+        // it goes when updates are kept or the switch is turned off.
+        UpdatesBlockedBanner(shop: shop)
+        // SOMETHING A PERSON ASKED FOR WAS REFUSED by the switch (frame D):
+        // said here too, with the way to the setting.
+        if let notice = shop.outboundNotice {
+            Banner(text: notice, symbol: "wifi.slash", tint: Khayt.attention) {
+                HStack(spacing: 8) {
+                    OpenInternetUse(shop: shop)
+                    BannerClose(words: shop.words) { shop.outboundNotice = nil }
+                }
+            }
+        }
+        // THE SHOP'S SWITCH, FROM KHAYT CLOUD, WAITING FOR A PERSON
+        // (`Shop+NetworkSwitch`). Never applied on its own: an old "off" met
+        // by a new install, or a change made at another computer at the
+        // moment the switch was changed here.
+        // Drawn as page 27's frames G1 and G2, with the way to Internet use.
+        if let ask = shop.networkSwitchAsk {
+            NetworkSwitchQuestion(shop: shop, ask: ask)
+        }
         // ORDERS THIS APP DRAFTED BY ITSELF, because the shop asked it to.
         //
         // Drafts only, and the shop reviews them before any is sent — but the

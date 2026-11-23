@@ -387,7 +387,9 @@ extension Shop {
         var moved = root
         let move: MoveOutcome
         do {
-            move = try await applyMove(to: &moved, id: id, stage: stage, engine: engine, words: words)
+            move = try await applyMove(to: &moved, id: id, stage: stage, engine: engine, words: words,
+                                           // Over the LAN: nobody at this Mac did this.
+                                           actor: nil)
         } catch let refused as MoveRefused {
             let body: JSONValue = .object(["error": .string("Move refused"),
                                            "code": .string(refused.code ?? "refused"),

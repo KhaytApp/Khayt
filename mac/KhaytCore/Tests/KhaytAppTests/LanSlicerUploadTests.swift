@@ -238,6 +238,24 @@ struct LanSlicerUploadTests {
         #expect(Multipart.parts(Data("garbage".utf8), boundary: "x") == nil)
     }
 
+    @Test("padding after a delimiter is a few bytes: megabytes of spaces are refused, quickly, and copy nothing")
+    func paddingIsBounded() throws {
+        func body(pad: Int) -> Data {
+            var d = Data("--b".utf8)
+            d.append(Data(repeating: UInt8(ascii: " "), count: pad))
+            d.append(Data("\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.gcode\"\r\n\r\nG28\r\n--b--\r\n".utf8))
+            return d
+        }
+        #expect(Multipart.parts(body(pad: 0), boundary: "b")?.count == 1)
+        #expect(Multipart.parts(body(pad: Multipart.maxPadding), boundary: "b")?.count == 1, "real transport padding is still read")
+        #expect(Multipart.parts(body(pad: Multipart.maxPadding + 1), boundary: "b") == nil)
+        // Fifty megabytes of spaces: refused at the 65th, not walked to the end.
+        let huge = body(pad: 50 * 1024 * 1024)
+        let started = Date()
+        #expect(Multipart.parts(huge, boundary: "b") == nil)
+        #expect(Date().timeIntervalSince(started) < 2, "the padding was walked to its end")
+    }
+
     @Test("only sliced files are taken")
     func kinds() {
         #expect(LanServer.slicerFileTaken("a.gcode"))

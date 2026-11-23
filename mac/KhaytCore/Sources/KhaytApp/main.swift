@@ -25,6 +25,11 @@ Direction.settle()
 // rewritten, so the shop's own words for the stages have to be in hand BEFORE
 // AppKit starts. See `Words.warm`.
 Words.preload(Direction.shopLanguage())
+// BEFORE AppKit starts, and so before the menu bar builds the updater: until
+// the shop's book is read, nothing but the shop's own network is called
+// (`OutboundGate`). A shop that turned "make no internet calls" on must not
+// leak one call at each launch.
+Shop.outboundBegins()
 
 // `--import` runs WITHOUT the window, and returns before AppKit is started.
 //

@@ -341,6 +341,9 @@ struct CompanionBook {
     /// The few KB the notification extension reads instead of the book (job
     /// id → stage), rewritten whenever the book changes. See `AlertIndex`.
     func writeAlertIndex(_ store: [String: JSONValue]) {
+        // The shop's internet switch follows the book (P8): told here, where
+        // every change to the book already passes with the whole book in hand.
+        PhoneOutbound.changed(store)
         var rows: [[String: Any]] = []
         if case .array(let log)? = store["printLog"] {
             for case .object(let o) in log {
@@ -579,6 +582,7 @@ struct CompanionBook {
 
     /// Forget the shop entirely. Unpairing must not leave a client list behind.
     func forget() {
+        PhoneOutbound.forgotten()
         // The baseline is a second full copy of the shop's records — same client
         // list, same prices. It goes with everything else.
         try? FileManager.default.removeItem(at: baselineURL)

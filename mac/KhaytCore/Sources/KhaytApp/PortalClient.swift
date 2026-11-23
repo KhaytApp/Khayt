@@ -131,6 +131,7 @@ enum PortalClient {
         guard !path.isEmpty, let url = URL(string: base + path) else {
             throw Failure.badAddress("That address cannot be read")
         }
+        try OutboundGate.shared.require(.cloud)
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = timeout
@@ -182,6 +183,7 @@ enum PortalClient {
             throw Failure.badAddress("That address cannot be read")
         }
 
+        try OutboundGate.shared.require(.cloud)
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.timeoutInterval = timeout

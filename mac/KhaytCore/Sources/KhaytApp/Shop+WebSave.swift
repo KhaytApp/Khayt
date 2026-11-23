@@ -303,6 +303,8 @@ extension Shop {
     /// a library photo is. Nil for anything else.
     nonisolated static func fetchWebCover(_ address: String,
                                           session: URLSession = WebCoverFetch.session) async -> String? {
+        // Asked before the host is looked up: a refused call makes no DNS query.
+        guard OutboundGate.shared.allows(.lookups) else { return nil }
         guard let checked = WebSave.https(address), let url = URL(string: checked), let host = url.host else { return nil }
         // Never a machine on the shop's own network: the browser keeps a page
         // from reaching those, and this fetch is the page's choice of address.

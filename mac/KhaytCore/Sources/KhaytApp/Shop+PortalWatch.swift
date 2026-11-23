@@ -111,7 +111,8 @@ extension Shop {
             if said.paid { await recordPortalDeposit(job.id, items: items, token: job.token, quiet: true) }
             if said.advance, cloudRoleCanWrite, lockAllows("orders", "edit") {
                 let kept = moveNotices
-                await moveJob(job.id, to: .pending)
+                // The customer's answer moved it, not whoever is at this Mac.
+                await moveJob(job.id, to: .pending, byPersonHere: false)
                 if orders.first(where: { $0.id == job.id })?.status == "pending" {
                     moveNotices = kept + [words.callIt("cloud.portal_approved_advanced")]
                 }

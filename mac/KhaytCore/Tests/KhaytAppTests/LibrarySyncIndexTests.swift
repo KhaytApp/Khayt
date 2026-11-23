@@ -372,7 +372,7 @@ struct LibrarySyncIndexTests {
         #expect(delete.contains("syncIndex?.setKeep(Set(keptAmong(plan.keptOnline)), false)"))
         #expect(try src("ShopWindow.swift").contains("shop.keptModelsNotice(plan)"))
         let shop = try src("Shop.swift")
-        #expect(shop.contains("didSet { refreshLibraryRemote() }"))
+        #expect(shop.contains("didSet { refreshLibraryRemote(); tellOutboundGate() }"))
         let settingsAt = try #require(shop.range(of: "settingsValue = root[\"settings\"] ?? .object([:]) }"))
         let openAt = try #require(shop.range(of: "openSyncIndex()"))
         #expect(settingsAt.lowerBound < openAt.lowerBound, "the index is opened before the settings are read")

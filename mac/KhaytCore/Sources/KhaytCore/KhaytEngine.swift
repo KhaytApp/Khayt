@@ -1029,6 +1029,12 @@ public actor KhaytEngine {
         "moonraker-problems",
         "printer-problems",
         "waiting-at-machine",
+        // What each printer needs, as one call (the desktop's live rows are
+        // built with it), and the live snapshot's rules: what is published to
+        // Khayt Cloud, when, and WHETHER this computer may speak for the shop
+        // at all (`hasFreshPoll`). live-snapshot reads printer-needs at load.
+        "printer-needs",
+        "live-snapshot",
         // A U1's RFID spool tags (U1 idea 2) and a time-lapse kept as the
         // customer's proof (U1 idea 3): bundled for the phone and for the
         // screens that follow their frames. Nothing on the Mac calls them yet.
@@ -1083,6 +1089,14 @@ public actor KhaytEngine {
         // one can still resolve to an internal address, so the caller must also
         // resolve and check every answer. `WebhookClient` does.
         "host-ranges",
+        // May Khayt make this internet call? The "make no internet calls"
+        // switch (P8, `lib/outbound.js`). Self-contained; `OutboundGate` also
+        // loads it alone, to answer a call site without waiting on the engine.
+        "outbound",
+        // The switch through Khayt Cloud, as the desktop keeps it. The Mac
+        // asks it for a change's stamp (`stampAfter`), so both apps stamp
+        // the same way. After `outbound`, which it reads at call time.
+        "network-switch",
         // Who the shop's best customers are and what it is asked for most.
         // ORDER-MONEY, CONTENT-LANGUAGES, BUSINESS-SCOPE AND DATE-RANGE ARE ALL
         // ALREADY ABOVE and must be: it reaches every one of them through a
@@ -8862,6 +8876,46 @@ public actor KhaytEngine {
     /// platform, appVersion, schema }`.
     public func pluginUpdateFetches(settings: JSONValue, index: JSONValue, ctx: JSONValue) throws -> JSONValue {
         try runtime.call2("globalThis.KhaytPluginUpdate.fetchesFor(ARG0, ARG1, ARG2)", [settings, index, ctx], as: JSONValue.self)
+    }
+
+    /// One connector's row in the index, for an install the shop asked for by
+    /// link: whether the index may be acted on (`checkIndex`: signed, current,
+    /// well formed), the row for `id` if it lists one, and the versions of it
+    /// Khayt has withdrawn.
+    public struct PluginIndexListing: Decodable, Sendable, Equatable {
+        public struct Row: Decodable, Sendable, Equatable {
+            public let version: String
+            public let url: String
+            public let sha256: String
+        }
+        public let ok: Bool
+        public let reason: String?
+        public let row: Row?
+        public let revoked: [String]
+        /// The listed version needs a newer Khayt than this one (the row's
+        /// `requires`: a schema, or a minimum app version for this platform),
+        /// by the same rule an update is held to (`planUpdate`: `blocked`).
+        public let needsNewer: Bool
+    }
+
+    public func pluginIndexListing(index: JSONValue, ctx: JSONValue, id: String) throws -> PluginIndexListing {
+        try runtime.call2("""
+            (function (index, ctx, id) {
+              var U = globalThis.KhaytPluginUpdate;
+              var check = U.checkIndex(index, ctx);
+              if (!check.ok) return { ok: false, reason: check.reason, row: null, revoked: [], needsNewer: false };
+              var row = U.rowFor(index, id, 'connector');
+              if (!row) return { ok: true, reason: null, row: null, revoked: [], needsNewer: false };
+              // Asked as an update from nothing: `blocked` is the rule's word for "needs a newer app or schema".
+              // Asked with plain numbers, 0 installed and 1 offered, so the rule reaches its `requires`
+              // check whatever the row's own version is (0.0.0 included) and whatever the Mac's language:
+              // a made-up version that is not a number is compared as text, by the user's locale.
+              var plan = U.planUpdate({ version: '0' }, {}, Object.assign({}, row, { version: '1', revoked: [] }), ctx);
+              var needsNewer = !!plan && plan.plan === 'blocked';
+              var revoked = (Array.isArray(row.revoked) ? row.revoked : []).map(function (x) { return String(x.version); });
+              return { ok: true, reason: null, row: { version: String(row.version), url: String(row.url), sha256: String(row.sha256) }, revoked: revoked, needsNewer: needsNewer };
+            })(ARG0, ARG1, ARG2)
+            """, [index, ctx, .string(id)], as: PluginIndexListing.self)
     }
 
     /// Step 2: `{ ok, reason, settings, changed, notes }`. `fetched` maps id →

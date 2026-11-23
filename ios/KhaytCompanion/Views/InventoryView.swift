@@ -9,6 +9,7 @@ import SwiftUI
 struct InventoryView: View {
     @EnvironmentObject private var api: KhaytAPIClient
     @EnvironmentObject private var ordersNav: OrdersNavigationState
+    @EnvironmentObject private var settings: ConnectionSettings
 
     @State private var spools: [InventorySpool] = []
     @State private var loaded = false
@@ -98,9 +99,12 @@ struct InventoryView: View {
                         .accessibilityLabel(L10n.tr("shop.title"))
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showAddSpool = true } label: { Image(systemName: "plus") }
-                    .accessibilityLabel(L10n.tr("spool.add.title"))
+            // A new spool asks what it cost: not a floor phone's (D-P6 a).
+            if !settings.isFloorPhone {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showAddSpool = true } label: { Image(systemName: "plus") }
+                        .accessibilityLabel(L10n.tr("spool.add.title"))
+                }
             }
         }
         .navigationDestination(isPresented: $showShopping) { ShoppingListPage() }

@@ -81,7 +81,7 @@ extension Shop {
         // Off the main thread, on the write chain: a whole-book write.
         try? await StoreWriter.updateOffMain(build) { root in
             let snapshot = root
-            Self.appendActivity(&root, text: text, ref: ref, settings: Self.settings(root), root: snapshot,
+            Self.appendActivity(&root, text: text, ref: ref, root: snapshot,
                                 action: "slicer_inbox", actor: actor)
         }
     }

@@ -134,6 +134,7 @@ enum CloudLibrary {
     /// never the URL, where proxies and logs keep it. Five seconds: a
     /// disconnect should not wait on an unreachable Google. True on a 2xx.
     static func revokeAtGoogle(_ refreshToken: String, fetch: S3.Fetch) async -> Bool {
+        guard OutboundGate.shared.allows(.storage) else { return false }
         var request = URLRequest(url: googleRevokeURL, timeoutInterval: 5)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")

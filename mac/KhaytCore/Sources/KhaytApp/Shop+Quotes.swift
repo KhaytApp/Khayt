@@ -123,6 +123,8 @@ extension Shop {
         let wanted = Set(ids)
         let label = words.callIt("quote.followup_btn")
         var stamped: [Order.ID] = []
+        // Pressed by somebody here, or the launch sweep (`onlyIfDue`), which is nobody's.
+        let actor = onlyIfDue ? nil : actorHere
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
@@ -148,7 +150,7 @@ extension Shop {
                 let snapshot = root
                 for id in stamped {
                     Self.appendActivity(&root, text: "\(id) → " + label,
-                                        ref: id, settings: settings, root: snapshot, action: "quote_followup")
+                                        ref: id, root: snapshot, action: "quote_followup", actor: actor)
                 }
             }
         } catch {

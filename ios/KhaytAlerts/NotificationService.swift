@@ -105,6 +105,10 @@ final class NotificationService: UNNotificationServiceExtension {
         components?.path = "/v1/shops/" + (shared.shopId.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "_-"))) ?? shared.shopId) + "/events"
         components?.queryItems = [URLQueryItem(name: "since", value: since)]
         guard let url = components?.url else { return nil }
+        // The shop's "Make no internet calls" switch, as the app last saw it
+        // (OutboundMirror): a refused fetch keeps Apple's generic alert.
+        guard (try? OutboundMirror.gate(from: UserDefaults(suiteName: SharedCloud.group)).require(.cloud, url: url)) != nil
+        else { return nil }
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.setValue("Bearer " + shared.token, forHTTPHeaderField: "Authorization")

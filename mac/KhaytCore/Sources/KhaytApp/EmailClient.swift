@@ -160,6 +160,7 @@ enum EmailClient {
 
     private static func post(url: URL, headers: [String: String], body: Data,
                              session: URLSession) async throws {
+        try OutboundGate.shared.require(.messaging)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = timeout

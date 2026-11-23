@@ -80,10 +80,30 @@ final class LiveChannel: ObservableObject {
     init(api: KhaytAPIClient, printers: LivePrinters) {
         self.api = api
         self.printers = printers
+        // The shop's internet switch (P8): an open stream is closed when the
+        // book turns Khayt Cloud off, and opened again when it turns it back on.
+        bookWatch = NotificationCenter.default.addObserver(forName: .khaytBookChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.followTheSwitch() }
+        }
+    }
+
+    private var bookWatch: NSObjectProtocol?
+    /// Whether the app wants the stream (the last setActive).
+    private var wanted = false
+
+    private func followTheSwitch() {
+        guard wanted else { return }
+        let allowed = OutboundGate.shared.verdict(.cloud).allowed
+        if !allowed, task != nil {
+            task?.cancel(); task = nil; opened(false)
+        } else if allowed, task == nil {
+            setActive(true)
+        }
     }
 
     /// Open it if there is a cloud to open it to; close it otherwise.
     func setActive(_ active: Bool) {
+        wanted = active
         if active, api.cloud != nil, !api.cloudNeedsSignIn {
             guard task == nil else { return }
             task = Task { [weak self] in await self?.run() }
@@ -101,6 +121,7 @@ final class LiveChannel: ObservableObject {
 
     private func run() async {
         var delay: Double = 5
+        var refused = false
         while !Task.isCancelled {
             guard let session = api.cloud else { break }
             var retryAfter: Double?
@@ -139,11 +160,16 @@ final class LiveChannel: ObservableObject {
                     }
                 }
                 if let ms = parser.retryMs { delay = max(1, Double(ms) / 1000) }
+            } catch is OutboundBlocked {
+                // The shop's internet switch (P8): not a network failure, so
+                // the delay does not grow. The book changing reopens it.
+                refused = true
             } catch {
                 // Dropped, refused or unreachable: try again later.
             }
             opened(false)
             if Task.isCancelled { break }
+            if refused { refused = false; try? await Task.sleep(for: .seconds(60)); continue }
             let wait = retryAfter ?? delay
             try? await Task.sleep(for: .seconds(wait))
             delay = min(delay * 2, 60)

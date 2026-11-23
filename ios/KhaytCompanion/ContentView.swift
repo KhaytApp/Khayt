@@ -84,6 +84,7 @@ struct MainTabView: View {
     @EnvironmentObject private var health: ConnectionHealth
     @EnvironmentObject private var ordersNav: OrdersNavigationState
     @EnvironmentObject private var api: KhaytAPIClient
+    @EnvironmentObject private var settings: ConnectionSettings
     /// A job a tapped alert asked for, shown over whichever tab is open.
     @State private var alertOrder: QueueOrder?
     @State private var alertIntake = false
@@ -143,15 +144,21 @@ struct MainTabView: View {
             }
         }
         .sheet(isPresented: $alertIntake) { IntakeView() }
+        // After every sheet, so a job opened from an alert or a link hides the
+        // customer too (a modifier reaches only what is inside it).
+        .environment(\.hidesClients, settings.isFloorPhone)
         // Folding iPhone Duo with Settings open takes that tab away, and so
         // does asking for it in compact width: Home, rather than a blank page.
         .onChange(of: widthClass) { _, _ in keepSelectionShown() }
         .onChange(of: selectedTab) { _, _ in keepSelectionShown() }
+        .onChange(of: settings.effectiveRole) { _, _ in keepSelectionShown() }
     }
 
     private func openAskedIntake() {
         guard ordersNav.intakeAsked else { return }
         ordersNav.intakeAsked = false
+        // Customer requests are clients: not a floor phone's.
+        guard !settings.isFloorPhone else { return }
         alertIntake = true
     }
 
@@ -167,7 +174,13 @@ struct MainTabView: View {
 
     @Environment(\.horizontalSizeClass) private var widthClass
 
-    private var shownTabs: [KhaytTabItem] { Self.shown(tabs, regularWidth: widthClass == .regular) }
+    /// A floor phone (operator or viewer, D-P6 a) has Today, Jobs, Printers
+    /// and Stock (frames 255:2–255:55): no Clients and no Calculator, which
+    /// are prices and customers. Settings stays, to unpair.
+    private var shownTabs: [KhaytTabItem] {
+        let all = Self.shown(tabs, regularWidth: widthClass == .regular)
+        return settings.isFloorPhone ? all.filter { $0.id != 4 && $0.id != Self.calculatorTab } : all
+    }
 
     static func shown(_ tabs: [KhaytTabItem], regularWidth: Bool) -> [KhaytTabItem] {
         regularWidth ? tabs : tabs.filter { $0.id != settingsTab && $0.id != calculatorTab }
@@ -193,7 +206,7 @@ struct MainTabView: View {
     @ViewBuilder
     private func tabContent(_ id: Int) -> some View {
         switch id {
-        case 0: DashboardView()
+        case 0: if settings.isFloorPhone { FloorTodayView() } else { DashboardView() }
         case 1: OrdersView()
         case 2: InventoryView()
         case 3: MachinesView()
