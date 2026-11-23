@@ -6200,8 +6200,13 @@ const timelapseKeep = require('./lib/main/timelapse-keep.js').createTimelapseKee
   progress: (id, got, total) => BrowserWindow.getAllWindows().forEach((w) => { if (!w.isDestroyed()) w.webContents.send('timelapse-progress', { id, got, total }); }),
 });
 ipcMain.handle('hub:timelapse-keep', async (_e, { jobId } = {}) => {
-  const gate = printerGate('control');
-  if (!gate.ok) return gate;
+  // A job's file, not a printer control (Dev Hub, Nov 23): whoever may edit
+  // jobs (orders/edit) under the lock, decided from main's own book.
+  if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+  const { lock, role } = PrinterPermission.activeRole(lanServerStore);
+  if (lock && !(role && require('./lib/rbac.js').can(role, 'orders', 'edit', { lockEnabled: true, limits: lanServerStore.settings && lanServerStore.settings.roleLimits }))) {
+    return { ok: false, error: 'not_permitted' };
+  }
   try { return await timelapseKeep.keep(jobId); } catch (e) { return { ok: false, reason: 'unreachable' }; }
 });
 ipcMain.handle('hub:timelapse-cancel', (_e, { jobId } = {}) => ({ ok: timelapseKeep.cancel(jobId) }));

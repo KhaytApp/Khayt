@@ -134,7 +134,10 @@ test('a job with no time-lapse, or one already kept, copies nothing', async () =
 test('wired: the poll notes the edge, the copy is gated and streamed through the pinned printer address', () => {
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
   assert.match(main, /const q = timelapseKeep\.noteEdge\(machine, before, after\);/);
-  assert.match(main, /ipcMain\.handle\('hub:timelapse-keep', async \(_e, \{ jobId \} = \{\}\) => \{\s*const gate = printerGate\('control'\);/);
+  // A job's file: orders/edit under the lock, not printer control (Dev Hub, Nov 23).
+  const keepH = main.slice(main.indexOf("ipcMain.handle('hub:timelapse-keep'"), main.indexOf("ipcMain.handle('hub:timelapse-cancel'"));
+  assert.match(keepH, /rbac\.js'\)\.can\(role, 'orders', 'edit'/);
+  assert.doesNotMatch(keepH, /printerGate\(/);
   const stream = main.slice(main.indexOf('async function moonrakerStream('), main.indexOf('const timelapseKeep ='));
   assert.match(stream, /resolvePrinterTarget\(host\)/);
   assert.match(stream, /machineSecrets\.unsaved\(machine\)/);
