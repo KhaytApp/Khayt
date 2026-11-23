@@ -335,7 +335,7 @@ extension Shop {
         let base = networkSwitchFetcher
         let fetch: NetworkSwitchFetch = { request in
             let answer = try await base(request)
-            if let http = answer.1 as? HTTPURLResponse { said.note(http.statusCode) }
+            if let http = answer.1 as? HTTPURLResponse { said.note(http.statusCode, body: answer.0) }
             return answer
         }
         let (heard, published) = await Self.networkSwitchGet(connection, token: token, fetch: fetch)
@@ -455,7 +455,11 @@ extension Shop {
     /// "off" is sent, the shop stops sharing, or a newer setting replaces it:
     /// each of those forgets the unsent "off", and this with it.
     var networkSwitchSignInEnded: Bool {
-        networkSwitchUnsentOff != nil && outboundDefaults.bool(forKey: Self.unsentOffSignInKey(networkSwitchShopId))
+        // Only while that "off" is still the shop's word here: a switch
+        // turned on again by a sync leaves the slot until the next check
+        // drops it, and the banner must not say "turned back on" meanwhile.
+        guard let stamp = networkSwitchUnsentOff, unsentOffStillStands(stamp) else { return false }
+        return outboundDefaults.bool(forKey: Self.unsentOffSignInKey(networkSwitchShopId))
     }
 
     /// Remember an "off" to send again. Only while it is still the shop's
@@ -468,8 +472,13 @@ extension Shop {
     /// was heard either way (no network), and what was known before stands.
     private func rememberUnsentOff(_ stamp: String, seenBefore: String?, signIn: Bool? = nil) {
         guard unsentOffStillStands(stamp) else { return }
-        if let signIn { outboundDefaults.set(signIn, forKey: Self.unsentOffSignInKey(networkSwitchShopId)) }
+        // A DIFFERENT "off" from the one in the slot starts from "not known
+        // to be a sign-in": what an older change learned is not this one's.
+        let known: Bool? = networkSwitchUnsentOff == stamp ? signIn : (signIn ?? false)
+        if let known { outboundDefaults.set(known, forKey: Self.unsentOffSignInKey(networkSwitchShopId)) }
         outboundDefaults.set(stamp, forKey: Self.unsentOffKey(networkSwitchShopId))
+        // The page that shows this reads defaults, which nothing observes.
+        outboundRevision &+= 1
         let key = Self.unsentOffSeenBeforeKey(networkSwitchShopId)
         if let seenBefore { outboundDefaults.set(seenBefore, forKey: key) } else { outboundDefaults.removeObject(forKey: key) }
     }
@@ -492,6 +501,7 @@ extension Shop {
         outboundDefaults.removeObject(forKey: Self.unsentOffKey(networkSwitchShopId))
         outboundDefaults.removeObject(forKey: Self.unsentOffSeenBeforeKey(networkSwitchShopId))
         outboundDefaults.removeObject(forKey: Self.unsentOffSignInKey(networkSwitchShopId))
+        outboundRevision &+= 1
     }
 
     /// Whether the unsent "off" is still this shop's current word: the book
@@ -947,11 +957,18 @@ extension NetworkSwitchAsk {
 final class SignInHeard: @unchecked Sendable {
     private let lock = NSLock()
     private var ended = false, answered = false
-    func note(_ status: Int) {
+    /// `body`: the answer's bytes. "Signed in" is only believed from an
+    /// answer that is Khayt Cloud's own JSON: a captive portal says 200 with
+    /// a web page, and a proxy says 404 with its own, and neither knows
+    /// whether this Mac is signed in.
+    func note(_ status: Int, body: Data = Data("{}".utf8)) {
         lock.lock(); defer { lock.unlock() }
-        if status == 401 { ended = true }
-        // Any answer Khayt Cloud gives only to somebody signed in.
-        else if (200..<300).contains(status) || status == 404 || status == 409 { answered = true }
+        if status == 401 { ended = true; return }
+        guard (200..<300).contains(status) || status == 404 || status == 409 else { return }
+        guard body.count <= 65_536, case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body) else { return }
+        // A 404 here is the route's own "nothing published", never any 404.
+        if status == 404, o["reason"] != .string("none") { return }
+        answered = true
     }
     /// `true` ended, `false` signed in, nil nothing heard either way.
     var verdict: Bool? {

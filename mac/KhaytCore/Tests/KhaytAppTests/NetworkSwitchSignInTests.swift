@@ -80,8 +80,46 @@ struct NetworkSwitchSignInTests {
         let heard = SignInHeard()
         #expect(heard.verdict == nil)
         heard.note(503); #expect(heard.verdict == nil)
-        heard.note(404); #expect(heard.verdict == false)
+        // Not Khayt Cloud's own answer: a captive portal's page, a proxy's 404. Nothing is learned.
+        heard.note(200, body: Data("<html>Sign in to the hotel Wi-Fi</html>".utf8)); #expect(heard.verdict == nil)
+        heard.note(404, body: Data(#"{"error":"not found"}"#.utf8)); #expect(heard.verdict == nil)
+        heard.note(404, body: Data(#"{"reason":"none"}"#.utf8)); #expect(heard.verdict == false)
         heard.note(401); #expect(heard.verdict == true, "a 401 on any call of the attempt wins")
+    }
+
+    @Test("a newer “off” does not inherit an older one's sign-in; and it is not said while the switch is on")
+    func notInherited() async throws {
+        let (shop, server, book) = await W.shop(option: true, network: Self.on)
+        await server.answerGet(401, Data())
+        #expect(await W.gated(shop) { await shop.setOutboundOffline(false) })
+        #expect(shop.networkSwitchSignInEnded)
+        let revision = shop.outboundRevision
+        // The switch comes back ON by a sync (another computer's change), not by the owner here:
+        // the slot is still there until the next check, but the banner must not show.
+        var n = W.obj(book.network)
+        n["offline"] = .bool(true)
+        book.network = .object(n)
+        var settings = shop.settingsDict
+        settings["network"] = .object(n)
+        shop.settingsValue = .object(settings)
+        #expect(shop.networkSwitchUnsentOff != nil && !shop.networkSwitchSignInEnded, "“turned back on” said while the switch is on")
+        // The owner turns it OFF again with no network at all: a NEW change, about which nothing is known.
+        shop.networkSwitchFetch = { _ in throw URLError(.notConnectedToInternet) }
+        #expect(await W.gated(shop) { await shop.setOutboundOffline(false) })
+        #expect(shop.networkSwitchUnsentOff != nil)
+        #expect(!shop.networkSwitchSignInEnded, "an older change's 401 was carried over to this one")
+        #expect(shop.outboundRevision != revision, "the page was never told to redraw")
+    }
+
+    @Test("signing in to Khayt Cloud sends a waiting “off” at once, not at the next quarter-hour check")
+    func signingInSendsIt() throws {
+        let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let cloud = try String(contentsOf: app.appending(path: "Shop+Cloud.swift"), encoding: .utf8)
+        let signedIn = try #require(cloud.range(of: #"? [words.callIt("mac.cloud_signed_in")]"#))
+        let retry = try #require(cloud.range(of: "if networkSwitchUnsentOff != nil { Task { await self.checkNetworkSwitch() } }"))
+        #expect(retry.upperBound < signedIn.lowerBound && cloud.distance(from: retry.upperBound, to: signedIn.lowerBound) < 200,
+                "the retry is not on the successful sign-in's path")
     }
 
     @Test("the words are frame H's, with the name and the time when the book has them")
