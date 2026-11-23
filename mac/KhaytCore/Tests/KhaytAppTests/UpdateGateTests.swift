@@ -134,7 +134,7 @@ struct UpdateGateTests {
         #expect(shop.launchGatePending.first?.items == ["الأسعار تشمل الآن ضريبة القيمة المضافة."])
     }
 
-    @Test("read in Arabic is read: the record is the English text, whatever language it was shown in")
+    @Test("read in Arabic is read in Arabic; in another language the same items are shown again, never hidden")
     func arabic() async throws {
         let shop = await Self.shop()
         await shop.words.load("ar", engine: Self.engine)
@@ -144,8 +144,12 @@ struct UpdateGateTests {
         #expect(unread[1].items == ["Check Settings › Phones."], "no Arabic for beta.42 in the file: English, not nothing")
         shop.holdUpdate("4.0.0-beta.43", unread)
         shop.continueToUpdate()
+        #expect(await shop.updateGateItems(for: "4.0.0-beta.43", running: "4.0.0-beta.41").isEmpty, "asked twice")
+        // The record is the words that were shown. The Mac's language changed: the two items read in
+        // Arabic are shown in English (the safe way to be wrong); the one read in English is not.
         await shop.words.load("en", engine: Self.engine)
-        #expect(await shop.updateGateItems(for: "4.0.0-beta.43", running: "4.0.0-beta.41").isEmpty)
+        let again = await shop.updateGateItems(for: "4.0.0-beta.43", running: "4.0.0-beta.41")
+        #expect(again.map(\.version) == ["4.0.0-beta.43"] && again.first?.items == ["Prices now include VAT.", "Update every computer first."])
     }
 
     @Test("the first start after it: what was read before the download is not asked again, and anything else still is")
@@ -195,7 +199,8 @@ struct UpdateGateTests {
             let l = Words(); await l.load(lang, engine: Self.engine)
             for n in [1, 2, 3, 7, 11, 25] {
                 let said = UpdateGate.changes(n, words: l)
-                #expect(!said.isEmpty && !said.contains("{") && !said.contains(where: \.isNumber), Comment(rawValue: "\(lang) \(n): \(said)"))
+                // A figure, in any script's digits. Not `isNumber`: 二 and 七 are number WORDS and count as numbers there.
+                #expect(!said.isEmpty && !said.contains("{") && !said.unicodeScalars.contains(where: CharacterSet.decimalDigits.contains), Comment(rawValue: "\(lang) \(n): \(said)"))
             }
             for key in ["mac.upgate_title", "mac.upgate_head", "mac.upgate_later", "mac.upgate_continue", "mac.upgate_hold"] {
                 #expect(l.callIt(key) != key && (lang == "en" || l.callIt(key) != en.callIt(key)), Comment(rawValue: "\(lang) \(key)"))
