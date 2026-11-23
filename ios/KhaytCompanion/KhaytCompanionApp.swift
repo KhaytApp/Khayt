@@ -119,6 +119,12 @@ struct KhaytCompanionApp: App {
             settings.host = "192.168.1.42"
             settings.needsPairAgain = true
         }
+        // `-KhaytRole operator|viewer` (with the sample shop): the floor
+        // screens of a phone paired by number with that role (frames 255:*).
+        if let role = defaults.string(forKey: "KhaytRole"), DeviceRole.ladder.contains(role) {
+            settings.pairedByCode = true
+            settings.deviceRole = role
+        }
         if let tab = defaults.string(forKey: "KhaytTab") {
             defaults.set(tab, forKey: "khayt.pending.tab")
         }

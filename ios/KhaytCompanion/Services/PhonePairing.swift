@@ -191,6 +191,27 @@ enum DeviceRole {
     /// phone keeps NO book and runs on the question routes (D-P6 a, floor mode).
     static func mayHoldBook(_ effective: String) -> Bool { effective == "owner" || effective == "manager" }
 
+    /// `scopesFor` (lib/device-roles.js): what each role may do. The owner
+    /// holds every scope. Tested against `device-roles-vectors.json` so the
+    /// phone never offers a button the Mac would refuse, nor hides one it allows.
+    static let viewerScopes: Set<String> = ["queue:read", "machines:read", "orders:read", "inventory:read"]
+    static let operatorScopes = viewerScopes.union(["orders:write", "inventory:write", "waste:write", "machines:control"])
+    static let managerScopes = operatorScopes.union(["clients:read", "clients:write", "expense:write", "quote:write", "book:read"])
+
+    /// Whether `effective` holds `scope`. Only the owner holds a scope this
+    /// table does not name, as the shared rule fails closed.
+    static func allows(_ effective: String, _ scope: String) -> Bool {
+        switch effective {
+        case "owner": return true
+        case "manager": return managerScopes.contains(scope)
+        case "operator": return operatorScopes.contains(scope)
+        default: return viewerScopes.contains(scope)
+        }
+    }
+
+    /// A floor phone (D-P6 a): below manager. No book, no money, no clients.
+    static func isFloor(_ effective: String) -> Bool { !mayHoldBook(effective) }
+
     /// A 403 that says the role does not reach the route:
     /// `{"reason":"role-scope","required":"book:read"}`. The required scope, or nil.
     static func refusedScope(status: Int, body: Data) -> String? {

@@ -24,6 +24,9 @@ struct MachinesView: View {
     /// Why nothing is moving. A relayed snapshot that has gone quiet says how
     /// long ago the Mac last spoke — "asleep for an hour" and "just dropped
     /// off" are different things to a shop deciding whether to drive in.
+    /// Paired by number as a viewer: no `machines:control`.
+    private var viewerPhone: Bool { settings.isFloorPhone && !settings.can("machines:control") }
+
     private var staleNote: String {
         if let reported = printers.reportedAt {
             return L10n.format("machines.reported", reported.formatted(.relative(presentation: .named).locale(L10n.locale)))
@@ -127,6 +130,11 @@ struct MachinesView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 44)
                     } else {
+                        // A viewer phone sees the floor and changes nothing
+                        // (frame 255:55): no pause, stop or camera.
+                        if viewerPhone {
+                            FloorBanner(text: L10n.tr("floor.printers.banner.viewer"))
+                        }
                         LiveStamp()
                         LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
                             ForEach(rows) { m in
@@ -140,15 +148,20 @@ struct MachinesView: View {
                                         MachineCareLink(name: m.displayName, machineId: m.id, care: care) { await load() }
                                     }
                                     // A print on the bed, on a printer the Mac drives.
-                                    if m.hasPrinterApi, m.isPrinting || m.isPaused, !settings.isSampleShop {
+                                    if m.hasPrinterApi, m.isPrinting || m.isPaused, !settings.isSampleShop,
+                                       settings.can("machines:control") {
                                         PrinterControls(machine: m)
                                     }
-                                    cameraLink(m)
+                                    if settings.can("machines:control") { cameraLink(m) }
                                 }
                                 .frame(maxHeight: .infinity, alignment: .top)
                             }
                         }
                         .readsFold($fold)
+                        if viewerPhone {
+                            V2Note(text: L10n.tr("floor.printers.no_controls"))
+                                .padding(.top, 6)
+                        }
                         if !printers.isLive {
                             Text(staleNote)
                                 .font(.khayt(12, relativeTo: .caption))

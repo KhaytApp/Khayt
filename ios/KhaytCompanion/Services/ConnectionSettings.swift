@@ -187,6 +187,10 @@ final class ConnectionSettings: ObservableObject {
     /// Whether this phone may keep the shop's book (`book:read`): manager and
     /// owner. Below that it is a floor phone with no local book (D-P6 a).
     var mayHoldBook: Bool { DeviceRole.mayHoldBook(effectiveRole) }
+    /// Whether this phone's role holds `scope` (what to show; the Mac checks).
+    func can(_ scope: String) -> Bool { DeviceRole.allows(effectiveRole, scope) }
+    /// Operator or viewer: the floor screens (no book, prices or clients).
+    var isFloorPhone: Bool { DeviceRole.isFloor(effectiveRole) }
     /// The Mac signed this phone out (`device-revoked`). The pairing screen
     /// says so, until a PIN is typed again.
     @Published var signedOutByMac: Bool {

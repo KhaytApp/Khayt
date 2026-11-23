@@ -328,6 +328,105 @@ final class PhonePairingTests: XCTestCase {
         XCTAssertEqual(s.pin, "1234", "nothing changed")
     }
 
+    /// The role is believed only from an answer the Mac signed: an unsigned
+    /// one, or one whose MAC is over other words, pairs nothing.
+    func testARoleAnswerTheMacDidNotSignIsNotBelieved() async throws {
+        for signing in [StubPairMac.ReplySigning.unsigned, .forged] {
+            StubPairMac.reset()
+            StubPairMac.replySigning = signing
+            StubPairMac.role = "owner"
+            let s = freshSettings()
+            let api = KhaytAPIClient(settings: s, protocols: [StubPairMac.self], withBook: false)
+            guard case .number(let ticket) = await api.startCodePairing(name: "x", version: "1") else { return XCTFail() }
+            StubPairMac.approved = true
+            let done = await api.finishCodePairing(ticket)
+            XCTAssertFalse(done, "\(signing)")
+            XCTAssertNil(s.device, "\(signing)")
+            XCTAssertNil(s.deviceRole, "\(signing)")
+        }
+    }
+
+    /// #2631's answers to DELETE /api/devices/pair/<pairId>, as LAN_API.md writes them.
+    func testTheCancelAnswersAreRead() {
+        func a(_ status: Int, _ body: String) -> KhaytAPIClient.CodePairCancel {
+            KhaytAPIClient.cancelAnswer(status: status, body: Data(body.utf8))
+        }
+        XCTAssertEqual(a(200, #"{"state":"cancelled"}"#), .cancelled)
+        XCTAssertEqual(a(409, #"{"state":"approved"}"#), .approved)
+        XCTAssertEqual(a(409, #"{"state":"denied"}"#), .denied)
+        XCTAssertEqual(a(409, #"{"state":"expired"}"#), .expired)
+        XCTAssertEqual(a(404, #"{"state":"unknown"}"#), .unknown)
+        XCTAssertEqual(a(200, #"{"state":"approved"}"#), .unknown, "approved is only believed as the 409 the route sends")
+        XCTAssertEqual(a(409, "[]"), .unknown)
+        XCTAssertEqual(a(500, ""), .unknown)
+    }
+
+    /// Cancel while the number is up: the Mac drops it, and a later poll
+    /// reads it as run out. A second cancel finds nothing to give up.
+    func testCancellingTheNumberTellsTheMac() async throws {
+        let s = freshSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubPairMac.self], withBook: false)
+        guard case .number(let ticket) = await api.startCodePairing(name: "x", version: "1") else { return XCTFail() }
+        let cancelled = await api.cancelCodePairing(ticket)
+        XCTAssertEqual(cancelled, .cancelled)
+        XCTAssertTrue(StubPairMac.cancelled)
+        let after = await api.pollCodePairing(ticket)
+        XCTAssertEqual(after, .expired)
+        let again = await api.cancelCodePairing(ticket)
+        XCTAssertEqual(again, .expired)
+        XCTAssertNil(s.device, "a cancel pairs nothing")
+        XCTAssertFalse(s.isPaired)
+    }
+
+    /// Too late: the Mac had approved. The cancel says so and the approval
+    /// stands, so the phone finishes it (signed, proved) rather than leaving
+    /// an enrolment on the Mac that no phone holds.
+    func testACancelAfterTheMacApprovedFinishesThePairing() async throws {
+        let s = freshSettings()
+        StubPairMac.role = "viewer"
+        let api = KhaytAPIClient(settings: s, protocols: [StubPairMac.self], withBook: false)
+        guard case .number(let ticket) = await api.startCodePairing(name: "x", version: "1") else { return XCTFail() }
+        StubPairMac.approved = true
+        let answer = await api.cancelCodePairing(ticket)
+        XCTAssertEqual(answer, .approved)
+        let done = await api.finishCodePairing(ticket, markPaired: true)
+        XCTAssertTrue(done)
+        XCTAssertEqual(s.device?.deviceId, StubPairMac.deviceId)
+        XCTAssertEqual(s.deviceRole, "viewer")
+        XCTAssertTrue(StubPairMac.selfSigned)
+    }
+
+    /// A cancel that comes back "approved" is taken only when the person has
+    /// not moved on (review of #2635): never over the PIN step, a PIN pairing
+    /// in progress or a newer attempt.
+    func testALateApprovalNeverTakesOverAnotherChoice() {
+        let may = PairingView.mayFinishAfterCancel
+        XCTAssertTrue(may(false, .find, false, true), "Cancel, back on Find: the approval is shown")
+        XCTAssertTrue(may(false, .code, false, false), "the screen went away: finished, shown at the next open")
+        XCTAssertFalse(may(false, .pin, false, true), "the person chose the PIN")
+        XCTAssertFalse(may(false, .find, true, true), "a PIN pairing is running")
+        XCTAssertFalse(may(true, .find, false, true), "a newer attempt started")
+        XCTAssertFalse(may(true, .code, false, true), "a new number is up")
+        XCTAssertFalse(may(false, .manual, false, true), "typing another address")
+    }
+
+    /// A wrong secret is the route's 404: nothing is given up, nothing changes.
+    func testACancelWithAWrongSecretIsUnknown() async throws {
+        let s = freshSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubPairMac.self], withBook: false)
+        guard case .number(let ticket) = await api.startCodePairing(name: "x", version: "1") else { return XCTFail() }
+        let forged = KhaytAPIClient.CodePairTicket(
+            pairing: ticket.pairing,
+            offer: try JSONDecoder().decode(PairOffer.self, from: JSONSerialization.data(withJSONObject: [
+                "pairId": ticket.offer.pairId, "pollSecret": "pollsecret9999999999999999999999",
+                "deviceId": ticket.offer.deviceId, "publicKey": ticket.offer.publicKey,
+                "sig": ticket.offer.sig, "identity": ticket.offer.identity])),
+            check: ticket.check)
+        let answer = await api.cancelCodePairing(forged)
+        XCTAssertEqual(answer, .unknown)
+        XCTAssertFalse(StubPairMac.cancelled)
+    }
+
     func testAnOlderMacFallsBackToThePin() async {
         let s = freshSettings()
         StubPairMac.hasRoute = false
@@ -365,6 +464,11 @@ final class StubPairMac: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var key: SymmetricKey?
     nonisolated(unsafe) static var sentPin: String?
     nonisolated(unsafe) static var selfSigned = false
+    nonisolated(unsafe) static var cancelled = false
+    /// How the Mac signs its role answer: as #2631 does, not at all, or with
+    /// a MAC that is not over this answer (a forgery).
+    enum ReplySigning { case signed, unsigned, forged }
+    nonisolated(unsafe) static var replySigning = ReplySigning.signed
     static let identity = Curve25519.Signing.PrivateKey()
     nonisolated(unsafe) static var server = Curve25519.KeyAgreement.PrivateKey()
     static let deviceId = "dev_stubCodePhone01"
@@ -374,6 +478,7 @@ final class StubPairMac: URLProtocol, @unchecked Sendable {
     static func reset() {
         hasRoute = true; closed = false; approved = false; enrols = true; role = "operator"; commit = ""; check = ""
         key = nil; sentPin = nil; selfSigned = false; server = Curve25519.KeyAgreement.PrivateKey()
+        replySigning = .signed; cancelled = false
     }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-pair-stub.invalid" }
@@ -398,6 +503,7 @@ final class StubPairMac: URLProtocol, @unchecked Sendable {
         let serverPub = Self.server.publicKey.rawRepresentation.base64EncodedString()
         let idPub = Self.identity.publicKey.rawRepresentation.base64EncodedString()
         var answer: (Int, Any) = (404, ["error": "not found"])
+        var replyMacFor: (SymmetricKey, String)?
         switch (request.httpMethod ?? "GET", path) {
         case ("POST", "/api/devices/pair") where Self.hasRoute:
             if Self.closed { answer = (403, ["reason": "pairing-closed"]); break }
@@ -420,7 +526,14 @@ final class StubPairMac: URLProtocol, @unchecked Sendable {
                                                       sharedInfo: Data(Self.deviceId.utf8), outputByteCount: 32)
             answer = (200, ["state": "waiting"])
         case ("GET", "/api/devices/pair/\(Self.pairId)") where request.value(forHTTPHeaderField: "x-khayt-poll") == Self.poll:
-            answer = (200, ["state": Self.approved ? "approved" : "waiting"])
+            answer = (200, ["state": Self.cancelled ? "expired" : Self.approved ? "approved" : "waiting"])
+        // #2631: the phone gives its own request up; an approval is not undone.
+        case ("DELETE", "/api/devices/pair/\(Self.pairId)") where request.value(forHTTPHeaderField: "x-khayt-poll") == Self.poll:
+            if Self.approved { answer = (409, ["state": "approved"]) }
+            else if Self.cancelled { answer = (409, ["state": "expired"]) }
+            else { Self.cancelled = true; answer = (200, ["state": "cancelled"]) }
+        case ("DELETE", _) where path.hasPrefix("/api/devices/pair/"):
+            answer = (404, ["state": "unknown"])
         case ("GET", "/api/devices/self"):
             guard Self.enrols, let key = Self.key, request.value(forHTTPHeaderField: "x-khayt-device") == Self.deviceId else {
                 answer = (401, ["reason": "device-unknown"]); break
@@ -432,11 +545,22 @@ final class StubPairMac: URLProtocol, @unchecked Sendable {
             guard expected == request.value(forHTTPHeaderField: "x-khayt-mac") else { answer = (401, ["reason": "device-auth"]); break }
             Self.selfSigned = true
             answer = (200, ["deviceId": Self.deviceId, "role": Self.role.map { $0 as Any } ?? NSNull()])
+            replyMacFor = (key, request.value(forHTTPHeaderField: "x-khayt-nonce") ?? "")
         default: break
         }
         let data = try! JSONSerialization.data(withJSONObject: answer.1)
+        var fields = ["Content-Type": "application/json"]
+        // The reply MAC as docs/LAN_API.md writes it, worked out here on its
+        // own rather than with the phone's DeviceKey.replyMac.
+        if let (key, nonce) = replyMacFor, Self.replySigning != .unsigned {
+            let signedBody = Self.replySigning == .forged ? Data(#"{"role":"owner"}"#.utf8) : data
+            let hex = SHA256.hash(data: signedBody).map { String(format: "%02x", $0) }.joined()
+            let text = "khayt-reply-v1\n\(nonce)\n\(answer.0)\n\(hex)"
+            fields["x-khayt-reply-mac"] = Data(HMAC<SHA256>.authenticationCode(for: Data(text.utf8), using: key))
+                .base64EncodedString()
+        }
         let response = HTTPURLResponse(url: url, statusCode: answer.0, httpVersion: "HTTP/1.1",
-                                       headerFields: ["Content-Type": "application/json"])!
+                                       headerFields: fields)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)

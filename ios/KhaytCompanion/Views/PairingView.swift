@@ -14,7 +14,9 @@ struct PairingView: View {
     @EnvironmentObject private var settings: ConnectionSettings
     @EnvironmentObject private var api: KhaytAPIClient
 
-    enum Step { case find, manual, pin, pull }
+    enum Step { case find, manual, code, approved, notPaired, pin, pull }
+    /// Why pairing by number stopped (frame "Pair 3 · Denied or ran out").
+    enum NotPaired: Equatable { case denied, expired, busy, refused, unreachable }
 
     @State private var step: Step = .find
     @StateObject private var browser = ShopBrowser()
@@ -27,6 +29,18 @@ struct PairingView: View {
     @State private var summary: PairingSummary?
     @State private var sampleFailure: String?
     @FocusState private var pinFocused: Bool
+    /// Pairing by number (C1): the offer the Mac made and this phone checked.
+    @State private var ticket: KhaytAPIClient.CodePairTicket?
+    @State private var notPaired: NotPaired = .expired
+    /// The Mac has no pairing by number (404/405/pairing-upgrade): the PIN
+    /// step says so, and pairs as the owner, as before (D-P1).
+    @State private var olderMac = false
+    /// Each attempt, so an old attempt's poll can never finish a new one.
+    @State private var attempt = 0
+    /// Whether this screen is still up, read by a cancel that comes back
+    /// after it went away (a reference, so the answer sees the truth).
+    @State private var presence = Presence()
+    final class Presence { var shown = false }
 
     var body: some View {
         ZStack {
@@ -35,6 +49,9 @@ struct PairingView: View {
                 switch step {
                 case .find: findStep
                 case .manual: manualStep
+                case .code: codeStep
+                case .approved: approvedStep
+                case .notPaired: notPairedStep
                 case .pin: pinStep
                 case .pull: pullStep
                 }
@@ -45,12 +62,26 @@ struct PairingView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: step)
         .sheet(isPresented: $showCloudSignIn) { CloudSignInSheet() }
+        .onAppear { presence.shown = true }
+        .onDisappear { presence.shown = false; giveUpTheNumber() }
+        // Approved on the Mac, then the app was closed before Continue: the
+        // enrolment is live, so pick up at the approved screen, not Find.
+        .onAppear {
+            if settings.pairedByCode, settings.device != nil, !settings.isPaired { step = .approved }
+        }
         #if DEBUG
         // `-KhaytPairStep pin`: open on the PIN step, for a screenshot.
         .onAppear {
             if UserDefaults.standard.string(forKey: "KhaytPairStep") == "pin" {
                 if settings.host.isEmpty { settings.host = "192.168.1.42" }
                 step = .pin
+            }
+            // `-KhaytPairStep code|approved|denied|older`: the pairing-by-number
+            // screens with sample data, for comparing against the frames.
+            if let shot = PairShot(rawValue: UserDefaults.standard.string(forKey: "KhaytPairStep") ?? "") {
+                if settings.host.isEmpty { settings.host = "192.168.1.42" }
+                shot.apply(step: &step, notPaired: &notPaired, olderMac: &olderMac, sample: &sampleCheck,
+                           role: &sampleRole)
             }
         }
         #endif
@@ -186,7 +217,7 @@ struct PairingView: View {
         settings.port = Int(found.port)
         settings.shopLabel = shop.name
         settings.serviceName = shop.id
-        goToPin()
+        goToCode()
     }
 
     // MARK: - 1b. The Mac's address
@@ -223,13 +254,288 @@ struct PairingView: View {
                     settings.shopLabel = settings.host
                 }
                 settings.serviceName = ""
-                goToPin()
+                goToCode()
             }
             secondary(L10n.tr("pair.back")) { step = .find }
         }
     }
 
-    // MARK: - 2. The owner PIN
+    // MARK: - 2. Pairing by a number the Mac approves (C1, frames 254:3/17/31)
+
+    // ── THE NUMBER IS THE CHECK, NOT A SECRET ──────────────────────────────
+    //
+    // The phone shows the six digits only once the Mac's signed offer checks
+    // out against this phone's own commitment (`CodePairing.accept`); the Mac
+    // shows the same six from the same inputs. A person approving on the Mac
+    // compares them, so something else on the Wi-Fi asking at the same moment
+    // is told apart. Nothing typed, no PIN kept; the Mac gives the role.
+
+    private func goToCode() {
+        attempt += 1
+        ticket = nil
+        olderMac = false
+        failure = nil
+        step = .code
+        let mine = attempt
+        Task { await startCode(mine) }
+    }
+
+    private func startCode(_ mine: Int) async {
+        let started = await api.startCodePairing(name: settings.nameToSend)
+        guard mine == attempt, step == .code else {
+            // Cancelled (or left) while the Mac was being asked: it has
+            // already put this number up, so give it up there too.
+            if case .number(let late) = started { Task { _ = await api.cancelCodePairing(late) } }
+            return
+        }
+        switch started {
+        case .number(let t): ticket = t
+        case .unsupported:
+            // A phone that has paired with this Mac by number does not fall
+            // back to the PIN because something answered "no such route":
+            // that is how a host on the Wi-Fi would ask for the owner PIN.
+            if settings.pairedByCode, settings.macIdentityKey != nil { return stop(.refused) }
+            olderMac = true; goToPin()
+        case .closed: stop(.expired)
+        case .busy: stop(.busy)
+        case .refused: stop(.refused)
+        case .unreachable: stop(.unreachable)
+        }
+    }
+
+    private func stop(_ why: NotPaired) {
+        ticket = nil
+        notPaired = why
+        step = .notPaired
+        CompanionHaptics.warning()
+    }
+
+    /// Asks the Mac every two seconds while the number is on screen. A poll
+    /// that does not get through is asked again; the Mac's own window decides
+    /// when the number runs out.
+    private func waitForTheMac(_ t: KhaytAPIClient.CodePairTicket, _ mine: Int) async {
+        while !Task.isCancelled, mine == attempt, step == .code {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled, mine == attempt, step == .code else { return }
+            let state = await api.pollCodePairing(t)
+            // Cancel, Start again or the PIN may have been chosen while the
+            // Mac was asked: their choice stands, not this answer.
+            guard !Task.isCancelled, mine == attempt, step == .code else { return }
+            switch state {
+            case .waiting, .unreachable: continue
+            case .denied: return stop(.denied)
+            case .expired, .unknown: return stop(.expired)
+            case .approved:
+                let done = await api.finishCodePairing(t, markPaired: false) {
+                    !Task.isCancelled && mine == attempt && step == .code
+                }
+                guard !Task.isCancelled, mine == attempt, step == .code else { return }
+                if done {
+                    CompanionHaptics.success()
+                    ticket = nil            // used: leaving the number now cancels nothing
+                    step = .approved
+                } else {
+                    stop(.refused)
+                }
+                return
+            }
+        }
+    }
+
+    // ── GIVING THE NUMBER UP (#2631) ───────────────────────────────────────
+    //
+    // Cancel, Use the PIN or the screen going away tells the Mac, so it stops
+    // showing a number nobody is looking at. The ticket is taken and the
+    // attempt moved on first, so the poll and a second call find nothing.
+    //
+    // If the Mac had ALREADY approved (409 "approved"), that approval stands
+    // on the Mac. The phone finishes it only when the person has not moved on
+    // (`mayFinishAfterCancel`): never over the PIN step, a PIN pairing in
+    // progress or a newer attempt, whose choice is theirs (review of #2635).
+    // And it never marks the phone paired by itself: the approved screen's
+    // Continue does, now or at the next open (`onAppear` above), so a person
+    // always sees which Mac and which role before the phone uses it.
+    private func giveUpTheNumber() {
+        // A number still being asked for (no ticket yet, still on the number
+        // step) is moved on too, so its late answer is given up in startCode.
+        // Not when the step already changed: that is this same give-up's
+        // second call (the button, then the step's onDisappear).
+        guard ticket != nil || step == .code else { return }
+        attempt += 1
+        guard let t = ticket else { return }
+        ticket = nil
+        let mine = attempt
+        let presence = presence
+        Task { @MainActor in
+            guard await api.cancelCodePairing(t) == .approved else { return }
+            let wanted = {
+                Self.mayFinishAfterCancel(stale: mine != attempt, step: step, connecting: isConnecting,
+                                          shown: presence.shown)
+            }
+            guard wanted() else { return }
+            let done = await api.finishCodePairing(t, markPaired: false, stillWanted: wanted)
+            if done, wanted(), presence.shown {
+                CompanionHaptics.success()
+                step = .approved
+            }
+        }
+    }
+
+    /// A cancel came back "approved": may the phone take that approval?
+    /// Only when nothing newer has started (`stale`) and the person is not
+    /// pairing another way: back on Find (Cancel) or off this screen. Not on
+    /// the PIN step, not while a PIN pairing runs, not on a new number.
+    nonisolated static func mayFinishAfterCancel(stale: Bool, step: Step, connecting: Bool, shown: Bool) -> Bool {
+        guard !stale, !connecting else { return false }
+        return !shown || step == .find
+    }
+
+    /// "481 207": the check number in two groups, as the Mac shows it.
+    nonisolated static func grouped(_ check: String) -> String {
+        guard check.count == 6 else { return check }
+        return String(check.prefix(3)) + " " + String(check.suffix(3))
+    }
+
+    #if DEBUG
+    @State private var sampleCheck: String?
+    @State private var sampleRole: String?
+    #else
+    private var sampleCheck: String? { nil }
+    private var sampleRole: String? { nil }
+    #endif
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    }
+
+    private var codeStep: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            title(L10n.tr("pair.code.title"))
+            lead(L10n.tr("pair.code.body"))
+                .padding(.bottom, 22)
+            VStack(spacing: 10) {
+                if let check = ticket?.check ?? sampleCheck {
+                    Text(Self.grouped(check))
+                        .font(.khayt(44, .bold, relativeTo: .largeTitle))
+                        .monospacedDigit()
+                        .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+                        .foregroundStyle(KhaytDesign.ink)
+                        .accessibilityLabel(check.map { String($0) }.joined(separator: " "))
+                } else {
+                    ProgressView().frame(height: 52)
+                }
+                Text(L10n.format("pair.code.device", settings.nameToSend, appVersion))
+                    .font(.khaytMono(11.5))
+                    .foregroundStyle(KhaytDesign.note)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+            .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+            HStack(spacing: 8) {
+                Circle().fill(KhaytDesign.brand).frame(width: 7, height: 7)
+                Text(L10n.tr(ticket == nil && sampleCheck == nil ? "pair.code.starting" : "pair.code.waiting"))
+                    .font(.khayt(13.5, .medium, relativeTo: .footnote))
+                    .foregroundStyle(KhaytDesign.ink)
+            }
+            .padding(.top, 16)
+            foot(L10n.tr("pair.code.foot")).padding(.top, 8)
+            Spacer(minLength: 18)
+            centredLink(L10n.tr("pair.code.use_pin")) { giveUpTheNumber(); olderMac = false; goToPin() }
+            tonal(L10n.tr("pair.code.cancel")) { giveUpTheNumber(); step = .find }
+        }
+        .task(id: ticket?.offer.pairId) {
+            if let t = ticket { await waitForTheMac(t, attempt) }
+        }
+        // The number step going away for any other reason (the pairing
+        // screen itself closing) gives it up too. Backgrounding or quitting
+        // the app sends nothing: the Mac's window runs the number out.
+        .onDisappear { giveUpTheNumber() }
+    }
+
+    private var role: String { sampleRole ?? settings.effectiveRole }
+
+    private var approvedStep: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            title(L10n.tr("pair.approved.title"))
+            lead(L10n.tr("pair.approved.body"))
+                .padding(.bottom, 16)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(L10n.tr("role.\(role)"))
+                    .font(.khayt(19, .semibold, relativeTo: .title3))
+                    .foregroundStyle(KhaytDesign.ink)
+                    .padding(.bottom, 2)
+                ForEach(L10n.tr("role.\(role).can").components(separatedBy: "\n"), id: \.self) { line in
+                    Text("· " + line)
+                        .font(.khayt(13.5, relativeTo: .footnote))
+                        .foregroundStyle(KhaytDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+            .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+            foot(L10n.tr("pair.approved.foot")).padding(.top, 12)
+            Spacer(minLength: 18)
+            primary(L10n.tr("pair.approved.continue"), busy: isConnecting) {
+                Task { await afterApproval() }
+            }
+        }
+    }
+
+    /// A manager or owner phone takes the book now, as the PIN flow does; a
+    /// floor phone keeps none (D-P6 a) and goes straight in.
+    private func afterApproval() async {
+        guard settings.mayHoldBook else { settings.isPaired = true; return }
+        isConnecting = true
+        defer { isConnecting = false }
+        do {
+            let book = try CompanionBook.inSharedContainer()
+            _ = try await api.pullBook(into: book)
+            summary = await api.fetchPairingSummary()
+        } catch {
+            summary = nil
+        }
+        if summary != nil { step = .pull } else { settings.isPaired = true }
+    }
+
+    private var notPairedStep: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            title(L10n.tr("pair.not.title"))
+                .padding(.bottom, 18)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L10n.tr("pair.not.\(Self.key(notPaired)).title"))
+                    .font(.khayt(15, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(notPaired == .denied || notPaired == .refused ? KhaytDesign.late : KhaytDesign.ink)
+                Text(L10n.tr("pair.not.\(Self.key(notPaired)).body"))
+                    .font(.khayt(13.5, relativeTo: .footnote))
+                    .foregroundStyle(KhaytDesign.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+            .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+            Spacer(minLength: 18)
+            primary(L10n.tr("pair.not.again")) { goToCode() }
+            centredLink(L10n.tr("pair.code.use_pin")) { olderMac = false; goToPin() }
+                .padding(.top, 8)
+        }
+    }
+
+    nonisolated static func key(_ why: NotPaired) -> String {
+        switch why {
+        case .denied: return "denied"
+        case .expired: return "expired"
+        case .busy: return "busy"
+        case .refused: return "refused"
+        case .unreachable: return "unreachable"
+        }
+    }
+
+    // MARK: - 2b. The owner PIN
 
     private func goToPin() {
         settings.pin = ""
@@ -243,8 +549,8 @@ struct PairingView: View {
         VStack(alignment: .leading, spacing: 0) {
             eyebrow(settings.shopLabel.isEmpty ? settings.host : settings.shopLabel)
                 .padding(.bottom, 10)
-            title(L10n.tr("pair.pin.title"))
-            lead(L10n.tr("pair.pin.body"))
+            title(L10n.tr(olderMac ? "pair.older.title" : "pair.pin.title"))
+            lead(L10n.tr(olderMac ? "pair.older.body" : "pair.pin.body"))
                 .padding(.bottom, 22)
             SecureField("••••••••", text: $settings.pin)
                 .pinEntry()
@@ -274,15 +580,17 @@ struct PairingView: View {
                     .foregroundStyle(KhaytDesign.late)
                     .padding(.top, 10)
             }
-            foot(L10n.tr("pair.pin.foot")).padding(.top, 10)
-            fieldLabel(L10n.tr("pair.phone_name")).padding(.top, 18)
-            TextField(ConnectionSettings.defaultPhoneName, text: $settings.phoneName)
-                .textInputAutocapitalization(.words)
-                .autocorrectionDisabled()
-                .modifier(BigField())
-            foot(L10n.tr("pair.phone_name.foot"))
+            foot(L10n.tr(olderMac ? "pair.older.foot" : "pair.pin.foot")).padding(.top, 10)
+            if !olderMac {
+                fieldLabel(L10n.tr("pair.phone_name")).padding(.top, 18)
+                TextField(ConnectionSettings.defaultPhoneName, text: $settings.phoneName)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .modifier(BigField())
+                foot(L10n.tr("pair.phone_name.foot"))
+            }
             Spacer(minLength: 18)
-            primary(L10n.tr("pair.connect"), busy: isConnecting,
+            primary(L10n.tr(olderMac ? "pair.older.pair" : "pair.connect"), busy: isConnecting,
                     disabled: settings.pin.trimmingCharacters(in: .whitespacesAndNewlines).count < 8 || isConnecting) {
                 Task { await connect() }
             }
@@ -291,6 +599,9 @@ struct PairingView: View {
     }
 
     private func connect() async {
+        // The owner PIN pairs as the owner: a number pairing left over from
+        // before must not make this a floor phone.
+        settings.pairedByCode = false
         isConnecting = true
         defer { isConnecting = false }
         do {
@@ -468,6 +779,31 @@ struct PairingView: View {
         .disabled(disabled)
     }
 
+    /// A centred text link in the brand colour ("Use the owner PIN instead").
+    private func centredLink(_ text: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text)
+                .font(.khayt(14.5, .medium, relativeTo: .subheadline))
+                .foregroundStyle(KhaytDesign.brand)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The frame's light-filled button (Cancel while waiting for the Mac).
+    private func tonal(_ text: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text)
+                .font(.khayt(17, .semibold, relativeTo: .headline))
+                .foregroundStyle(KhaytDesign.brand)
+                .frame(maxWidth: .infinity, minHeight: 58)
+                .background(KhaytDesign.brand.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 6)
+    }
+
     private func secondary(_ text: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(text)
@@ -478,6 +814,25 @@ struct PairingView: View {
         }
         .buttonStyle(.plain)
         .padding(.top, 8)
+    }
+}
+
+/// The pairing-by-number screens with sample data (`-KhaytPairStep …`),
+/// DEBUG only, for comparing the built screens with the signed-off frames.
+enum PairShot: String {
+    case code, approved, viewer, denied, expired, busy, older
+
+    func apply(step: inout PairingView.Step, notPaired: inout PairingView.NotPaired, olderMac: inout Bool,
+               sample: inout String?, role: inout String?) {
+        switch self {
+        case .code: step = .code; sample = "481207"
+        case .approved: step = .approved; role = "operator"
+        case .viewer: step = .approved; role = "viewer"
+        case .denied: step = .notPaired; notPaired = .denied
+        case .expired: step = .notPaired; notPaired = .expired
+        case .busy: step = .notPaired; notPaired = .busy
+        case .older: step = .pin; olderMac = true
+        }
     }
 }
 
