@@ -51,8 +51,9 @@
 "settings.port" = "Puerto: %d";
 "settings.pin" = "PIN de red local del propietario";
 "settings.retest" = "Volver a probar el emparejamiento";
-"settings.unpair" = "Desemparejar este dispositivo";
-"settings.unpair.footer" = "Elimina de este iPhone el libro del taller, el PIN y las claves de los conectores.";
+"settings.unpair" = "Cerrar sesión";
+"settings.unpair.footer" = "Elimina de este iPhone el libro del taller, el PIN y las claves de los conectores. También cierra la sesión de este iPhone en Khayt Cloud.";
+"settings.unpair.title" = "¿Cerrar sesión en este taller?";
 "settings.language" = "Idioma";
 "settings.notifications" = "Notificaciones";
 "settings.notify.queue" = "Cambios en la cola";
@@ -564,6 +565,7 @@
 "settings.live_activities" = "Impresiones en la pantalla de bloqueo";
 "settings.count_install.hint" = "Una vez al día, envía solo la plataforma, la versión y el canal de publicación de la app, y si es su primer día de esta semana, este mes o en total. Sin ID, nada sobre tu taller.";
 "settings.count_install" = "Contar esta instalación (anónimo)";
+"settings.count_install.owner_only" = "Solo el propietario puede activar esto.";
 "settings.privacy" = "Privacidad";
 "settings.privacy_policy" = "Política de privacidad";
 "alert.print.finished" = "Impresión terminada";
@@ -1195,7 +1197,7 @@
 "connectors.key.enter" = "Introducir";
 "connectors.key.replace" = "Reemplazar";
 "connectors.key.delete" = "Eliminar clave";
-"connectors.key.footer" = "Solo se guarda en el llavero de este iPhone. Cada iPhone y Mac guarda la suya, y Desvincular la elimina.";
+"connectors.key.footer" = "Solo se guarda en el llavero de este iPhone. Cada iPhone y Mac guarda la suya, y Cerrar sesión la elimina.";
 "connectors.error.key_missing" = "Primero añade la clave «%@» en Ajustes ▸ Conectores. No se envió nada.";
 "connectors.error.build" = "Este botón no se puede usar ahora. No se envió nada.";
 "connectors.error.scheme" = "Khayt solo abre enlaces https seguros. No se abrió ni envió nada.";

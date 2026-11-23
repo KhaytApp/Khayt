@@ -187,6 +187,28 @@ enum DeviceRole {
         return role == nil && !pairedByCode ? "owner" : "viewer"
     }
 
+    /// The role this phone ACTS on for what only a role may do (the owner's
+    /// switches, the scopes a screen offers). Stricter than `effective`, which
+    /// read every phone without a device role as the owner, including one
+    /// signed in to Khayt Cloud as a viewer and never paired with a Mac (found
+    /// in review of #2656). In order:
+    /// - a role the Mac gave this phone: that role (unknown text: viewer);
+    /// - paired by code with no role: viewer;
+    /// - paired with the owner PIN before roles, and still holding the Mac's
+    ///   credential (`heldByMac`): the owner, as it always was;
+    /// - otherwise, signed in to Khayt Cloud: the cloud member's role;
+    /// - otherwise, the sample shop (made-up data, nothing to protect): owner,
+    ///   so the demo shows every screen;
+    /// - anything else, or a role this build does not know: viewer (fail closed).
+    static func acting(role: String?, pairedByCode: Bool, heldByMac: Bool,
+                       cloudSignedIn: Bool, cloudRole: String?, sampleShop: Bool = false) -> String {
+        if let role { return ladder.contains(role) ? role : "viewer" }
+        if pairedByCode { return "viewer" }
+        if heldByMac { return "owner" }
+        if cloudSignedIn { return cloudRole.flatMap { ladder.contains($0) ? $0 : nil } ?? "viewer" }
+        return sampleShop ? "owner" : "viewer"
+    }
+
     /// `book:read` (GET /api/store): manager and owner only. Below that the
     /// phone keeps NO book and runs on the question routes (D-P6 a, floor mode).
     static func mayHoldBook(_ effective: String) -> Bool { effective == "owner" || effective == "manager" }
