@@ -158,7 +158,9 @@ struct LaunchGateTests {
         let source = try String(contentsOf: Self.root.appending(path: "mac/KhaytCore/Sources/KhaytApp/LaunchGate.swift"), encoding: .utf8)
         // No Later, Continue off until the tick, and Escape does not close it.
         #expect(source.contains(".disabled(!read)") && source.contains(".interactiveDismissDisabled(true)"))
-        #expect(!source.contains("common.cancel") && !source.contains("later"))
+        // No way out but Continue: no Cancel, no Later button, no second Button at all in the sheet.
+        #expect(!source.contains("common.cancel") && !source.contains("role: .cancel") && !source.contains("gate_later"))
+        #expect(source.components(separatedBy: "Button(").count == 2, "the sheet has one button")
     }
 
     @Test("the bundled gate file is lib's, the floor is a real earlier Mac release, and the cut checks the file")
