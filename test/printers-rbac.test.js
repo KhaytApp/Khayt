@@ -517,7 +517,8 @@ test('refusals are said in the shop\'s language, never as codes (MED1)', () => {
   for (const [file, re] of [['machines.js', /mach\.printer_failed', \{ error: explainRefusal\(/g], ['machines.js', /slicer\.fail'\)\} \$\{explainRefusal\(e\.message\)\}/], ['kanban.js', /slicer\.fail'\)\} \$\{explainRefusal\(e\.message\)\}/]]) {
     assert.match(fs.readFileSync(path.join(__dirname, '..', 'renderer', file), 'utf8'), re, file);
   }
-  assert.equal((fs.readFileSync(path.join(__dirname, '..', 'renderer', 'machines.js'), 'utf8').match(/mach\.printer_failed', \{ error: explainRefusal\(/g) || []).length, 2);
+  // Commands, controls and the light switches (Figma 134): each says a refusal in words.
+  assert.equal((fs.readFileSync(path.join(__dirname, '..', 'renderer', 'machines.js'), 'utf8').match(/mach\.printer_failed', \{ error: explainRefusal\(/g) || []).length, 3);
   for (const l of ['en', 'ar', 'de', 'es', 'fr', 'ja', 'pt-BR', 'tr', 'zh']) {
     const loc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'locales', l + '.js'), 'utf8');
     for (const k of ['err.not_permitted', 'err.settings_missing', 'err.store_unreadable', 'err.guard_failed', 'err.refused', 'err.refused_signin', 'err.refused_lock', 'err.refused_people', 'err.refused_printer']) {
