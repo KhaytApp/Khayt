@@ -2454,6 +2454,24 @@
     else if (added && skipped) toast(`${skipped} ${t('plib.zip_skipped') || 'other files in the archive were skipped'}`, 'info');
   }
 
+  /**
+   * One file into the library through the ordinary intake (hub:printlib-copy-path,
+   * then the same record every dropped file gets). The library entry already
+   * holding these bytes (`sha256`, the content hash) is returned instead of a
+   * second copy. Null when the file could not be taken. Used by Connected apps'
+   * "From slicer" inbox (renderer/connected-apps.js).
+   */
+  async function addFromPath(srcPath, sha256) {
+    const have = sha256 ? (printFiles || []).find((r) => r && r.contentHash === sha256) : null;
+    if (have) return have;
+    const hub = api(); if (!hub || !hub.printLibCopyPath) return null;
+    const id = uid('PF');
+    let r;
+    try { r = await hub.printLibCopyPath(id, srcPath); } catch (_) { r = null; }
+    if (!r || !r.ok) return null;
+    return ingestSafely(id, r);
+  }
+
   // Bind drag-and-drop once to the (persistent) tab element; renderPrintFiles only swaps its innerHTML.
   let _dropWired = false;
   function wirePfDrop() {
@@ -3322,7 +3340,7 @@
     if (hub && typeof hub.onPrintLibBroughtDown === 'function') hub.onPrintLibBroughtDown((d) => { onBroughtDown(d).catch(() => {}); });
   }
 
-  const pub = { renderPrintFiles, migrateThumbsToDisk, addPrintFile, openInSlicer, editPrintFile, deletePrintFile, attachConverted, importConvertedAsNew, warnIfAlreadyHave, identifyPrintFile, onBroughtDown };
+  const pub = { renderPrintFiles, migrateThumbsToDisk, addPrintFile, addFromPath, openInSlicer, editPrintFile, deletePrintFile, attachConverted, importConvertedAsNew, warnIfAlreadyHave, identifyPrintFile, onBroughtDown };
   Object.assign(global, pub);
   global.KhaytPrintFiles = pub;
   if (typeof module !== 'undefined' && module.exports) module.exports = pub;

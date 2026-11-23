@@ -145,6 +145,21 @@ jobs:
             echo "Draft release for $TAG exists — continuing to finish it."
           fi
 
+      # The release's own "Before you update" items in every language
+      # (lib/release-gates.json, i18n included), for the PRE-download dialog
+      # of the builds already out there: they cannot carry translations of a
+      # version that did not exist when they were built (lib/update-gate-text.js;
+      # the Mac's update sheet reads it too). Onto the DRAFT, so it is there
+      # the moment the release goes live. A stale file fails the release: it
+      # would show last week's items.
+      - name: Attach the gate items (release-gates.json)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          node scripts/write-release-gates.js --check
+          gh release upload "$TAG" lib/release-gates.json --clobber --repo "$GITHUB_REPOSITORY"
+
   # ── macOS Apple Silicon DMG ───────────────────────────────────────────────
   #
   # The three build jobs and `publish` all need `create-release`, and a job whose

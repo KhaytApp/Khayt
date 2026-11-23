@@ -72,26 +72,32 @@ function machineLiveBadge(m) {
     ? KhaytAttention.machineState(m, entry)
     : (entry && String(entry.state || '').toLowerCase().includes('print') ? 'printing' : 'idle');
 
-  const badge = (bg, fg, text, title) =>
-    `<span class="machine-jobs-badge" style="background:${bg};color:${fg};"${title ? ` title="${escapeHtml(title)}"` : ''}>${escapeHtml(text)}</span>`;
+  // The seven states as coloured words (Figma 129, S2): Paused its own, in
+  // the board's "on hold" colour, and still busy (lib/printer-activity.js).
+  // Reconnecting is a missed poll or two, not an error.
+  // `tail` is a figure ("62%"), kept in its own direction inside Arabic.
+  const badge = (cls, text, title, tail) =>
+    `<span class="machine-live-state is-${cls}"${title ? ` title="${escapeHtml(title)}"` : ''}>${escapeHtml(text)}${tail ? ` · <bdi>${escapeHtml(tail)}</bdi>` : ''}</span>`;
 
-  if (st === 'unknown') return badge('var(--surface-2)', 'var(--text-muted)', t('mach.live_no_reading') || 'No reading', t('mach.live_no_reading_hint') || 'This printer is configured but has not answered yet.');
-  if (st === 'error') return badge('var(--danger)', '#fff', (entry && entry.state) || (t('mach.live_error') || 'Error'));
-  if (st === 'reconnecting') return badge('var(--warning)', '#000', t('mach.live_reconnecting') || 'Reconnecting');
-  if (st === 'offline' && !m.isOffline) return badge('var(--danger)', '#fff', t('mach.offline_badge'));
+  if (st === 'unknown') return badge('unknown', t('mach.live_not_known') || 'Not known yet', t('mach.live_no_reading_hint') || 'This printer is configured but has not answered yet.');
+  if (st === 'error') return badge('error', t('mach.live_error') || 'Error', (entry && entry.state) || '');
+  if (st === 'reconnecting') return badge('reconnecting', t('mach.live_reconnecting') || 'Reconnecting');
+  if (st === 'offline' && !m.isOffline) return badge('offline', t('mach.offline_badge'));
 
   const age = (entry && entry.lastUpdated) ? Date.now() - entry.lastUpdated : null;
   if (age !== null && age > MACHINE_LIVE_STALE_MS) {
     const mins = Math.round(age / 60000);
-    return badge('var(--surface-2)', 'var(--text-muted)', t('dash.printer_stale', { mins: String(mins) }) || `No update for ${mins} min`);
+    return badge('stale', t('dash.printer_stale', { mins: String(mins) }) || `No update for ${mins} min`);
   }
 
   if (st === 'printing') {
     const pct = Math.min(100, Math.max(0, Math.round(+(entry && entry.progress) || 0)));
-    const label = `${t('mach.live_printing') || 'Printing'} · ${pct}%`;
-    return badge('var(--success)', '#fff', label, (entry && entry.filename) || '');
+    const PA = (typeof KhaytPrinterActivity !== 'undefined') ? KhaytPrinterActivity : null;
+    const paused = !!(PA && entry && PA.machineStatus(m, entry).activity === 'paused');
+    const word = paused ? (t('mach.live_paused') || 'Paused') : (t('mach.live_printing') || 'Printing');
+    return badge(paused ? 'paused' : 'printing', word, (entry && entry.filename) || '', `${pct}%`);
   }
-  return badge('var(--surface-2)', 'var(--text-muted)', t('mach.live_idle') || 'Idle');
+  return badge('idle', t('mach.live_idle') || 'Idle');
 }
 
 /**
@@ -266,6 +272,59 @@ async function plugSwitch(machineId, on) {
   refreshPlug(machineId);
 }
 
+/* ── WHAT EACH MODEL CAN DO (Figma 134:153, CAP1; lib/printer-capabilities.js) ──
+ *
+ * A control is drawn only when the printer's connection can send it AND its
+ * model has it. The model is the catalogue id the editor records when a model
+ * is picked (machine.catalogId); a machine saved before that is matched by its
+ * model name. A model nobody recorded keeps every control its connection can
+ * send: a missing row never hides a button a printer has.
+ */
+function machineCatalogId(m) {
+  if (m && m.catalogId) return String(m.catalogId);
+  const name = String((m && (m.printerModelName || m.printerModel)) || '').trim().toLowerCase();
+  const PCat = (typeof KhaytPrinterCatalog !== 'undefined') ? KhaytPrinterCatalog : null;
+  if (!name || !PCat || typeof PCat.list !== 'function') return '';
+  const hit = PCat.list().find((p) => p && String(p.name || '').toLowerCase() === name);
+  return hit ? String(hit.id) : '';
+}
+function machineCapability(m, control) {
+  const C = (typeof KhaytPrinterCapabilities !== 'undefined') ? KhaytPrinterCapabilities : null;
+  if (!C) return { state: 'unknown', reason: null };
+  return C.capability(Object.assign({}, m, { catalogId: machineCatalogId(m) }), control, { transports: ['mqtt'] });
+}
+const _capShown = (c) => c.state === 'yes' || c.state === 'unknown';
+
+/* ── ACCESSORIES (Figma 134:258, CAP2) ─────────────────────────────────────
+ * Only for a model whose table row names an accessory (a P1P's Chamber Camera
+ * & LED kit). Ticking it records the accessory on the machine
+ * (machine.addons), which is what adds the light switch to its card. A model
+ * with no known accessories has no section at all. */
+function machineAddonsFor(catalogId) {
+  const C = (typeof KhaytPrinterCapabilities !== 'undefined') ? KhaytPrinterCapabilities : null;
+  const row = C && catalogId && Object.prototype.hasOwnProperty.call(C.MODELS, catalogId) ? C.MODELS[catalogId] : null;
+  if (!row) return [];
+  return [...new Set(Object.values(row).filter((v) => v && typeof v === 'object' && v.addon).map((v) => v.addon))];
+}
+function renderMachineAccessories(modal, draft) {
+  const el = modal && modal.querySelector('#machAccessories');
+  if (!el) return;
+  const addons = machineAddonsFor(machineCatalogId(draft));
+  if (!addons.length) { el.innerHTML = ''; return; }
+  const have = new Set(Array.isArray(draft.addons) ? draft.addons : []);
+  el.innerHTML = `<div class="mcap-acc">
+      <div class="mcap-acc-head">${escapeHtml(t('mach.accessories'))}</div>
+      ${addons.map((a) => `<label class="mcap-acc-row"><input type="checkbox" data-addon="${escapeHtml(a)}"${have.has(a) ? ' checked' : ''}>
+        <span><span class="mcap-acc-name">${escapeHtml(t('mach.addon.' + a))}</span><span class="mcap-acc-sub">${escapeHtml(t('mach.addon.' + a + '.hint'))}</span></span></label>`).join('')}
+      <div class="mcap-acc-note">${escapeHtml(t('mach.accessories_note'))}</div>
+    </div>`;
+  el.querySelectorAll('[data-addon]').forEach((cb) => cb.addEventListener('change', () => {
+    const set = new Set(Array.isArray(draft.addons) ? draft.addons : []);
+    if (cb.checked) set.add(cb.dataset.addon); else set.delete(cb.dataset.addon);
+    draft.addons = [...set];
+  }));
+}
+
 function machineControlsHtml(m) {
   if (!m || !m.printerApi || !m.printerApi.type || m.printerApi.type === 'none') return '';
   const cache = (typeof machineStatusCache !== 'undefined' && machineStatusCache) || {};
@@ -278,30 +337,62 @@ function machineControlsHtml(m) {
   // still report its last job's progress, and that is no job to pause.
   const paused = /paus/.test(raw);
   const running = !paused && /print/.test(raw) && !/error/.test(raw);
-  if (!(paused || running)) return '';
   const id = escapeHtml(m.id);
   const out = [];
+  // The lights work idle too; the job's controls only while there is a job.
+  const lights = machineLightSwitchesHtml(m, entry);
+  if (!(paused || running)) return lights;
   if (paused) {
     if (_printerVerbOk(m, 'resume')) out.push(`<button class="btn small" data-act="printer-resume" data-id="${id}">${escapeHtml(t('mach.printer_resume'))}</button>`);
   } else if (_printerVerbOk(m, 'pause')) {
     out.push(`<button class="btn small" data-act="printer-pause" data-id="${id}">${escapeHtml(t('mach.printer_pause'))}</button>`);
   }
   if (_printerVerbOk(m, 'cancel')) out.push(`<button class="btn small danger" data-act="printer-cancel" data-id="${id}">${escapeHtml(t('mach.printer_cancel'))}</button>`);
-  if (m.printerApi.type === 'moonraker') out.push(`<button class="btn small ghost" data-act="printer-drop" data-id="${id}">${escapeHtml(t('mach.drop_object'))}…</button>`);
-  // A Bambu's speed preset and chamber light (the Mac's card has both). One
-  // compact menu; a change event sends it, and the menu resets to its label.
-  const PC = (typeof KhaytPrinterCommands !== 'undefined') ? KhaytPrinterCommands : null;
-  if (PC && m.printerApi.type === 'bambu' && !PC.buildControl('bambu', 'light', 'on', { transports: ['mqtt'] }).unsupported) {
+  if (_capShown(machineCapability(m, 'exclude-object'))) out.push(`<button class="btn small ghost" data-act="printer-drop" data-id="${id}">${escapeHtml(t('mach.drop_object'))}…</button>`);
+  // A Bambu's speed preset, while a job runs; a change event sends it, and the
+  // menu resets to its label.
+  if (_capShown(machineCapability(m, 'speed'))) {
     const speeds = [1, 2, 3, 4].map((n) => `<option value="speed:${n}">${escapeHtml(t('mach.printer_speed_' + n))}</option>`).join('');
-    out.push(`<select class="btn small ghost" data-printer-control="${id}" aria-label="${escapeHtml(t('mach.printer_speed'))}">
-      <option value="" selected>${escapeHtml(t('mach.printer_speed'))} / ${escapeHtml(t('mach.printer_light'))}…</option>
-      <optgroup label="${escapeHtml(t('mach.printer_speed'))}">${speeds}</optgroup>
-      <optgroup label="${escapeHtml(t('mach.printer_light'))}">
-        <option value="light:on">${escapeHtml(t('mach.printer_light_on'))}</option>
-        <option value="light:off">${escapeHtml(t('mach.printer_light_off'))}</option>
-      </optgroup></select>`);
+    out.push(`<select class="btn small ghost" style="width:auto;flex:none;" data-printer-control="${id}" aria-label="${escapeHtml(t('mach.printer_speed'))}">
+      <option value="" selected>${escapeHtml(t('mach.printer_speed'))}…</option>${speeds}</select>`);
   }
-  return out.join('');
+  return out.join('') + lights;
+}
+
+/* What a switch last sent, by machine and control: neither printer reports its
+ * light in the poll, so the switch shows what this computer last asked for. */
+const _switchSent = new Map();
+async function printerSwitch(machineId, control, on) {
+  const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === machineId);
+  if (!m || _printerBusy.has(machineId) || !window.hubAPI?.printerControl) return false;
+  _printerBusy.add(machineId);
+  try {
+    const r = await window.hubAPI.printerControl(m, control, on ? 'on' : 'off').catch((e) => ({ ok: false, error: String(e && e.message || e) }));
+    if (r && r.ok) { _switchSent.set(machineId + '|' + control, on); toast(t(on ? 'mach.light_on_sent' : 'mach.light_off_sent'), 'success'); return true; }
+    toast(t('mach.printer_failed', { error: explainRefusal((r && (r.error || r.unsupported)) || '') }), r && r.unconfirmed ? 'warning' : 'error');
+    return false;
+  } finally {
+    _printerBusy.delete(machineId);
+  }
+}
+
+/** The light switches a card draws, and why one is missing (CAP1's notes). */
+function machineLightSwitchesHtml(m, entry) {
+  const id = escapeHtml(m.id);
+  const out = [];
+  const sw = (control, label, on) => `<button type="button" class="mcap-switch${on ? ' on' : ''}" role="switch" aria-checked="${on ? 'true' : 'false'}" data-printer-switch="${id}" data-control="${control}">
+      <span class="mcap-switch-label">${escapeHtml(label)}</span><span class="mcap-track" aria-hidden="true"><span class="mcap-knob"></span></span></button>`;
+  const light = machineCapability(m, 'light');
+  const seen = (control, fromPrinter) => (typeof fromPrinter === 'boolean' ? fromPrinter : _switchSent.get(m.id + '|' + control) === true);
+  if (_capShown(light)) out.push(sw('light', t('mach.printer_light'), seen('light', entry && entry.light)));
+  const chamber = machineCapability(m, 'chamber-light');
+  if (_capShown(chamber)) out.push(sw('chamber-light', t('mach.chamber_light'), seen('chamber-light', entry && entry.chamberLight)));
+  let note = '';
+  if (light.state === 'addon') note = t('mach.cap_addon_note.' + light.addon);
+  else if (light.state === 'unknown' && machineCatalogId(m) && m.printerApi && m.printerApi.type === 'bambu') {
+    note = t('mach.cap_light_unknown', { model: (typeof KhaytPrinterCatalog !== 'undefined' && KhaytPrinterCatalog.get(machineCatalogId(m)) || {}).name || '' });
+  }
+  return out.join('') + (note ? `<span class="mcap-note">${escapeHtml(note)}</span>` : '');
 }
 
 const _printerBusy = new Set();
@@ -396,6 +487,8 @@ async function openDropObject(machineId) {
  * seconds.
  */
 function updateMachinesLiveStatus() {
+  renderMachineNeeds();
+  renderMachineHeads();
   document.querySelectorAll('#machinesList [data-machine-live]').forEach((el) => {
     const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === el.dataset.machineLive);
     if (m) el.innerHTML = machineLiveBadge(m);
@@ -407,6 +500,236 @@ function updateMachinesLiveStatus() {
   document.querySelectorAll('#machinesList [data-machine-ctl]').forEach((el) => {
     const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === el.dataset.machineCtl);
     if (m) el.innerHTML = machineControlsHtml(m);
+  });
+}
+
+/* ── What a printer needs from a person (Figma 136:153, N1) ──────────────
+ *
+ * Under each card: the printer's own problems while it answers, worst first,
+ * and "waiting at the machine" for a bed, which is read from what Khayt
+ * stored and so survives a restart and a printer that is off. Both come from
+ * main's lib/printer-needs.js (hub:printer-needs), the same lists a paired
+ * phone reads from /api/machines/live. A filament runout or "needs attention"
+ * is shown once, as a problem; the waiting rows here are the bed's. "Bed is
+ * clear" is the same stamp as the queue's and a phone's (machine.bedClearedAt).
+ */
+let _machineNeedsSeq = 0;
+/** `given`: a needs map to draw instead of asking main (tests and screenshots). */
+async function renderMachineNeeds(given) {
+  const blocks = document.querySelectorAll('#machinesList [data-machine-needs]');
+  if (!blocks.length || (!given && !window.hubAPI?.printerNeeds)) return;
+  const seq = ++_machineNeedsSeq;
+  let needs = {};
+  if (given && typeof given === 'object') needs = given;
+  else { try { needs = (await window.hubAPI.printerNeeds()) || {}; } catch (_) { needs = {}; } }
+  if (seq !== _machineNeedsSeq) return;   // a newer render is under way
+  document.querySelectorAll('#machinesList [data-machine-needs]').forEach((el) => {
+    const id = el.dataset.machineNeeds;
+    const html = machineNeedsHtml((typeof machines !== 'undefined' ? machines : []).find((x) => x.id === id), needs[id]);
+    el.innerHTML = html;
+    el.hidden = !html;
+  });
+}
+
+function machineNeedsHtml(m, need) {
+  if (!m || !need) return '';
+  const problems = Array.isArray(need.problems) ? need.problems : [];
+  // A bed the window has already said is clear is not drawn again while main
+  // catches up with the save (a poll can redraw from main's older book).
+  const cleared = Date.parse(String(m.bedClearedAt || ''));
+  const waiting = (Array.isArray(need.waiting) ? need.waiting : []).filter((w) => w && (w.reason === 'print-to-take-off' || w.reason === 'bed-to-clear')
+    && !(Number.isFinite(cleared) && Number(w.since) < cleared));
+  if (!problems.length && !waiting.length) return '';
+  const rows = problems.slice(0, 6).map((p) => {
+    const tone = p.severity === 'info' ? 'info' : (p.severity === 'common' ? 'warn' : 'bad');
+    const own = (p.code === 'printer-exception' || p.code === 'printer-error' || p.code === 'printer-attention') && p.message;
+    // The printer's own words keep their own direction (<bdi>): an English
+    // message inside an Arabic sentence otherwise pulls the quote marks round.
+    let title;
+    if (own) title = escapeHtml(t('needs.printer_says', { message: '\u0001' })).replace('\u0001', () => `<bdi>${escapeHtml(String(p.message))}</bdi>`);
+    else {
+      title = t('needs.problem.' + p.code) || p.code;
+      if (Number.isInteger(p.head)) title = t('needs.on_tool', { what: title, n: String(p.head + 1) });
+      title = escapeHtml(title);
+    }
+    const actKey = own ? 'needs.own_message' : (p.code === 'power-lost' ? 'needs.action.power-lost' : 'needs.action.' + p.action);
+    const act = p.action === 'none' && !own ? '' : t(actKey);
+    return `<div class="mn-row"><span class="mn-ico mn-${tone}" aria-hidden="true">${tone === 'info' ? 'i' : '!'}</span>
+      <div class="mn-text"><div class="mn-title">${title}</div>${act ? `<div class="mn-sub">${escapeHtml(act)}</div>` : ''}</div></div>`;
+  }).join('');
+  const cache = (typeof machineStatusCache !== 'undefined' && machineStatusCache) || {};
+  const entry = cache[m.id];
+  const answering = !!(entry && !entry.error) && !m.isOffline;
+  const waits = waiting.slice(0, 2).map((w) => `<div class="mn-row mn-wait">
+      <div class="mn-text"><div class="mn-title mn-amber">${escapeHtml(t('needs.wait.' + w.reason))}</div>
+      <div class="mn-sub">${escapeHtml([machineNeedsSince(w.since), t(answering ? 'needs.wait_live' : 'needs.wait_offline')].filter(Boolean).join(' '))}</div></div>
+      <button type="button" class="btn small mn-clear" data-machine-bed-clear="${escapeHtml(m.id)}">${escapeHtml(t('needs.bed_clear'))}</button>
+    </div>`).join('');
+  return rows + waits;
+}
+
+/** "Since 14:10 today." / "Since yesterday, 18:40." / "Since 20 Nov, 09:05." in the shop's language. */
+function machineNeedsSince(since) {
+  const at = typeof since === 'number' ? since : Date.parse(String(since || ''));
+  if (!Number.isFinite(at)) return '';
+  const d = new Date(at), now = new Date();
+  const time = d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' });
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (at >= dayStart) return t('needs.since_today', { time });
+  if (at >= dayStart - 86400000) return t('needs.since_yesterday', { time });
+  return t('needs.since_date', { date: d.toLocaleDateString(localeTag(), { day: 'numeric', month: 'short' }), time });
+}
+
+/* ── LOADED ON THIS PRINTER (Figma 134:282, U1-1; 134:333, U1-2) ─────────────
+ *
+ * A Snapmaker U1 says what each head holds twice: what was set on the printer
+ * (the poll's `loaded`) and, for a tagged spool, its RFID tag (filament_detect,
+ * lib/rfid-tray.js through hub:printer-spool-tags). Which of the shop's spools
+ * a head holds is the shop's own record, `machine.headSpools[head] = spoolId`,
+ * written only by a click in the Link dialog. Khayt never changes a spool.
+ */
+const _headTags = new Map();     // machine id → { at, heads }
+const HEAD_TAGS_EVERY_MS = 60000;
+async function renderMachineHeads() {
+  const els = document.querySelectorAll('#machinesList [data-machine-heads]');
+  for (const el of els) {
+    const m = machines.find((x) => x.id === el.dataset.machineHeads);
+    if (!m) continue;
+    const entry = ((typeof machineStatusCache !== 'undefined' && machineStatusCache) || {})[m.id];
+    const answering = !!(entry && !entry.error);
+    const had = _headTags.get(m.id);
+    if (answering && window.hubAPI?.printerSpoolTags && (!had || Date.now() - had.at > HEAD_TAGS_EVERY_MS)) {
+      _headTags.set(m.id, { at: Date.now(), heads: had ? had.heads : [] });
+      window.hubAPI.printerSpoolTags(m).then((r) => {
+        if (r && r.ok) { _headTags.set(m.id, { at: Date.now(), heads: Array.isArray(r.heads) ? r.heads : [] }); paintMachineHeads(m.id); }
+      }).catch(() => {});
+    }
+    paintMachineHeads(m.id);
+  }
+}
+
+function _spoolLabel(s) {
+  if (!s) return '';
+  const name = [s.brand, s.material, s.colourVariant].filter((x) => x && String(x).trim()).join(' ');
+  return name || String(s.id);
+}
+function _kgOrG(g) {
+  const n = Number(g);
+  if (!(n > 0)) return '';
+  return n >= 1000 && n % 100 === 0 ? t('mach.heads_kg', { n: String(n / 1000) }) : t('mach.heads_g', { n: String(Math.round(n)) });
+}
+function _headTray(tag, live) {
+  if (tag && tag.material) return tag;
+  if (live && live.material) return { material: String(live.material).split(' ')[0], sub: '', colours: live.hex ? [live.hex] : [], manufacturer: '', vendor: '' };
+  return null;
+}
+
+function machineHeadsRows(m) {
+  const entry = ((typeof machineStatusCache !== 'undefined' && machineStatusCache) || {})[m.id] || {};
+  const tags = (_headTags.get(m.id) || {}).heads || [];
+  const LC = (typeof KhaytLoadedColours !== 'undefined') ? KhaytLoadedColours : null;
+  const live = LC ? LC.normalizeLoaded(entry.loaded) : [];
+  const links = (m.headSpools && typeof m.headSpools === 'object') ? m.headSpools : {};
+  const count = Math.max(4, tags.length, live.length ? Math.max(...live.map((l) => l.slot)) + 1 : 0);
+  const rows = [];
+  for (let i = 0; i < Math.min(count, 16); i++) {
+    const tag = tags[i] || null;
+    const slot = live.find((l) => l.slot === i) || null;
+    const spool = links[i] != null ? inventory.find((x) => String(x.id) === String(links[i])) : null;
+    rows.push({ head: i, tag, live: slot, spool, hex: (tag && tag.colours && tag.colours[0]) || (slot && slot.hex) || (spool && spool.color) || '' });
+  }
+  return rows;
+}
+
+function paintMachineHeads(machineId) {
+  const el = document.querySelector(`#machinesList [data-machine-heads="${CSS.escape(machineId)}"]`);
+  const m = machines.find((x) => x.id === machineId);
+  if (!el || !m) return;
+  const RT = (typeof KhaytRfidTray !== 'undefined') ? KhaytRfidTray : null;
+  const rows = machineHeadsRows(m).map((r) => {
+    const n = String(r.head + 1);
+    const src = r.tag || r.live;
+    if (!src && !r.spool) return `<div class="mhead"><span class="mhead-dot mhead-empty" aria-hidden="true"></span><div class="mhead-text"><div class="mhead-title">${escapeHtml(t('mach.heads_nothing', { n }))}</div></div></div>`;
+    const maker = r.tag ? (r.tag.manufacturer || r.tag.vendor || '') : '';
+    const material = r.tag ? [r.tag.material, r.tag.sub].filter(Boolean).join(' ') : (r.live ? r.live.material : (r.spool && r.spool.material) || '');
+    const title = [t('mach.heads_tool', { n }), material, maker].filter(Boolean).join(' · ');
+    const how = r.tag ? [t('mach.heads_tag_read'), _kgOrG(r.tag.weightG) ? t('mach.heads_spool_of', { size: _kgOrG(r.tag.weightG) }) : ''].filter(Boolean).join(' · ')
+      : (r.live ? t('mach.heads_set_on_printer') : '');
+    let linkLine;
+    if (r.spool) linkLine = `<div class="mhead-sub mhead-ink">${escapeHtml(t('mach.heads_linked', { spool: _spoolLabel(r.spool), left: _kgOrG(r.spool.weight) || '0 g' }))}</div>`;
+    else if (r.tag && RT && RT.spoolMatch(r.tag, inventory).action === 'new') linkLine = `<div class="mhead-sub mhead-amber">${escapeHtml(t('mach.heads_no_match'))}</div>`;
+    else linkLine = `<div class="mhead-sub">${escapeHtml(t('mach.heads_not_linked'))}</div>`;
+    const dot = r.hex ? `<span class="mhead-dot" style="background:${safeCssColor(r.hex)};" aria-hidden="true"></span>` : '<span class="mhead-dot mhead-empty" aria-hidden="true"></span>';
+    return `<div class="mhead">${dot}<div class="mhead-text"><div class="mhead-title">${escapeHtml(title)}</div>${how ? `<div class="mhead-sub">${escapeHtml(how)}</div>` : ''}${linkLine}</div>
+      <button type="button" class="btn small" data-head-link="${escapeHtml(m.id)}" data-head="${r.head}">${escapeHtml(t(r.spool ? 'mach.heads_change' : 'mach.heads_link'))}</button></div>`;
+  }).join('');
+  el.innerHTML = `<div class="mheads-eyebrow">${escapeHtml(t('mach.heads_title'))}</div>${rows}
+    <button type="button" class="btn-link mheads-add" data-heads-add="1">${escapeHtml(t('mach.heads_add'))}</button>
+    <div class="mheads-note">${escapeHtml(t('mach.heads_note'))}</div>`;
+}
+
+/** U1-2: which of the shop's spools is in this head. Never edits a spool. */
+function openHeadLink(machineId, head) {
+  const m = machines.find((x) => x.id === machineId);
+  if (!m) return;
+  const r = machineHeadsRows(m).find((x) => x.head === head);
+  if (!r) return;
+  const RT = (typeof KhaytRfidTray !== 'undefined') ? KhaytRfidTray : null;
+  const tray = _headTray(r.tag, r.live);
+  const match = RT && tray ? RT.spoolMatch(tray, inventory) : { action: 'none' };
+  const ids = match.action === 'link' ? [match.spoolId] : (match.action === 'ask' ? match.candidates.map((c) => c.spoolId) : []);
+  const candidates = ids.map((id) => inventory.find((s) => String(s.id) === String(id))).filter(Boolean);
+  const bestWhy = match.action === 'link' ? t('mach.heads_best') : t('mach.heads_same');
+  const from = r.tag ? [r.tag.material, r.tag.manufacturer || r.tag.vendor, _kgOrG(r.tag.weightG), r.tag.diameterMm ? t('mach.heads_mm', { n: String(r.tag.diameterMm) }) : ''].filter(Boolean).join(' · ') : '';
+  // Under the staff lock: adding a spool is inventory/create, as Spoolman's
+  // import asks (review); linking edits the machine's record.
+  const mayCreate = !(typeof operatorCan === 'function') || operatorCan('inventory', 'create');
+  if (typeof operatorCan === 'function' && !operatorCan('settings', 'edit') && !operatorCan('printers', 'edit')) {
+    toast(explainRefusal('not_permitted'), 'error');
+    return;
+  }
+  const prefill = mayCreate && r.tag && RT ? (RT.spoolMatch(r.tag, []).prefill || null) : null;
+  let chosen = r.spool ? String(r.spool.id) : (candidates[0] ? String(candidates[0].id) : (prefill ? '__new' : ''));
+  const card = (value, title, sub) => `<label class="mlink-opt${value === chosen ? ' on' : ''}"><input type="radio" name="mlinkPick" value="${escapeHtml(value)}"${value === chosen ? ' checked' : ''}>
+      <span class="mlink-title">${escapeHtml(title)}</span><span class="mlink-sub">${escapeHtml(sub)}</span></label>`;
+  const list = candidates.map((s, i) => card(String(s.id), [_spoolLabel(s), _kgOrG(s.weight) ? t('mach.heads_left', { left: _kgOrG(s.weight) }) : ''].filter(Boolean).join(' · '), i === 0 ? bestWhy : t('mach.heads_same'))).join('')
+    + (prefill ? card('__new', t('mach.heads_add_new'), t('mach.heads_add_new_sub', { what: [prefill.material, _kgOrG(prefill.weight)].filter(Boolean).join(', ') })) : '');
+  openFormModal({
+    title: t('mach.heads_which', { n: String(head + 1) }),
+    bodyHtml: `${from ? `<p class="mlink-from">${escapeHtml(t('mach.heads_from_tag', { what: from }))}</p>` : ''}
+      <div class="mlink-list">${list || `<p class="mlink-from">${escapeHtml(t('mach.heads_none_to_link'))}</p>`}</div>
+      <p class="mlink-note">${escapeHtml(t('mach.heads_link_note'))}</p>`,
+    saveLabel: t('mach.heads_link_btn'),
+    sizeLg: false,
+    onMount: (modal) => {
+      modal.querySelectorAll('input[name="mlinkPick"]').forEach((inp) => inp.addEventListener('change', () => {
+        chosen = inp.value;
+        modal.querySelectorAll('.mlink-opt').forEach((o) => o.classList.toggle('on', o.querySelector('input').checked));
+      }));
+    },
+    onSave: () => {
+      if (!chosen) return false;
+      let spoolId = chosen;
+      if (chosen === '__new') {
+        if (typeof operatorCan === 'function' && !operatorCan('inventory', 'create')) { toast(explainRefusal('not_permitted'), 'error'); return false; }
+        // Added because the shop clicked it; its price is the shop's to set.
+        const SE = (typeof globalThis !== 'undefined' && globalThis.KhaytSpoolEdit) || null;
+        if (!SE) return false;
+        const made = SE.newSpool({ material: prefill.material, weight: prefill.weight || '', color: prefill.color || '', cost: '', materialType: 'fdm' },
+          { id: uid('INV'), today: localDateStr(), activeLocation: (typeof activeLocation !== 'undefined') ? activeLocation : null });
+        if (made.refused) { toast(t('inv.material_ph'), 'error'); return false; }
+        if (prefill.brand) made.spool.brand = prefill.brand;
+        inventory.push(made.spool);
+        spoolId = made.spool.id;
+      }
+      const now = machines.find((x) => x.id === machineId);
+      if (!now) return true;
+      now.headSpools = Object.assign({}, now.headSpools || {}, { [head]: spoolId });
+      saveAll();
+      paintMachineHeads(machineId);
+      if (chosen === '__new' && typeof openInventoryEditor === 'function') setTimeout(() => openInventoryEditor(spoolId), 50);
+      return true;
+    },
   });
 }
 
@@ -499,7 +822,7 @@ function renderMachines() {
         ${retired ? `<span class="machine-jobs-badge" style="background:var(--text-muted); color:#fff;">${escapeHtml(t('mach.retired_badge', { date: m.retiredAt || '' }))}</span>` : ''}
         ${m.isOffline ? `<span class="machine-jobs-badge" style="background:var(--danger); color:#fff;">${_mIcoL('alert', '⚠', 12)}${escapeHtml(t('mach.offline_badge'))}</span>` : ''}
         <span data-machine-live="${escapeHtml(m.id)}">${machineLiveBadge(m)}</span>
-        <span data-machine-ctl="${escapeHtml(m.id)}" style="display:inline-flex;gap:6px;">${retired ? '' : machineControlsHtml(m)}</span>
+        <span data-machine-ctl="${escapeHtml(m.id)}" style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;max-width:100%;">${retired ? '' : machineControlsHtml(m)}</span>
         ${retired ? '' : smartPlugCardHtml(m)}
         ${active > 0 ? `<span class="machine-jobs-badge">${escapeHtml(t(active === 1 ? 'mach.active_jobs_one' : 'mach.active_jobs_many', { n: active }))}</span>` : ''}
         ${svcBadge ? `<span class="pro-only">${svcBadge}</span>` : ''}
@@ -514,6 +837,8 @@ function renderMachines() {
           ? `<button class="btn small" data-act="unretire-mach" data-id="${m.id}">${escapeHtml(t('mach.unretire'))}</button>`
           : `<button class="btn danger small" data-act="del-mach" data-id="${m.id}">${escapeHtml(t('common.delete'))}</button>`}
         <div data-machine-detail="${escapeHtml(m.id)}" style="flex-basis:100%;">${retired ? '' : machineLiveDetailHtml(m)}</div>
+        ${retired ? '' : `<div class="mach-needs" data-machine-needs="${escapeHtml(m.id)}" hidden></div>`}
+        ${(!retired && machineCatalogId(m) === 'snapmaker-u1') ? `<div class="mheads" data-machine-heads="${escapeHtml(m.id)}"></div>` : ''}
         ${nozzleHtml}
         ${specsHtml}
         ${(typeof KhaytWebcam !== 'undefined' && KhaytWebcam.hasCamera(m)) ? `
@@ -522,6 +847,8 @@ function renderMachines() {
         </div>` : ''}
       </div>`;
   }).join('');
+  renderMachineNeeds();
+  renderMachineHeads();
   // The support link opens in the shop's browser, not in the app window.
   // Wired here rather than in the markup because the list is rebuilt on every
   // render and an inline handler would be a CSP violation in this renderer.
@@ -636,6 +963,7 @@ function openMachineEditor(machineId = null) {
       </div>
       <div id="machScanResults" style="display:none;margin-top:6px;"></div>
       <div id="machPrinterModelHint" style="font-size:11px;color:var(--text-muted);margin-top:3px;">${escapeHtml(t('mach.printer_model_hint') || 'Pick a model to auto-fill nozzle, build volume, colours and power.')}</div>
+      <div id="machAccessories"></div>
       ${measuredPowerHtml(draft)}
       <label style="margin-top:12px;">${escapeHtml(t('mach.color'))}</label>
       <div id="machColorPicker" style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
@@ -942,7 +1270,7 @@ function openMachineEditor(machineId = null) {
 
           const applyFound = (p) => {
             // Specs first (via the catalog, when the advertised model matched one)…
-            if (p.catalogId && PC) fillSpecs(PC.toMachineSpecs(p.catalogId), p.name);
+            if (p.catalogId && PC) { draft.catalogId = p.catalogId; fillSpecs(PC.toMachineSpecs(p.catalogId), p.name); renderMachineAccessories(modal, draft); }
             const pmEl = modal.querySelector('#machPrinterModel');
             if (pmEl && p.name) pmEl.value = p.name;
             const nameEl = modal.querySelector('#machName');
@@ -1051,7 +1379,9 @@ function openMachineEditor(machineId = null) {
           const nm = (raw || '').trim();
           if (!nm) return;
           const hit = catalog.find(p => p.name.toLowerCase() === nm.toLowerCase());
-          if (hit && PC) { fillSpecs(PC.toMachineSpecs(hit.id), hit.name); return; }
+          if (hit && PC) { draft.catalogId = hit.id; fillSpecs(PC.toMachineSpecs(hit.id), hit.name); renderMachineAccessories(modal, draft); return; }
+          delete draft.catalogId;   // not a catalogue model: nothing known about its parts
+          renderMachineAccessories(modal, draft);
           if (window.hubAPI?.orcaMachineInfo) {
             try {
               const r = await window.hubAPI.orcaMachineInfo(nm);
@@ -1069,6 +1399,7 @@ function openMachineEditor(machineId = null) {
           draft.printerModel = nm; draft.printerModelName = nm;
         };
         pmInput.addEventListener('change', () => applyModel(pmInput.value));
+        renderMachineAccessories(modal, draft);
       })();
 
       // Camera detect: ASK the printer, and only guess if it cannot answer.
@@ -2115,7 +2446,18 @@ async function sliceAndPrintForMachine(machineId) {
   const isGcode = /\.(gcode|gco|g)$/i.test(filePath);
   const sl = settings.slicer || {};
   if (!isGcode && !sl.path) { toast(t('slicer.no_config'), 'error'); return; } // slicing needs a slicer; pre-sliced G-code doesn't
-  const ok = await confirmModal(t(isGcode ? 'slicer.send_gcode_confirm' : 'slicer.start_confirm', { name: machine.name }));
+  // Checked against this printer before it goes (Figma 129, S1/S1b/S1c;
+  // renderer/send-checks-dialog.js over lib/send-checks.js). A model to be
+  // sliced first has no file facts yet: its bed is still checked.
+  let ok;
+  if (typeof openSendChecks === 'function') {
+    const facts = (window.hubAPI?.printerSendFacts && await window.hubAPI.printerSendFacts({ gcodePath: filePath }))
+      || { name: filePath.split(/[\\/]/).pop() };
+    if (!facts.name) facts.name = filePath.split(/[\\/]/).pop();
+    ok = await openSendChecks({ machine, facts, model: !isGcode });
+  } else {
+    ok = await confirmModal(t(isGcode ? 'slicer.send_gcode_confirm' : 'slicer.start_confirm', { name: machine.name }));
+  }
   if (!ok) return;
   toast(t('slicer.sending') || 'Slicing & sending…', 'info');
   try {
@@ -2323,6 +2665,14 @@ function machineWearRate(m) {
     openWaSendModal,
     estimateMachineQueueClearDate,
     machineLiveBadge,
+    renderMachineNeeds,
+    machineNeedsHtml,
+    machineNeedsSince,
+    renderMachineHeads,
+    openHeadLink,
+    printerSwitch,
+    // What a U1's heads' tags said, set as hub:printer-spool-tags would (tests).
+    setHeadTags: (id, heads) => { _headTags.set(String(id), { at: Date.now(), heads: Array.isArray(heads) ? heads : [] }); },
     updateMachinesLiveStatus,
     machineRecentHours,
     machineWearRate,
