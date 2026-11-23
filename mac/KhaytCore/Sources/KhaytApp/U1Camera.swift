@@ -98,6 +98,7 @@ enum U1Camera {
               await frameAllowed(frame, id: id, engine: engine) else {
             return (renew, .refused)
         }
+        guard OutboundGate.shared.allows(.lan, host: url.host()) else { return (renew, .refused) }
         var request = URLRequest(url: url)
         request.timeoutInterval = Double(plan.deadlineMs) / 1000
         for (name, value) in plan.headers { request.setValue(value, forHTTPHeaderField: name) }
@@ -173,6 +174,7 @@ enum U1Camera {
               let rec = await record(machine, shop: shop),
               let plan = try? await engine.chamberLight(machine: rec.row),
               let url = await aimed(plan.queryUrl, api: rec.api, engine: engine, lookUp: lookUp) else { return nil }
+        guard OutboundGate.shared.allows(.lan, host: url.host()) else { return nil }
         var request = URLRequest(url: url)
         request.timeoutInterval = 2
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
@@ -196,6 +198,7 @@ enum U1Camera {
               let script = try? await engine.chamberLightScript(on: on),
               (try? await engine.scriptAllowed(script)) == true,
               let url = await aimed(plan.scriptUrl, api: rec.api, engine: engine, lookUp: lookUp) else { return nil }
+        guard OutboundGate.shared.allows(.lan, host: url.host()) else { return nil }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 2

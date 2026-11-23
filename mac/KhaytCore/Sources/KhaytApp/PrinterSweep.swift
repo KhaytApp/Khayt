@@ -147,6 +147,7 @@ enum PrinterSweep {
     /// printer's API key to the wrong device. `PrinterMovedTests` holds it.
     static func request(_ host: String, port: Int, path: String) -> URLRequest? {
         guard let url = URL(string: "http://\(host):\(port)\(path)") else { return nil }
+        guard OutboundGate.shared.allows(.lan, host: host) else { return nil }
         var request = URLRequest(url: url)
         request.timeoutInterval = perHost
         request.httpMethod = "GET"
@@ -162,7 +163,7 @@ enum PrinterSweep {
     static func ask(_ host: String, port: Int, path: String,
                     type: String) async -> (String, String, Int, Data)? {
         guard let request = request(host, port: port, path: path) else { return nil }
-        let session = URLSession(configuration: .ephemeral)
+        let session = URLSession(configuration: .ephemeral, delegate: RefuseRedirects.shared, delegateQueue: nil)
         session.configuration.timeoutIntervalForRequest = perHost
         defer { session.finishTasksAndInvalidate() }
         guard let (data, response) = try? await session.data(for: request),

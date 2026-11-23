@@ -71,7 +71,7 @@ enum WebhookClient {
                         event: String, engine: KhaytEngine) async throws -> Int {
         let payload = try JSONEncoder().encode(body)
         let headers = signedHeaders(payload: payload, secret: secret, event: event, now: Date())
-        return try await post(payload, to: url, headers: headers, engine: engine)
+        return try await post(payload, to: url, headers: headers, engine: engine, purpose: .webhooks)
     }
 
     /// One POST of these bytes with these headers, through BOTH guards and the
@@ -79,9 +79,14 @@ enum WebhookClient {
     /// push and an SMS provider too: each carries a shop's secret in a header
     /// to an address the book names, which is exactly the request the guards
     /// are for. Returns the HTTP status, or throws for a fault.
+    ///
+    /// `purpose` is what the POST is FOR, said by the caller and never
+    /// defaulted: this one socket carries webhooks, the accounting push and an
+    /// SMS provider, and "make no internet calls" keeps or blocks each on its
+    /// own (`OutboundGate`).
     static func post(_ payload: Data, to url: URL, headers: [(String, String)],
-                     engine: KhaytEngine) async throws -> Int {
-        try await exchange(payload, to: url, headers: headers, engine: engine, timeout: timeout, keep: 0).status
+                     engine: KhaytEngine, purpose: OutboundPurpose) async throws -> Int {
+        try await exchange(payload, to: url, headers: headers, engine: engine, timeout: timeout, keep: 0, purpose: purpose).status
     }
 
     /// The same POST, through the same guards, with the answer's body read too
@@ -90,14 +95,16 @@ enum WebhookClient {
     /// HTTP — the status still stands.
     static func postReading(_ payload: Data, to url: URL, headers: [(String, String)],
                             engine: KhaytEngine, timeout: TimeInterval, keep: Int,
-                            method: String = "POST") async throws -> (status: Int, body: Data?) {
-        try await exchange(payload, to: url, headers: headers, engine: engine, timeout: timeout, keep: keep, method: method)
+                            method: String = "POST", purpose: OutboundPurpose) async throws -> (status: Int, body: Data?) {
+        try await exchange(payload, to: url, headers: headers, engine: engine, timeout: timeout, keep: keep, method: method, purpose: purpose)
     }
 
     private static func exchange(_ payload: Data, to url: URL, headers: [(String, String)],
                                  engine: KhaytEngine, timeout: TimeInterval, keep: Int,
-                                 method: String = "POST") async throws -> (status: Int, body: Data?) {
+                                 method: String = "POST", purpose: OutboundPurpose) async throws -> (status: Int, body: Data?) {
         guard let host = url.host, !host.isEmpty else { throw Failure.blocked("") }
+        // Before the name is even looked up: a refused call makes no DNS query.
+        try OutboundGate.shared.require(purpose)
         // https ONLY, which is what the other app allows. Plain http would
         // carry a shop's order data and its HMAC across the network in the
         // clear, and there is no consumer that needs it.

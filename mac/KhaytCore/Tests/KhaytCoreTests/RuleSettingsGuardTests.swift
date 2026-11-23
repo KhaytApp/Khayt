@@ -53,7 +53,7 @@ struct RuleSettingsGuardTests {
     static let trimmed: Set<String> = [
         "aiFeatures", "applyJobEdit", "billedAndPaidByOrder", "cashFlow", "catalogue", "chaseSwitches",
         "contentLanguages", "customerNames", "dashboardFacts", "defaultSlicer", "duplicateNumbers",
-        "estimateMesh", "estimateMeshes", "inventoryUnits", "kpis", "lateOrders", "lowStock",
+        "estimateMesh", "estimateMeshes", "inventoryUnits", "kpis", "lateOrders", "lowStock", "outboundAllowed",
         "lowStockWarning", "needsOrdering", "nozzleWear", "orderFigures", "orderNextSteps", "overhead",
         "owedByOrder", "previewNewOrder", "revenueOutlook", "riskWhen", "shopText", "slicers", "taxProfile",
         "tradeRevenue",

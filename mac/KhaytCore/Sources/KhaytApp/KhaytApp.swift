@@ -143,7 +143,17 @@ struct KhaytApp: App {
                     // there is not. Reading is safe, the source is named in the
                     // toolbar, and an app that opens on invented data when real
                     // data exists is answering a question nobody asked.
+                    // A refused internet call says why in this shop's words.
+                    OutboundBlocked.speaker = { [weak shop] blocked in
+                        guard let shop else { return blocked.description }
+                        let sentence = shop.outboundSentence(blocked)
+                        shop.noteOutboundRefusal(blocked, sentence: sentence)
+                        return sentence
+                    }
                     await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
+                    // The book is read: a launch check for updates that waited
+                    // for it is made now, if the shop's switch allows one.
+                    Updates.shared.bookWasRead()
                     // A new shop — an empty book, or no book on this Mac at
                     // all — is offered the setup, once. See `ShopSetup.offers`.
                     shop.offerSetupIfNew()
@@ -155,6 +165,10 @@ struct KhaytApp: App {
                     // Opt-in crash reports and usage counts (#1789). Sends
                     // nothing unless the book says so; see `Telemetry`.
                     Telemetry.shared.start(shop: shop)
+                    // The shop's switch as Khayt Cloud holds it, for a shop that
+                    // shares it: now, and every fifteen minutes
+                    // (`Shop+NetworkSwitch`). Asks nothing unless signed in.
+                    shop.startNetworkSwitchChecks()
                     // Pages saved with the browser extension, waiting in the
                     // app group's inbox (`WebSaveInbox`). Never in a snapshot
                     // run: that is the sample, which would refuse and drop them.
@@ -968,6 +982,12 @@ final class Activator: NSObject, NSApplicationDelegate {
             // deleting, on the sample, in memory (`SnapshotVaultLapse.swift`).
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_VAULTLAPSE"] == "1", let shop = subject {
                 await captureVaultLapse(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // The Internet use page, page 27's frames (`SnapshotInternetUse.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_INTERNETUSE"] == "1", let shop = subject {
+                await captureInternetUse(shop, into: dir, dark: dark)
                 NSApp.terminate(nil)
                 return
             }

@@ -1257,6 +1257,7 @@ struct MachineSheet: View {
         // refuse. Resolved, and aimed at the address that was checked, as the
         // camera tile does (`PrinterWatch.pinned`).
         guard let aimed = await PrinterWatch.pinned(url, engine: engine) else { return nil }
+        guard OutboundGate.shared.allows(.lan, host: aimed.host()) else { return nil }
         var request = URLRequest(url: aimed)
         request.timeoutInterval = 4
         if Camera.samePrinterHost(url, printerApi: row),

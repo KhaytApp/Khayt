@@ -765,6 +765,8 @@ extension Shop {
     ///   valid and nothing here has to reach into another app's bookkeeping.
     func pullFromCloud() async {
         guard permitted("cloud", "edit") else { return }
+        // Beside each sync: the shop's switch as Khayt Cloud holds it.
+        await checkNetworkSwitch()
         cloudProblem = nil
         cloudSent = nil
         cloudPulled = nil
