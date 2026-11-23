@@ -314,10 +314,9 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
 
     var displayName: String { name ?? id }
 
-    var isPrinting: Bool { (state ?? "").lowercased().contains("print") }
-    /// Paused is a print still on the bed, not an ending — a pause raised a
-    /// "Print finished" alert while `isPrinting` was the only question asked.
-    var isPaused: Bool { (state ?? "").lowercased().contains("pause") }
+    // isPrinting, isPaused, isBusy, needsPerson and saysUnlinked are in
+    // Services/PrinterActivity.swift: they ask the shared rule, and this file
+    // must compile on its own (scripts/ios-contract.sh decodes with it alone).
     var hasError: Bool { !(error ?? "").isEmpty }
     /// No state at all: the Mac's last poll of this printer failed (an
     /// unreachable printer comes back as `state: null` plus the poll's error).
