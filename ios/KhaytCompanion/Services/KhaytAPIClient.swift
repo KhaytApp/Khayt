@@ -2315,7 +2315,10 @@ final class KhaytAPIClient: ObservableObject {
         guard requiresPin else { return try await send(url, method: method, body: body, auth: .none, contentType: contentType) }
         guard let device = usableDevice else { return try await send(url, method: method, body: body, auth: .pin, contentType: contentType) }
 
-        let (data, response) = try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
+        // This request's nonce, kept: a signed refusal (#2643) is signed over it.
+        let nonce = MacIdentity.nonce()
+        let (data, response) = try await send(url, method: method, body: body, auth: .device(device),
+                                              contentType: contentType, nonce: nonce)
         let status = (response as? HTTPURLResponse)?.statusCode
         if let status, (200...299).contains(status), settings.needsPairAgain {
             // A signed request went through: whatever said this phone was
@@ -2351,12 +2354,87 @@ final class KhaytAPIClient: ObservableObject {
             return try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
         case .revoked?:
             // Signed out on the Mac: never back to the PIN, never enrol.
+            //
+            // ── BUT ONLY WHEN THE MAC SAYS SO ────────────────────────────
+            //
+            // A 401 is unsigned: anything on the shop's Wi-Fi can send
+            // `device-revoked`, and acting on it forgot the PIN, the
+            // enrolment and the pinned key, so one forged reply signed the
+            // phone out for good. As with `.unknown`, the answerer first
+            // proves it holds the PINNED Mac key (`/api/proof`). Proven: the
+            // Mac really signed this phone out. Not proven, or no answer:
+            // nothing changes and the request fails as a network fault.
+            //
+            // SIGNED BY THE MAC (#2643): a Mac that has it signs the refusal
+            // with `x-khayt-reply-mac` over THIS request's nonce, the status
+            // and the body, under this phone's key, as /api/devices/self does.
+            // That closes what the proof alone leaves open (an attacker in the
+            // middle relaying /api/proof to the real Mac). A signature that is
+            // present is believed only when it verifies; it is never "repaired"
+            // by the proof. No signature (an older Mac, a sign-out over 256
+            // ago): the /api/proof check below, as before.
+            //
+            // The proof alone shows the real Mac is reachable, not that it sent
+            // this refusal (Opus review), which is why the signature wins.
+            let replyMac = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "x-khayt-reply-mac")
+            if let replyMac {
+                guard DeviceKey.verifiesReply(device, nonce: nonce, status: 401, body: data, replyMac: replyMac) else {
+                    throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+                }
+            } else {
+                // Unsigned. A Mac with #2643 refuses a LARGE upload (a photo
+                // over 1 MB, a big estimate file) from its headers, before the
+                // body, and that refusal carries no signature (docs/LAN_API.md).
+                // So ask the small signed route and act on ITS answer.
+                switch await signedRevocation(device) {
+                case .revoked:
+                    break   // signed and verified: signed out, below
+                case .notRevoked:
+                    // The Mac took a signed request: the unsigned refusal was
+                    // not the Mac's word about this phone.
+                    throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+                case .noSignedAnswer:
+                    // An older Mac (it never signs), or an impostor. NEVER a
+                    // wipe on unsigned words alone (Dev Hub, from #2643's
+                    // review): the answerer proves the pinned key, and then the
+                    // phone stops showing the book as live and asks to pair
+                    // again, as for `.unknown`, keeping its PIN, enrolment and
+                    // key. A good signed request later clears it.
+                    let key = settings.macIdentityKey
+                    if !key.isEmpty, await proves(host: settings.host, port: settings.port, key: key) {
+                        settings.needsPairAgain = true
+                        throw KhaytAPIError.unauthorized
+                    }
+                    throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+                }
+            }
             settings.forgetMac(keepShop: cloud != nil)
             enrolNotBefore = nil
             throw KhaytAPIError.server(L10n.tr("pair.signed_out"))
         case nil:
             return (data, response)
         }
+    }
+
+    private enum Revocation { case revoked, notRevoked, noSignedAnswer }
+
+    /// After an UNSIGNED `device-revoked`: one small signed request
+    /// (`GET /api/devices/self`), whose refusal a Mac with #2643 signs over
+    /// its nonce. `.revoked` only for a 401 `device-revoked` whose reply MAC
+    /// verifies; `.notRevoked` when the Mac took the signed request (2xx);
+    /// anything else (an older Mac's unsigned 401 or 404, no answer) is
+    /// `.noSignedAnswer`.
+    private func signedRevocation(_ device: DeviceKey.Credential) async -> Revocation {
+        guard let url = try? makeURL(path: "/api/devices/self") else { return .noSignedAnswer }
+        let nonce = MacIdentity.nonce()
+        guard let (data, response) = try? await send(url, method: "GET", body: nil, auth: .device(device), nonce: nonce),
+              let http = response as? HTTPURLResponse else { return .noSignedAnswer }
+        if (200...299).contains(http.statusCode) { return .notRevoked }
+        guard http.statusCode == 401, DeviceKey.refusal(data) == .revoked,
+              DeviceKey.verifiesReply(device, nonce: nonce, status: 401, body: data,
+                                      replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+        else { return .noSignedAnswer }
+        return .revoked
     }
 
     private enum Auth { case none, pin, device(DeviceKey.Credential) }
