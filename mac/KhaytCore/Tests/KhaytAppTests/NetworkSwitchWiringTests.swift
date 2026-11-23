@@ -79,6 +79,15 @@ struct NetworkSwitchWiringTests {
         try await OutboundGate.$scoped.withValue(shop.outboundGate) { try await work() }
     }
 
+    /// A stamp `secondsAgo` before now; negative is AHEAD of now.
+    ///
+    /// "Another computer's newer change" is a stamp a MINUTE ahead, never a
+    /// couple of seconds: the Mac's own change is stamped when it happens,
+    /// and on a loaded CI runner two seconds pass between this line and that
+    /// one, so the "newer" stamp was older by then and the test's whole
+    /// premise flipped (Nov 23 2026: `keepOnThisMacOnly` failed once in CI,
+    /// 7.6 s into a test that takes 0.3 s here). A minute is far inside the
+    /// ten the rule allows a stamp to be ahead.
     static func stamp(_ secondsAgo: TimeInterval) -> String { StoreWriter.iso(Date().addingTimeInterval(-secondsAgo)) }
 
     // MARK: - Sending
@@ -214,7 +223,7 @@ struct NetworkSwitchWiringTests {
     @Test("a 409: said, the other computer's value held, this Mac keeps what was set here, and nothing is retried")
     func changedElsewhere() async throws {
         let (shop, server, book) = await Self.shop(option: true)
-        let theirs = Self.stamp(-2)   // two seconds after now: at or after this change
+        let theirs = Self.stamp(-60)   // a minute after now: after this change, however slow the machine
         await server.answerPut(409, Data(#"{"reason":"stale","changedAt":"\#(theirs)"}"#.utf8))
         await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: theirs, changedBy: "Noura")))
         #expect(await Self.gated(shop) { await shop.setOutboundOffline(true) })
@@ -230,7 +239,7 @@ struct NetworkSwitchWiringTests {
     @Test("turning ON beaten by another computer's OFF: \"Keep it on this Mac only\" turns this Mac's own switch on and lets the shop's follow")
     func keepOnThisMacOnly() async throws {
         let (shop, server, book) = await Self.shop(option: true)
-        let theirs = Self.stamp(-2)
+        let theirs = Self.stamp(-60)
         await server.answerPut(409, Data(#"{"reason":"stale","changedAt":"\#(theirs)"}"#.utf8))
         await server.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: theirs, changedBy: "Noura")))
         #expect(await Self.gated(shop) { await shop.setOutboundOffline(true) })
@@ -253,7 +262,7 @@ struct NetworkSwitchWiringTests {
     func turningOffLoses() async throws {
         let on: JSONValue = .object(["offline": .bool(true), "via": .string("cloud"), "changedAt": .string(Self.stamp(3600))])
         let (shop, server, book) = await Self.shop(option: true, network: on)
-        let theirs = Self.stamp(-2)
+        let theirs = Self.stamp(-60)
         // A value is published there, so the "off" is sent; it is beaten (409),
         // and the GET that would read the other value fails at first.
         await server.answerNextGet(200, try Self.published(.init(offline: true, keep: [], changedAt: Self.stamp(3600), changedBy: nil)))
@@ -439,7 +448,7 @@ struct NetworkSwitchWiringTests {
     /// read of what it set failed: the question waits with only a stamp.
     static func beatenUnread() async throws -> (Shop, Server, NetworkBookForTests, theirs: String) {
         let (shop, server, book) = await Self.shop(option: true)
-        let theirs = Self.stamp(-2)
+        let theirs = Self.stamp(-60)
         await server.answerPut(409, Data(#"{"reason":"stale","changedAt":"\#(theirs)"}"#.utf8))
         await server.answerGet(500, Data())
         #expect(await Self.gated(shop) { await shop.setOutboundOffline(true) })
@@ -526,7 +535,7 @@ struct NetworkSwitchWiringTests {
 
         // With the value held (the usual 409), the answer asks nothing.
         let (held, server2, book2) = await Self.shop(option: true)
-        let at = Self.stamp(-2)
+        let at = Self.stamp(-60)
         await server2.answerPut(409, Data(#"{"reason":"stale","changedAt":"\#(at)"}"#.utf8))
         await server2.answerGet(200, try Self.published(.init(offline: false, keep: [], changedAt: at, changedBy: nil)))
         #expect(await Self.gated(held) { await held.setOutboundOffline(true) })
@@ -811,7 +820,7 @@ struct NetworkSwitchWiringTests {
     @Test("a 409 remembers which change the question is about")
     func askedAboutIsRemembered() async throws {
         let (shop, server, book) = await Self.shop(option: true)
-        await server.answerPut(409, Data(#"{"reason":"stale","changedAt":"\#(Self.stamp(-2))"}"#.utf8))
+        await server.answerPut(409, Data(#"{"reason":"stale","changedAt":"\#(Self.stamp(-60))"}"#.utf8))
         #expect(await Self.gated(shop) { await shop.setOutboundOffline(true) })
         #expect(shop.networkSwitchAsk != nil)
         #expect(JSONValue.string(try #require(shop.networkSwitchAskedAbout)) == Self.obj(book.network)["changedAt"])
