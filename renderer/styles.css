@@ -6199,3 +6199,52 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
   .ca-row { flex-wrap: wrap; }
   .ca-field { width: 100%; }
 }
+/* ── Printer cards: controls by model (Figma 134:153, CAP1/CAP2) ───────────── */
+.mcap-switch { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; padding: 2px 4px; color: var(--text); font-size: 12px; cursor: pointer; }
+.mcap-switch:disabled { opacity: .55; cursor: progress; }
+.mcap-track { width: 32px; height: 18px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg-soft); position: relative; transition: background .15s; }
+.mcap-knob { position: absolute; top: 1px; inset-inline-start: 1px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface, #fff); box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: inset-inline-start .15s; }
+.mcap-switch.on .mcap-track { background: var(--primary); border-color: var(--primary); }
+.mcap-switch.on .mcap-knob { inset-inline-start: 15px; }
+.mcap-switch:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+.mcap-note { flex-basis: 100%; font-size: 11.5px; color: var(--text-muted); line-height: 1.45; }
+.mcap-acc { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.mcap-acc-head { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+[dir="rtl"] .mcap-acc-head, [dir="rtl"] .mheads-eyebrow { letter-spacing: 0; font-family: inherit; text-transform: none; }
+.mcap-acc-row { display: flex; gap: 10px; align-items: flex-start; margin: 0; cursor: pointer; }
+.mcap-acc-row input { width: auto; margin: 2px 0 0; }
+.mcap-acc-name { display: block; font-size: 13px; font-weight: 600; }
+.mcap-acc-sub, .mcap-acc-note { display: block; font-size: 12px; color: var(--text-muted); }
+
+/* ── A U1's heads: what each holds, and its spool (Figma 134:282/333, U1-1/U1-2) ── */
+.mheads { flex-basis: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+.mheads:empty { display: none; }
+.mheads-eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mhead { display: flex; align-items: center; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+.mhead-dot { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border); }
+.mhead-dot.mhead-empty { background: transparent; border-style: dashed; }
+.mhead-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mhead-title { font-size: 13px; font-weight: 600; }
+.mhead-sub { font-size: 12px; color: var(--text-muted); }
+.mhead-sub.mhead-ink { color: var(--text); }
+.mhead-sub.mhead-amber { color: var(--warning); }
+.mheads-add { align-self: flex-start; background: none; border: 0; padding: 0; color: var(--primary); font-size: 12px; font-weight: 600; cursor: pointer; }
+.mheads-note { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+.mlink-from, .mlink-note { font-size: 12.5px; color: var(--text-muted); margin: 0 0 10px; }
+.mlink-note { margin: 12px 0 0; }
+.mlink-list { display: flex; flex-direction: column; gap: 8px; }
+.mlink-opt { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; margin: 0; }
+.mlink-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.mlink-opt.on { border: 2px solid var(--primary); padding: 11px 13px; }
+.mlink-opt:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+.mlink-title { font-size: 13px; font-weight: 600; }
+.mlink-sub { font-size: 12px; color: var(--text-muted); }
+
+/* ── Job page › Files: a U1's time-lapse as the customer's proof (Figma 134:359, U1-3) ── */
+.jp-lapse { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+.jp-lapse-eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+[dir="rtl"] .jp-lapse-eyebrow { letter-spacing: 0; font-family: inherit; text-transform: none; }
+.jp-lapse-row { display: flex; align-items: center; gap: 12px; }
+.jp-lapse-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.jp-lapse-bar { height: 4px; border-radius: 2px; background: var(--bg-soft); overflow: hidden; margin-top: 6px; }
+.jp-lapse-bar i { display: block; height: 100%; background: var(--primary); }

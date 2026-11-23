@@ -360,6 +360,7 @@ const hubAPI = {
   // What is on the plate, and dropping one of it. Klipper only, and the drop
   // cannot be undone — see lib/exclude-object.js.
   printerPlate:        (machine) => ipcRenderer.invoke('hub:printer-plate', { machine }),
+  printerSpoolTags:    (machine) => ipcRenderer.invoke('hub:printer-spool-tags', { machine }),
   printerExcludeObject: (machine, name) => ipcRenderer.invoke('hub:printer-exclude-object', { machine, name }),
   printerHistory: (payload) => ipcRenderer.invoke('hub:printer-history', payload),
   spoolmanFetch: (payload) => ipcRenderer.invoke('hub:spoolman-fetch', payload),
@@ -442,6 +443,11 @@ const hubAPI = {
   onLanOrderPhotoAdded: (() => { let _cb=null; ipcRenderer.on('lan-order-photo-added', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   // Main noted filament used per head on a job after a U1 print (lib/main/head-actuals.js).
   onPrinterHeadActuals: (() => { let _cb=null; ipcRenderer.on('printer-head-actuals', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
+  onPrinterTimelapse:   (() => { let _cb=null; ipcRenderer.on('printer-timelapse', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
+  onTimelapseProgress:  (() => { let _cb=null; ipcRenderer.on('timelapse-progress', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
+  timelapseKeep:        (jobId) => ipcRenderer.invoke('hub:timelapse-keep', { jobId }),
+  timelapseCancel:      (jobId) => ipcRenderer.invoke('hub:timelapse-cancel', { jobId }),
+  timelapseOpen:        (jobId) => ipcRenderer.invoke('hub:timelapse-open', { jobId }),
   onLanOrderUpdated:    (() => { let _cb=null; ipcRenderer.on('lan-order-updated',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanOrderCreated:    (() => { let _cb=null; ipcRenderer.on('lan-order-created',    (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   onLanWaitingUpdated:  (() => { let _cb=null; ipcRenderer.on('lan-waiting-updated',  (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),

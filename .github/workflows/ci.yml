@@ -452,6 +452,10 @@ jobs:
         run: xvfb-run -a npm run test:e2e:needs
       - name: E2E smoke (Connected apps and the From slicer inbox, Figma page 131)
         run: xvfb-run -a npm run test:e2e:connectedapps
+      # Controls by model, Edit printer's accessories, and a U1's heads with
+      # their spools (Figma page 134).
+      - name: E2E smoke (printer capabilities and U1 heads)
+        run: xvfb-run -a npm run test:e2e:capabilities
 
       - name: E2E smoke (Internet use settings)
         run: xvfb-run -a npm run test:e2e:internetuse

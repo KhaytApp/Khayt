@@ -1732,6 +1732,22 @@ function wireEvents() {
     if (btn.dataset.act === 'plug-on') plugSwitch(btn.dataset.id, true);
     if (btn.dataset.act === 'plug-off') plugSwitch(btn.dataset.id, false);
   });
+  // A card's light switch (Figma 134:153, CAP1): sends the opposite of what it
+  // shows; the switch keeps what was last sent, and the toast says what the
+  // printer answered.
+  $('#machinesList')?.addEventListener('click', async (e) => {
+    // A U1 head's Link…/Change… (Figma 134:333) and Add spool… (134:282).
+    const hl = e.target.closest('[data-head-link]');
+    if (hl) { openHeadLink(hl.dataset.headLink, Number(hl.dataset.head)); return; }
+    if (e.target.closest('[data-heads-add]')) { window.KhaytShell?.switchTab?.('inventory-tab'); return; }
+    const sw = e.target.closest('[data-printer-switch]');
+    if (!sw || sw.disabled) return;
+    const on = sw.getAttribute('aria-checked') !== 'true';
+    sw.disabled = true;
+    const ok = await printerSwitch(sw.dataset.printerSwitch, sw.dataset.control, on);
+    sw.disabled = false;
+    if (ok) { sw.setAttribute('aria-checked', on ? 'true' : 'false'); sw.classList.toggle('on', on); }
+  });
   $('#machinesList')?.addEventListener('change', (e) => {
     const sel = e.target.closest('select[data-printer-control]');
     if (!sel || !sel.value) return;
