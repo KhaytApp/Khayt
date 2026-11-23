@@ -244,7 +244,7 @@ const hubAPI = {
   themesRemove:    (o)    => ipcRenderer.invoke('hub:themes-remove', o),
   webcamProbe: (o)        => ipcRenderer.invoke('hub:webcam-probe', o),
   // Quit handshake: main asks the renderer to flush its debounced save before exiting.
-  launchGate:           () => ipcRenderer.invoke('hub:launch-gate'),
+  launchGate:           (lang) => ipcRenderer.invoke('hub:launch-gate', String(lang || '')),
   launchGateAccept:     () => ipcRenderer.invoke('hub:launch-gate-accept'),
   launchGateAcceptedInUpdate: (version) => ipcRenderer.invoke('hub:launch-gate-accepted-in-update', String(version || '')),
   onFlushSaveRequest:   (cb) => { ipcRenderer.on('hub:flush-save-request', () => { try { cb(); } catch { /* noop */ } }); },
@@ -494,6 +494,7 @@ const hubAPI = {
   setUpdateOptions:     (opts)           => ipcRenderer.invoke('hub:set-update-options', opts),
   checkForUpdates:      ()               => ipcRenderer.invoke('hub:check-for-updates'),
   formatReleaseNotes:   (notes, opts)    => ipcRenderer.invoke('hub:format-release-notes', notes, opts),
+  updateGateText:       (req) => ipcRenderer.invoke('hub:update-gate-text', req),
   startUpdateDownload:  ()               => ipcRenderer.invoke('hub:start-update-download'),
   // Quit and install; pass null after flushSave() (avoid duplicate encrypt+write on large stores).
   installUpdate:        (storeSnapshot)  => ipcRenderer.invoke('hub:install-update', storeSnapshot),
