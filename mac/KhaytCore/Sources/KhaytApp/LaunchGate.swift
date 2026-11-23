@@ -19,10 +19,15 @@ enum LaunchGate {
     /// version that shipped WITHOUT this sheet. Every gated release after it,
     /// up to the one running, is shown once.
     ///
-    /// SET AT THE CUT THAT SHIPS THE SHEET. If the sheet first ships in
-    /// beta.44, this is beta.43. `LaunchGateTests` holds it below the
-    /// version in `mac/VERSION`.
-    static let floor = "4.0.0-beta.42"
+    /// ONE RELEASE EARLIER THAN IT NEEDS TO BE, ON PURPOSE. No Mac has a
+    /// record yet, so every Mac counts as coming from here. beta.42 is the
+    /// last release without the sheet, but its own item (update every
+    /// computer before using a product's own rates) was only ever shown as
+    /// release notes, and a Mac that jumps from beta.41 past it would never
+    /// see it. So the floor is beta.41: a Mac that did read it is asked once
+    /// more, which is the safe way to be wrong (`lib/launch-gate.js`).
+    /// `LaunchGateTests` holds it below the version in `mac/version.json`.
+    static let floor = "4.0.0-beta.41"
 
     static let lastRunKey = "launchGate.lastRun"
     static let acceptedForKey = "launchGate.acceptedFor"
@@ -58,9 +63,17 @@ extension Shop {
         guard let current, !current.isEmpty, let engine else { return }
         let last = launchGateDefaults.string(forKey: LaunchGate.lastRunKey)
         let accepted = launchGateDefaults.string(forKey: LaunchGate.acceptedForKey)
-        let pending = (try? await engine.launchGatePending(current: current, lastRun: last, acceptedFor: accepted,
-                                                           hasBook: source.isReal, floor: LaunchGate.floor,
-                                                           gates: launchGateFileForTests)) ?? []
+        // "Is there a book on this Mac", not "is the sample showing": a shop's
+        // Mac opened on the sample for a look must not be taken for a new
+        // install and have its record moved past what it has not read.
+        //
+        // And a gate file that cannot be read is NOT "nothing to read": the
+        // record stays where it is, so a later build with a good file still
+        // shows what this one could not.
+        guard let pending = try? await engine.launchGatePending(current: current, lastRun: last, acceptedFor: accepted,
+                                                                hasBook: launchGateHasBookForTests ?? (aRealBookExists || source.isReal),
+                                                                floor: LaunchGate.floor,
+                                                                gates: launchGateFileForTests) else { return }
         launchGateFrom = last
         launchGateCurrent = current
         launchGatePending = pending

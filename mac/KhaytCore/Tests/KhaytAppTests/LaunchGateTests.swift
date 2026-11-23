@@ -55,15 +55,20 @@ struct LaunchGateTests {
                 == ["4.0.0-beta.43", "4.0.0-beta.42", "4.0.0-beta.41"])
         // Already read (in the update window, when that gate exists): not asked again.
         #expect(try await Self.pending(current: "4.0.0-beta.43", last: "4.0.0-beta.41", accepted: "4.0.0-beta.43").isEmpty)
-        // A gate file that cannot be read asks nothing rather than failing the launch.
-        #expect(try await Self.engine.launchGatePending(current: "4.0.0-beta.43", lastRun: "4.0.0-beta.41", acceptedFor: nil,
-                                                        hasBook: true, floor: "4.0.0-beta.42", gates: "not json").isEmpty)
+        // A gate file that is not one is an error, never "nothing to read".
+        for bad in ["not json", "{}", #"{"mac":[]}"#, #"{"mac":"x"}"#] {
+            await #expect(throws: (any Error).self, Comment(rawValue: bad)) {
+                _ = try await Self.engine.launchGatePending(current: "4.0.0-beta.43", lastRun: "4.0.0-beta.41", acceptedFor: nil,
+                                                            hasBook: true, floor: "4.0.0-beta.42", gates: bad)
+            }
+        }
     }
 
     static func shop() async -> Shop {
         let shop = await OperatorLockTests.shop(on: false)
         shop.launchGateDefaults = UserDefaults(suiteName: "khayt.gate.test.\(UUID().uuidString)")!
         shop.launchGateFileForTests = gates
+        shop.launchGateHasBookForTests = false
         return shop
     }
 
@@ -71,7 +76,16 @@ struct LaunchGateTests {
     func record() async throws {
         let shop = await Self.shop()
         let d = shop.launchGateDefaults
-        // The sample book is a new install: nothing is asked, and the record is the running version.
+        // A Mac with a book and no record (it updated from before the sheet existed) counts as
+        // coming from the floor, one release earlier than strictly needed: beta.42's item, which
+        // was only ever release notes, is shown once more, and so is beta.43's.
+        shop.launchGateHasBookForTests = true
+        await shop.checkLaunchGate(current: "4.0.0-beta.43")
+        #expect(LaunchGate.floor == "4.0.0-beta.41")
+        #expect(shop.launchGatePending.map(\.version) == ["4.0.0-beta.43", "4.0.0-beta.42"] && shop.launchGateFrom == nil)
+        #expect(d.string(forKey: LaunchGate.lastRunKey) == nil, "the record moved before anything was read")
+        // A new install (no book on this Mac): nothing is asked, and the record is the running version.
+        shop.launchGateHasBookForTests = false
         await shop.checkLaunchGate(current: "4.0.0-beta.43")
         #expect(shop.launchGatePending.isEmpty && !shop.showsLaunchGate)
         #expect(d.string(forKey: LaunchGate.lastRunKey) == "4.0.0-beta.43")
@@ -99,6 +113,16 @@ struct LaunchGateTests {
         #expect(d.string(forKey: LaunchGate.lastRunKey) == nil)
         // The book is never written: the record is this Mac's.
         #expect(shop.settingsDict["launchGate"] == nil)
+        // A gate file that cannot be read shows nothing AND leaves the record alone, so a later
+        // build with a good file still shows what this one could not.
+        d.set("4.0.0-beta.41", forKey: LaunchGate.lastRunKey)
+        d.removeObject(forKey: LaunchGate.acceptedForKey)
+        shop.launchGateFileForTests = "not json"
+        await shop.checkLaunchGate(current: "4.0.0-beta.43")
+        #expect(!shop.showsLaunchGate && d.string(forKey: LaunchGate.lastRunKey) == "4.0.0-beta.41", "an unreadable file was taken for “read”")
+        shop.launchGateFileForTests = Self.gates
+        await shop.checkLaunchGate(current: "4.0.0-beta.43")
+        #expect(shop.showsLaunchGate)
     }
 
     @Test("with the staff lock on, the sign-in screen comes first; whoever signs in may read and continue")
@@ -123,6 +147,11 @@ struct LaunchGateTests {
         #expect(w.callIt("mac.gate_read") == "I have read these changes" && w.callIt("mac.gate_continue") == "Continue")
         #expect(LaunchGateSheet.summary(current: "4.0.0-beta.43", from: "4.0.0-beta.41", count: 2, words: w)
                 == "This Mac now runs Khayt 4.0.0-beta.43 (it ran beta.41 before). 2 things changed that you should know before you carry on.")
+        // Arabic counts two, a few and many each in its own form.
+        let ar = Words(); await ar.load("ar", engine: Self.engine)
+        #expect(ar.counting(2, "mac.gate_changed") == "تغيّر أمران ينبغي أن تعرفهما قبل المتابعة.")
+        #expect(ar.counting(1, "mac.gate_changed") == "تغيّر أمر واحد ينبغي أن تعرفه قبل المتابعة.")
+        #expect(ar.counting(5, "mac.gate_changed").contains("أمور") && ar.counting(12, "mac.gate_changed").contains("أمرًا"))
         #expect(LaunchGateSheet.summary(current: "4.0.0-beta.43", from: nil, count: 1, words: w)
                 == "This Mac now runs Khayt 4.0.0-beta.43. 1 thing changed that you should know before you carry on.")
         #expect(LaunchGate.short("4.0.0-beta.43") == "beta.43" && LaunchGate.short("4.0.0") == "4.0.0")
@@ -141,10 +170,15 @@ struct LaunchGateTests {
         // The floor is below the version this tree builds, or the sheet would hide that version's own items.
         let version = try #require((try JSONSerialization.jsonObject(with: Data(contentsOf: Self.root.appending(path: "mac/version.json")))
                                     as? [String: Any])?["version"] as? String)
-        func n(_ v: String) -> Int { Int(v.split(separator: ".").last ?? "") ?? -1 }
-        #expect(LaunchGate.floor.hasPrefix("4.0.0-beta.") && n(LaunchGate.floor) <= n(version), "\(LaunchGate.floor) vs \(version)")
+        #expect(try Self.engine.compareVersions(LaunchGate.floor, version) < 0, "\(LaunchGate.floor) is not older than \(version)")
+        #expect(try Self.engine.compareVersions("4.0.0-beta.9", "4.0.0-beta.10") < 0 && Self.engine.compareVersions("4.0.0", "4.0.0-beta.99") > 0)
+        // The cut checks the gate file in the tree it BUILDS (the release worktree), never in the
+        // checkout it was started from, which it must not write into.
         let cut = try String(contentsOf: Self.root.appending(path: "mac/release-local.sh"), encoding: .utf8)
-        #expect(cut.contains("node scripts/write-release-gates.js --check"))
+        let enters = try #require(cut.range(of: "\ncd \"$WT\"\n"))
+        let checks = try #require(cut.range(of: "node scripts/write-release-gates.js --check"))
+        let syncs = try #require(cut.range(of: "bash mac/sync-js.sh >/dev/null"))
+        #expect(enters.upperBound < checks.lowerBound && enters.upperBound < syncs.lowerBound, "checked or synced before entering the release tree")
         // Started once at launch, never in a snapshot run, and drawn over the shop window.
         let app = try String(contentsOf: Self.root.appending(path: "mac/KhaytCore/Sources/KhaytApp/KhaytApp.swift"), encoding: .utf8)
         #expect(app.contains(#"if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] == nil { await shop.checkLaunchGate() }"#))

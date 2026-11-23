@@ -2567,8 +2567,11 @@ final class Shop {
     var launchGatePending: [KhaytEngine.GatedRelease] = []
     var launchGateCurrent: String?
     var launchGateFrom: String?
-    /// TESTS ONLY: the gate file's text instead of the bundled one.
+    /// TESTS ONLY: the gate file's text instead of the bundled one, and
+    /// whether this Mac has a book (a test must not depend on the machine
+    /// it runs on having one).
     var launchGateFileForTests: String?
+    var launchGateHasBookForTests: Bool?
 
     /// What is low and has not already been ordered.
     private(set) var needsOrdering: [KhaytEngine.ToOrder] = []

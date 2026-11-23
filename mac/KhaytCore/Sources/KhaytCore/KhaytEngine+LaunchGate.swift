@@ -29,6 +29,7 @@ extension KhaytEngine {
     /// including `current`, NEWEST FIRST, each item once (under the newest
     /// release that says it). Empty when there is nothing to read: the same
     /// build, an older one, a new install, or releases with no items.
+    /// THROWS when the gate file is missing or not one: that is not "nothing".
     ///
     /// - `lastRun`, `acceptedFor`: this Mac's record; nil when it has none.
     /// - `hasBook`: a shop's book exists (an update, not a first install).
@@ -37,14 +38,18 @@ extension KhaytEngine {
     /// - `gates`: the gate file's text; nil reads the bundled copy.
     public func launchGatePending(current: String, lastRun: String?, acceptedFor: String?, hasBook: Bool,
                                   floor: String, gates: String? = nil) throws -> [GatedRelease] {
-        guard let text = gates ?? Self.bundledReleaseGates() else { return [] }
+        // No gate file, or one that is not what the writer makes, is an
+        // ERROR, not "nothing to read": the caller must not conclude this
+        // Mac has read anything.
+        guard let text = gates ?? Self.bundledReleaseGates() else { throw KhaytJSError.moduleMissing("release-gates.json") }
         var seen: [String: JSONValue] = [:]
         if let lastRun, !lastRun.isEmpty { seen["lastRun"] = .string(lastRun) }
         if let acceptedFor, !acceptedFor.isEmpty { seen["acceptedFor"] = .string(acceptedFor) }
         return try runtime.call2("""
             (function (current, seen, hasBook, floor, text) {
-              var G; try { G = JSON.parse(text); } catch (e) { return []; }
-              var mac = G && G.mac && typeof G.mac === 'object' ? G.mac : {};
+              var G = JSON.parse(text);
+              if (!G || typeof G !== 'object' || !G.mac || typeof G.mac !== 'object' || Array.isArray(G.mac)) throw new Error('release-gates.json has no mac map');
+              var mac = G.mac;
               var L = globalThis.KhaytLaunchGate;
               var r = L.pending({ current: current, seen: seen, gates: mac, hasBook: hasBook, isNewer: L.isNewer, floor: floor });
               var said = {}, out = [];
@@ -58,5 +63,11 @@ extension KhaytEngine {
             })(ARG0, ARG1, ARG2, ARG3, ARG4)
             """, [.string(current), seen.isEmpty ? .null : .object(seen), .bool(hasBook), .string(floor), .string(text)],
             as: [GatedRelease].self)
+    }
+
+    /// <0, 0 or >0 as `a` is older than, the same as, or newer than `b`
+    /// (`KhaytLaunchGate.compareVersions`: beta.9 < beta.10 < the release).
+    public func compareVersions(_ a: String, _ b: String) throws -> Int {
+        try runtime.call2("globalThis.KhaytLaunchGate.compareVersions(ARG0, ARG1)", [.string(a), .string(b)], as: Int.self)
     }
 }
