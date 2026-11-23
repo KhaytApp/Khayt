@@ -14,11 +14,17 @@ struct FindPrintersSheet: View {
     @Bindable var shop: Shop
 
     @State private var found: [KhaytEngine.FoundPrinter] = []
+    /// Printers earlier scans found and this one did not (page 28, frame A).
+    @State private var earlier: [EarlierFind] = []
+    /// An earlier find somebody pressed Add on, waiting for a yes.
+    @State private var asking: EarlierFind?
     @State private var looking = true
     @State private var started = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // The house frame: the sheet never grows past the screen, and its
+        // buttons stay put while what is above them scrolls.
+        SheetFrame(width: 460) {
             Text(shop.words.callIt("mac.find_printers")).font(.headline)
 
             if looking {
@@ -27,6 +33,10 @@ struct FindPrintersSheet: View {
                     Text(shop.words.callIt("mac.find_looking")).foregroundStyle(.secondary)
                 }
             } else if found.isEmpty {
+                // Said whenever THIS scan found nothing, with or without
+                // earlier finds under it: a scan that is refused the local
+                // network finds nothing either, and "seen yesterday, it may
+                // be asleep" beside no hint would blame the printers.
                 // Not "no printers" — this app cannot tell an empty network from
                 // a refused permission, and saying the first when it is the
                 // second sends somebody hunting for a fault in the printer.
@@ -35,36 +45,34 @@ struct FindPrintersSheet: View {
                     .foregroundStyle(.secondary)
             }
 
-            if !found.isEmpty {
-                List(found) { printer in
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(printer.name).fontWeight(.medium)
-                            HStack(spacing: 6) {
-                                Text(printer.host).monospacedDigit()
-                                if let vendor = printer.vendor, !vendor.isEmpty {
-                                    Text(vendor)
-                                }
-                                // A printer Khayt can see and cannot speak to
-                                // says so, rather than being added as if it
-                                // were ready to answer.
-                                if printer.connection == nil {
-                                    Text(shop.words.callIt("mac.find_unsupported"))
-                                        .foregroundStyle(Khayt.attention)
+            if !found.isEmpty || !earlier.isEmpty {
+                List {
+                    // With nothing seen earlier the sheet is what it always
+                    // was: one list, no headings.
+                    if earlier.isEmpty {
+                        ForEach(found) { row($0, when: nil, primary: true) }
+                    } else {
+                        if !found.isEmpty {
+                            Section(shop.words.callIt("mac.find_now")) {
+                                ForEach(found) { row($0, when: nil, primary: true) }
+                            }
+                        }
+                        Section(shop.words.callIt("mac.find_earlier")) {
+                            ForEach(earlier) { find in
+                                row(find.printer, when: FindPrintersSheet.seen(find, now: Date(), words: shop.words), primary: false) {
+                                    asking = find
                                 }
                             }
-                            .font(.caption).foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Button(shop.words.callIt("mac.find_add")) {
-                            Task { await shop.addFound(printer) }
-                        }
-                        .disabled(!shop.canMoveJobs)
-                        .help(Shop.findPrintersCaveat(shop) ?? "")
                     }
-                    .padding(.vertical, 2)
                 }
-                .frame(height: 200)
+                .frame(height: earlier.isEmpty ? 200 : 280)
+            }
+
+            // Where the second list comes from, and that it goes nowhere.
+            if !earlier.isEmpty {
+                Text(shop.words.callIt("mac.find_kept_here")).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             // Why "Add" is off, where it is off — rather than a row of grey
@@ -74,16 +82,36 @@ struct FindPrintersSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+        } footer: {
             HStack {
+                // Asks nothing: it empties this computer's own list, and the
+                // next scan starts it again.
+                if !earlier.isEmpty {
+                    Button(shop.words.callIt("mac.find_forget")) {
+                        shop.forgetFoundPrinters()
+                        earlier = []
+                    }
+                }
+                Spacer()
                 Button(shop.words.callIt("mac.find_again")) { Task { await scan() } }
                     .disabled(looking)
-                Spacer()
-                Button(shop.words.callIt("common.cancel")) { shop.findingPrinters = false }
+                Button(shop.words.callIt("common.done")) { shop.findingPrinters = false }
                     .keyboardShortcut(.cancelAction)
             }
         }
-        .padding(18)
-        .frame(width: 460)
+        // AN EARLIER FIND DID NOT ANSWER THIS SCAN. Its address is where it
+        // was up to three days ago; a router can have given that address to
+        // something else since, and Khayt would then be asking that device
+        // for a printer's status, and later sending it the key the shop
+        // types in. So Add on an earlier find asks first, with the address.
+        .alert(shop.words.callIt("mac.find_add_earlier_q", ["name": .string(asking?.printer.name ?? ""),
+                                                           "host": .string(asking?.printer.host ?? "")]),
+               isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }), presenting: asking) { find in
+            Button(shop.words.callIt("mac.find_add")) { Task { await shop.addFound(find.printer) } }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: { _ in
+            Text(shop.words.callIt("mac.find_add_earlier_note"))
+        }
         .task {
             guard !started else { return }
             started = true
@@ -94,7 +122,68 @@ struct FindPrintersSheet: View {
     private func scan() async {
         looking = true
         found = await shop.findPrinters()
+        // After the scan, which has just added what it saw to the list: what
+        // is left is what THIS scan missed.
+        earlier = await shop.earlierFinds(notIn: found)
         looking = false
+    }
+
+    /// One printer: its name, where it is, and Add. An earlier find says when
+    /// it was last seen, and its Add is the quieter button (frame A) and
+    /// asks first (`add`): it did not answer this scan.
+    @ViewBuilder private func row(_ printer: KhaytEngine.FoundPrinter, when: String?, primary: Bool,
+                                  add: (() -> Void)? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(printer.name).fontWeight(.medium)
+                HStack(spacing: 6) {
+                    Text(printer.host).monospacedDigit()
+                    if let vendor = printer.vendor, !vendor.isEmpty {
+                        Text(vendor)
+                    }
+                    // A printer Khayt can see and cannot speak to
+                    // says so, rather than being added as if it
+                    // were ready to answer.
+                    if printer.connection == nil {
+                        Text(shop.words.callIt("mac.find_unsupported"))
+                            .foregroundStyle(Khayt.attention)
+                    }
+                }
+                .font(.caption).foregroundStyle(.secondary)
+                if let when {
+                    Text(when).font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer()
+            if primary {
+                Button(shop.words.callIt("mac.find_add")) { Task { await shop.addFound(printer) } }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!shop.canMoveJobs)
+                    .help(Shop.findPrintersCaveat(shop) ?? "")
+            } else {
+                Button(shop.words.callIt("mac.find_add")) { add?() }
+                    .buttonStyle(.bordered)
+                    .disabled(!shop.canMoveJobs)
+                    .help(Shop.findPrintersCaveat(shop) ?? "")
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// "Seen 2 hours ago. It may be asleep or busy." or, for a printer whose
+    /// address moved, "Seen yesterday, at another address before: 192.168.1.50".
+    @MainActor static func seen(_ find: EarlierFind, now: Date, words: Words) -> String {
+        // How long ago, as of `now`, said from the present: a relative style
+        // has no "as of", so the same span is laid back from this instant.
+        // Never "in 3 seconds": a clock that moved does not put a sighting in the future.
+        let ago = max(0, now.timeIntervalSince(find.lastSeen))
+        let when = Date().addingTimeInterval(-ago)
+            .formatted(Date.RelativeFormatStyle(presentation: .named, unitsStyle: .wide).locale(words.locale))
+        if let was = find.previousHost {
+            return words.callIt("mac.find_seen_moved", ["when": .string(when), "host": .string(was)])
+        }
+        return words.callIt("mac.find_seen", ["when": .string(when)])
     }
 }
 
