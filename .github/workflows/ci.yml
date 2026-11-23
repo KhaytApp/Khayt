@@ -441,6 +441,22 @@ jobs:
       - name: E2E smoke (printer discovery)
         run: xvfb-run -a npm run test:e2e:discovery
 
+      # Send to printer, checked first, and the printer card's seven states
+      # (Figma desktop page 129): main reads a picked file, the window runs
+      # lib/send-checks.js, a stop keeps Send off. Nothing is sent.
+      - name: E2E smoke (send checks)
+        run: xvfb-run -a npm run test:e2e:sendchecks
+      # What a printer needs under each machine card, Bed is clear, and the
+      # Machine P&L's prints / came-out-right columns (Figma page 136).
+      - name: E2E smoke (machine needs and success rate)
+        run: xvfb-run -a npm run test:e2e:needs
+      - name: E2E smoke (Connected apps and the From slicer inbox, Figma page 131)
+        run: xvfb-run -a npm run test:e2e:connectedapps
+      # Controls by model, Edit printer's accessories, and a U1's heads with
+      # their spools (Figma page 134).
+      - name: E2E smoke (printer capabilities and U1 heads)
+        run: xvfb-run -a npm run test:e2e:capabilities
+
       - name: E2E smoke (Internet use settings)
         run: xvfb-run -a npm run test:e2e:internetuse
 

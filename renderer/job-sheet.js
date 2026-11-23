@@ -85,11 +85,17 @@
   /**
    * One sheet for New and Edit (Figma 75:583). `orderId` edits that job;
    * none opens a NEW job (`opts.clientId` to start it for a customer).
+   *
+   * From a file in the "From slicer" inbox (renderer/connected-apps.js):
+   * `opts.project` names it, `opts.part` ({ name, grams, hours, material }) is
+   * its one part, costed off the first spool of that material, `opts.fromSlicer`
+   * is carried onto the job (lib/order-new.js fromSlicer), and `opts.asQuote`
+   * makes Save keep it as a quote.
    */
   function openJobSheet(orderId, opts) {
     const isNew = !orderId;
     const order = isNew
-      ? { id: null, project: '', clientId: (opts && opts.clientId) || null, dueDate: '', notes: '', parts: [], discountPct: 0 }
+      ? { id: null, project: (opts && typeof opts.project === 'string' && opts.project) || '', clientId: (opts && opts.clientId) || null, dueDate: '', notes: '', parts: [], discountPct: 0 }
       : list('printLog').find((o) => o.id === orderId);
     if (!order || !ED() || typeof openFormModal !== 'function' || (isNew && !NEW())) return;
     // A new job has nothing to protect yet: every part may come and go.
@@ -108,6 +114,16 @@
       // the discount moved it: the old total, typed, through the shared rule.
       keepTotal: undefined,
     };
+    const asQuoteFirst = isNew && !!(opts && opts.asQuote);
+    const fromSlicer = isNew && opts && opts.fromSlicer && typeof opts.fromSlicer === 'object' ? opts.fromSlicer : null;
+    if (isNew && opts && opts.part && typeof opts.part === 'object') {
+      const want = String(opts.part.material || '').trim().toLowerCase();
+      const spool = (want && list('inventory').find((i) => String(i.material || '').trim().toLowerCase() === want)) || list('inventory')[0];
+      const p = { name: String(opts.part.name || '').slice(0, 200) || t('calc.part.name_ph'), printWeight: Math.max(0, num(opts.part.grams)),
+        printTime: Math.max(0, num(opts.part.hours)), qty: 1, labourPerLine: true };
+      st.parts.push(costed(Object.assign(p, spool ? filamentFields(spool.id) || {} : {}), order));
+      st.touched = true;
+    }
     // A job whose invoice has left the shop: its money does not move
     // (applyJobEdit refuses it; the sheet does not offer it).
     const frozen = !isNew && ['zatca', 'voided', 'credited', 'cancelled'].includes(lock.code);
@@ -288,6 +304,7 @@
         overheadPerHour: typeof shopOverheadPerHour === 'function' ? shopOverheadPerHour() : 0,
         priorityLevel: priority(),
         asQuote: !!asQuote,
+        ...(fromSlicer ? { fromSlicer } : {}),
       };
     }
     /** The job itself: newOrder allocates its number from the shop's counters. */
@@ -566,14 +583,14 @@
 
     openFormModal({
       title: t(isNew ? 'js.title_new' : 'js.title'),
-      saveLabel: isNew ? t('js.create_job') : undefined,
+      saveLabel: isNew ? t(asQuoteFirst ? 'js.save_quote' : 'js.create_job') : undefined,
       bodyHtml,
       onMount(m) {
         modal = m;
         modal.classList.add('job-sheet-modal');
         const footer = modal.querySelector('.modal-footer');
         footer.insertAdjacentHTML('afterbegin', `<div class="js-totalbox"><div class="js-hint">${escapeHtml(t('js.total'))}</div><div class="js-total" data-js="total"></div><div class="js-hint js-fixed" data-js="fixed" hidden>${escapeHtml(t('js.price_fixed'))}</div><div class="js-hint js-capfoot" data-js="capFoot" role="status" hidden></div></div>`);
-        if (isNew) {
+        if (isNew && !asQuoteFirst) {
           const asQuote = document.createElement('button');
           asQuote.type = 'button';
           asQuote.className = 'btn';
@@ -643,7 +660,7 @@
         refresh();
       },
       async onSave() {
-        if (isNew) return create(false);
+        if (isNew) return create(asQuoteFirst);
         st.keepPrice = undefined;
         st.keepTotal = undefined;
         const typedTotal = q('price').value.trim() !== '';

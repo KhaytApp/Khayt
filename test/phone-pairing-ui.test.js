@@ -36,7 +36,10 @@ test('hub:lan-device-role is the owner\'s only, by main\'s own reading; the wind
   const h = lan.slice(lan.indexOf("ipcMain.handle('hub:lan-device-role'"), lan.indexOf("ipcMain.handle('hub:phone-pair-close'"));
   assert.match(h, /if \(approver\(\)\.role !== 'owner'\) return \{ ok: false, error: 'not_permitted' \};/);
   const ui = fs.readFileSync(path.join(ROOT, 'renderer', 'phone-pairing.js'), 'utf8');
-  assert.match(ui, /phonePairApprove\(\{ role: memo\.chosen, pairId: memo\.asked\.pairId, check: memo\.asked\.check \}\)/, 'the exact request shown');
+  // The dialog asks through pairApi (a phone, or a slicer without a role): the phone's call passes the request through whole.
+  assert.match(ui, /P\.approve\(\{ role: memo\.chosen, pairId: memo\.asked\.pairId, check: memo\.asked\.check \}\)/, 'the exact request shown');
+  assert.match(ui, /approve: \(x\) => a\.phonePairApprove\(x\)/, 'a phone is approved with that request, role and all');
+  assert.match(ui, /approve: \(x\) => a\.connectorPairApprove\(\{ pairId: x\.pairId, check: x\.check \}\)/, 'a slicer is approved with no role');
   assert.match(ui, /code && owner\s*\n?\s*\? `<label class="pp-role">/, 'only the owner gets a role picker');
   const html = fs.readFileSync(path.join(ROOT, 'renderer', 'index.html'), 'utf8');
   assert.ok(html.indexOf('<script src="phone-pairing.js">') < html.indexOf('<script src="settings.js">'));

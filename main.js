@@ -1360,6 +1360,7 @@ ipcMain.handle('hub:pick-file', async (event, opts = {}) => {
   const filters = opts.filters || [{ name: 'All Files', extensions: ['*'] }];
   const result = await dialog.showOpenDialog(win, { filters, properties: ['openFile'] });
   if (result.canceled || !result.filePaths.length) return null;
+  notePickedFile(result.filePaths[0]);
   return result.filePaths[0];
 });
 
@@ -1884,6 +1885,61 @@ ipcMain.handle('hub:printer-send-gcode', async (_e, { machine, gcodePath, startP
   try {
     if (!gcodePath || !fs.existsSync(gcodePath)) return { ok: false, error: 'G-code file not found.' };
     return await yieldingFor(machine, () => uploadGcodeToPrinter(machine, gcodePath, startPrint));
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
+/* SEND CHECKS (Figma desktop page 129, S1/S1b/S1c): what the file says about
+ * itself, so the window can run lib/send-checks.js before the send instead of
+ * a plain "Send to …?". Only a file the person just picked in the open dialog
+ * (hub:pick-file), never a path the window names: the same reach rule as
+ * hub:parse-print-file's allowlist. Facts only, never the file's text. */
+const pickedFiles = [];   // the last few paths hub:pick-file returned
+function notePickedFile(p) {
+  const r = path.resolve(String(p || ''));
+  const i = pickedFiles.indexOf(r);
+  if (i !== -1) pickedFiles.splice(i, 1);
+  pickedFiles.push(r);
+  if (pickedFiles.length > 8) pickedFiles.shift();
+}
+// Past this, only the head and the tail are read, and the moves are not
+// walked (no toolpath bounds): a 100 MB file read whole and walked on the
+// main thread stalled the window, the LAN server and the polls (review).
+const SEND_FACTS_WHOLE_MAX = 16 * 1024 * 1024;
+ipcMain.handle('hub:printer-send-facts', async (_e, { gcodePath } = {}) => {
+  const resolved = path.resolve(String(gcodePath || ''));
+  if (!gcodePath || !pickedFiles.includes(resolved)) return { ok: false, error: 'not_picked' };
+  // One pick, one read (review): a path picked earlier is not readable for ever.
+  pickedFiles.splice(pickedFiles.indexOf(resolved), 1);
+  const out = { ok: true, name: path.basename(resolved), sliced: false };
+  if (!/\.(gcode|gco|g)$/i.test(resolved)) return out;
+  try {
+    const stat = await fs.promises.stat(resolved);
+    let text;
+    if (stat.size <= SEND_FACTS_WHOLE_MAX) {
+      text = await fs.promises.readFile(resolved, 'utf8');
+    } else {
+      const EDGE = 8 * 1024 * 1024;
+      const fh = await fs.promises.open(resolved, 'r');
+      try {
+        const EDGE_READ = Math.min(EDGE, stat.size);
+        const head = Buffer.alloc(EDGE_READ), tail = Buffer.alloc(EDGE_READ);
+        await fh.read(head, 0, EDGE_READ, 0);
+        await fh.read(tail, 0, EDGE_READ, Math.max(0, stat.size - EDGE_READ));
+        text = head.toString('utf8') + '\n' + tail.toString('utf8');
+      } finally { await fh.close(); }
+    }
+    const GP = require('./lib/gcode-parse');
+    const parsed = parseGcodeText(text);
+    const bounds = require('./lib/gcode-placed-extents').placedExtents(text, { moves: stat.size <= SEND_FACTS_WHOLE_MAX });
+    return {
+      ...out,
+      sliced: true,
+      printTimeMins: parsed.printTimeMins,
+      filamentGrams: parsed.filamentGrams,
+      filaments: parsed.filaments,
+      header: GP.parsePrinterHeader(text),
+      bounds: bounds ? { x: bounds.x, y: bounds.y, z: bounds.z, source: bounds.source } : null,
+    };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
@@ -6037,6 +6093,21 @@ ipcMain.handle('hub:probe-printer', async (_e, machine) => {
 });
 
 ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
+// What each printer needs from a person, for the Machines page (Figma 136:153,
+// N1): the SAME shared rule as /api/machines/live and the cloud snapshot
+// (lib/printer-needs.js), so the window, a paired phone and the Mac say the
+// same thing. Read from main's own copy of the book and its poll cache.
+ipcMain.handle('hub:printer-needs', () => {
+  try {
+    const PN = require('./lib/printer-needs.js');
+    const book = lanServerStore || {};
+    return PN.printerNeeds({
+      machines: Array.isArray(book.machines) ? book.machines : [],
+      cache: printerStatusCache, polled: PN.polledFrom(printerStatusCache),
+      completions: book.printerCompletions || {}, orders: book.printLog || [],
+    }) || {};
+  } catch (e) { return {}; }
+});
 
 /**
  * Pause / resume / cancel the job on a printer.
@@ -6114,6 +6185,18 @@ async function moonrakerRead(machine, pathAndQuery, timeoutMs) {
 }
 const MOONRAKER_READ_MAX = 1024 * 1024;
 
+/* What each head of a Snapmaker U1 holds, from its spool tags (Figma 134:282,
+ * U1-1): one read-only GET of filament_detect, decoded by lib/rfid-tray.js.
+ * Nothing is written; linking a head to a spool is the window's, by a click. */
+ipcMain.handle('hub:printer-spool-tags', async (_e, { machine } = {}) => {
+  try {
+    const body = await moonrakerRead(machine, '/printer/objects/query?filament_detect', 10000);
+    const detect = body && body.result && body.result.status && body.result.status.filament_detect;
+    if (!detect || typeof detect !== 'object') return { ok: true, heads: [] };
+    return { ok: true, heads: require('./lib/rfid-tray.js').trays(detect) };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
 /* Filament used per head after a finished U1 (Moonraker) print, with each
  * head's colour and material, on the job (lib/main/head-actuals.js; the Mac's
  * HeadActuals.swift). Two read-only GETs on the printer, a write through
@@ -6139,7 +6222,81 @@ function noteHeadActuals(machine, before, after) {
     const p = headActuals.noteEdge(machine, before, after, Date.now());
     if (p && typeof p.catch === 'function') p.catch(() => {});
   } catch (_) { /* never break polling */ }
+  // And its time-lapse (Figma 134:359, U1-3): found and named on the job.
+  try {
+    const q = timelapseKeep.noteEdge(machine, before, after);
+    if (q && typeof q.catch === 'function') q.catch(() => {});
+  } catch (_) { /* never break polling */ }
 }
+
+/* A GET on a Moonraker printer whose body is read as it comes (the
+ * time-lapse copy): the same pinned address and key as moonrakerRead, with
+ * no size limit of its own; the caller counts what it reads. */
+async function moonrakerStream(machine, pathAndQuery, signal) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  if (machineSecrets.unsaved(machine)) throw new Error('connection_unsaved');
+  const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
+  if (type !== 'moonraker') throw new Error('not a Moonraker printer');
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) throw new Error(target.error);
+  const portNum = parseInt(port || defaultPrinterPort(type), 10);
+  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) throw new Error('Invalid port number');
+  const headers = {};
+  if (apiKey) headers['X-Api-Key'] = apiKey;
+  // A printer that never answers is given up on after 8 s; once its reply
+  // starts, only the caller's cancel stops the copy (a long video takes time).
+  const ctl = new AbortController();
+  if (signal) { if (signal.aborted) ctl.abort(); else signal.addEventListener('abort', () => ctl.abort(), { once: true }); }
+  const timer = setTimeout(() => ctl.abort(), 8000);
+  try {
+    // outbound: lan (a printer: resolvePrinterTarget keeps it on the LAN)
+    return await fetch(`http://${target.urlHost}:${portNum}${pathAndQuery}`, { headers, redirect: 'manual', signal: ctl.signal });
+  } finally { clearTimeout(timer); }
+}
+
+/* A finished U1 print's time-lapse (lib/main/timelapse-keep.js; the Mac's
+ * Timelapse.swift): found after the print and named on the job; copied into
+ * the job's files only on "Keep as proof". */
+const timelapseKeep = require('./lib/main/timelapse-keep.js').createTimelapseKeep({
+  read: (machine, p) => moonrakerRead(machine, p, 10000),
+  stream: (machine, p, signal) => moonrakerStream(machine, p, signal),
+  readBook: () => {
+    if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+    return lanServerStore;
+  },
+  updateStoreOnDisk: (mutate) => updateStoreOnDisk(mutate),
+  filesDir: () => orderFilesDir(),
+  fs,
+  stopped: () => _quittingNow || _flushedForQuit || !printerPollInterval,
+  notify: (id, record) => BrowserWindow.getAllWindows().forEach((w) => { if (!w.isDestroyed()) w.webContents.send('printer-timelapse', { id, record }); }),
+  progress: (id, got, total) => BrowserWindow.getAllWindows().forEach((w) => { if (!w.isDestroyed()) w.webContents.send('timelapse-progress', { id, got, total }); }),
+});
+ipcMain.handle('hub:timelapse-keep', async (_e, { jobId } = {}) => {
+  // A job's file, not a printer control (Dev Hub, Nov 23): whoever may edit
+  // jobs (orders/edit) under the lock, decided from main's own book.
+  if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+  const { lock, role } = PrinterPermission.activeRole(lanServerStore);
+  if (lock && !(role && require('./lib/rbac.js').can(role, 'orders', 'edit', { lockEnabled: true, limits: lanServerStore.settings && lanServerStore.settings.roleLimits }))) {
+    return { ok: false, error: 'not_permitted' };
+  }
+  try { return await timelapseKeep.keep(jobId); } catch (e) { return { ok: false, reason: 'unreachable' }; }
+});
+ipcMain.handle('hub:timelapse-cancel', (_e, { jobId } = {}) => ({ ok: timelapseKeep.cancel(jobId) }));
+/** "Open on printer": the video where the printer keeps it, in the browser. */
+ipcMain.handle('hub:timelapse-open', async (_e, { jobId } = {}) => {
+  if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
+  const book = lanServerStore || {};
+  const order = (book.printLog || []).find((o) => o && String(o.id) === String(jobId || ''));
+  const t = order && order.printerTimelapse;
+  const machine = t && (book.machines || []).find((m) => m && String(m.id) === String(t.machineId));
+  const link = order && machine ? require('./lib/webcam.js').timelapseLink(order, machine) : null;
+  if (!link || !link.videoUrl) return { ok: false };
+  const host = (() => { try { return new URL(link.videoUrl).hostname.replace(/^\[|\]$/g, ''); } catch (_) { return ''; } })();
+  if (!host || !isAllowedPrinterHost(host)) return { ok: false };
+  // outbound-exempt: browser — the shop's own browser opens a printer on the LAN
+  await shell.openExternal(link.videoUrl);
+  return { ok: true };
+});
 
 // Bambu's `sequence_id`: "incremented by 1 on each request" (OpenBambuAPI).
 // Each command opens its own connection here, so it only has to be distinct
@@ -6388,6 +6545,28 @@ async function sendPrinterControl(machine, control, value) {
   machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   if (machineSecrets.unsaved(machine)) return { ok: false, error: 'connection_unsaved' };
   const { type, host, port, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
+  // The Snapmaker U1's chamber light (Figma 134:153, CAP1): Snapmaker's own
+  // Moonraker LED, switched by exactly the two lines lib/webcam.js writes and
+  // nothing else (scriptAllowed).
+  if (control === 'chamber-light' && type === 'moonraker') {
+    const Webcam = require('./lib/webcam.js');
+    if (!['on', 'off', true, false].includes(value)) return { ok: false, error: 'invalid light state' };
+    const script = Webcam.chamberLightScript(value === 'on' || value === true);
+    if (!script || !Webcam.scriptAllowed(script)) return { ok: false, error: 'invalid light state' };
+    const target = await resolvePrinterTarget(host);
+    if (!target.ok) return { ok: false, error: target.error };
+    const portNum = parseInt(port || defaultPrinterPort(type), 10);
+    if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) return { ok: false, error: 'Invalid port number' };
+    const headers = { 'Content-Type': 'application/json' };
+    if (machine.printerApi.apiKey) headers['X-Api-Key'] = machine.printerApi.apiKey;
+    try {
+      // outbound: lan (a printer: resolvePrinterTarget keeps it on the LAN)
+      const res = await fetch(`http://${target.urlHost}:${portNum}/printer/gcode/script`, {
+        method: 'POST', headers, body: JSON.stringify({ script }), redirect: 'manual', signal: AbortSignal.timeout(10000),
+      });
+      return res.ok ? { ok: true, control } : { ok: false, error: `Printer answered HTTP ${res.status}` };
+    } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+  }
   if (type !== 'bambu') return { ok: false, error: `${control} is not available for this printer type` };
   const target = await resolvePrinterTarget(host);
   if (!target.ok) return { ok: false, error: target.error };
