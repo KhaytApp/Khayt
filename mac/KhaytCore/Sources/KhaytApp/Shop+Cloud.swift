@@ -182,7 +182,7 @@ extension Shop {
         guard case .store(let build) = source else { return }
         let connection = try? CloudReader.connection(settingsDict)
         await livePublisher.publishIfDue(
-            rows: machinesLive(), connection: connection, dek: cloudDek, canWrite: cloudRoleCanWrite,
+            rows: machinesLive(), engine: engine, connection: connection, dek: cloudDek, canWrite: cloudRoleCanWrite,
             token: { [weak self] in
                 guard let self, let c = connection else { return nil }
                 _ = self
