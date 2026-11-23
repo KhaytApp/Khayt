@@ -2624,6 +2624,8 @@ final class Shop {
     var updateOffer: UpdateOffer?
     /// TESTS ONLY: a release's gate file, instead of asking GitHub for it.
     var updateGateFetchForTests: (@Sendable (String) async -> String?)?
+    /// TESTS ONLY: the version this Mac runs (a test build has none).
+    var updateGateRunningForTests: String?
     var launchGateHasBookForTests: Bool?
 
     /// What is low and has not already been ordered.

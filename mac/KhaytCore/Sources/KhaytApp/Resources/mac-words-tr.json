@@ -793,6 +793,7 @@
  "mac.upgate_later": "Sonra",
  "mac.upgate_continue": "Güncellemeye devam et",
  "mac.upgate_hold": "Önce Khayt penceresindeki “Güncellemeden önce” bölümünü okuyun. Ardından güncelleme devam edebilir.",
+ "mac.upgate_looking": "Khayt bu güncellemenin neleri değiştirdiğini okuyor. Birazdan kendiliğinden açılacak.",
  "mac.find_cant_add_locked": "Bu defteri başka bir uygulama açık tutuyor, bu yüzden bulduğu bir yazıcı buraya eklenemez.",
  "mac.find_cant_add_sample": "Bu örnek dükkân: bulduğu yazıcılar görülebilir ama eklenemez.",
  "mac.find_looking": "Bu ağda aranıyor…",

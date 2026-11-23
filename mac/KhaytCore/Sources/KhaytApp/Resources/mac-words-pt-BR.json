@@ -793,6 +793,7 @@
  "mac.upgate_later": "Depois",
  "mac.upgate_continue": "Continuar para a atualização",
  "mac.upgate_hold": "Leia primeiro “Antes de atualizar” na janela do Khayt. Depois a atualização pode continuar.",
+ "mac.upgate_looking": "O Khayt está lendo o que esta atualização muda. Ela abre sozinha em instantes.",
  "mac.find_cant_add_locked": "Outro app está com este livro aberto, então uma impressora encontrada não pode ser adicionada aqui.",
  "mac.find_cant_add_sample": "Esta é a loja de exemplo: as impressoras encontradas podem ser vistas, mas não adicionadas.",
  "mac.find_looking": "Procurando nesta rede…",

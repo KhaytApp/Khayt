@@ -793,6 +793,7 @@
  "mac.upgate_later": "Später",
  "mac.upgate_continue": "Weiter zum Update",
  "mac.upgate_hold": "Lesen Sie zuerst „Vor dem Update“ im Khayt-Fenster. Danach kann das Update weitergehen.",
+ "mac.upgate_looking": "Khayt liest gerade, was dieses Update ändert. Es öffnet sich gleich von selbst.",
  "mac.find_cant_add_locked": "Eine andere App hat dieses Geschäftsbuch geöffnet, daher kann ein gefundener Drucker hier nicht hinzugefügt werden.",
  "mac.find_cant_add_sample": "Dies ist der Beispiel-Shop: Gefundene Drucker können angesehen, aber nicht hinzugefügt werden.",
  "mac.find_looking": "Suche in diesem Netzwerk …",

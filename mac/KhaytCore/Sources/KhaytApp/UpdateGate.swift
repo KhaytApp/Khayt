@@ -26,17 +26,42 @@ import KhaytCore
 // can hold an update is having positively read items for it that nobody has
 // ticked. An update the shop cannot reach is the one bug an update cannot fix.
 //
-// WHAT IS REMEMBERED: the items that were read, by their English text, per
-// Mac, outside the book. Not "read up to version X": frame B drops exactly
-// the items ticked here and still shows any the installed app holds that this
-// sheet never showed, so the signed app's own list stays the backstop for a
-// download that was tampered with.
+// WHAT IS REMEMBERED: each item that was ticked, per Mac, outside the book,
+// as the release it was under, its English text AND the words it was shown
+// in. Not "read up to version X": frame B drops an item only when the signed
+// app would show that same release's item in those same words, and still
+// shows anything else. So the installed app's own list stays the backstop
+// for a release file that was tampered with, in any language: a translation
+// that said something else does not count as having read the real one.
 
 enum UpdateGate {
-    /// The English text of every item ticked on this sheet, on this Mac.
-    /// Kept short: old items fall off the front. Emptied by a downgrade.
+    /// Every item ticked on this sheet, on this Mac (`mark`). Kept short:
+    /// old items fall off the front. Emptied by a downgrade.
     static let readItemsKey = "updateGate.readItems"
     static let keeps = 200
+    /// More than a release file could honestly hold. A file past either is
+    /// not believed at all, and the update is offered as before.
+    static let mostItems = 40
+    static let longestItem = 2000
+
+    /// One ticked item: which release said it, what it is, what was shown.
+    static func mark(version: String, english: String, shown: String) -> String {
+        [version, english, shown].joined(separator: "\u{1E}")
+    }
+
+    /// The same list as marks, item for item.
+    static func marks(_ release: KhaytEngine.GatedRelease) -> [String] {
+        release.english.indices.map {
+            mark(version: release.version, english: release.english[$0],
+                 shown: $0 < release.items.count ? release.items[$0] : release.english[$0])
+        }
+    }
+
+    /// Is this what a release file holds, or something made to be shown?
+    static func believable(_ releases: [KhaytEngine.GatedRelease]) -> Bool {
+        releases.reduce(0) { $0 + $1.items.count } <= mostItems
+            && !releases.contains { $0.items.contains { $0.count > longestItem } }
+    }
     static let maxBytes = 512 * 1024
     static let seconds: TimeInterval = 5
 
@@ -76,9 +101,18 @@ enum UpdateGate {
         setup.timeoutIntervalForResource = seconds
         let session = URLSession(configuration: setup)
         defer { session.finishTasksAndInvalidate() }
-        guard let (data, response) = try? await session.data(for: URLRequest(url: url)),
+        guard let (bytes, response) = try? await session.bytes(for: URLRequest(url: url)),
               let http = response as? HTTPURLResponse, http.statusCode == 200,
-              http.url?.scheme == "https", data.count <= maxBytes else { return nil }
+              http.url?.scheme == "https", http.expectedContentLength <= Int64(maxBytes) else { return nil }
+        // Counted as it arrives: a body with no stated length is cut off at
+        // the limit, not read to the end and measured.
+        var data = Data()
+        do {
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count > maxBytes { return nil }
+            }
+        } catch { return nil }
         return String(data: data, encoding: .utf8)
     }
 
@@ -87,7 +121,8 @@ enum UpdateGate {
         guard !read.isEmpty else { return releases }
         let read = Set(read)
         return releases.compactMap { release in
-            let keep = release.english.indices.filter { !read.contains(release.english[$0]) }
+            let all = marks(release)
+            let keep = release.english.indices.filter { !read.contains(all[$0]) }
             guard !keep.isEmpty else { return nil }
             return KhaytEngine.GatedRelease(version: release.version,
                                             items: keep.map { $0 < release.items.count ? release.items[$0] : release.english[$0] },
@@ -113,28 +148,30 @@ struct UpdateOffer: Equatable {
 }
 
 extension Shop {
-    /// The English text of the items ticked on this Mac.
+    /// The items ticked on this Mac (`UpdateGate.mark`).
     var readGateItems: [String] { launchGateDefaults.stringArray(forKey: UpdateGate.readItemsKey) ?? [] }
 
     /// Remember these items as read on this Mac.
     func noteGateItemsRead(_ releases: [KhaytEngine.GatedRelease]) {
         // lock: system — this Mac's own record of what was read on it; nothing in the book.
         var read = readGateItems
-        for item in releases.flatMap(\.english) where !read.contains(item) { read.append(item) }
+        var have = Set(read)
+        for item in releases.flatMap(UpdateGate.marks) where have.insert(item).inserted { read.append(item) }
         launchGateDefaults.set(Array(read.suffix(UpdateGate.keeps)), forKey: UpdateGate.readItemsKey)
     }
 
     /// What an update to `version` has that this Mac has not read. Empty when
     /// there is nothing, AND when it cannot be found out: see "fails open".
-    func updateGateItems(for version: String, running: String? = Shop.runningVersion) async -> [KhaytEngine.GatedRelease] {
-        guard let running, !running.isEmpty, let engine else { return [] }
+    func updateGateItems(for version: String, running given: String? = nil) async -> [KhaytEngine.GatedRelease] {
+        guard let running = given ?? updateGateRunningForTests ?? Shop.runningVersion, !running.isEmpty, let engine else { return [] }
         let text: String?
         if let stand = updateGateFetchForTests { text = await stand(version) } else { text = await UpdateGate.fetch(version: version) }
         // The same rule as frame B, asked as if this Mac already ran the new
         // version: every gated release after the one running, up to it.
         guard let text, let all = try? await engine.launchGatePending(current: version, lastRun: running, acceptedFor: nil,
                                                                       hasBook: true, floor: LaunchGate.floor, gates: text,
-                                                                      language: words.language) else { return [] }
+                                                                      language: words.language),
+              UpdateGate.believable(all) else { return [] }
         return UpdateGate.unread(all, read: readGateItems)
     }
 

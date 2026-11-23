@@ -86,8 +86,11 @@ struct UpdateGateTests {
         shop.holdUpdate("4.0.0-beta.43", unread)
         shop.continueToUpdate()
         #expect(!shop.showsUpdateGate && shop.updateOffer == nil)
-        #expect(d.stringArray(forKey: UpdateGate.readItemsKey)
-                == ["Prices now include VAT.", "Update every computer first.", "Check Settings › Phones."])
+        #expect(d.stringArray(forKey: UpdateGate.readItemsKey) == [
+            UpdateGate.mark(version: "4.0.0-beta.43", english: "Prices now include VAT.", shown: "Prices now include VAT."),
+            UpdateGate.mark(version: "4.0.0-beta.43", english: "Update every computer first.", shown: "Update every computer first."),
+            UpdateGate.mark(version: "4.0.0-beta.42", english: "Check Settings › Phones.", shown: "Check Settings › Phones."),
+        ])
         #expect(await shop.updateGateItems(for: "4.0.0-beta.43", running: "4.0.0-beta.41").isEmpty, "asked twice")
         // Nothing held: Continue and an empty hold do nothing.
         shop.continueToUpdate()
@@ -96,6 +99,39 @@ struct UpdateGateTests {
         // The record is a short list, not a ledger.
         shop.noteGateItemsRead([KhaytEngine.GatedRelease(version: "9.0.0", items: (0..<300).map { "item \($0)" })])
         #expect(d.stringArray(forKey: UpdateGate.readItemsKey)?.count == UpdateGate.keeps)
+    }
+
+    @Test("a file made to be shown is not believed: too many items, or one too long, and the update is offered as before")
+    func notBelieved() async throws {
+        func file(_ items: [String]) -> String {
+            let list = items.map { "\"\($0)\"" }.joined(separator: ",")
+            return #"{"mac":{"4.0.0-beta.43":["# + list + "]}}"
+        }
+        let most = await Self.shop(file((0..<UpdateGate.mostItems).map { "item \($0)" }))
+        #expect(await most.updateGateItems(for: "4.0.0-beta.43", running: "4.0.0-beta.41").first?.items.count == UpdateGate.mostItems)
+        let many = await Self.shop(file((0...UpdateGate.mostItems).map { "item \($0)" }))
+        #expect(await many.updateGateItems(for: "4.0.0-beta.43", running: "4.0.0-beta.41").isEmpty)
+        let long = await Self.shop(file([String(repeating: "x", count: UpdateGate.longestItem + 1)]))
+        #expect(await long.updateGateItems(for: "4.0.0-beta.43", running: "4.0.0-beta.41").isEmpty)
+    }
+
+    @Test("a translation that is not the signed app's does not count as having read the real item")
+    func wrongTranslation() async throws {
+        // The release file shows an Arabic shop something soothing for beta.43's first item.
+        let forged = Self.asset.replacingOccurrences(of: "الأسعار تشمل الآن ضريبة القيمة المضافة.", with: "لا شيء مهم.")
+        let shop = await Self.shop(forged)
+        await shop.words.load("ar", engine: Self.engine)
+        shop.launchGateDefaults.set("4.0.0-beta.41", forKey: LaunchGate.lastRunKey)
+        shop.launchGateFileForTests = Self.asset          // what the installed, signed app holds
+        shop.launchGateHasBookForTests = true
+        let shown = await shop.updateGateItems(for: "4.0.0-beta.43", running: "4.0.0-beta.41")
+        #expect(shown[0].items[0] == "لا شيء مهم.")
+        shop.holdUpdate("4.0.0-beta.43", shown)
+        shop.continueToUpdate()
+        // First start of beta.43: the item whose words were not the app's is shown; the two that matched are not.
+        await shop.checkLaunchGate(current: "4.0.0-beta.43")
+        #expect(shop.launchGatePending.map(\.version) == ["4.0.0-beta.43"])
+        #expect(shop.launchGatePending.first?.items == ["الأسعار تشمل الآن ضريبة القيمة المضافة."])
     }
 
     @Test("read in Arabic is read: the record is the English text, whatever language it was shown in")
@@ -129,6 +165,7 @@ struct UpdateGateTests {
         #expect(shop.launchGatePending[1].items == ["Check Settings › Phones."])
         #expect(d.string(forKey: LaunchGate.lastRunKey) == "4.0.0-beta.41", "the record moved before the rest was read")
         shop.acceptLaunchGate()
+        #expect(d.string(forKey: LaunchGate.lastRunKey) == "4.0.0-beta.43" && !shop.showsLaunchGate)
         // Everything read before the download: the first start asks nothing and moves the record on.
         let all = await Self.shop(LaunchGateTests.gates)
         all.launchGateDefaults.set("4.0.0-beta.41", forKey: LaunchGate.lastRunKey)
@@ -171,9 +208,20 @@ struct UpdateGateTests {
         let source = try String(contentsOf: Self.root.appending(path: "mac/KhaytCore/Sources/KhaytApp/Updates.swift"), encoding: .utf8)
         #expect(source.components(separatedBy: "updater.checkForUpdates()").count == 2,
                 "Sparkle's update window is reachable around the sheet")
+        // And nowhere else in the app, by any of Sparkle's other doors.
+        let app = Self.root.appending(path: "mac/KhaytCore/Sources/KhaytApp")
+        for file in try FileManager.default.contentsOfDirectory(at: app, includingPropertiesForKeys: nil) where file.pathExtension == "swift" {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            #expect(!text.contains("checkForUpdatesInBackground()") && !text.contains(".checkForUpdates(nil") && !text.contains("SPUStandardUserDriver("),
+                    Comment(rawValue: file.lastPathComponent))
+            if file.lastPathComponent != "Updates.swift" { #expect(!text.contains("updater.checkForUpdates"), Comment(rawValue: file.lastPathComponent)) }
+        }
+        let cutCI = try String(contentsOf: Self.root.appending(path: ".github/workflows/mac-release.yml"), encoding: .utf8)
+        #expect(cutCI.contains(#"gh release create "$TAG" dist/*.zip lib/release-gates.json"#))
         let hook = try #require(source.range(of: "shouldProceedWithUpdate updateItem"))
         let body = source[hook.upperBound...].prefix(1600)
         #expect(body.contains("Updates.shared.mayProceed(version)") && body.contains("app.khayt.update-gate"))
+        #expect(body.contains("if let refusal {") && body.contains("throw NSError"))
         // The look that shows nothing is let through; everything else is asked.
         #expect(body.contains("guard updateCheck != .updateInformation else { return }"))
         // The release carries the file the sheet reads.
@@ -183,18 +231,57 @@ struct UpdateGateTests {
         #expect(source.contains(#"environment["KHAYT_SNAPSHOT_DIR"] == nil else { return }"#))
     }
 
-    @Test("the updater's own decision: unknown starts the finding out and refuses, clear proceeds")
+    @Test("the updater's own decision: not known is refused and looked into; unread holds the sheet; ticked goes on")
     func updater() async throws {
         let updates = Updates.shared
-        // No window yet: refused, and remembered for when there is one.
-        #expect(!updates.mayProceed("9.9.1"))
+        var opened = 0
+        var busy = false
+        updates.busyForTests = { busy }
+        updates.openForTests = { opened += 1 }
+        defer { updates.busyForTests = nil; updates.openForTests = nil }
+        func settle(_ done: () -> Bool) async throws {
+            for _ in 0..<300 where !done() { try await Task.sleep(for: .milliseconds(10)) }
+        }
+        let en = Words(); await en.load("en", engine: Self.engine)
         let shop = await Self.shop(#"{"mac":{"9.9.1":["Read me."]}}"#)
-        // A build with no version of its own holds nothing: clear once looked into.
+        shop.updateGateRunningForTests = "9.9.0"
         updates.attach(shop)
-        for _ in 0..<200 where !updates.mayProceed("9.9.1") { try await Task.sleep(for: .milliseconds(10)) }
-        #expect(updates.mayProceed("9.9.1"), "an update Khayt cannot find anything about must go on")
-        // Ticked: clear.
-        updates.wasRead("9.9.3")
-        #expect(updates.mayProceed("9.9.3"))
+
+        // A version with something to read. First sight: refused, said to be looking, and looked into.
+        #expect(updates.mayProceed("9.9.1") == en.callIt("mac.upgate_looking"))
+        try await settle { shop.updateOffer != nil }
+        #expect(shop.updateOffer == UpdateOffer(version: "9.9.1", releases: [KhaytEngine.GatedRelease(version: "9.9.1", items: ["Read me."])]))
+        #expect(opened == 0, "Sparkle's window opened beside the sheet")
+        // Known and unread: refused with the other sentence, however often Sparkle asks; Later changes nothing.
+        shop.putOffUpdate()
+        #expect(updates.mayProceed("9.9.1") == en.callIt("mac.upgate_hold"))
+        #expect(shop.updateOffer?.version == "9.9.1", "the sheet did not come back at the next check")
+        #expect(opened == 0)
+        // Ticked: Sparkle's window is asked for, and the hook lets the version through.
+        shop.continueToUpdate()
+        try await settle { opened == 1 }
+        #expect(opened == 1 && updates.mayProceed("9.9.1") == nil)
+
+        // A version with nothing to read (the file has no such release): looked into, then offered by Sparkle.
+        #expect(updates.mayProceed("9.9.0-beta.1") != nil)
+        try await settle { opened == 2 }
+        #expect(opened == 2 && updates.mayProceed("9.9.0-beta.1") == nil && shop.updateOffer == nil)
+
+        // A file that cannot be read never holds anything.
+        shop.updateGateFetchForTests = { _ in nil }
+        #expect(updates.mayProceed("9.9.2") != nil)
+        try await settle { opened == 3 }
+        #expect(opened == 3 && updates.mayProceed("9.9.2") == nil)
+
+        // Sparkle drops a call made while a check is running: the window is asked for only once it is free.
+        busy = true
+        updates.showOffer()
+        updates.showOffer()
+        try await Task.sleep(for: .milliseconds(600))
+        #expect(opened == 3, "asked while Sparkle was busy: the call is dropped and nothing is shown")
+        busy = false
+        try await settle { opened == 4 }
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(opened == 4, "asked for more than once")
     }
 }

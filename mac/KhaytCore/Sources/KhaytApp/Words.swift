@@ -5882,6 +5882,7 @@ final class Words {
         "mac.upgate_later": ["en": "Later", "ar": "لاحقًا"],
         "mac.upgate_continue": ["en": "Continue to the update", "ar": "المتابعة إلى التحديث"],
         "mac.upgate_hold": ["en": "Read “Before you update” in the Khayt window first. The update can go on after that.", "ar": "اقرأ «قبل التحديث» في نافذة خيط أولًا، وبعدها يمكن متابعة التحديث."],
+        "mac.upgate_looking": ["en": "Khayt is reading what this update changes. It opens by itself in a moment.", "ar": "خيط يقرأ ما يغيّره هذا التحديث. سيُفتح من تلقاء نفسه بعد لحظة."],
         "mac.find_unsupported": ["en": "Khayt cannot talk to this one yet",
                                  "ar": "لا يستطيع خيط التحدث إلى هذه بعد"],
         "mac.printer_pause":  ["en": "Pause",        "ar": "إيقاف مؤقت"],

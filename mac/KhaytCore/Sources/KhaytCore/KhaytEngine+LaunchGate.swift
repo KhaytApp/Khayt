@@ -71,7 +71,7 @@ extension KhaytEngine {
               var L = globalThis.KhaytLaunchGate;
               var r = L.pending({ current: current, seen: seen, gates: mac, hasBook: hasBook, isNewer: L.isNewer, floor: floor });
               var words = G.i18n && typeof G.i18n === 'object' && G.i18n.mac && typeof G.i18n.mac === 'object' ? G.i18n.mac : null;
-              var said = {}, out = [];
+              var said = Object.create(null), out = [];
               r.versions.slice().reverse().forEach(function (v) {
                 var en = (Array.isArray(mac[v]) ? mac[v] : []).map(String);
                 // The rule's own reading of a translation: an array of another length is not trusted at all.
