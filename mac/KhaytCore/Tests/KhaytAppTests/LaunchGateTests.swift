@@ -162,7 +162,7 @@ struct LaunchGateTests {
     }
 
     @Test("the bundled gate file is lib's, the floor is a real earlier Mac release, and the cut checks the file")
-    func shipped() throws {
+    func shipped() async throws {
         let lib = try Data(contentsOf: Self.root.appending(path: "lib/release-gates.json"))
         let bundled = try Data(contentsOf: Self.root.appending(path: "mac/KhaytCore/Sources/KhaytCore/JS/release-gates.json"))
         #expect(lib == bundled, "run mac/sync-js.sh")
@@ -170,8 +170,11 @@ struct LaunchGateTests {
         // The floor is below the version this tree builds, or the sheet would hide that version's own items.
         let version = try #require((try JSONSerialization.jsonObject(with: Data(contentsOf: Self.root.appending(path: "mac/version.json")))
                                     as? [String: Any])?["version"] as? String)
-        #expect(try Self.engine.compareVersions(LaunchGate.floor, version) < 0, "\(LaunchGate.floor) is not older than \(version)")
-        #expect(try Self.engine.compareVersions("4.0.0-beta.9", "4.0.0-beta.10") < 0 && Self.engine.compareVersions("4.0.0", "4.0.0-beta.99") > 0)
+        let floorVsThis = try await Self.engine.compareVersions(LaunchGate.floor, version)
+        #expect(floorVsThis < 0, "\(LaunchGate.floor) is not older than \(version)")
+        let nineVsTen = try await Self.engine.compareVersions("4.0.0-beta.9", "4.0.0-beta.10")
+        let releaseVsBeta = try await Self.engine.compareVersions("4.0.0", "4.0.0-beta.99")
+        #expect(nineVsTen < 0 && releaseVsBeta > 0)
         // The cut checks the gate file in the tree it BUILDS (the release worktree), never in the
         // checkout it was started from, which it must not write into.
         let cut = try String(contentsOf: Self.root.appending(path: "mac/release-local.sh"), encoding: .utf8)
