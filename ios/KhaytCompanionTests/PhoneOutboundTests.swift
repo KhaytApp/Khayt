@@ -20,7 +20,7 @@ final class PhoneOutboundTests: XCTestCase {
         struct Case: Decodable {
             let why: String; let settings: JSONValue?; let purpose: String; let ctx: Ctx?
             let want: Want
-            struct Want: Decodable { let allowed: Bool; let reason: String }
+            struct Want: Decodable { let allowed: Bool; let reason: String; let once: Bool? }
             /// `local` as written: the fixture also holds a switch written as
             /// 1 or "yes", which the gate's `Local` (two Bools) cannot be told.
             struct Ctx: Decodable { let local: JSONValue?; let host: String? }
@@ -29,9 +29,15 @@ final class PhoneOutboundTests: XCTestCase {
         let v = try JSONDecoder().decode(Vectors.self,
                                          from: Data(contentsOf: root.appending(path: "test/fixtures/outbound-vectors.json")))
         XCTAssertGreaterThanOrEqual(v.cases.count, 40)
-        var checked = 0
+        var checked = 0, answered = 0
         for c in v.cases {
             guard let purpose = OutboundPurpose(rawValue: c.purpose) else { continue }   // a typo case: the rule's own
+            // A person's one-shot answer (`ctx.answer`, lib/outbound.js `answerToken`):
+            // the phone has no "Use the newer setting" to answer, so its gate is
+            // never handed one. The cases an answer OPENS (`once`) are not the
+            // phone's; every case an answer does not open reads the same with or
+            // without it, and is checked below.
+            if c.want.once == true { answered += 1; continue }
             var offlineHere = false, countOff = false
             if case .object(let l)? = c.ctx?.local {
                 func flag(_ k: String) -> Bool?? {
@@ -53,6 +59,7 @@ final class PhoneOutboundTests: XCTestCase {
             checked += 1
         }
         XCTAssertGreaterThanOrEqual(checked, 40)
+        XCTAssertLessThanOrEqual(answered, 5, "only the answered one-shot cases are left out")
     }
 
     override func setUp() {

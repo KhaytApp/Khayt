@@ -26,7 +26,7 @@ final class PrinterNeedsTests: XCTestCase {
     /// Runs `call` (a JS function of one case) over a vector file and returns
     /// the cases whose answer is not `want`, compared key-order-free.
     private func failures(_ ctx: JSContext, fixture: String, call: String) throws -> (Int, [String]) {
-        let json = try String(contentsOf: root.appending(path: "test/fixtures/\(fixture).json"), encoding: .utf8)
+        let json = try String(contentsOf: root.appending(path: fixture), encoding: .utf8)
         let js = """
         (function (V) {
           function canon(v) {
@@ -50,7 +50,7 @@ final class PrinterNeedsTests: XCTestCase {
 
     func testTheProblemCatalogueVectors() throws {
         let (ctx, thrown) = try context(["printer-activity", "bambu-faults", "moonraker-problems", "printer-problems"])
-        let (count, fails) = try failures(ctx, fixture: "printer-problems-vectors",
+        let (count, fails) = try failures(ctx, fixture: "test/fixtures/printer-problems-vectors.json",
                                           call: "function (c) { return KhaytPrinterProblems.problemsFor(c.type, c.report); }")
         XCTAssertNil(thrown())
         XCTAssertGreaterThanOrEqual(count, 15)
@@ -62,8 +62,8 @@ final class PrinterNeedsTests: XCTestCase {
     }
 
     func testTheWaitingAtTheMachineVectors() throws {
-        let (ctx, thrown) = try context(["waiting-at-machine"])
-        let (count, fails) = try failures(ctx, fixture: "waiting-at-machine-vectors",
+        let (ctx, thrown) = try context(["printer-activity", "waiting-at-machine"])   // the rule reads the printer's state now (#2613 review)
+        let (count, fails) = try failures(ctx, fixture: "test/fixtures/waiting-at-machine-vectors.json",
                                           call: "function (c) { return KhaytWaitingAtMachine.waiting(c.machine, c.opts); }")
         XCTAssertNil(thrown())
         XCTAssertGreaterThanOrEqual(count, 7)
