@@ -34,6 +34,7 @@ final class PhoneOutboundStatusTests: XCTestCase {
 
     override func setUp() {
         PhoneOutbound.defaults = UserDefaults(suiteName: "status-\(UUID().uuidString)")!
+        PhoneOutbound.mirror = UserDefaults(suiteName: "mirror-\(UUID().uuidString)")
         // Other suites leave a book "held"; start each test bookless.
         OutboundGate.$scoped.withValue(OutboundGate()) { PhoneOutbound.forgotten() }
     }
@@ -72,7 +73,7 @@ final class PhoneOutboundStatusTests: XCTestCase {
                            "no credential any more: the verified block still stands")
         }
     }
-    override func tearDown() { PhoneOutbound.defaults = .standard }
+    override func tearDown() { PhoneOutbound.defaults = .standard; PhoneOutbound.mirror = nil }
 
     func testOnlyAVerifiedAnswerIsBelieved() {
         let on = body(#"{"offline":true,"keep":["updates"]}"#)

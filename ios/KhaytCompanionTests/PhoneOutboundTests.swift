@@ -57,9 +57,10 @@ final class PhoneOutboundTests: XCTestCase {
 
     override func setUp() {
         PhoneOutbound.defaults = UserDefaults(suiteName: "outbound-\(UUID().uuidString)")!
+        PhoneOutbound.mirror = UserDefaults(suiteName: "mirror-\(UUID().uuidString)")
     }
 
-    override func tearDown() { PhoneOutbound.defaults = .standard }
+    override func tearDown() { PhoneOutbound.defaults = .standard; PhoneOutbound.mirror = nil }
 
     /// A whole pull from Khayt Cloud can bring settings with no `network`
     /// block (the Mac never syncs settings to the cloud): the switch the Mac

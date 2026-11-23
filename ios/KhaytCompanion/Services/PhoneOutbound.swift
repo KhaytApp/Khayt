@@ -28,8 +28,8 @@ import KhaytCore
 ///
 /// A phone that keeps no book (a floor phone, a cloud sign-in before its first
 /// pull) has no settings to read, so its gate reads `.none` (as every app
-/// without a book does). The notification extension runs in its own process
-/// and asks no gate.
+/// without a book does). The notification extension runs in its own process:
+/// it follows the same book through `OutboundMirror` in the App Group.
 enum PhoneOutbound {
     /// The last `settings.network` the phone saw (review of #2638). A whole
     /// pull from Khayt Cloud can bring a copy of the book whose `settings`
@@ -192,7 +192,23 @@ enum PhoneOutbound {
         OutboundGate.shared.update(local: .init(offline: false, installCountOff: !countInstall))
     }
 
+    /// Where the notification extension reads the switch (`OutboundMirror`).
+    /// A test host writes nowhere unless a test points it at a suite of its
+    /// own: the simulator's App Group is not a test's to change.
+    nonisolated(unsafe) static var mirror: UserDefaults? =
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            ? nil : UserDefaults(suiteName: OutboundMirror.group)
+
+    /// The gate and the mirror change together: two tellers on different
+    /// threads (a book write and a status answer) can never leave the
+    /// extension following one book while the app follows another.
+    private static let telling = NSLock()
+
     private static func tell(_ book: OutboundGate.Book) {
+        telling.lock(); defer { telling.unlock() }
         OutboundGate.shared.update(book: book)
+        // The extension runs in its own process and asks a gate of its own:
+        // it follows what this one follows.
+        OutboundMirror.write(book, to: mirror)
     }
 }
