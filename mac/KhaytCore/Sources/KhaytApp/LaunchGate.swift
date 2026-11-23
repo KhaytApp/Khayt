@@ -29,6 +29,10 @@ enum LaunchGate {
     /// Where every Mac release's notes are (`mac/release-local.sh`).
     static let releaseNotes = URL(string: "https://github.com/KhaytApp/khayt-mac/releases")!
 
+    /// The mark before each item. A constant, not a literal in a `Text`: it
+    /// is a symbol, not a word for anybody to translate.
+    static let bullet = "\u{2022}"
+
     /// "beta.43" for "4.0.0-beta.43": how an item says which release it is from.
     static func short(_ version: String) -> String {
         guard let dash = version.firstIndex(of: "-") else { return version }
@@ -111,7 +115,7 @@ struct LaunchGateSheet: View {
                     ForEach(releases) { release in
                         ForEach(Array(release.items.enumerated()), id: \.offset) { _, item in
                             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                Text("\u{2022}").accessibilityHidden(true)
+                                Text(LaunchGate.bullet).accessibilityHidden(true)
                                 // Which release said it, when more than one did.
                                 Text(releases.count > 1 ? LaunchGate.short(release.version) + ": " + item : item)
                                     .textSelection(.enabled)

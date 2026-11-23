@@ -776,7 +776,7 @@
  "mac.gate_now_from": "这台 Mac 现在运行 Khayt {v}（之前是 {from}）。",
  "mac.gate_now": "这台 Mac 现在运行 Khayt {v}。",
  "mac.gate_changed": "有 {n} 项变更需要你在继续之前了解。",
- "mac.gate_changed_one": "有 1 项变更需要你在继续之前了解。",
+ "mac.gate_changed_one": "有 {n} 项变更需要你在继续之前了解。",
  "mac.gate_head": "继续之前",
  "mac.gate_read": "我已阅读这些变更",
  "mac.gate_continue": "继续",

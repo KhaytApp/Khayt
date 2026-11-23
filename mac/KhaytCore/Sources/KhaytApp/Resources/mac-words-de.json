@@ -776,7 +776,7 @@
  "mac.gate_now_from": "Auf diesem Mac läuft jetzt Khayt {v} (vorher {from}).",
  "mac.gate_now": "Auf diesem Mac läuft jetzt Khayt {v}.",
  "mac.gate_changed": "{n} Dinge haben sich geändert, die Sie wissen sollten, bevor Sie weitermachen.",
- "mac.gate_changed_one": "Eine Sache hat sich geändert, die Sie wissen sollten, bevor Sie weitermachen.",
+ "mac.gate_changed_one": "{n} Sache hat sich geändert, die Sie wissen sollten, bevor Sie weitermachen.",
  "mac.gate_head": "Bevor Sie weitermachen",
  "mac.gate_read": "Ich habe diese Änderungen gelesen",
  "mac.gate_continue": "Weiter",

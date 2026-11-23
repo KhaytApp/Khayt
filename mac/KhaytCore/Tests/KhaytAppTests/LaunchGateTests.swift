@@ -124,7 +124,7 @@ struct LaunchGateTests {
         #expect(LaunchGateSheet.summary(current: "4.0.0-beta.43", from: "4.0.0-beta.41", count: 2, words: w)
                 == "This Mac now runs Khayt 4.0.0-beta.43 (it ran beta.41 before). 2 things changed that you should know before you carry on.")
         #expect(LaunchGateSheet.summary(current: "4.0.0-beta.43", from: nil, count: 1, words: w)
-                == "This Mac now runs Khayt 4.0.0-beta.43. One thing changed that you should know before you carry on.")
+                == "This Mac now runs Khayt 4.0.0-beta.43. 1 thing changed that you should know before you carry on.")
         #expect(LaunchGate.short("4.0.0-beta.43") == "beta.43" && LaunchGate.short("4.0.0") == "4.0.0")
         let source = try String(contentsOf: Self.root.appending(path: "mac/KhaytCore/Sources/KhaytApp/LaunchGate.swift"), encoding: .utf8)
         // No Later, Continue off until the tick, and Escape does not close it.

@@ -5742,7 +5742,7 @@ final class Words {
         "mac.gate_now_from": ["en": "This Mac now runs Khayt {v} (it ran {from} before).", "ar": "يعمل هذا الماك الآن بإصدار خيط ‎{v}‎ (وكان يعمل بإصدار ‎{from}‎)."],
         "mac.gate_now": ["en": "This Mac now runs Khayt {v}.", "ar": "يعمل هذا الماك الآن بإصدار خيط ‎{v}‎."],
         "mac.gate_changed": ["en": "{n} things changed that you should know before you carry on.", "ar": "تغيّرت {n} أمور ينبغي أن تعرفها قبل المتابعة."],
-        "mac.gate_changed_one": ["en": "One thing changed that you should know before you carry on.", "ar": "تغيّر أمر واحد ينبغي أن تعرفه قبل المتابعة."],
+        "mac.gate_changed_one": ["en": "{n} thing changed that you should know before you carry on.", "ar": "تغيّر أمر واحد ينبغي أن تعرفه قبل المتابعة."],
         "mac.gate_head": ["en": "Before you carry on", "ar": "قبل المتابعة"],
         "mac.gate_read": ["en": "I have read these changes", "ar": "قرأت هذه التغييرات"],
         "mac.gate_continue": ["en": "Continue", "ar": "متابعة"],
