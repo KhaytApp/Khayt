@@ -50,7 +50,9 @@ struct WritersAreGatedTests {
     static func asksTheLock(_ text: String) -> Bool {
         // `permittedPrinter(`/`printerAllows(` are the printers area's own gate
         // (P5, `lib/rbac.js canPrinter`): the lock, asked about a printer.
-        ["permitted(", "permittedRestoring(", "lockAllows(", "permittedPrinter(", "printerAllows("].contains { text.contains($0) }
+        // `ownerAllowsPrivacy(` is the owner-only gate on the privacy settings.
+        ["permitted(", "permittedRestoring(", "lockAllows(", "permittedPrinter(", "printerAllows(",
+         "ownerAllowsPrivacy("].contains { text.contains($0) }
     }
 
     // MARK: - Reading the sources

@@ -149,7 +149,7 @@ struct ActiveCountSettings: View {
 
     private var toggle: some View {
         Section {
-            Toggle(isOn: $sender.enabled) {
+            Toggle(isOn: Binding(get: { sender.enabled }, set: { shop.setInstallCount($0, sender: sender) })) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(shop.words.callIt("tel.active"))
                     Text(shop.words.callIt("tel.active_hint"))
@@ -157,6 +157,21 @@ struct ActiveCountSettings: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            PrivacyProblem(shop: shop, key: "mac.priv_owner_count")
+        }
+    }
+}
+
+/// Why a privacy switch was not changed, beside THAT switch only (`key` is
+/// the one the refused change belongs to, whatever the sentence).
+struct PrivacyProblem: View {
+    let shop: Shop
+    let key: String
+
+    var body: some View {
+        if let said = shop.privacyProblem, shop.privacyProblemKey == key {
+            Text(said).font(.caption).foregroundStyle(Khayt.late)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

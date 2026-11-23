@@ -1982,6 +1982,8 @@
  "mac.phones_roles_manager": "只有店主可以更改手机的角色。你可以让手机退出登录。",
  "mac.phones_role_pin": "这部手机是用 PIN 配对的，因此仍是店主。要给它其他角色，请先让它退出登录，再用数字重新配对。",
  "mac.prole_holds": "无论员工锁是否开启，这些都有效：角色就是你给这部手机的权限。查看者或操作员手机不保留账本副本，并在店铺的 Wi-Fi 下工作。",
+ "mac.priv_owner_telemetry": "未保存，因为需要店主操作：崩溃报告和使用统计。",
+ "mac.priv_owner_count": "未保存，因为需要店主操作：匿名安装计数。",
  "mac.net_row_on": "“不进行任何互联网访问”已开启。",
  "mac.net_row_off": "Khayt 通过互联网发送的内容，以及一个停止它的开关。",
  "mac.net_title": "互联网使用",

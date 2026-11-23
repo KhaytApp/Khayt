@@ -255,6 +255,12 @@ final class Shop {
     var feedsOutboundGate = Shop.inTheApp
     /// Settings ▸ General should open on Internet use (`OpenInternetUse`).
     var opensInternetUse = false
+    /// Why a privacy switch (the install count, crash reports, usage
+    /// statistics) was not changed, said beside the switch in Settings: the
+    /// shop window's banner is behind that window.
+    var privacyProblem: String?
+    /// Which switch that sentence belongs beside (its word key).
+    var privacyProblemKey: String?
     /// Moves whenever the gate is told something, so a view that asks the
     /// gate (which is not observable) is redrawn.
     var outboundRevision = 0
@@ -985,7 +991,7 @@ final class Shop {
         // are read (`lockReady`), and nobody signed in. A reload of the same
         // book keeps both — every write reloads, and a sign-in screen flashing
         // after each would be the lock punishing the person it let in.
-        if source != next { lockReady = false; lockSessionId = nil }
+        if source != next { lockReady = false; lockSessionId = nil; clearPrivacyProblem() }
         source = next
         problem = nil
         skipped = []
@@ -2572,6 +2578,8 @@ final class Shop {
         // (alpha.62 review). Undo is the person's, not the Mac's.
         didSet {
             guard lockSessionId != oldValue else { return }
+            // What the last person was refused is not said to the next one.
+            clearPrivacyProblem()
             undoManager?.removeAllActions()
             // And every sheet or dialog the last person had open: a sheet
             // stays on screen over the sign-in screen otherwise, half filled

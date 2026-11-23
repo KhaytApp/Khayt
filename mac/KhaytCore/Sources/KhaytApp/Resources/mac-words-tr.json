@@ -1982,6 +1982,8 @@
  "mac.phones_roles_manager": "Bir telefonun rolünü yalnızca işletme sahibi değiştirebilir. Bir telefonun oturumunu kapatabilirsiniz.",
  "mac.phones_role_pin": "Bu telefon PIN ile eşleştiği için sahip olarak kalır. Başka bir rol vermek için oturumunu kapatıp kodla yeniden eşleyin.",
  "mac.prole_holds": "Bunlar personel kilidi açık da olsa kapalı da olsa geçerlidir: rol, bu telefona verdiğiniz şeydir. İzleyici veya operatör telefonu defterin kopyasını tutmaz ve işletmenin Wi-Fi'sinde çalışır.",
+ "mac.priv_owner_telemetry": "Kaydedilmedi, çünkü işletme sahibi gerekiyor: çökme raporları ve kullanım istatistikleri.",
+ "mac.priv_owner_count": "Kaydedilmedi, çünkü işletme sahibi gerekiyor: anonim kurulum sayımı.",
  "mac.net_row_on": "“İnternete hiç bağlanma” açık.",
  "mac.net_row_off": "Khayt'ın internet üzerinden gönderdikleri ve bunu durduran bir anahtar.",
  "mac.net_title": "İnternet kullanımı",

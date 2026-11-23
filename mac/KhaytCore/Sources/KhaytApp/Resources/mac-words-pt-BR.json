@@ -1982,6 +1982,8 @@
  "mac.phones_roles_manager": "Só o proprietário pode mudar a função de um telefone. Você pode desconectar um telefone.",
  "mac.phones_role_pin": "Este telefone foi emparelhado com o PIN, então continua sendo o proprietário. Para dar outra função, desconecte-o e emparelhe de novo por código.",
  "mac.prole_holds": "Isto vale com o bloqueio de equipe ligado ou desligado: uma função é o que você deu a este telefone. Um telefone leitor ou operador não guarda cópia do livro e funciona no Wi-Fi da loja.",
+ "mac.priv_owner_telemetry": "Não foi salvo, porque precisa do proprietário: relatórios de falhas e estatísticas de uso.",
+ "mac.priv_owner_count": "Não foi salvo, porque precisa do proprietário: a contagem anônima de instalações.",
  "mac.net_row_on": "“Não fazer chamadas à internet” está ativado.",
  "mac.net_row_off": "O que o Khayt envia pela internet, e um interruptor para parar.",
  "mac.net_title": "Uso da internet",

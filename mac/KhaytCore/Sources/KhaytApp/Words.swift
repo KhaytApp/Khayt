@@ -4114,6 +4114,8 @@ final class Words {
         "mac.phones_roles_manager": ["en": "Only the owner can change a phone's role. You can sign a phone out.", "ar": "المالك وحده يستطيع تغيير دور الجوال. يمكنك تسجيل خروج جوال."],
         "mac.phones_role_pin": ["en": "This phone was paired with the PIN, so it stays the owner. To give it another role, sign it out and pair it again by code.", "ar": "هذا الجوال مقترن بالرمز، فيبقى المالك. لمنحه دورًا آخر، سجّل خروجه ثم أقرنه من جديد بالرقم."],
         "mac.prole_holds": ["en": "These hold whether the staff lock is on or off: a role is what you gave this phone. A viewer or operator phone keeps no copy of the book and works on the shop's Wi-Fi.", "ar": "هذه سارية سواء كان قفل الموظفين مفعّلًا أم لا: الدور هو ما منحته لهذا الجوال. جوال المشاهد أو المشغّل لا يحتفظ بنسخة من الدفتر ويعمل على Wi-Fi المتجر."],
+        "mac.priv_owner_telemetry": ["en": "Not saved, because it needs the owner: crash reports and usage statistics.", "ar": "لم يُحفظ، لأنه يحتاج إلى المالك: تقارير الأعطال وإحصاءات الاستخدام."],
+        "mac.priv_owner_count": ["en": "Not saved, because it needs the owner: the anonymous install count.", "ar": "لم يُحفظ، لأنه يحتاج إلى المالك: عدّاد التثبيت المجهول."],
         "mac.net_title": ["en": "Internet use", "ar": "استخدام الإنترنت"],
         "mac.net_open": ["en": "Internet use…", "ar": "استخدام الإنترنت…"],
         "mac.net_sub": ["en": "Choose what Khayt may send over the internet. Printers, cameras and phones on your shop's network always keep working.", "ar": "اختر ما يُسمح لخيط بإرساله عبر الإنترنت. الطابعات والكاميرات والجوالات على شبكة متجرك تواصل العمل دائمًا."],

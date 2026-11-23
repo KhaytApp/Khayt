@@ -1982,6 +1982,8 @@
  "mac.phones_roles_manager": "Seul le propriétaire peut modifier le rôle d'un téléphone. Vous pouvez déconnecter un téléphone.",
  "mac.phones_role_pin": "Ce téléphone a été jumelé avec le code, il reste donc le propriétaire. Pour lui donner un autre rôle, déconnectez-le et jumelez-le à nouveau par code.",
  "mac.prole_holds": "Cela vaut que le verrou du personnel soit activé ou non : un rôle est ce que vous avez donné à ce téléphone. Un téléphone lecteur ou opérateur ne garde aucune copie du registre et fonctionne sur le Wi-Fi de l'atelier.",
+ "mac.priv_owner_telemetry": "Non enregistré, car le propriétaire est requis : rapports de plantage et statistiques d'utilisation.",
+ "mac.priv_owner_count": "Non enregistré, car le propriétaire est requis : le comptage anonyme des installations.",
  "mac.net_row_on": "« Ne faire aucun appel à Internet » est activé.",
  "mac.net_row_off": "Ce que Khayt envoie sur Internet, et un interrupteur pour l'arrêter.",
  "mac.net_title": "Utilisation d'Internet",

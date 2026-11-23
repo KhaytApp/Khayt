@@ -1982,6 +1982,8 @@
  "mac.phones_roles_manager": "Solo el propietario puede cambiar el rol de un teléfono. Puedes cerrar la sesión de un teléfono.",
  "mac.phones_role_pin": "Este teléfono se emparejó con el PIN, así que sigue siendo el propietario. Para darle otro rol, cierra su sesión y emparéjalo de nuevo por código.",
  "mac.prole_holds": "Esto vale tanto si el bloqueo de personal está activado como si no: un rol es lo que diste a este teléfono. Un teléfono de lector u operador no guarda copia del libro y funciona en el Wi-Fi de la tienda.",
+ "mac.priv_owner_telemetry": "No se guardó, porque hace falta el propietario: informes de fallos y estadísticas de uso.",
+ "mac.priv_owner_count": "No se guardó, porque hace falta el propietario: el recuento anónimo de instalaciones.",
  "mac.net_row_on": "«No hacer llamadas a internet» está activado.",
  "mac.net_row_off": "Qué envía Khayt por internet, y un interruptor para detenerlo.",
  "mac.net_title": "Uso de internet",

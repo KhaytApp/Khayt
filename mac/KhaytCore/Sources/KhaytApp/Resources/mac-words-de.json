@@ -1982,6 +1982,8 @@
  "mac.phones_roles_manager": "Nur der Inhaber kann die Rolle eines Telefons ändern. Sie können ein Telefon abmelden.",
  "mac.phones_role_pin": "Dieses Telefon wurde mit der PIN gekoppelt und bleibt daher Inhaber. Für eine andere Rolle melden Sie es ab und koppeln es erneut per Code.",
  "mac.prole_holds": "Dies gilt unabhängig davon, ob die Mitarbeitersperre an oder aus ist: Eine Rolle ist das, was Sie diesem Telefon gegeben haben. Ein Betrachter- oder Bediener-Telefon behält keine Kopie des Buchs und arbeitet im WLAN des Betriebs.",
+ "mac.priv_owner_telemetry": "Nicht gespeichert, weil der Inhaber nötig ist: Absturzberichte und Nutzungsstatistiken.",
+ "mac.priv_owner_count": "Nicht gespeichert, weil der Inhaber nötig ist: die anonyme Installationszählung.",
  "mac.net_row_on": "„Keine Internetverbindungen herstellen“ ist eingeschaltet.",
  "mac.net_row_off": "Was Khayt über das Internet sendet, und ein Schalter, um es zu stoppen.",
  "mac.net_title": "Internetnutzung",
