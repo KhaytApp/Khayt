@@ -1702,7 +1702,20 @@ function wireEvents() {
   // Machine profiles (settings section)
   $('#btnAddMachine')?.addEventListener('click', () => openMachineEditor(null));
   $('#btnPartsToBuy')?.addEventListener('click', () => openPartsToBuy());
-  $('#machinesList')?.addEventListener('click', (e) => {
+  $('#machinesList')?.addEventListener('click', async (e) => {
+    // "Bed is clear" under a card (Figma 136:153): the same stamp as the
+    // queue's and a phone's; main reads it once the save lands.
+    const bed = e.target.closest('[data-machine-bed-clear]');
+    if (bed) {
+      const m = machines.find((x) => x.id === bed.dataset.machineBedClear);
+      if (!m) return;
+      bed.disabled = true;
+      m.bedClearedAt = new Date().toISOString();
+      saveAll();
+      try { if (typeof flushSave === 'function') await flushSave(); } catch (_) { /* the next save carries it */ }
+      if (typeof renderMachineNeeds === 'function') renderMachineNeeds();
+      return;
+    }
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
     if (btn.dataset.act === 'maint-log') openMaintLog(btn.dataset.id);
@@ -1718,6 +1731,22 @@ function wireEvents() {
     if (btn.dataset.act === 'printer-drop') openDropObject(btn.dataset.id);
     if (btn.dataset.act === 'plug-on') plugSwitch(btn.dataset.id, true);
     if (btn.dataset.act === 'plug-off') plugSwitch(btn.dataset.id, false);
+  });
+  // A card's light switch (Figma 134:153, CAP1): sends the opposite of what it
+  // shows; the switch keeps what was last sent, and the toast says what the
+  // printer answered.
+  $('#machinesList')?.addEventListener('click', async (e) => {
+    // A U1 head's Link…/Change… (Figma 134:333) and Add spool… (134:282).
+    const hl = e.target.closest('[data-head-link]');
+    if (hl) { openHeadLink(hl.dataset.headLink, Number(hl.dataset.head)); return; }
+    if (e.target.closest('[data-heads-add]')) { window.KhaytShell?.switchTab?.('inventory-tab'); return; }
+    const sw = e.target.closest('[data-printer-switch]');
+    if (!sw || sw.disabled) return;
+    const on = sw.getAttribute('aria-checked') !== 'true';
+    sw.disabled = true;
+    const ok = await printerSwitch(sw.dataset.printerSwitch, sw.dataset.control, on);
+    sw.disabled = false;
+    if (ok) { sw.setAttribute('aria-checked', on ? 'true' : 'false'); sw.classList.toggle('on', on); }
   });
   $('#machinesList')?.addEventListener('change', (e) => {
     const sel = e.target.closest('select[data-printer-control]');

@@ -92,13 +92,32 @@ async function renderList(box, foot, devices, ctx) {
 }
 
 // ── The dialog (frames P1–P4) ───────────────────────────────────────────────
+//
+// One sheet, two kinds (Figma page 131, "Pair a slicer…"): `opts.kind ===
+// 'connector'` pairs a slicer plugin through hub:connector-pair-*, the same
+// window and the same 6-digit number, without the role choice (a slicer has
+// one fixed scope, said in words instead).
+
+/** The five calls, for a phone or for a slicer. */
+function pairApi(slicer) {
+  const a = api();
+  return slicer
+    ? { state: () => a.connectorPairState(), open: () => a.connectorPairOpen(), close: () => a.connectorPairClose(),
+      approve: (x) => a.connectorPairApprove({ pairId: x.pairId, check: x.check }), deny: () => a.connectorPairDeny() }
+    : { state: () => a.phonePairState(), open: () => a.phonePairOpen(), close: () => a.phonePairClose(),
+      approve: (x) => a.phonePairApprove(x), deny: () => a.phonePairDeny() };
+}
 
 let _timer = null;
-function openDialog(onClose) {
-  let overlay = document.getElementById('phonePairOverlay');
+function openDialog(onClose, opts) {
+  const slicer = !!(opts && opts.kind === 'connector');
+  const P = pairApi(slicer);
+  const unnamed = () => tr(slicer ? 'ca.unnamed' : 'lan.phones_unnamed');
+  const overlayId = slicer ? 'connectorPairOverlay' : 'phonePairOverlay';
+  let overlay = document.getElementById(overlayId);
   if (overlay) overlay.remove();
   overlay = document.createElement('div');
-  overlay.id = 'phonePairOverlay';
+  overlay.id = overlayId;
   overlay.className = 'modal-backdrop confirm-modal-overlay';
   overlay.style.zIndex = '10040';
   (document.getElementById('modalMount') || document.body).appendChild(overlay);
@@ -106,19 +125,32 @@ function openDialog(onClose) {
 
   const close = async (stopWindow) => {
     if (_timer) { clearInterval(_timer); _timer = null; }
-    if (stopWindow) { try { await api().phonePairClose(); } catch (_) { /* main closes it on its own clock */ } }
+    if (stopWindow) { try { await P.close(); } catch (_) { /* main closes it on its own clock */ } }
     overlay.remove();
     if (typeof onClose === 'function') onClose();
   };
 
   const draw = (st) => {
-    const head = `<div class="modal-header"><h3 id="ppTitle">${esc(tr('pp.title'))}</h3></div>`;
+    const head = `<div class="modal-header"><h3 id="ppTitle">${esc(tr(slicer ? 'ca.pair_title' : 'pp.title'))}</h3></div>`;
     let body = '', foot = '';
     const p = st && st.pending && st.pending.revealed ? st.pending : null;
     if (memo.end) {
       // P4: how it ended, in words.
       body = `<div class="pp-end">${esc(memo.end)}</div>`;
       foot = `<button type="button" class="btn primary" data-pp-act="done">${esc(tr('pp.done'))}</button>`;
+    } else if (p && slicer) {
+      // P2 for a slicer: the same number on both screens, and what it may do (no role).
+      memo.asked = { pairId: p.pairId, check: p.check, name: p.name };
+      body = `<div class="pp-asks">${esc(tr('pp.asks', { name: p.name || unnamed() }))}</div>
+        <div class="pp-sub">${esc([p.app && p.version ? `${p.app} ${p.version}` : (p.app || ''), p.address || ''].filter(Boolean).join(' · '))}</div>
+        <div class="pp-check" dir="ltr">${esc(spaced(p.check))}</div>
+        <div class="pp-sub pp-center">${esc(tr('ca.pair_check_same'))}</div>
+        <div class="pp-may">${esc(tr('ca.pair_may'))}</div>
+        <div class="pp-sub">${esc(tr('ca.pair_scope'))}</div>
+        <div class="pp-sub">${esc(tr('ca.pair_deny_note'))}</div>`;
+      foot = `<span class="pp-left">${esc(tr('pp.left', { time: mmss(st.remainingMs) }))}</span><span style="flex:1"></span>
+        <button type="button" class="btn" data-pp-act="deny">${esc(tr('pp.deny'))}</button>
+        <button type="button" class="btn primary" data-pp-act="approve">${esc(tr('pp.approve'))}</button>`;
     } else if (p) {
       // P2/P3: the same number on both screens, and a role.
       const grantable = (st.grantable || []).filter((r) => ROLES.includes(r));
@@ -139,11 +171,11 @@ function openDialog(onClose) {
         <button type="button" class="btn primary" data-pp-act="approve">${esc(tr('pp.approve'))}</button>`;
     } else {
       // P1: waiting.
-      body = `<div class="pp-wait"><b>${esc(tr('pp.waiting'))}</b><span class="pp-left">${esc(tr('pp.left', { time: mmss(st && st.remainingMs) }))}</span></div>
-        <div class="pp-sub">${esc(tr('pp.instructions'))}</div>
+      body = `<div class="pp-wait"><b>${esc(tr(slicer ? 'ca.pair_waiting' : 'pp.waiting'))}</b><span class="pp-left">${esc(tr('pp.left', { time: mmss(st && st.remainingMs) }))}</span></div>
+        <div class="pp-sub">${esc(tr(slicer ? 'ca.pair_instructions' : 'pp.instructions'))}</div>
         <div class="field"><label>${esc(tr('pp.address_label'))}</label>
           <div class="pp-addr"><input type="text" readonly dir="ltr" value="${esc(memo.address)}"><button type="button" class="btn" data-pp-act="copy">${esc(tr('pp.copy'))}</button></div></div>
-        <div class="pp-sub">${esc(tr('pp.older_note'))}</div>`;
+        <div class="pp-sub">${esc(tr(slicer ? 'ca.pair_note' : 'pp.older_note'))}</div>`;
       foot = `<span style="flex:1"></span><button type="button" class="btn" data-pp-act="stop">${esc(tr('pp.stop'))}</button>`;
     }
     overlay.innerHTML = `<div class="modal modal-form pp-dialog" role="dialog" aria-modal="true" aria-labelledby="ppTitle" style="max-width:560px;">${head}<div class="modal-body">${body}</div><div class="modal-footer">${foot}</div></div>`;
@@ -156,9 +188,9 @@ function openDialog(onClose) {
     const why = st && st.lastClosed;
     if (why === 'paired') return null;   // said by the approve answer itself
     if (why === 'timedOut') return tr('pp.timed_out');
-    if (why === 'offersUsed') return tr('pp.offers_used');
+    if (why === 'offersUsed') return tr(slicer ? 'ca.pair_offers_used' : 'pp.offers_used');
     if (why === 'pinUnreadable') return tr('pp.pin_unreadable');
-    if (why === 'serverStopped') return tr('pp.server_stopped');
+    if (why === 'serverStopped') return tr(slicer ? 'ca.pair_server_stopped' : 'pp.server_stopped');
     return null;
   };
 
@@ -167,13 +199,16 @@ function openDialog(onClose) {
     if (what === 'stop' || what === 'done') return close(what === 'stop');
     if (what === 'deny') {
       memo.denied = memo.asked && memo.asked.name;
-      try { await api().phonePairDeny(); } catch (_) { /* main's state decides */ }
+      try { await P.deny(); } catch (_) { /* main's state decides */ }
       return tick();
     }
     if (what === 'approve' && memo.asked) {
       let r = null;
-      try { r = await api().phonePairApprove({ role: memo.chosen, pairId: memo.asked.pairId, check: memo.asked.check }); } catch (_) { r = null; }
-      if (r && r.ok && r.paired) memo.end = tr('pp.paired', { name: memo.asked.name || tr('lan.phones_unnamed'), role: roleName(memo.chosen) });
+      try { r = await P.approve({ role: memo.chosen, pairId: memo.asked.pairId, check: memo.asked.check }); } catch (_) { r = null; }
+      if (r && r.ok && r.paired) {
+        memo.end = slicer ? tr('ca.paired', { name: memo.asked.name || unnamed() })
+          : tr('pp.paired', { name: memo.asked.name || tr('lan.phones_unnamed'), role: roleName(memo.chosen) });
+      }
       else if (r && r.error === 'pin') memo.end = tr('pp.pin_unreadable');
       return tick();
     }
@@ -181,13 +216,13 @@ function openDialog(onClose) {
 
   const tick = async () => {
     let st = null;
-    try { st = await api().phonePairState(); } catch (_) { st = null; }
+    try { st = await P.state(); } catch (_) { st = null; }
     if (!memo.end && st && !st.open) memo.end = ended(st) || memo.end;
     // A request that went away while the window stays open: denied here, or the phone gave up.
     const p = st && st.pending && st.pending.revealed ? st.pending : null;
     if (memo.lastPending && !p && st && st.open && !memo.end) {
-      const name = memo.lastPending.name || tr('lan.phones_unnamed');
-      if (typeof toast === 'function') toast(memo.denied ? tr('pp.denied', { name }) : tr('pp.stopped_asking', { name }), 'info', 6000);
+      const name = memo.lastPending.name || unnamed();
+      if (typeof toast === 'function') toast(memo.denied ? tr('pp.denied', { name }) : tr(slicer ? 'ca.pair_stopped_asking' : 'pp.stopped_asking', { name }), 'info', 6000);
       memo.denied = null;
     }
     memo.lastPending = p;
@@ -198,10 +233,11 @@ function openDialog(onClose) {
   (async () => {
     try { const u = await api().getLanUrl(); memo.address = u && u.ok ? String(u.url || '').replace(/^https?:\/\//, '') : ''; } catch (_) { memo.address = ''; }
     let opened = null;
-    try { opened = await api().phonePairOpen(); } catch (_) { opened = null; }
+    try { opened = await P.open(); } catch (_) { opened = null; }
     if (!opened || opened.ok === false) {
       const e = opened && opened.error;
-      memo.end = e === 'server_stopped' ? tr('pp.server_stopped') : e === 'pin' ? tr('pp.pin_needed') : e === 'not_permitted' ? tr('pp.ask_owner') : tr('pp.server_stopped');
+      const stopped = tr(slicer ? 'ca.pair_server_stopped' : 'pp.server_stopped');
+      memo.end = e === 'server_stopped' ? stopped : e === 'pin' ? tr('pp.pin_needed') : e === 'not_permitted' ? tr(slicer ? 'ca.pair_ask_owner' : 'pp.ask_owner') : stopped;
       draw({});
       return;
     }
