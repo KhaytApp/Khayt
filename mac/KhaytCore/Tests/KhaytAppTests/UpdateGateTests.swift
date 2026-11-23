@@ -242,19 +242,19 @@ struct UpdateGateTests {
         func settle(_ done: () -> Bool) async throws {
             for _ in 0..<300 where !done() { try await Task.sleep(for: .milliseconds(10)) }
         }
-        let en = Words(); await en.load("en", engine: Self.engine)
+        #expect(Words.upfront("mac.upgate_looking") != Words.upfront("mac.upgate_hold"))
         let shop = await Self.shop(#"{"mac":{"9.9.1":["Read me."]}}"#)
         shop.updateGateRunningForTests = "9.9.0"
         updates.attach(shop)
 
         // A version with something to read. First sight: refused, said to be looking, and looked into.
-        #expect(updates.mayProceed("9.9.1") == en.callIt("mac.upgate_looking"))
+        #expect(updates.mayProceed("9.9.1") == Words.upfront("mac.upgate_looking"))
         try await settle { shop.updateOffer != nil }
         #expect(shop.updateOffer == UpdateOffer(version: "9.9.1", releases: [KhaytEngine.GatedRelease(version: "9.9.1", items: ["Read me."])]))
         #expect(opened == 0, "Sparkle's window opened beside the sheet")
         // Known and unread: refused with the other sentence, however often Sparkle asks; Later changes nothing.
         shop.putOffUpdate()
-        #expect(updates.mayProceed("9.9.1") == en.callIt("mac.upgate_hold"))
+        #expect(updates.mayProceed("9.9.1") == Words.upfront("mac.upgate_hold"))
         #expect(shop.updateOffer?.version == "9.9.1", "the sheet did not come back at the next check")
         #expect(opened == 0)
         // Ticked: Sparkle's window is asked for, and the hook lets the version through.
