@@ -47,6 +47,10 @@ struct KhaytCompanionApp: App {
     init() {
         let s = ConnectionSettings()
         let apiClient = KhaytAPIClient(settings: s)
+        // Before anything can call out: the shop's internet switch, from the
+        // book on disk (P8).
+        PhoneOutbound.start(book: apiClient.book, countInstall: s.countInstall,
+                            paired: { MainActor.assumeIsolated { s.isPaired || s.device != nil } })
         let healthMonitor = ConnectionHealth(api: apiClient, settings: s)
         _settings = StateObject(wrappedValue: s)
         _api = StateObject(wrappedValue: apiClient)

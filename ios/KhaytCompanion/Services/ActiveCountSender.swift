@@ -79,7 +79,12 @@ final class ActiveCountSender {
     /// Send today's ping if it is owed. Switched off: nothing, and the dates
     /// stay, so switching back on is not a new install.
     func tick(now: Date = Date()) async {
+        // This phone's own switch, told to the gate whichever way it is set.
+        PhoneOutbound.local(countInstall: settings.countInstall)
         guard isReady, settings.countInstall, !sending, state.due(now: now) else { return }
+        // The shop's internet switch (P8): a refused count is dropped, not
+        // queued, and the dates stay as they are.
+        guard OutboundGate.shared.allows(.installCount) else { return }
         if let wait = retryNotBefore, now < wait { return }
         guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
               ActiveCount.accepts(version: version) else { return }
