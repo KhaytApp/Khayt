@@ -13,9 +13,23 @@ extension KhaytEngine {
     /// One gated release and what the shop should know about it.
     public struct GatedRelease: Decodable, Sendable, Equatable, Identifiable {
         public let version: String
+        /// In the shop's language where the file has it.
         public let items: [String]
+        /// The same items as the CHANGELOG wrote them, index for index: what
+        /// an item IS, whatever language it was read in.
+        public let english: [String]
         public var id: String { version }
-        public init(version: String, items: [String]) { self.version = version; self.items = items }
+        public init(version: String, items: [String], english: [String]? = nil) {
+            self.version = version; self.items = items; self.english = english ?? items
+        }
+        enum CodingKeys: String, CodingKey { case version, items, english }
+        public init(from decoder: Decoder) throws {
+            let box = try decoder.container(keyedBy: CodingKeys.self)
+            version = try box.decode(String.self, forKey: .version)
+            items = try box.decode([String].self, forKey: .items)
+            let en = try box.decodeIfPresent([String].self, forKey: .english)
+            english = en?.count == items.count ? en! : items
+        }
     }
 
     /// The bundled gate file's text, or nil when the bundle has none.
@@ -62,12 +76,13 @@ extension KhaytEngine {
                 var en = (Array.isArray(mac[v]) ? mac[v] : []).map(String);
                 // The rule's own reading of a translation: an array of another length is not trusted at all.
                 var tr = words ? L.translated(words, v, lang, en.length) : null;
-                var items = [];
+                var items = [], english = [];
                 en.forEach(function (x, i) {
                   if (said[x]) return; said[x] = true;
                   items.push(tr && typeof tr[i] === 'string' && tr[i].trim() ? tr[i] : x);
+                  english.push(x);
                 });
-                if (items.length) out.push({ version: v, items: items });
+                if (items.length) out.push({ version: v, items: items, english: english });
               });
               return out;
             })(ARG0, ARG1, ARG2, ARG3, ARG4, ARG5)

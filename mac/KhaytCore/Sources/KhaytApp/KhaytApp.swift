@@ -154,6 +154,9 @@ struct KhaytApp: App {
                     // The book is read: a launch check for updates that waited
                     // for it is made now, if the shop's switch allows one.
                     Updates.shared.bookWasRead()
+                    // An update with "Before you update" items is held in
+                    // this window until they are read (`UpdateGate.swift`).
+                    Updates.shared.attach(shop)
                     // A new shop — an empty book, or no book on this Mac at
                     // all — is offered the setup, once. See `ShopSetup.offers`.
                     shop.offerSetupIfNew()

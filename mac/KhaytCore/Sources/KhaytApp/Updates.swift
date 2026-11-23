@@ -117,7 +117,81 @@ final class Updates {
         controller.updater.checkForUpdateInformation()
     }
 
-    func checkForUpdates() { controller?.updater.checkForUpdates() }
+    // ── "BEFORE YOU UPDATE" IS READ BEFORE THE UPDATE WINDOW OPENS ────────
+    //
+    // `UpdateGate.swift` (Mac file page 28, frame C). Sparkle's window is
+    // opened in ONE place, `showOffer`, and Sparkle is refused in its own
+    // hook (`shouldProceedWithUpdate`) for a version whose items nobody has
+    // ticked, so its scheduler and anything else meet the same answer.
+
+    /// Each version found, and its unread items once its file was asked for
+    /// (empty: nothing to read, or it could not be read). In memory: asked
+    /// again in the next run.
+    private var known: [String: [KhaytEngine.GatedRelease]] = [:]
+    private var looking: Set<String> = []
+    /// A version found before there was a window to hold it in.
+    private var waiting: String?
+    private weak var shop: Shop?
+
+    /// The window an update is held in. A version found earlier is taken up now.
+    func attach(_ shop: Shop) {
+        self.shop = shop
+        if let version = waiting { waiting = nil; offer(version) }
+    }
+
+    /// "Check for Updates…", by hand. It LOOKS first, without Sparkle's
+    /// window, so a version that must be read about meets Khayt's sheet and
+    /// not a refusal. Nothing found, or no check possible: Sparkle's own
+    /// check follows and says so in its own words.
+    func checkForUpdates() {
+        guard let controller else { return }
+        // Sparkle ignores a check while one is running: bring its window forward.
+        guard !controller.updater.sessionInProgress else { showOffer(); return }
+        launchProbe.armed = true
+        launchProbe.byHand = true
+        controller.updater.checkForUpdateInformation()
+    }
+
+    /// A check found `version`: Sparkle's window, Khayt's sheet first, or
+    /// find out which.
+    func offer(_ version: String) {
+        guard let shop else { waiting = version; return }
+        switch UpdateGate.verdict(known[version]) {
+        case .proceed: showOffer()
+        case .hold(let releases): shop.holdUpdate(version, releases)
+        case .ask:
+            guard !looking.contains(version) else { return }
+            looking.insert(version)
+            Task { @MainActor in
+                let unread = await shop.updateGateItems(for: version)
+                self.looking.remove(version)
+                self.known[version] = unread
+                self.offer(version)
+            }
+        }
+    }
+
+    /// Sparkle's hook asks: may this version be shown and downloaded? No
+    /// while it has items nobody ticked, or while that is not known yet; and
+    /// asking starts the finding out, which ends in the sheet or in Sparkle's
+    /// window (`offer`), so a refusal here is never the end of it.
+    func mayProceed(_ version: String) -> Bool {
+        if UpdateGate.verdict(known[version]) == .proceed { return true }
+        offer(version)
+        return false
+    }
+
+    /// The items were ticked: this version is clear, and its window opens.
+    func wasRead(_ version: String) {
+        known[version] = []
+        showOffer()
+    }
+
+    /// Sparkle's update window. The next run-loop turn: a check that just
+    /// ended, or was just refused, has finished by then.
+    func showOffer() {
+        DispatchQueue.main.async { [weak self] in self?.controller?.updater.checkForUpdates() }
+    }
 
     /// Whether this Mac looks for updates by itself — Sparkle's own setting,
     /// kept in this Mac's defaults, never in the shop's book.
@@ -178,7 +252,10 @@ final class LaunchProbe: NSObject, SPUUpdaterDelegate {
     /// Only the probe made at launch opens the offer; Sparkle's own scheduled
     /// checks keep their own behaviour.
     @MainActor var armed = false
-    @MainActor private var found = false
+    /// The probe was asked for from the menu: with nothing found, Sparkle's
+    /// own check follows, to say "up to date" or why it could not ask.
+    @MainActor var byHand = false
+    @MainActor private var found: String?
     /// A check was refused because the shop's book had not been read yet.
     @MainActor var waitsForBook = false
 
@@ -202,6 +279,17 @@ final class LaunchProbe: NSObject, SPUUpdaterDelegate {
             throw NSError(domain: "app.khayt.outbound", code: 1, userInfo: [
                 NSLocalizedDescriptionKey: Self.reason(blocked)])
         }
+        // A look without a window shows and downloads nothing.
+        guard updateCheck != .updateInformation else { return }
+        // "Before you update" first (`Updates.mayProceed`). This is the lock:
+        // whatever started the check, a version with unread items stops here.
+        let version = updateItem.displayVersionString
+        let clear = Thread.isMainThread ? MainActor.assumeIsolated { Updates.shared.mayProceed(version) }
+                                        : DispatchQueue.main.sync { MainActor.assumeIsolated { Updates.shared.mayProceed(version) } }
+        if !clear {
+            throw NSError(domain: "app.khayt.update-gate", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: Words.upfront("mac.upgate_hold")])
+        }
     }
 
     /// The hook's own answer, apart from Sparkle's types so it can be tested.
@@ -224,17 +312,18 @@ final class LaunchProbe: NSObject, SPUUpdaterDelegate {
     }
 
     nonisolated func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
-        MainActor.assumeIsolated { if armed { found = true } }
+        MainActor.assumeIsolated { if armed { found = item.displayVersionString } }
     }
 
     nonisolated func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: (any Error)?) {
         MainActor.assumeIsolated {
             guard armed, updateCheck == .updateInformation else { return }
             armed = false
-            guard found else { return }
-            found = false
-            // The next run-loop turn: the probe's session has ended by then.
-            DispatchQueue.main.async { updater.checkForUpdates() }
+            let hand = byHand, version = found
+            byHand = false
+            found = nil
+            if let version { Updates.shared.offer(version) }
+            else if hand { Updates.shared.showOffer() }
         }
     }
 }
