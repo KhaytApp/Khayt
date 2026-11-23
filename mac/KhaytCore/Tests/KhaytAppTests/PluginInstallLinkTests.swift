@@ -54,10 +54,11 @@ struct PluginInstallLinkTests {
 
     /// A well-formed index (`lib/plugin-update.js`), issued an hour ago.
     static func index(version: String, sha: String, revoked: [String] = [], id: String = lamhaId,
-                      issued: Date = Date().addingTimeInterval(-3600)) -> JSONValue {
+                      issued: Date = Date().addingTimeInterval(-3600), requires: JSONValue? = nil) -> JSONValue {
         var row: [String: JSONValue] = [
             "id": .string(id), "kind": .string("connector"), "version": .string(version),
             "url": .string(manifestURL), "sha256": .string(sha)]
+        if let requires { row["requires"] = requires }
         if !revoked.isEmpty {
             row["revoked"] = .array(revoked.map { .object(["version": .string($0), "reason": .string("withdrawn")]) })
         }
@@ -97,6 +98,42 @@ struct PluginInstallLinkTests {
         #expect(offer.reviewedBy != nil, "the sheet is built from a manifest Khayt signed")
         #expect(shop.settingsValue == before, "nothing is installed until the shop presses Install")
         #expect(await asked.urls.map(\.absoluteString) == [Self.manifestURL], "fetched from where the index says, nowhere else")
+    }
+
+    @Test("a connector that needs a newer Khayt is refused before anything is downloaded, as an update would be held")
+    func needsNewerKhayt() async throws {
+        let m = try Self.manifest()
+        let link = PluginInstallLink(id: Self.lamhaId, version: m.version)
+        func offer(_ requires: JSONValue?, app: String = "4.0.0", schema: Int = 1) async -> (Shop.InstallLinkRefusal?, [URL], Bool) {
+            let (shop, asked) = await Self.shop(serving: m.data)
+            let refusal = await shop.offerConnector(from: link, index: Self.index(version: m.version, sha: m.sha, requires: requires),
+                                                    signedBy: Self.keyId, appVersion: app, schema: schema)
+            return (refusal, await asked.urls, shop.connectorOffer != nil)
+        }
+        // A newer Mac app than this one.
+        var (refusal, urls, sheet) = await offer(.object(["mac": .string("4.1.0")]))
+        #expect(refusal == .newer && urls.isEmpty && !sheet, "the manifest was fetched for a connector this Khayt cannot run")
+        // A newer schema.
+        (refusal, urls, sheet) = await offer(.object(["schema": .number(2)]))
+        #expect(refusal == .newer && urls.isEmpty && !sheet)
+        // Met exactly, or exceeded: offered.
+        (refusal, urls, sheet) = await offer(.object(["mac": .string("4.0.0"), "schema": .number(1)]))
+        #expect(refusal == nil && urls.count == 1 && sheet)
+        (refusal, _, sheet) = await offer(.object(["mac": .string("3.9.0")]), app: "4.0.0-beta.42")
+        #expect(refusal == nil && sheet)
+        // Another platform's minimum is not this Mac's.
+        (refusal, _, sheet) = await offer(.object(["desktop": .string("9.0.0"), "ios": .string("9.0.0")]))
+        #expect(refusal == nil && sheet)
+        // The rule is asked with plain numbers, never a made-up version compared as text
+        // (under some languages' sort order "-1" did not come before "0.9").
+        let engineSource = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/KhaytCore/KhaytEngine.swift"), encoding: .utf8)
+        #expect(engineSource.contains("U.planUpdate({ version: '0' }, {}, Object.assign({}, row, { version: '1', revoked: [] }), ctx)"))
+        #expect(!engineSource.contains("planUpdate({ version: '-1' }"))
+        // No requirement at all.
+        (refusal, _, sheet) = await offer(nil)
+        #expect(refusal == nil && sheet)
     }
 
     @Test("every way it can go wrong is a refusal with no sheet")
@@ -181,7 +218,7 @@ struct PluginInstallLinkTests {
     @Test("every refusal has a sentence, and each says nothing was installed")
     func words() async {
         let shop = await ConnectorInstallTests.shop()
-        for refusal in ["off", "notAllowed", "index", "unlisted", "otherVersion", "withdrawn", "manifest"] {
+        for refusal in ["off", "notAllowed", "index", "unlisted", "otherVersion", "withdrawn", "newer", "manifest"] {
             let said = shop.words.callIt("mac.pil_" + refusal, ["id": .string("com.example.ship"), "v": .string("1.2.0")])
             #expect(!said.hasPrefix("mac.") && !said.contains("{"), Comment(rawValue: said))
         }

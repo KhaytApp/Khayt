@@ -8878,6 +8878,10 @@ public actor KhaytEngine {
         public let reason: String?
         public let row: Row?
         public let revoked: [String]
+        /// The listed version needs a newer Khayt than this one (the row's
+        /// `requires`: a schema, or a minimum app version for this platform),
+        /// by the same rule an update is held to (`planUpdate`: `blocked`).
+        public let needsNewer: Bool
     }
 
     public func pluginIndexListing(index: JSONValue, ctx: JSONValue, id: String) throws -> PluginIndexListing {
@@ -8885,11 +8889,17 @@ public actor KhaytEngine {
             (function (index, ctx, id) {
               var U = globalThis.KhaytPluginUpdate;
               var check = U.checkIndex(index, ctx);
-              if (!check.ok) return { ok: false, reason: check.reason, row: null, revoked: [] };
+              if (!check.ok) return { ok: false, reason: check.reason, row: null, revoked: [], needsNewer: false };
               var row = U.rowFor(index, id, 'connector');
-              if (!row) return { ok: true, reason: null, row: null, revoked: [] };
+              if (!row) return { ok: true, reason: null, row: null, revoked: [], needsNewer: false };
+              // Asked as an update from nothing: `blocked` is the rule's word for "needs a newer app or schema".
+              // Asked with plain numbers, 0 installed and 1 offered, so the rule reaches its `requires`
+              // check whatever the row's own version is (0.0.0 included) and whatever the Mac's language:
+              // a made-up version that is not a number is compared as text, by the user's locale.
+              var plan = U.planUpdate({ version: '0' }, {}, Object.assign({}, row, { version: '1', revoked: [] }), ctx);
+              var needsNewer = !!plan && plan.plan === 'blocked';
               var revoked = (Array.isArray(row.revoked) ? row.revoked : []).map(function (x) { return String(x.version); });
-              return { ok: true, reason: null, row: { version: String(row.version), url: String(row.url), sha256: String(row.sha256) }, revoked: revoked };
+              return { ok: true, reason: null, row: { version: String(row.version), url: String(row.url), sha256: String(row.sha256) }, revoked: revoked, needsNewer: needsNewer };
             })(ARG0, ARG1, ARG2)
             """, [index, ctx, .string(id)], as: PluginIndexListing.self)
     }
