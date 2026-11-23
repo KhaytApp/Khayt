@@ -46,6 +46,48 @@ struct LaunchGateTests {
         #expect(!all.flatMap(\.items).contains { $0.contains("desktop") })
     }
 
+    /// The same file, with Arabic for beta.43 only, and a German array of the wrong length.
+    static let translatedGates = #"""
+        {"about":"test","gates":{},
+         "mac":{"4.0.0-beta.42":["Update every computer first.","Check Settings › Phones."],
+                "4.0.0-beta.43":["Prices now include VAT.","Update every computer first."]},
+         "i18n":{"gates":{},
+                 "mac":{"4.0.0-beta.43":{"ar":["الأسعار تشمل الآن ضريبة القيمة المضافة.","حدّث كل الأجهزة أولًا."],
+                                         "de":["Nur ein Eintrag"],
+                                         "fr":["Les prix incluent désormais la TVA.",""]}}}}
+        """#
+
+    @Test("an Arabic shop reads the items in Arabic, and in English where the file has no Arabic")
+    func translated() async throws {
+        func items(_ lang: String) async throws -> [KhaytEngine.GatedRelease] {
+            try await Self.engine.launchGatePending(current: "4.0.0-beta.43", lastRun: "4.0.0-beta.41", acceptedFor: nil, hasBook: true,
+                                                    floor: "4.0.0-beta.41", gates: Self.translatedGates, language: lang)
+        }
+        let ar = try await items("ar")
+        #expect(ar.map(\.version) == ["4.0.0-beta.43", "4.0.0-beta.42"])
+        #expect(ar[0].items == ["الأسعار تشمل الآن ضريبة القيمة المضافة.", "حدّث كل الأجهزة أولًا."])
+        // beta.42 has no Arabic in the file: its remaining item stays English, and the item it shares
+        // with beta.43 is still said once (judged on the English text), in Arabic, under the newest.
+        #expect(ar[1].items == ["Check Settings › Phones."])
+        // English, and a language the file does not have: the English items.
+        let en = try await items("en"), tr = try await items("tr")
+        #expect(en[0].items == ["Prices now include VAT.", "Update every computer first."] && tr == en)
+        // An array of the wrong length was made for different English: not trusted at all.
+        #expect(try await items("de") == en)
+        // One item translated and one empty: that one item falls back, not the whole release.
+        #expect(try await items("fr")[0].items == ["Les prix incluent désormais la TVA.", "Update every computer first."])
+        // The file that ships: every language the Mac speaks has its items for the gated Mac releases.
+        let shipped = try #require(KhaytEngine.bundledReleaseGates())
+        let file = try #require(try JSONSerialization.jsonObject(with: Data(shipped.utf8)) as? [String: Any])
+        let mac = try #require(file["mac"] as? [String: [String]])
+        let words = try #require((file["i18n"] as? [String: Any])?["mac"] as? [String: [String: [String]]])
+        for (version, english) in mac where !english.isEmpty {
+            for lang in Words.supported where lang != "en" {
+                #expect(words[version]?[lang]?.count == english.count, Comment(rawValue: "\(version) \(lang)"))
+            }
+        }
+    }
+
     @Test("no record: a new install is asked nothing; a Mac with a book counts as coming from the floor")
     func noRecord() async throws {
         #expect(try await Self.pending(current: "4.0.0-beta.43", last: nil, book: false).isEmpty)
@@ -146,14 +188,37 @@ struct LaunchGateTests {
         #expect(w.callIt("mac.gate_title") == "Khayt was updated" && w.callIt("mac.gate_head") == "Before you carry on")
         #expect(w.callIt("mac.gate_read") == "I have read these changes" && w.callIt("mac.gate_continue") == "Continue")
         #expect(LaunchGateSheet.summary(current: "4.0.0-beta.43", from: "4.0.0-beta.41", count: 2, words: w)
-                == "This Mac now runs Khayt 4.0.0-beta.43 (it ran beta.41 before). 2 things changed that you should know before you carry on.")
+                == "This Mac now runs Khayt 4.0.0-beta.43 (it ran beta.41 before). Two things changed that you should know before you carry on.",
+                "the count is a word, as the frame is drawn (Turki, Nov 23)")
+        #expect(LaunchGate.changed(3, words: w) == "Three things changed that you should know before you carry on.")
+        #expect(LaunchGate.changed(12, words: w) == "Twelve things changed that you should know before you carry on.")
+        // No numeral anywhere, in any language, for any count a release could have.
+        for lang in Words.supported {
+            let l = Words(); await l.load(lang, engine: Self.engine)
+            for n in [1, 2, 3, 5, 10, 11, 21] {
+                let said = LaunchGate.changed(n, words: l)
+                #expect(!said.contains(where: \.isNumber) || said.unicodeScalars.allSatisfy { !("0"..."9").contains(Character($0)) },
+                        Comment(rawValue: "\(lang) \(n): \(said)"))
+                #expect(!said.contains("{") && !said.isEmpty, Comment(rawValue: "\(lang) \(n): \(said)"))
+            }
+        }
         // Arabic counts two, a few and many each in its own form.
         let ar = Words(); await ar.load("ar", engine: Self.engine)
-        #expect(ar.counting(2, "mac.gate_changed") == "تغيّر أمران ينبغي أن تعرفهما قبل المتابعة.")
-        #expect(ar.counting(1, "mac.gate_changed") == "تغيّر أمر واحد ينبغي أن تعرفه قبل المتابعة.")
-        #expect(ar.counting(5, "mac.gate_changed").contains("أمور") && ar.counting(12, "mac.gate_changed").contains("أمرًا"))
+        #expect(LaunchGate.changed(2, words: ar) == "تغيّر أمران ينبغي أن تعرفهما قبل المتابعة.")
+        #expect(LaunchGate.changed(1, words: ar) == "تغيّر أمر واحد ينبغي أن تعرفه قبل المتابعة.")
+        #expect(LaunchGate.changed(5, words: ar) == "تغيّرت خمسة أمور ينبغي أن تعرفها قبل المتابعة.")
+        #expect(LaunchGate.changed(12, words: ar).contains("أمرًا") && !LaunchGate.changed(12, words: ar).contains("12"))
+        // Languages whose "two" is not the dictionary's: Portuguese agrees with "coisas", Chinese says 两 before a measure word.
+        let pt = Words(); await pt.load("pt-BR", engine: Self.engine)
+        #expect(LaunchGate.changed(2, words: pt).hasPrefix("Duas coisas"))
+        let zh = Words(); await zh.load("zh", engine: Self.engine)
+        #expect(LaunchGate.changed(2, words: zh).contains("两项"))
+        let es = Words(); await es.load("es", engine: Self.engine)
+        #expect(LaunchGate.changed(3, words: es) == "Han cambiado tres cosas que debes saber antes de continuar.")
+        let de = Words(); await de.load("de", engine: Self.engine)
+        #expect(LaunchGate.changed(4, words: de).hasPrefix("Vier Dinge"))
         #expect(LaunchGateSheet.summary(current: "4.0.0-beta.43", from: nil, count: 1, words: w)
-                == "This Mac now runs Khayt 4.0.0-beta.43. 1 thing changed that you should know before you carry on.")
+                == "This Mac now runs Khayt 4.0.0-beta.43. One thing changed that you should know before you carry on.")
         #expect(LaunchGate.short("4.0.0-beta.43") == "beta.43" && LaunchGate.short("4.0.0") == "4.0.0")
         let source = try String(contentsOf: Self.root.appending(path: "mac/KhaytCore/Sources/KhaytApp/LaunchGate.swift"), encoding: .utf8)
         // No Later, Continue off until the tick, and Escape does not close it.

@@ -38,6 +38,37 @@ enum LaunchGate {
     /// is a symbol, not a word for anybody to translate.
     static let bullet = "\u{2022}"
 
+    /// How many, AS A WORD: "Two things changed", as the frames are drawn
+    /// (decided by Turki, Nov 23), in the shop's language.
+    ///
+    /// The count is not a figure the shop reads off; it is part of a
+    /// sentence. One and two have sentences of their own in every language
+    /// (Arabic's dual, Portuguese "duas", Chinese 两), and from three up the
+    /// number is spelled by the system in that language and set into the
+    /// sentence for a few (Arabic: three to ten) or for many.
+    @MainActor static func changed(_ n: Int, words: Words) -> String {
+        if n <= 1 { return words.callIt("mac.gate_changed_single") }
+        if n == 2 { return words.callIt("mac.gate_changed_pair") }
+        let count: [String: JSONValue] = ["count": .string(spelled(n, words: words))]
+        let said = (3...10).contains(n % 100) ? words.callIt("mac.gate_changed_few", count)
+                                              : words.callIt("mac.gate_changed_many", count)
+        return capitalised(said, words: words)
+    }
+
+    /// A number in words, in the shop's language ("three", "ثلاثة", "drei").
+    @MainActor static func spelled(_ n: Int, words: Words) -> String {
+        let speller = NumberFormatter()
+        speller.locale = words.locale
+        speller.numberStyle = .spellOut
+        return speller.string(from: NSNumber(value: n)) ?? String(n)
+    }
+
+    /// The sentence starts with a capital where the language has them,
+    /// wherever the number word fell in it.
+    @MainActor static func capitalised(_ said: String, words: Words) -> String {
+        said.prefix(1).uppercased(with: words.locale) + said.dropFirst()
+    }
+
     /// "beta.43" for "4.0.0-beta.43": how an item says which release it is from.
     static func short(_ version: String) -> String {
         guard let dash = version.firstIndex(of: "-") else { return version }
@@ -73,7 +104,8 @@ extension Shop {
         guard let pending = try? await engine.launchGatePending(current: current, lastRun: last, acceptedFor: accepted,
                                                                 hasBook: launchGateHasBookForTests ?? (aRealBookExists || source.isReal),
                                                                 floor: LaunchGate.floor,
-                                                                gates: launchGateFileForTests) else { return }
+                                                                gates: launchGateFileForTests,
+                                                                language: words.language) else { return }
         launchGateFrom = last
         launchGateCurrent = current
         launchGatePending = pending
@@ -112,7 +144,7 @@ struct LaunchGateSheet: View {
     @MainActor static func summary(current: String, from: String?, count: Int, words: Words) -> String {
         let now = from.map { words.callIt("mac.gate_now_from", ["v": .string(current), "from": .string(LaunchGate.short($0))]) }
             ?? words.callIt("mac.gate_now", ["v": .string(current)])
-        return now + " " + words.counting(count, "mac.gate_changed")
+        return now + " " + LaunchGate.changed(count, words: words)
     }
 
     var body: some View {

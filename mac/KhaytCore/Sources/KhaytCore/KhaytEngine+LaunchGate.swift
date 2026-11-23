@@ -36,8 +36,12 @@ extension KhaytEngine {
     /// - `floor`: where a Mac with a book and no record counts as coming
     ///   from: the last version that shipped without this sheet.
     /// - `gates`: the gate file's text; nil reads the bundled copy.
+    /// - `language`: the shop's language. Each item is said in it when the
+    ///   file has it (`i18n.mac`, one array per language, index for index
+    ///   with the English), else in English: per item, never all or nothing.
+    ///   "Said once" is still judged on the English text.
     public func launchGatePending(current: String, lastRun: String?, acceptedFor: String?, hasBook: Bool,
-                                  floor: String, gates: String? = nil) throws -> [GatedRelease] {
+                                  floor: String, gates: String? = nil, language: String = "en") throws -> [GatedRelease] {
         // No gate file, or one that is not what the writer makes, is an
         // ERROR, not "nothing to read": the caller must not conclude this
         // Mac has read anything.
@@ -46,22 +50,29 @@ extension KhaytEngine {
         if let lastRun, !lastRun.isEmpty { seen["lastRun"] = .string(lastRun) }
         if let acceptedFor, !acceptedFor.isEmpty { seen["acceptedFor"] = .string(acceptedFor) }
         return try runtime.call2("""
-            (function (current, seen, hasBook, floor, text) {
+            (function (current, seen, hasBook, floor, text, lang) {
               var G = JSON.parse(text);
               if (!G || typeof G !== 'object' || !G.mac || typeof G.mac !== 'object' || Array.isArray(G.mac)) throw new Error('release-gates.json has no mac map');
               var mac = G.mac;
               var L = globalThis.KhaytLaunchGate;
               var r = L.pending({ current: current, seen: seen, gates: mac, hasBook: hasBook, isNewer: L.isNewer, floor: floor });
+              var words = G.i18n && typeof G.i18n === 'object' && G.i18n.mac && typeof G.i18n.mac === 'object' ? G.i18n.mac : null;
               var said = {}, out = [];
               r.versions.slice().reverse().forEach(function (v) {
-                var items = (Array.isArray(mac[v]) ? mac[v] : []).map(String).filter(function (x) {
-                  if (said[x]) return false; said[x] = true; return true;
+                var en = (Array.isArray(mac[v]) ? mac[v] : []).map(String);
+                // The rule's own reading of a translation: an array of another length is not trusted at all.
+                var tr = words ? L.translated(words, v, lang, en.length) : null;
+                var items = [];
+                en.forEach(function (x, i) {
+                  if (said[x]) return; said[x] = true;
+                  items.push(tr && typeof tr[i] === 'string' && tr[i].trim() ? tr[i] : x);
                 });
                 if (items.length) out.push({ version: v, items: items });
               });
               return out;
-            })(ARG0, ARG1, ARG2, ARG3, ARG4)
-            """, [.string(current), seen.isEmpty ? .null : .object(seen), .bool(hasBook), .string(floor), .string(text)],
+            })(ARG0, ARG1, ARG2, ARG3, ARG4, ARG5)
+            """, [.string(current), seen.isEmpty ? .null : .object(seen), .bool(hasBook), .string(floor), .string(text),
+                  .string(language)],
             as: [GatedRelease].self)
     }
 
