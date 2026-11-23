@@ -778,6 +778,8 @@
  "mac.find_seen_moved": "{when} görüldü, daha önce başka bir adresteydi: {host}",
  "mac.find_kept_here": "Son 3 günde bulunan yazıcılar yalnızca bu bilgisayarda tutulur. Defterinizde yer almaz ve hiçbir yere gönderilmez.",
  "mac.find_forget": "Önceki bulguları unut",
+ "mac.find_add_earlier_q": "{host} adresindeki “{name}” eklensin mi?",
+ "mac.find_add_earlier_note": "Bu aramada yanıt vermedi. Son görüldüğünden beri adresi değiştiyse Khayt, şu anda o adrese sahip cihazla konuşur.",
  "mac.find_cant_add_locked": "Bu defteri başka bir uygulama açık tutuyor, bu yüzden bulduğu bir yazıcı buraya eklenemez.",
  "mac.find_cant_add_sample": "Bu örnek dükkân: bulduğu yazıcılar görülebilir ama eklenemez.",
  "mac.find_looking": "Bu ağda aranıyor…",

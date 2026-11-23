@@ -778,6 +778,8 @@
  "mac.find_seen_moved": "Vista {when}, antes em outro endereço: {host}",
  "mac.find_kept_here": "As impressoras encontradas nos últimos 3 dias ficam só neste computador. Não estão no seu livro e não são enviadas a lugar nenhum.",
  "mac.find_forget": "Esquecer o que foi encontrado antes",
+ "mac.find_add_earlier_q": "Adicionar “{name}” em {host}?",
+ "mac.find_add_earlier_note": "Ela não respondeu a esta busca. Se o endereço mudou desde a última vez, o Khayt falaria com o que tiver esse endereço agora.",
  "mac.find_cant_add_locked": "Outro app está com este livro aberto, então uma impressora encontrada não pode ser adicionada aqui.",
  "mac.find_cant_add_sample": "Esta é a loja de exemplo: as impressoras encontradas podem ser vistas, mas não adicionadas.",
  "mac.find_looking": "Procurando nesta rede…",

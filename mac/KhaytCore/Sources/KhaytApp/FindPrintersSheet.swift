@@ -16,6 +16,8 @@ struct FindPrintersSheet: View {
     @State private var found: [KhaytEngine.FoundPrinter] = []
     /// Printers earlier scans found and this one did not (page 28, frame A).
     @State private var earlier: [EarlierFind] = []
+    /// An earlier find somebody pressed Add on, waiting for a yes.
+    @State private var asking: EarlierFind?
     @State private var looking = true
     @State private var started = false
 
@@ -30,7 +32,11 @@ struct FindPrintersSheet: View {
                     ProgressView().controlSize(.small)
                     Text(shop.words.callIt("mac.find_looking")).foregroundStyle(.secondary)
                 }
-            } else if found.isEmpty, earlier.isEmpty {
+            } else if found.isEmpty {
+                // Said whenever THIS scan found nothing, with or without
+                // earlier finds under it: a scan that is refused the local
+                // network finds nothing either, and "seen yesterday, it may
+                // be asleep" beside no hint would blame the printers.
                 // Not "no printers" — this app cannot tell an empty network from
                 // a refused permission, and saying the first when it is the
                 // second sends somebody hunting for a fault in the printer.
@@ -53,7 +59,9 @@ struct FindPrintersSheet: View {
                         }
                         Section(shop.words.callIt("mac.find_earlier")) {
                             ForEach(earlier) { find in
-                                row(find.printer, when: FindPrintersSheet.seen(find, now: Date(), words: shop.words), primary: false)
+                                row(find.printer, when: FindPrintersSheet.seen(find, now: Date(), words: shop.words), primary: false) {
+                                    asking = find
+                                }
                             }
                         }
                     }
@@ -91,6 +99,19 @@ struct FindPrintersSheet: View {
                     .keyboardShortcut(.cancelAction)
             }
         }
+        // AN EARLIER FIND DID NOT ANSWER THIS SCAN. Its address is where it
+        // was up to three days ago; a router can have given that address to
+        // something else since, and Khayt would then be asking that device
+        // for a printer's status, and later sending it the key the shop
+        // types in. So Add on an earlier find asks first, with the address.
+        .alert(shop.words.callIt("mac.find_add_earlier_q", ["name": .string(asking?.printer.name ?? ""),
+                                                           "host": .string(asking?.printer.host ?? "")]),
+               isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }), presenting: asking) { find in
+            Button(shop.words.callIt("mac.find_add")) { Task { await shop.addFound(find.printer) } }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: { _ in
+            Text(shop.words.callIt("mac.find_add_earlier_note"))
+        }
         .task {
             guard !started else { return }
             started = true
@@ -108,9 +129,10 @@ struct FindPrintersSheet: View {
     }
 
     /// One printer: its name, where it is, and Add. An earlier find says when
-    /// it was last seen, and its Add is the quieter button (frame A): it may
-    /// not answer, and the form says so as it does for any address.
-    @ViewBuilder private func row(_ printer: KhaytEngine.FoundPrinter, when: String?, primary: Bool) -> some View {
+    /// it was last seen, and its Add is the quieter button (frame A) and
+    /// asks first (`add`): it did not answer this scan.
+    @ViewBuilder private func row(_ printer: KhaytEngine.FoundPrinter, when: String?, primary: Bool,
+                                  add: (() -> Void)? = nil) -> some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(printer.name).fontWeight(.medium)
@@ -140,7 +162,7 @@ struct FindPrintersSheet: View {
                     .disabled(!shop.canMoveJobs)
                     .help(Shop.findPrintersCaveat(shop) ?? "")
             } else {
-                Button(shop.words.callIt("mac.find_add")) { Task { await shop.addFound(printer) } }
+                Button(shop.words.callIt("mac.find_add")) { add?() }
                     .buttonStyle(.bordered)
                     .disabled(!shop.canMoveJobs)
                     .help(Shop.findPrintersCaveat(shop) ?? "")

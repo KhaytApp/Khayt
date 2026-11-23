@@ -778,6 +778,8 @@
  "mac.find_seen_moved": "Vue {when}, auparavant à une autre adresse : {host}",
  "mac.find_kept_here": "Les imprimantes trouvées ces 3 derniers jours sont conservées uniquement sur cet ordinateur. Elles ne sont pas dans votre livre et ne sont envoyées nulle part.",
  "mac.find_forget": "Oublier les résultats précédents",
+ "mac.find_add_earlier_q": "Ajouter « {name} » à l’adresse {host} ?",
+ "mac.find_add_earlier_note": "Elle n’a pas répondu à cette recherche. Si son adresse a changé depuis, Khayt s’adresserait à l’appareil qui a cette adresse maintenant.",
  "mac.find_cant_add_locked": "Une autre app a ce livre ouvert ; une imprimante trouvée ne peut donc pas être ajoutée ici.",
  "mac.find_cant_add_sample": "Ceci est l’atelier d’exemple : les imprimantes trouvées peuvent être vues, pas ajoutées.",
  "mac.find_looking": "Recherche sur ce réseau…",

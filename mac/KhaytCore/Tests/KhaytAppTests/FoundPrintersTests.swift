@@ -65,6 +65,11 @@ struct FoundPrintersTests {
         #expect(Self.earlier(["name": .string("U1"), "seenNow": .bool(false), "lastSeen": .number(seen)]) == nil)
         #expect(Self.earlier(["name": .string("U1"), "host": .string("192.168.1.20"), "seenNow": .bool(false)]) == nil)
         #expect(EarlierFind(.string("junk")) == nil)
+        // What a device on the network said about itself is shown as plain text: no control
+        // characters, and nothing that reorders the address it sits beside.
+        let odd = try #require(Self.earlier(["name": .string("Cube\u{202E}\u{0007} "), "host": .string("192.168.1.9\u{202E}"),
+                                             "seenNow": .bool(false), "lastSeen": .number(seen), "previousHost": .string("\u{202E}")]))
+        #expect(odd.printer.name == "Cube" && odd.printer.host == "192.168.1.9" && odd.previousHost == nil)
         // No name: the address stands in. The same address before and now is not a move.
         let bare = try #require(Self.earlier(["host": .string("192.168.1.9"), "seenNow": .bool(false), "lastSeen": .number(seen),
                                               "previousHost": .string("192.168.1.9")]))
@@ -104,8 +109,13 @@ struct FoundPrintersTests {
         }
         // Forget asks nothing and empties the list on screen at once.
         #expect(sheet.contains("shop.forgetFoundPrinters()\n                        earlier = []"))
-        // Adding an earlier find is adding a found printer: no second path.
-        #expect(sheet.components(separatedBy: "await shop.addFound(printer)").count == 3)
+        // Adding an earlier find is adding a found printer (no second path), but it ASKS first:
+        // it did not answer this scan, and its address may be something else's by now.
+        #expect(sheet.components(separatedBy: "await shop.addFound(printer)").count == 2, "this scan's Add is the only one-click one")
+        #expect(sheet.contains("Button(shop.words.callIt(\"mac.find_add\")) { Task { await shop.addFound(find.printer) } }"))
+        #expect(sheet.contains("callIt(\"mac.find_add_earlier_q\"") && sheet.contains("callIt(\"mac.find_add_earlier_note\")"))
+        // A scan that finds nothing says so, with the Local Network hint, even with earlier finds under it.
+        #expect(sheet.contains("} else if found.isEmpty {\n") && !sheet.contains("found.isEmpty, earlier.isEmpty"))
         // The frame's words.
         let words = try String(contentsOf: app.appending(path: "Words.swift"), encoding: .utf8)
         #expect(words.contains(#""mac.find_earlier": ["en": "Seen earlier, not in this scan", "ar": "شوهدت سابقًا، وليست في هذا البحث"]"#))

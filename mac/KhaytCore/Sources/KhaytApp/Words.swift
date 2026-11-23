@@ -5744,6 +5744,8 @@ final class Words {
         "mac.find_seen_moved": ["en": "Seen {when}, at another address before: {host}", "ar": "شوهدت {when}، وكانت قبل ذلك على عنوان آخر: {host}"],
         "mac.find_kept_here": ["en": "Printers found in the last 3 days are kept on this computer only. They are not in your book and are never sent anywhere.", "ar": "الطابعات التي وُجدت خلال آخر 3 أيام تُحفظ على هذا الجهاز فقط. ليست في دفترك ولا تُرسل إلى أي مكان."],
         "mac.find_forget": ["en": "Forget earlier finds", "ar": "نسيان ما وُجد سابقًا"],
+        "mac.find_add_earlier_q": ["en": "Add “{name}” at {host}?", "ar": "إضافة «{name}» على العنوان {host}؟"],
+        "mac.find_add_earlier_note": ["en": "It did not answer this scan. If its address has changed since it was last seen, Khayt would be talking to whatever has that address now.", "ar": "لم تُجب في هذا البحث. إذا تغيّر عنوانها منذ آخر مرة شوهدت فيها، فسيتواصل خيط مع الجهاز الذي يحمل هذا العنوان الآن."],
         "mac.find_unsupported": ["en": "Khayt cannot talk to this one yet",
                                  "ar": "لا يستطيع خيط التحدث إلى هذه بعد"],
         "mac.printer_pause":  ["en": "Pause",        "ar": "إيقاف مؤقت"],
