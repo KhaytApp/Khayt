@@ -441,6 +441,12 @@ jobs:
       - name: E2E smoke (printer discovery)
         run: xvfb-run -a npm run test:e2e:discovery
 
+      # Send to printer, checked first, and the printer card's seven states
+      # (Figma desktop page 129): main reads a picked file, the window runs
+      # lib/send-checks.js, a stop keeps Send off. Nothing is sent.
+      - name: E2E smoke (send checks)
+        run: xvfb-run -a npm run test:e2e:sendchecks
+
       - name: E2E smoke (Internet use settings)
         run: xvfb-run -a npm run test:e2e:internetuse
 

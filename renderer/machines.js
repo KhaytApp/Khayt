@@ -72,26 +72,32 @@ function machineLiveBadge(m) {
     ? KhaytAttention.machineState(m, entry)
     : (entry && String(entry.state || '').toLowerCase().includes('print') ? 'printing' : 'idle');
 
-  const badge = (bg, fg, text, title) =>
-    `<span class="machine-jobs-badge" style="background:${bg};color:${fg};"${title ? ` title="${escapeHtml(title)}"` : ''}>${escapeHtml(text)}</span>`;
+  // The seven states as coloured words (Figma 129, S2): Paused its own, in
+  // the board's "on hold" colour, and still busy (lib/printer-activity.js).
+  // Reconnecting is a missed poll or two, not an error.
+  // `tail` is a figure ("62%"), kept in its own direction inside Arabic.
+  const badge = (cls, text, title, tail) =>
+    `<span class="machine-live-state is-${cls}"${title ? ` title="${escapeHtml(title)}"` : ''}>${escapeHtml(text)}${tail ? ` · <bdi>${escapeHtml(tail)}</bdi>` : ''}</span>`;
 
-  if (st === 'unknown') return badge('var(--surface-2)', 'var(--text-muted)', t('mach.live_no_reading') || 'No reading', t('mach.live_no_reading_hint') || 'This printer is configured but has not answered yet.');
-  if (st === 'error') return badge('var(--danger)', '#fff', (entry && entry.state) || (t('mach.live_error') || 'Error'));
-  if (st === 'reconnecting') return badge('var(--warning)', '#000', t('mach.live_reconnecting') || 'Reconnecting');
-  if (st === 'offline' && !m.isOffline) return badge('var(--danger)', '#fff', t('mach.offline_badge'));
+  if (st === 'unknown') return badge('unknown', t('mach.live_not_known') || 'Not known yet', t('mach.live_no_reading_hint') || 'This printer is configured but has not answered yet.');
+  if (st === 'error') return badge('error', t('mach.live_error') || 'Error', (entry && entry.state) || '');
+  if (st === 'reconnecting') return badge('reconnecting', t('mach.live_reconnecting') || 'Reconnecting');
+  if (st === 'offline' && !m.isOffline) return badge('offline', t('mach.offline_badge'));
 
   const age = (entry && entry.lastUpdated) ? Date.now() - entry.lastUpdated : null;
   if (age !== null && age > MACHINE_LIVE_STALE_MS) {
     const mins = Math.round(age / 60000);
-    return badge('var(--surface-2)', 'var(--text-muted)', t('dash.printer_stale', { mins: String(mins) }) || `No update for ${mins} min`);
+    return badge('stale', t('dash.printer_stale', { mins: String(mins) }) || `No update for ${mins} min`);
   }
 
   if (st === 'printing') {
     const pct = Math.min(100, Math.max(0, Math.round(+(entry && entry.progress) || 0)));
-    const label = `${t('mach.live_printing') || 'Printing'} · ${pct}%`;
-    return badge('var(--success)', '#fff', label, (entry && entry.filename) || '');
+    const PA = (typeof KhaytPrinterActivity !== 'undefined') ? KhaytPrinterActivity : null;
+    const paused = !!(PA && entry && PA.machineStatus(m, entry).activity === 'paused');
+    const word = paused ? (t('mach.live_paused') || 'Paused') : (t('mach.live_printing') || 'Printing');
+    return badge(paused ? 'paused' : 'printing', word, (entry && entry.filename) || '', `${pct}%`);
   }
-  return badge('var(--surface-2)', 'var(--text-muted)', t('mach.live_idle') || 'Idle');
+  return badge('idle', t('mach.live_idle') || 'Idle');
 }
 
 /**
@@ -2115,7 +2121,18 @@ async function sliceAndPrintForMachine(machineId) {
   const isGcode = /\.(gcode|gco|g)$/i.test(filePath);
   const sl = settings.slicer || {};
   if (!isGcode && !sl.path) { toast(t('slicer.no_config'), 'error'); return; } // slicing needs a slicer; pre-sliced G-code doesn't
-  const ok = await confirmModal(t(isGcode ? 'slicer.send_gcode_confirm' : 'slicer.start_confirm', { name: machine.name }));
+  // Checked against this printer before it goes (Figma 129, S1/S1b/S1c;
+  // renderer/send-checks-dialog.js over lib/send-checks.js). A model to be
+  // sliced first has no file facts yet: its bed is still checked.
+  let ok;
+  if (typeof openSendChecks === 'function') {
+    const facts = (window.hubAPI?.printerSendFacts && await window.hubAPI.printerSendFacts({ gcodePath: filePath }))
+      || { name: filePath.split(/[\\/]/).pop() };
+    if (!facts.name) facts.name = filePath.split(/[\\/]/).pop();
+    ok = await openSendChecks({ machine, facts, model: !isGcode });
+  } else {
+    ok = await confirmModal(t(isGcode ? 'slicer.send_gcode_confirm' : 'slicer.start_confirm', { name: machine.name }));
+  }
   if (!ok) return;
   toast(t('slicer.sending') || 'Slicing & sending…', 'info');
   try {

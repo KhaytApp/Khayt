@@ -126,6 +126,8 @@ const hubAPI = {
   slice:     (opts) => ipcRenderer.invoke('hub:slice', opts),
   sliceAndPrint: (opts) => ipcRenderer.invoke('hub:slice-and-print', opts),
   printerSendGcode: (opts) => ipcRenderer.invoke('hub:printer-send-gcode', opts),
+  // Send checks (Figma 129): facts about a file just picked, before it goes.
+  printerSendFacts: (opts) => ipcRenderer.invoke('hub:printer-send-facts', opts),
   printOrderFile: (opts) => ipcRenderer.invoke('hub:print-order-file', opts),
   sliceTest: (opts) => ipcRenderer.invoke('hub:slice-test', opts),
   detectSlicers: () => ipcRenderer.invoke('hub:detect-slicers'),

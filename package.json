@@ -99,6 +99,7 @@
     "capture:bedready": "node scripts/capture-bedready-screenshots.mjs",
     "capture:modes": "node scripts/capture-mode-showcase.mjs",
     "test:e2e:discovery": "node scripts/e2e-discovery-smoke.mjs",
+    "test:e2e:sendchecks": "node scripts/e2e-send-checks-smoke.mjs",
     "test:e2e:internetuse": "node scripts/e2e-internet-use-smoke.mjs",
     "test:e2e:netswitchcloud": "node scripts/e2e-network-switch-cloud-smoke.mjs",
     "test:e2e:quitflush": "node scripts/e2e-quit-flush-smoke.mjs",
