@@ -466,7 +466,9 @@
    */
   async function showLaunchGateIfNeeded() {
     let gate = null;
-    try { gate = await global.hubAPI?.launchGate?.(); } catch (_) { gate = null; }
+    // The items in the shop's language (release-gates.json i18n), else English.
+    const lang = (typeof i18n !== 'undefined' && i18n && i18n.current) || 'en';
+    try { gate = await global.hubAPI?.launchGate?.(lang); } catch (_) { gate = null; }
     if (!gate || !Array.isArray(gate.items) || !gate.items.length) return false;
     const overlay = document.createElement('div');
     overlay.id = 'launchGateOverlay';
