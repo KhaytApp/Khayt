@@ -6207,13 +6207,14 @@ ipcMain.handle('hub:timelapse-keep', async (_e, { jobId } = {}) => {
 ipcMain.handle('hub:timelapse-cancel', (_e, { jobId } = {}) => ({ ok: timelapseKeep.cancel(jobId) }));
 /** "Open on printer": the video where the printer keeps it, in the browser. */
 ipcMain.handle('hub:timelapse-open', async (_e, { jobId } = {}) => {
+  if (!lanServerStore || !lanServerStore.settings) syncLanServerStoreFromDisk();
   const book = lanServerStore || {};
   const order = (book.printLog || []).find((o) => o && String(o.id) === String(jobId || ''));
   const t = order && order.printerTimelapse;
   const machine = t && (book.machines || []).find((m) => m && String(m.id) === String(t.machineId));
   const link = order && machine ? require('./lib/webcam.js').timelapseLink(order, machine) : null;
   if (!link || !link.videoUrl) return { ok: false };
-  const host = (() => { try { return new URL(link.videoUrl).hostname; } catch (_) { return ''; } })();
+  const host = (() => { try { return new URL(link.videoUrl).hostname.replace(/^\[|\]$/g, ''); } catch (_) { return ''; } })();
   if (!host || !isAllowedPrinterHost(host)) return { ok: false };
   // outbound-exempt: browser — the shop's own browser opens a printer on the LAN
   await shell.openExternal(link.videoUrl);
@@ -6472,6 +6473,7 @@ async function sendPrinterControl(machine, control, value) {
   // nothing else (scriptAllowed).
   if (control === 'chamber-light' && type === 'moonraker') {
     const Webcam = require('./lib/webcam.js');
+    if (!['on', 'off', true, false].includes(value)) return { ok: false, error: 'invalid light state' };
     const script = Webcam.chamberLightScript(value === 'on' || value === true);
     if (!script || !Webcam.scriptAllowed(script)) return { ok: false, error: 'invalid light state' };
     const target = await resolvePrinterTarget(host);

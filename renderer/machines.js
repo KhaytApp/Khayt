@@ -597,7 +597,14 @@ function openHeadLink(machineId, head) {
   const candidates = ids.map((id) => inventory.find((s) => String(s.id) === String(id))).filter(Boolean);
   const bestWhy = match.action === 'link' ? t('mach.heads_best') : t('mach.heads_same');
   const from = r.tag ? [r.tag.material, r.tag.manufacturer || r.tag.vendor, _kgOrG(r.tag.weightG), r.tag.diameterMm ? t('mach.heads_mm', { n: String(r.tag.diameterMm) }) : ''].filter(Boolean).join(' · ') : '';
-  const prefill = r.tag && RT ? (RT.spoolMatch(r.tag, []).prefill || null) : null;
+  // Under the staff lock: adding a spool is inventory/create, as Spoolman's
+  // import asks (review); linking edits the machine's record.
+  const mayCreate = !(typeof operatorCan === 'function') || operatorCan('inventory', 'create');
+  if (typeof operatorCan === 'function' && !operatorCan('settings', 'edit') && !operatorCan('printers', 'edit')) {
+    toast(explainRefusal('not_permitted'), 'error');
+    return;
+  }
+  const prefill = mayCreate && r.tag && RT ? (RT.spoolMatch(r.tag, []).prefill || null) : null;
   let chosen = r.spool ? String(r.spool.id) : (candidates[0] ? String(candidates[0].id) : (prefill ? '__new' : ''));
   const card = (value, title, sub) => `<label class="mlink-opt${value === chosen ? ' on' : ''}"><input type="radio" name="mlinkPick" value="${escapeHtml(value)}"${value === chosen ? ' checked' : ''}>
       <span class="mlink-title">${escapeHtml(title)}</span><span class="mlink-sub">${escapeHtml(sub)}</span></label>`;
@@ -620,6 +627,7 @@ function openHeadLink(machineId, head) {
       if (!chosen) return false;
       let spoolId = chosen;
       if (chosen === '__new') {
+        if (typeof operatorCan === 'function' && !operatorCan('inventory', 'create')) { toast(explainRefusal('not_permitted'), 'error'); return false; }
         // Added because the shop clicked it; its price is the shop's to set.
         const SE = (typeof globalThis !== 'undefined' && globalThis.KhaytSpoolEdit) || null;
         if (!SE) return false;

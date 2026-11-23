@@ -199,6 +199,10 @@
     let r;
     try { r = await h.timelapseKeep(o.id); } catch (_) { r = { ok: false, reason: 'unreachable' }; }
     const now = byId(o.id);
+    // Copied, but the job is gone meanwhile: the file would belong to nothing.
+    if (r && r.ok && r.row && !now) { if (h.deleteOrderFile) h.deleteOrderFile(r.row.filename); lapseState.delete(o.id); return; }
+    // Already copying (a reload lost this window's state): say so, not "found".
+    if (r && r.reason === 'busy') { lapseState.set(o.id, { copying: { got: 0, total: Number(o.printerTimelapse && o.printerTimelapse.bytes) || 0 } }); redrawLapse(o.id); return; }
     if (r && r.ok && r.row && now) {
       lapseState.delete(o.id);
       if (!Array.isArray(now.attachedFiles)) now.attachedFiles = [];
