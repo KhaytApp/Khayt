@@ -6328,6 +6328,7 @@
   "ca.discard_note": "O arquivo é apagado deste computador. Nada muda no livro.",
   "ca.added": "{name} está na biblioteca.",
   "ca.add_failed": "Não foi possível adicionar o arquivo à biblioteca. Tente de novo.",
+  "ca.kind_not_in_library": "Este tipo de arquivo ainda não pode ir para a biblioteca (.bgcode e .g). Ele fica na caixa de entrada.",
   "ca.gone": "Esse arquivo não está mais na caixa.",
   "ca.none_title": "Nenhum fatiador pareado ainda.",
   "ca.none_body": "Pareie o OrcaSlicer com este computador para enviar arquivos fatiados direto para a caixa Do fatiador. Ele nunca vê seu livro ou seus clientes. Um fatiador sem o plugin ainda pode enviar para cá como impressora (OctoPrint), para a mesma caixa.",

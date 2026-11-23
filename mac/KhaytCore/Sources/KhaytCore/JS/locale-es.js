@@ -6327,6 +6327,7 @@
   "ca.discard_note": "El archivo se borra de este ordenador. No cambia nada en el libro.",
   "ca.added": "{name} está en la biblioteca.",
   "ca.add_failed": "No se pudo añadir el archivo a la biblioteca. Inténtalo de nuevo.",
+  "ca.kind_not_in_library": "Este tipo de archivo aún no puede ir a la biblioteca (.bgcode y .g). Se queda en la bandeja.",
   "ca.gone": "Ese archivo ya no está en la bandeja.",
   "ca.none_title": "Aún no hay ningún laminador vinculado.",
   "ca.none_body": "Vincula OrcaSlicer con este ordenador para enviar archivos laminados directamente a la bandeja Del laminador. Nunca ve tu libro ni tus clientes. Un laminador sin el plugin puede enviar aquí como impresora (OctoPrint), a la misma bandeja.",

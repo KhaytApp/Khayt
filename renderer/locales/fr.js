@@ -6327,6 +6327,7 @@
   "ca.discard_note": "Le fichier est supprimé de cet ordinateur. Rien ne change dans le registre.",
   "ca.added": "{name} est dans la bibliothèque.",
   "ca.add_failed": "Impossible d’ajouter le fichier à la bibliothèque. Réessayez.",
+  "ca.kind_not_in_library": "Ce type de fichier ne peut pas encore aller dans la bibliothèque (.bgcode et .g). Il reste dans la boîte de réception.",
   "ca.gone": "Ce fichier n’est plus dans la boîte.",
   "ca.none_title": "Aucun trancheur associé pour l’instant.",
   "ca.none_body": "Associez OrcaSlicer à cet ordinateur pour envoyer les fichiers tranchés directement dans la boîte Du trancheur. Il ne voit jamais votre registre ni vos clients. Un trancheur sans le plugin peut quand même envoyer ici comme imprimante (OctoPrint), dans la même boîte.",

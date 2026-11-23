@@ -255,9 +255,17 @@ const i18nLang = () => (typeof i18n !== 'undefined' && i18n && i18n.current) || 
 function itemOf(id) { return (_state && _state.items || []).find((i) => i.id === id) || null; }
 
 /** Into the library first, as the Mac does: then a job or a quote opens from it. */
+const _taking = new Set();   // one take per item at a time (two quick clicks made two copies)
 async function take(id, what) {
   const item = itemOf(id);
-  if (!item) return;
+  if (!item || _taking.has(id)) return;
+  // The library takes .stl, .3mf, .obj, .gcode and .gco only; a binary
+  // G-code (.bgcode) or a .g waits in the inbox, said plainly (review).
+  if (!/\.(stl|3mf|obj|gcode|gco)$/i.test(String(item.name || ''))) { say(tr('ca.kind_not_in_library'), 'error'); return; }
+  _taking.add(id);
+  try { await takeOne(id, item, what); } finally { _taking.delete(id); }
+}
+async function takeOne(id, item, what) {
   let read = null;
   try { read = await api().slicerInboxRead(id); } catch (_) { read = null; }
   if (!read || !read.ok || !read.file) { say(tr('ca.gone'), 'error'); return render(true); }

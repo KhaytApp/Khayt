@@ -6328,6 +6328,7 @@
   "ca.discard_note": "The file is deleted from this computer. Nothing in the book changes.",
   "ca.added": "{name} is in the library.",
   "ca.add_failed": "Could not add the file to the library. Try again.",
+  "ca.kind_not_in_library": "This kind of file can’t go in the library yet (.bgcode and .g). It stays in the inbox.",
   "ca.gone": "That file is no longer in the inbox.",
   "ca.none_title": "No slicer is paired yet.",
   "ca.none_body": "Pair OrcaSlicer with this computer to send sliced files straight to the From slicer inbox. It never sees your book or customers. A slicer without the plugin can still send here as a printer (OctoPrint), to the same inbox.",

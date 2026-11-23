@@ -6327,6 +6327,7 @@
   "ca.discard_note": "Dosya bu bilgisayardan silinir. Defterde hiçbir şey değişmez.",
   "ca.added": "{name} kitaplıkta.",
   "ca.add_failed": "Dosya kitaplığa eklenemedi. Tekrar deneyin.",
+  "ca.kind_not_in_library": "Bu dosya türü henüz kütüphaneye eklenemiyor (.bgcode ve .g). Gelen kutusunda kalır.",
   "ca.gone": "Bu dosya artık gelen kutusunda değil.",
   "ca.none_title": "Henüz eşlenmiş dilimleyici yok.",
   "ca.none_body": "Dilimlenen dosyaları doğrudan Dilimleyiciden kutusuna göndermek için OrcaSlicer’ı bu bilgisayarla eşleyin. Defterinizi veya müşterilerinizi asla görmez. Eklentisi olmayan bir dilimleyici de buraya yazıcı olarak (OctoPrint), aynı kutuya gönderebilir.",

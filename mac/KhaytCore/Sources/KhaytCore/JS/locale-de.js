@@ -6327,6 +6327,7 @@
   "ca.discard_note": "Die Datei wird von diesem Computer gelöscht. Im Buch ändert sich nichts.",
   "ca.added": "{name} ist in der Bibliothek.",
   "ca.add_failed": "Die Datei konnte nicht zur Bibliothek hinzugefügt werden. Versuche es erneut.",
+  "ca.kind_not_in_library": "Diese Dateiart kann noch nicht in die Bibliothek (.bgcode und .g). Sie bleibt im Eingang.",
   "ca.gone": "Diese Datei ist nicht mehr im Eingang.",
   "ca.none_title": "Noch kein Slicer gekoppelt.",
   "ca.none_body": "Kopple OrcaSlicer mit diesem Computer, um geslicte Dateien direkt in den Eingang „Vom Slicer“ zu senden. Er sieht nie dein Buch oder deine Kunden. Ein Slicer ohne Plugin kann trotzdem als Drucker (OctoPrint) hierher senden, in denselben Eingang.",
