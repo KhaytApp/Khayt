@@ -1901,10 +1901,15 @@ function notePickedFile(p) {
   pickedFiles.push(r);
   if (pickedFiles.length > 8) pickedFiles.shift();
 }
-const SEND_FACTS_WHOLE_MAX = 128 * 1024 * 1024;   // past this, the moves are not read (no toolpath bounds)
+// Past this, only the head and the tail are read, and the moves are not
+// walked (no toolpath bounds): a 100 MB file read whole and walked on the
+// main thread stalled the window, the LAN server and the polls (review).
+const SEND_FACTS_WHOLE_MAX = 16 * 1024 * 1024;
 ipcMain.handle('hub:printer-send-facts', async (_e, { gcodePath } = {}) => {
   const resolved = path.resolve(String(gcodePath || ''));
   if (!gcodePath || !pickedFiles.includes(resolved)) return { ok: false, error: 'not_picked' };
+  // One pick, one read (review): a path picked earlier is not readable for ever.
+  pickedFiles.splice(pickedFiles.indexOf(resolved), 1);
   const out = { ok: true, name: path.basename(resolved), sliced: false };
   if (!/\.(gcode|gco|g)$/i.test(resolved)) return out;
   try {
@@ -1916,9 +1921,10 @@ ipcMain.handle('hub:printer-send-facts', async (_e, { gcodePath } = {}) => {
       const EDGE = 8 * 1024 * 1024;
       const fh = await fs.promises.open(resolved, 'r');
       try {
-        const head = Buffer.alloc(EDGE), tail = Buffer.alloc(EDGE);
-        await fh.read(head, 0, EDGE, 0);
-        await fh.read(tail, 0, EDGE, stat.size - EDGE);
+        const EDGE_READ = Math.min(EDGE, stat.size);
+        const head = Buffer.alloc(EDGE_READ), tail = Buffer.alloc(EDGE_READ);
+        await fh.read(head, 0, EDGE_READ, 0);
+        await fh.read(tail, 0, EDGE_READ, Math.max(0, stat.size - EDGE_READ));
         text = head.toString('utf8') + '\n' + tail.toString('utf8');
       } finally { await fh.close(); }
     }

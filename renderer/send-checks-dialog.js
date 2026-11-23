@@ -183,7 +183,11 @@ function sendChecksFor(machine, facts) {
   const live = isObj(cache[machine.id]) ? cache[machine.id] : {};
   const loaded = Array.isArray(live.loaded) && live.loaded.length ? live.loaded
     : (Array.isArray(machine.loaded) ? machine.loaded : []);
-  const file = { name: f.name || '' };
+  // A model that is about to be sliced (an .stl, .3mf, .step…) is not what
+  // reaches the printer, so its NAME is not checked against what the printer
+  // takes: the G-code the slicer writes is (review: "Slice & send" was blocked
+  // as type-unsupported for every model). Only the bed and live checks run.
+  const file = f.sliced ? { name: f.name || '' } : {};
   if (f.sliced) {
     file.filaments = f.filaments || [];
     file.header = f.header || null;

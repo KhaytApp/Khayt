@@ -95,3 +95,15 @@ test('every new string is in all nine languages', () => {
     for (const k of keys) assert.ok(d[k], `${f} ${k}`);
   }
 });
+
+test('review: a model to slice is not refused by its own file type (Slice & send)', () => {
+  const machine = { id: 'M', name: 'U1', printerApi: { type: 'moonraker', host: '192.0.2.1' }, bed: { x: 270, y: 270, z: 270 } };
+  global.machineStatusCache = {};
+  for (const name of ['bracket.stl', 'plate.3mf', 'part.step', 'thing.obj']) {
+    const got = View.sendChecksFor(machine, { name, sliced: false });
+    assert.ok(!got.some((f) => f.code === 'type-unsupported'), name + ': ' + JSON.stringify(got));
+  }
+  // A G-code the printer cannot run is still refused.
+  const bad = View.sendChecksFor({ ...machine, printerApi: { type: 'bambu', host: '192.0.2.2' } }, { name: 'x.bgcode', sliced: true, filaments: [], header: null });
+  assert.ok(Array.isArray(bad));
+});
