@@ -450,6 +450,8 @@ jobs:
       # Machine P&L's prints / came-out-right columns (Figma page 136).
       - name: E2E smoke (machine needs and success rate)
         run: xvfb-run -a npm run test:e2e:needs
+      - name: E2E smoke (Connected apps and the From slicer inbox, Figma page 131)
+        run: xvfb-run -a npm run test:e2e:connectedapps
 
       - name: E2E smoke (Internet use settings)
         run: xvfb-run -a npm run test:e2e:internetuse

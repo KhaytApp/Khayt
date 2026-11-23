@@ -26,7 +26,7 @@
   // their original position (e.g. dashboard stays at top, settings in footer).
   const GROUPS = [
     { key: 'work', labelKey: 'vivid.group.work', label: 'Work',
-      tabs: ['calculator-tab', 'queue-tab', 'printfiles-tab', 'colorstudio-tab', 'converter-tab', 'hueforge-tab', 'inventory-tab', 'waste-tab'] },
+      tabs: ['calculator-tab', 'queue-tab', 'printfiles-tab', 'colorstudio-tab', 'converter-tab', 'hueforge-tab', 'inventory-tab', 'waste-tab', 'connectedapps-tab'] },
     { key: 'catalog', labelKey: 'vivid.group.catalog', label: 'Catalog',
       tabs: ['catalog-tab', 'clients-tab', 'gift-cards-tab', 'portfolio-tab'] },
     { key: 'money', labelKey: 'vivid.group.money', label: 'Money',

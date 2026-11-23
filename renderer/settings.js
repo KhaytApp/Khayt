@@ -4447,7 +4447,8 @@ async function renderLanPairedPhones() {
   const box = document.getElementById('lanPairedPhones');
   if (!box) return;
   const res = await window.hubAPI?.listLanDevices?.().catch(() => null);
-  const devices = res?.devices || [];
+  // A paired slicer is listed in Connected apps (renderer/connected-apps.js), not here.
+  const devices = (res?.devices || []).filter((d) => d && d.kind !== 'connector');
   const day = (iso) => { try { return new Date(iso).toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return ''; } };
   // Each phone's role, Pair a phone, and who may (renderer/phone-pairing.js,
   // frames P5/P6 signed off Nov 22). Main decides; this draws its answer.
