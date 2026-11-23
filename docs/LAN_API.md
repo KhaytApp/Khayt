@@ -1148,6 +1148,8 @@ A phone paired with this Mac carries a **role**: owner, manager, operator or vie
 
 Signed by a paired device. Answers what that device is: `{"deviceId":"dev_…","role":"operator","scopes":["queue:read", …]}`. A request with the owner PIN and no device signature is 403 `device-auth`. A role change takes effect on the next request; nothing is re-keyed.
 
+`can` (Nov 2026): a list of the phone writes this computer serves for THIS device that are not a scope in the role table. Today one value: `"network-switch"`, for an owner's phone, when `POST /api/network/switch` is served. An older computer sends no `can`; a phone reads a missing list as empty and offers none of those controls.
+
 #### A signed `device-revoked` (Mac only)
 
 When the shop signs a phone out, that phone's next signed request is answered `401 {"reason":"device-revoked"}`. **This refusal is signed**: `x-khayt-reply-mac` = `replyMac(key, nonce, status, body)` exactly as `/api/devices/self` answers are, where `key` is the key the phone had, `nonce` is this request's `x-khayt-nonce`, `status` is `401` and `body` is the bytes of the answer. The key is per device, so the MAC is bound to the device id through it.
@@ -1277,6 +1279,40 @@ unset or short PIN is `401`.
 | 409 | `not-connected`, `not-watched` (under service / retired / another app's protocol), `unsupported` (this protocol has no such verb), `no-job` |
 | 502 | `refused`: the printer said no, and `message` is what it said |
 | 503 | `busy`: the app is starting |
+
+### `POST /api/network/switch`
+
+> **Native Mac only** (Nov 2026, draft). `lib/lan-server.js` does not serve it
+> yet; the desktop is to match this shape. A phone treats a `404` as "this
+> computer cannot do it" and shows the switch read-only.
+
+An **owner's phone** turning the shop's "Make no internet calls" on or off (iPhone frame 1B). It is the same change the owner makes at the Mac, by the same path: the same forward-only stamp (`lib/network-switch.js stampAfter`), the same "tell my other computers" call when that option is on, one write of `settings.network`, and the Mac's own gate told at once.
+
+**Who.** A **signed**, enrolled phone whose role is **owner** (a phone paired with the owner PIN before roles is the owner). The PIN alone is `403 {"ok":false,"reason":"device-key-required"}`. A signed phone in any other role gets the usual `403 {"reason":"role-scope","required":"owner"}`: the route is deliberately not in the role table (`lib/device-roles.js`), and a route the table does not name is the owner's. A paired slicer cannot reach it.
+
+**Body** (JSON, at most 4 KB):
+
+```json
+{ "offline": true, "keep": ["cloud"], "seen": "2026-11-22T14:12:00.000Z" }
+```
+
+- `offline` (boolean, required): the switch.
+- `keep` (array, optional): the purposes kept while it is on, replacing the list. Omitted or `null`: left as it is. Each entry must be a purpose this computer lets a shop keep (not `lan`, not `switch-sync`, and on the Mac not `tunnel`). **An entry it does not know is refused (`bad-keep`), not dropped**, so a phone with a newer list learns it is talking to an older computer.
+- `seen` (string, optional): the `changedAt` the phone was showing when the person tapped. If the book's differs, nothing is changed and the answer is `409` with the current value, so two people flipping it at once never overwrite each other blind. A phone that has seen no `changedAt` sends none.
+
+**Answers.** The `200`, the `409`s and the role `403` carry `x-khayt-reply-mac`, as `/api/devices/self` does: a phone shows "Done" only when the MAC verifies.
+
+| Status | Body |
+|---|---|
+| 200 | `{"ok":true,"network":{"offline":true,"keep":["cloud"],"changedAt":"…","changedBy":"Turki's iPhone"}}` |
+| 400 | `{"ok":false,"reason":"bad-body"}` or `"bad-keep"` |
+| 403 | `device-key-required` (unsigned) or `role-scope` (signed, not the owner) |
+| 409 | `{"ok":false,"reason":"changed","network":{…}}`: `seen` is stale. `"not-saved"` with `network`: another change is in flight or this computer cannot save the book now. `"read-only"`: the sample book |
+| 503 | `{"ok":false,"reason":"busy"}`: the app is starting |
+
+`changedBy` is the phone's name as the shop sees it in Paired phones (cut at 80 characters). `changedAt` only ever moves forward.
+
+**How a phone knows the route is there.** `GET /api/devices/self` carries `"can": ["network-switch"]` for an owner's phone on a computer that serves this route (see below). No `can`, or a list without it: show the switch read-only.
 
 ### `POST /api/printer/{machineId}/bed-clear`
 

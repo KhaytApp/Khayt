@@ -175,11 +175,21 @@ extension Shop {
         return .object(n)
     }
 
+    /// The kept purposes replaced as a whole (a phone sends the list it
+    /// showed). Only purposes that may be kept, in the rule's own order.
+    nonisolated static func network(_ network: JSONValue?, keepAll kept: [OutboundPurpose]) -> JSONValue {
+        var n: [String: JSONValue] = { if case .object(let o)? = network { return o }; return [:] }()
+        let wanted = Set(kept.map(\.rawValue))
+        n["keep"] = .array(keepable.map(\.rawValue)
+            .filter { wanted.contains($0) && !NetworkSwitch.neverKept.contains($0) }.map(JSONValue.string))
+        return .object(n)
+    }
+
     /// The purposes a shop may tick Keep on, on the Mac.
     nonisolated static let keepable: [OutboundPurpose] = OutboundPurpose.allCases.filter { $0 != .lan && $0 != .tunnel }
 
     private func writeNetwork(_ change: @escaping @Sendable (JSONValue?) -> JSONValue) async -> Bool {
-        // lock: callers — setOutboundOffline, setOutboundKeep
+        // lock: callers — changeOutboundOffline, setOutboundKeep
         if networkBookForTests == nil, source.build == nil { moveProblem = words.callIt("mac.move_sample"); return false }
         return await writeNetworkSettings(change, says: true)
     }
@@ -224,6 +234,17 @@ extension Shop {
         moveProblem = nil
         guard permitted("security", "edit") else { return false }
         let name: String? = lockInForce ? signedIn?.name : nil
+        return await changeOutboundOffline(on, by: name, keep: nil, now: now)
+    }
+
+    /// The change itself, for whoever was let through: the owner at this Mac
+    /// (`setOutboundOffline`) or an owner's phone on the signed route
+    /// (`phoneSetOutbound`). ONE path, so a flip from the phone is stamped,
+    /// told to the other computers and applied here exactly as one made at
+    /// the Mac. `keep`, when given, replaces the kept purposes in the same
+    /// write; nil leaves them as they are.
+    func changeOutboundOffline(_ on: Bool, by name: String?, keep: [OutboundPurpose]?, now: Date = Date()) async -> Bool {
+        // lock: callers — setOutboundOffline, phoneSetOutbound
         // One change at a time: a second click while the last call is in
         // flight would be judged against a book that is about to change.
         guard !outboundChanging else { return false }
@@ -236,7 +257,12 @@ extension Shop {
         // here lose. The shared rule says when (`stampAfter`, as on the
         // desktop), and its answer is written as it came.
         let at = await outboundChangeStamp(now: now)
-        let next = Self.network(.object(before), offline: on, by: name, stamp: at)
+        let kept = keep
+        let withKeep: @Sendable (JSONValue) -> JSONValue = { value in
+            guard let kept else { return value }
+            return Self.network(value, keepAll: kept)
+        }
+        let next = withKeep(Self.network(.object(before), offline: on, by: name, stamp: at))
         let changed = Self.offlineOf(.object(before)) != on
         let stamp: String? = { if changed, case .object(let n) = next, case .string(let s)? = n["changedAt"] { return s }; return nil }()
         // What this Mac had seen before this change, for judging what another
@@ -253,8 +279,9 @@ extension Shop {
         // Mac itself published is never taken for another computer's.
         if told, let stamp { sawNetworkSwitchStamp(stamp, now: now) }
         let via: Bool? = changed ? (on && told) : nil
-        guard await writeNetwork({ Self.network($0, offline: on, by: name, stamp: at, viaCloud: via) }) else { return false }
+        guard await writeNetwork({ withKeep(Self.network($0, offline: on, by: name, stamp: at, viaCloud: via)) }) else { return false }
         if let stamp { sawNetworkSwitchStamp(stamp, now: now) }
+        if keep != nil { tellOutboundGate() }
         // TURNED OFF: this Mac is online again; its first calls say so to
         // Khayt Cloud if a value is published there (`Shop+NetworkSwitch`).
         if !on, changed { await tellOthersSwitchedOff(next, seenBefore: seenBefore) }

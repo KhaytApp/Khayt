@@ -299,6 +299,13 @@ final class LanDevices: @unchecked Sendable {
     /// What the shared rule is asked about a device (`lib/device-roles.js`
     /// `roleOf`, `allowsDevice`): its kind, role and rolesVersion exactly as
     /// stored, and nothing else. Nil for an id nobody enrolled.
+    /// The name the shop sees for a device ("Turki's iPhone"), for saying who
+    /// changed something. Nil for an id nobody enrolled.
+    func name(of id: String) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        return saved.devices.first(where: { $0.id == id })?.name
+    }
+
     func rulesRecord(_ id: String) -> [String: String]? {
         lock.lock(); defer { lock.unlock() }
         guard let d = saved.devices.first(where: { $0.id == id }) else { return nil }

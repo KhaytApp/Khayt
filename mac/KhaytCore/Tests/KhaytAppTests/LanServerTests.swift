@@ -42,6 +42,8 @@ struct LanServerTests {
         let photoCalls = PrinterCalls()
         /// What `/api/printer/{id}/bed-clear` handed the stubbed hook, in order.
         let bedCalls = PrinterCalls()
+        /// What `/api/network/switch` handed the stubbed hook: the device's name and the body, in order.
+        let switchCalls = PrinterCalls()
         /// What reached the expense hook: the body's size, once per call.
         let expenseCalls = PrinterCalls()
         /// Files a slicer plugin announced again while the same bytes waited
@@ -174,6 +176,11 @@ struct LanServerTests {
             host.printerCommand = { id, verb in
                 printerCalls.calls.append("\(id) \(verb.rawValue)")
                 return (200, #"{"ok":true,"state":"paused"}"#)
+            }
+            let switchCalls = self.switchCalls
+            host.networkSwitch = { body, name in
+                switchCalls.calls.append(name + " " + String(decoding: body, as: UTF8.self))
+                return (200, #"{"ok":true,"network":{"offline":true,"keep":[],"changedAt":"2026-11-23T10:00:00.000Z","changedBy":"stub"}}"#)
             }
             let bedCalls = self.bedCalls
             host.bedClear = { id in

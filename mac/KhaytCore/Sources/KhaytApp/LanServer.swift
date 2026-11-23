@@ -207,6 +207,10 @@ final class LanServer {
         /// Unset, the route is not here and the phone reads the 404 as "this
         /// Mac predates it".
         var bedClear: (@MainActor (_ machineId: String) async -> (Int, String))? = nil
+        /// An owner's phone turning the shop's "Make no internet calls" on or
+        /// off (`Shop.phoneSetOutbound`). Unset, the route is not here (404)
+        /// and `/api/devices/self` does not advertise it.
+        var networkSwitch: (@MainActor (_ body: Data, _ deviceName: String) async -> (Int, String))? = nil
         /// A paired phone's photo of a job (`Shop.phoneAddJobPhoto`): the JPEG
         /// it sent, filed as the Mac's own Add Photo files one.
         var addJobPhoto: (@MainActor (_ jobId: String, _ data: Data) async -> (Int, String))? = nil
@@ -1487,6 +1491,22 @@ final class LanServer {
             let body = (try? String(decoding: JSONEncoder().encode(page), as: UTF8.self)) ?? "{}"
             return .json(200, body)
 
+        // ── AN OWNER'S PHONE FLIPS "MAKE NO INTERNET CALLS" ──────────────
+        //
+        // `POST /api/network/switch`. SIGNED PHONES ONLY, and the OWNER'S:
+        // the gate runs first (host, PIN, signature, and the device's role;
+        // the shared rule answers `owner` for a route its table does not
+        // name, so a manager's phone gets the signed `role-scope` 403 there).
+        // The answer is SIGNED BACK on every status a phone acts on, so it
+        // shows "Done" only when this Mac really said so.
+        case (_, false) where request.method == "POST" && host.networkSwitch != nil && path == Self.networkSwitchPath:
+            if let refused = await pinGate(request) { return refused }
+            guard LanDevices.isSigned(request.headers), let id = request.headers["x-khayt-device"] else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let (status, body) = await host.networkSwitch!(request.body, host.devices.name(of: id) ?? "")
+            return signedForPhone(.json(status, body), request)
+
         // ── A PHONE SAYS THE BED IS CLEAR ────────────────────────────────
         //
         // `POST /api/printer/{machineId}/bed-clear`: the phone's "Bed is
@@ -2756,8 +2776,14 @@ final class LanServer {
               let scopes = try? await host.engine.deviceScopes(role: role) else {
             return .json(500, #"{"reason":"role"}"#)
         }
+        // `can`: the phone writes this Mac serves that are not a scope in the
+        // role table, so a phone offers a control only where it will work. A
+        // list, so later ones can be added; an older Mac sends none.
+        var can: [JSONValue] = []
+        if host.networkSwitch != nil, role == "owner" { can.append(.string("network-switch")) }
         let answer: JSONValue = .object(["deviceId": .string(id), "role": .string(role),
-                                         "scopes": .array(scopes.map(JSONValue.string))])
+                                         "scopes": .array(scopes.map(JSONValue.string)),
+                                         "can": .array(can)])
         // Signed back: the phone draws its screens, and keeps or drops its
         // copy of the book, on this answer.
         return signedForPhone(.json(200, Self.jsonText(answer)), request)
@@ -2772,6 +2798,7 @@ final class LanServer {
     // (`LanConnectorPairing.phoneCodeEnabled`), and then only while the owner
     // has opened Pair a phone. Exact paths, never a prefix match.
     static let phonePairPath = "/api/devices/pair"
+    static let networkSwitchPath = "/api/network/switch"
 
     func phonePairRoute(_ request: Request, path: String) async -> Response? {
         guard path == Self.phonePairPath || path.hasPrefix(Self.phonePairPath + "/") else { return nil }
@@ -3415,6 +3442,9 @@ extension Shop {
         host.machinesLive = { [weak self] in self?.machinesLive() ?? [] }
         host.printerCommand = { [weak self] id, verb in
             await self?.phonePrinterCommand(id, verb) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        host.networkSwitch = { [weak self] body, name in
+            await self?.phoneSetOutbound(body: body, deviceName: name) ?? (503, #"{"ok":false,"reason":"busy"}"#)
         }
         host.bedClear = { [weak self] id in
             await self?.phoneBedClear(id) ?? (503, #"{"ok":false,"reason":"busy"}"#)
