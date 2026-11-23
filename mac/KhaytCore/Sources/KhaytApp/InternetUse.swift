@@ -301,6 +301,11 @@ struct InternetUsePage: View {
                                       pretendThere: pretendThere)
             }
             switches
+            // Frame H: the "off" made here waits for a sign-in. Under the
+            // switch, and only for somebody who may change it.
+            if pretendSignInEnded ?? (pretend == nil && shop.networkSwitchSignInEnded), mayChange {
+                NetworkSwitchSignIn(shop: shop, pretendBy: pretendShopLine.map { $0.by }, pretendAt: pretendShopLine.map { $0.at })
+            }
             Text(words.callIt("mac.net_list")).font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary).padding(.top, 4)
             list
@@ -354,6 +359,8 @@ struct InternetUsePage: View {
     var pretendShopLine: InternetUse.ShopLine?
     var pretendHere: Bool?
     var pretendMayChange: Bool?
+    /// A capture's stand-in for frame H.
+    var pretendSignInEnded: Bool?
     /// Whether the "tell my other computers" row is drawn (`Shop.tellOthersOffered`).
     var offersTelling = Shop.tellOthersOffered
 

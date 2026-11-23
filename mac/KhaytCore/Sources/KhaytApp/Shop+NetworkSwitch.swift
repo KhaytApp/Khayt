@@ -327,7 +327,18 @@ extension Shop {
             rememberUnsentOff(stamp, seenBefore: seenBefore)
             return .unsent
         }
-        let (heard, published) = await Self.networkSwitchGet(connection, token: token, fetch: networkSwitchFetcher)
+        // What Khayt Cloud says about this Mac's SIGN-IN while the "off" is
+        // being sent, heard on the way past: a 401 on any of these calls is a
+        // session that has ended, and that is what the person can act on
+        // (frame H: "Sign in again"), where "could not be reached" is not.
+        let said = SignInHeard()
+        let base = networkSwitchFetcher
+        let fetch: NetworkSwitchFetch = { request in
+            let answer = try await base(request)
+            if let http = answer.1 as? HTTPURLResponse { said.note(http.statusCode) }
+            return answer
+        }
+        let (heard, published) = await Self.networkSwitchGet(connection, token: token, fetch: fetch)
         // The retry waited on the network: if the switch was changed here
         // meanwhile, this "off" is no longer the shop's word. Only ITS OWN
         // slot is touched from here on: a newer unsent "off" the owner made
@@ -338,7 +349,7 @@ extension Shop {
             // Not known whether a value is published there: neither sent nor
             // given up.
             if outboundTellsOthers { noteTold(.failed) }
-            rememberUnsentOff(stamp, seenBefore: seenBefore)
+            rememberUnsentOff(stamp, seenBefore: seenBefore, signIn: said.verdict)
             return .unsent
         case .none:
             // Nothing is published: nothing to send, and nothing failed.
@@ -368,7 +379,7 @@ extension Shop {
                 }
             }
         }
-        let sent = await Self.networkSwitchPut(value, connection: connection, token: token, dek: dek, fetch: networkSwitchFetcher)
+        let sent = await Self.networkSwitchPut(value, connection: connection, token: token, dek: dek, fetch: fetch)
         switch sent {
         case .ok:
             afterSending(sent, turningOn: false, option: outboundTellsOthers)
@@ -391,16 +402,16 @@ extension Shop {
                 // it cannot follow. Dropping the "off" for such a value left
                 // this Mac online and the others offline, with nothing said.
                 guard let saidAt = at.flatMap(NetworkSwitch.date), saidAt >= mine else {
-                    rememberUnsentOff(stamp, seenBefore: seenBefore)
+                    rememberUnsentOff(stamp, seenBefore: seenBefore, signIn: said.verdict)
                     return .unsent
                 }
-                let (_, again) = await Self.networkSwitchGet(connection, token: token, fetch: networkSwitchFetcher)
+                let (_, again) = await Self.networkSwitchGet(connection, token: token, fetch: fetch)
                 guard let again,
                       case .success(let there) = NetworkSwitch.read(again, shopId: connection.shopId, dek: dek,
                                                                     highestSeen: nil, purposes: outboundPurposeIds),
                       let thereAt = NetworkSwitch.date(there.changedAt), !NetworkSwitch.isAhead(there, now: Date()),
                       thereAt >= mine else {
-                    rememberUnsentOff(stamp, seenBefore: seenBefore)
+                    rememberUnsentOff(stamp, seenBefore: seenBefore, signIn: said.verdict)
                     return .unsent
                 }
                 // The owner changed the switch here while this was in flight:
@@ -424,7 +435,7 @@ extension Shop {
             return .refused
         case .refused, .failed:
             afterSending(sent, turningOn: false, option: outboundTellsOthers)
-            rememberUnsentOff(stamp, seenBefore: seenBefore)
+            rememberUnsentOff(stamp, seenBefore: seenBefore, signIn: said.verdict)
             return .unsent
         }
     }
@@ -436,12 +447,28 @@ extension Shop {
 
     /// The stamp of an "off" this Mac made and could not send, if any.
     var networkSwitchUnsentOff: String? { outboundDefaults.string(forKey: Self.unsentOffKey(networkSwitchShopId)) }
+    nonisolated static func unsentOffSignInKey(_ shopId: String) -> String { "network.switchOffUnsentSignIn." + shopId }
+
+    /// FRAME H (signed off Nov 23): the switch was turned back on here, the
+    /// "off" could not be sent to the other computers, and the reason is that
+    /// this Mac's Khayt Cloud sign-in has ended. True from the 401 until the
+    /// "off" is sent, the shop stops sharing, or a newer setting replaces it:
+    /// each of those forgets the unsent "off", and this with it.
+    var networkSwitchSignInEnded: Bool {
+        networkSwitchUnsentOff != nil && outboundDefaults.bool(forKey: Self.unsentOffSignInKey(networkSwitchShopId))
+    }
 
     /// Remember an "off" to send again. Only while it is still the shop's
     /// word here: a send that comes back after the owner changed the switch
     /// again must not write its old stamp over a newer unsent one.
-    private func rememberUnsentOff(_ stamp: String, seenBefore: String?) {
+    ///
+    /// `signIn`: what that attempt learned about this Mac's Khayt Cloud
+    /// sign-in. `true`: it has ended (a 401). `false`: Khayt Cloud answered
+    /// as to somebody signed in, so that is not what is wrong. Nil: nothing
+    /// was heard either way (no network), and what was known before stands.
+    private func rememberUnsentOff(_ stamp: String, seenBefore: String?, signIn: Bool? = nil) {
         guard unsentOffStillStands(stamp) else { return }
+        if let signIn { outboundDefaults.set(signIn, forKey: Self.unsentOffSignInKey(networkSwitchShopId)) }
         outboundDefaults.set(stamp, forKey: Self.unsentOffKey(networkSwitchShopId))
         let key = Self.unsentOffSeenBeforeKey(networkSwitchShopId)
         if let seenBefore { outboundDefaults.set(seenBefore, forKey: key) } else { outboundDefaults.removeObject(forKey: key) }
@@ -464,6 +491,7 @@ extension Shop {
     func forgetUnsentOff() {
         outboundDefaults.removeObject(forKey: Self.unsentOffKey(networkSwitchShopId))
         outboundDefaults.removeObject(forKey: Self.unsentOffSeenBeforeKey(networkSwitchShopId))
+        outboundDefaults.removeObject(forKey: Self.unsentOffSignInKey(networkSwitchShopId))
     }
 
     /// Whether the unsent "off" is still this shop's current word: the book
@@ -913,4 +941,21 @@ extension NetworkSwitchAsk {
 
     /// The buttons when the other computer's value is not known.
     var choices: [(key: String, apply: Bool)] { choices(there: nil) }
+}
+
+/// What the calls of one attempt said about the sign-in (`tellOthersSwitchedOff`).
+final class SignInHeard: @unchecked Sendable {
+    private let lock = NSLock()
+    private var ended = false, answered = false
+    func note(_ status: Int) {
+        lock.lock(); defer { lock.unlock() }
+        if status == 401 { ended = true }
+        // Any answer Khayt Cloud gives only to somebody signed in.
+        else if (200..<300).contains(status) || status == 404 || status == 409 { answered = true }
+    }
+    /// `true` ended, `false` signed in, nil nothing heard either way.
+    var verdict: Bool? {
+        lock.lock(); defer { lock.unlock() }
+        return ended ? true : (answered ? false : nil)
+    }
 }
