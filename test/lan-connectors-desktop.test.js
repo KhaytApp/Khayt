@@ -477,8 +477,10 @@ test('GET /api/connectors/queue: sealed, no customer data, keyed ETag, 304, 1 pe
   const snap = opened(dev, 'GET', '/api/connectors/queue', q);
   assert.deepEqual(snap.shop, { name: 'Ward' });
   assert.deepEqual(snap.jobs.map((j) => [j.id, j.stage, j.machine]), [['o1', 'printing', 'U1'], ['o2', 'pending', null]]);
-  for (const leak of ['Fatima', 'Secret', '99']) assert.ok(!JSON.stringify(snap).includes(leak), leak);
+  // Looked for outside `at`: the snapshot's own timestamp holds "99" whenever
+  // the clock does (CI on #2683, Nov 23), which is not a leaked price.
   const content = Object.assign({}, snap); delete content.at;
+  for (const leak of ['Fatima', 'Secret', '99']) assert.ok(!JSON.stringify(content).includes(leak), leak);
   const etag = q.headers.get('etag');
   assert.equal(etag, CR.queueEtag(JSON.stringify(content), dev.key, dev.id));
   assert.notEqual(etag, '"' + sha(Buffer.from(JSON.stringify(content))).slice(0, 32) + '"', 'keyed, not a plain hash');
