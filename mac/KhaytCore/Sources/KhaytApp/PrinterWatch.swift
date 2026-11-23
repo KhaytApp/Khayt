@@ -52,6 +52,51 @@ final class PrinterWatch {
         /// polls. Nil for a printer that has never answered — which is the
         /// whole difference between a wifi hiccup and a printer that is off.
         var lastGood: KhaytEngine.PrinterStatus? = nil
+        /// When this printer last ANSWERED. `at` moves on a failed poll too,
+        /// so it cannot say how stale the picture is. Nil: never, since this
+        /// Mac started watching.
+        var lastOkAt: Date? = nil
+        /// WHY there is no status, in a word no language changes
+        /// (`PrinterWatch.failure`), and the HTTP status when there was one.
+        /// `problem` is a sentence in the shop's language; a phone cannot
+        /// match on that.
+        var problemCode: String? = nil
+        var httpStatus: Int? = nil
+    }
+
+    /// A failed poll as a word a program can match, whatever language the
+    /// shop reads. The live rows carry it as `errorCode`.
+    ///
+    ///   access-refused   the printer answered and said no: HTTP 401 or 403,
+    ///                    a handshake or an access code turned down
+    ///   http             any other HTTP status (`httpStatus` says which)
+    ///   not-set-up       no address, a bad port, a missing serial or mainboard id: nothing was asked
+    ///   certificate      a Bambu's certificate is not the one expected
+    ///   unreadable       it answered with something that is not its protocol
+    ///   unreachable      no answer: off, asleep, another network, hung up
+    nonisolated static func failure(_ error: any Error) -> (code: String, http: Int?) {
+        if let refusal = error as? Refusal {
+            switch refusal {
+            case .http(let code, _): return (code == 401 || code == 403 ? "access-refused" : "http", code)
+            case .handshakeRefused: return ("access-refused", nil)
+            case .noHost, .notALanAddress, .badPort, .needsSerial, .needsMainboardId: return ("not-set-up", nil)
+            case .notJSON, .unreadable, .redirected: return ("unreadable", nil)
+            default: return ("unreachable", nil)
+            }
+        }
+        if let trouble = error as? SdcpSocket.Trouble {
+            if case .refused = trouble { return ("access-refused", nil) }
+            return ("unreachable", nil)
+        }
+        if let trouble = error as? BambuMqtt.Trouble {
+            switch trouble {
+            case .refused: return ("access-refused", nil)
+            case .certificateChanged, .notBambu, .otherPrinter: return ("certificate", nil)
+            case .malformed: return ("unreadable", nil)
+            default: return ("unreachable", nil)
+            }
+        }
+        return ("unreachable", nil)
     }
 
     /// How many failed polls in a row a printer that has answered before is
@@ -735,7 +780,7 @@ final class PrinterWatch {
     /// why there is none.
     private enum Heard: Sendable {
         case status(KhaytEngine.PrinterStatus)
-        case problem(String)
+        case problem(String, code: String, http: Int?)
     }
 
     /// Ask one machine and hand back what it said, or why it did not.
@@ -759,7 +804,8 @@ final class PrinterWatch {
         do {
             return .status(try await asking(machine, engine, key, accessCode))
         } catch {
-            return .problem(Self.say(error, shop.words))
+            let why = Self.failure(error)
+            return .problem(Self.say(error, shop.words), code: why.code, http: why.http)
         }
     }
 
@@ -768,8 +814,9 @@ final class PrinterWatch {
         switch answer {
         case .status(let status):
             let loadedBefore = readings[machine.id]?.status?.loaded ?? []
-            readings[machine.id] = Reading(status: status, problem: nil, at: Date(),
-                                           consecutiveFailures: 0, lastGood: status)
+            let now = Date()
+            readings[machine.id] = Reading(status: status, problem: nil, at: now,
+                                           consecutiveFailures: 0, lastGood: status, lastOkAt: now)
             // A spool swapped on the machine changes what the library can call
             // ready on it. Only then: a recount on every poll would be every
             // few seconds for nothing.
@@ -782,11 +829,13 @@ final class PrinterWatch {
             // screen should not wait on a store write to see its printer's
             // progress move. This is the only thing that notices a job ending.
             await capture(machine.id, status: status, shop: shop)
-        case .problem(let why):
+        case .problem(let why, let code, let http):
             let before = readings[machine.id]?.consecutiveFailures ?? 0
             let last = readings[machine.id]?.status ?? readings[machine.id]?.lastGood
             readings[machine.id] = Reading(status: nil, problem: why, at: Date(),
-                                           consecutiveFailures: before + 1, lastGood: last)
+                                           consecutiveFailures: before + 1, lastGood: last,
+                                           lastOkAt: readings[machine.id]?.lastOkAt,
+                                           problemCode: code, httpStatus: http)
         }
     }
 

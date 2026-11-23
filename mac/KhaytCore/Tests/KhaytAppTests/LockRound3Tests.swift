@@ -37,7 +37,7 @@ struct LockRound3Tests {
         #expect(!tick.contains("switchPlug("))
         let perform = try Self.body("performPlugSwitch", in: "Shop.swift")
         #expect(!WritersAreGatedTests.asksTheLock(perform))
-        #expect(try Self.body("switchPlug", in: "Shop.swift").contains("permitted(\"orders\", \"edit\")"))
+        #expect(try Self.body("switchPlug", in: "Shop.swift").contains("permittedPrinter(\"control\")"))
     }
 
     // 2

@@ -81,7 +81,7 @@ struct HeadActualsTests {
         let engine = OperatorLockTests.sharedEngine
         let v = Self.obj(try Self.json("per-head-actuals-vectors.json"))
         guard case .array(let jobs)? = v["actualsJob"], case .array(let runs)? = v["historyRun"] else { Issue.record("no vectors"); return }
-        #expect(jobs.count >= 6 && runs.count >= 6)
+        #expect(jobs.count >= 9 && runs.count >= 6)
         for c in jobs.map({ Self.obj($0) }) {
             guard case .array(let log)? = c["printLog"], case .string(let machine)? = c["machineId"], case .string(let file)? = c["filename"] else { continue }
             let got = try await engine.headActualsJob(printLog: log, machineId: machine, filename: file)
@@ -109,10 +109,30 @@ struct HeadActualsTests {
         // ...the figures' rule does not.
         #expect(try await engine.headActualsJob(printLog: log, machineId: "M1", filename: "calibration.gcode") == nil)
         #expect(try await engine.headActualsJob(printLog: log, machineId: "M1", filename: "bracket.gcode") == "J1")
+
+        // A PRINT KHAYT ITSELF SENT. The printer never hears the job's file
+        // name: it is uploaded as khayt-<time>.gcode, and that is what comes
+        // back when it ends. The send records that name on the job, through
+        // the same write the Mac makes after a send, and the figures find it.
+        var root: [String: JSONValue] = ["printLog": .array(log)]
+        #expect(try await Shop.applyPrintRun(to: &root, jobId: "J1", machineId: "M1", started: true,
+                                             file: "bracket.gcode", sentAs: "khayt-mb1x2y3.gcode",
+                                             at: "2026-11-22T10:00:00.000Z", engine: engine))
+        let sent = Shop.rows(root, "printLog")
+        guard case .object(let job)? = sent.first, case .array(let runs)? = job["printRuns"], case .object(let run)? = runs.last else {
+            Issue.record("no run recorded"); return
+        }
+        #expect(run["sentAs"] == .string("khayt-mb1x2y3.gcode") && run["file"] == .string("bracket.gcode"))
+        #expect(try await engine.headActualsJob(printLog: sent, machineId: "M1", filename: "khayt-mb1x2y3.gcode") == "J1",
+                "a print Khayt sent never gets its figures")
+        #expect(try await engine.headActualsJob(printLog: sent, machineId: "M1", filename: "khayt-other.gcode") == nil)
+        #expect(try await engine.headActualsJob(printLog: sent, machineId: "M2", filename: "khayt-mb1x2y3.gcode") == nil)
         let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
         let photos = try String(contentsOf: app.appending(path: "Shop+Photos.swift"), encoding: .utf8)
         #expect(photos.contains("noteHeadActuals(ended, machine: machine, jobId: figuresJob)"))
+        let printers = try String(contentsOf: app.appending(path: "Shop+Printers.swift"), encoding: .utf8)
+        #expect(printers.contains("file: file.lastPathComponent, sentAs: sent.remoteName)"), "the send does not record the name on the printer")
         let heads = try String(contentsOf: app.appending(path: "HeadActuals.swift"), encoding: .utf8)
         #expect(!heads.contains("ended.orderId,"), "the photo's job is used for the figures again")
     }
@@ -140,6 +160,59 @@ struct HeadActualsTests {
         #expect(try await Self.engine.perHeadPatch(order: held, historyJob: job) == .null)
         let other: JSONValue = .object(["id": .string("J1"), "actualHeadsJobId": .string("000001")])
         #expect(try await Self.engine.perHeadPatch(order: other, historyJob: job) == .null)
+    }
+
+    @Test("each head keeps the colour and material that were in it: the tag if read, else what the machine is recorded as holding")
+    func colourStamp() async throws {
+        let history = Self.obj(try Self.json("u1-history-around-timelapse.json"))
+        let found = await HeadActuals.job(in: history, filename: "td-swatch_PLA_17m25s.gcode",
+                                              endedAt: Date(timeIntervalSince1970: 1785823749), engine: OperatorLockTests.sharedEngine)
+        let job = try #require(found)
+        // The shop's own U1 reading: heads 1 and 2 tagged, 3 and 4 empty.
+        let detect = try #require(HeadActuals.filamentDetect(in: Self.obj(try Self.json("u1-filament-detect.json"))))
+        let loaded: JSONValue = .array([.object(["slot": .number(0), "hex": .string("#FF0000"), "material": .string("PETG")]),
+                                        .object(["slot": .number(1), "hex": .string("#00FF00"), "material": .string("PETG")])])
+        func heads(_ patch: JSONValue) -> [[String: JSONValue]] {
+            guard case .array(let list)? = Self.obj(patch)["actualHeads"] else { return [] }
+            return list.map(Self.obj)
+        }
+        let order: JSONValue = .object(["id": .string("J1")])
+        // A tag read wins over the list.
+        let tagged = heads(try await Self.engine.perHeadPatch(order: order, historyJob: job,
+                                                              filamentDetect: detect, machineLoaded: loaded))
+        #expect(tagged.count == 2)
+        for head in tagged {
+            #expect(head["colourFrom"] == .string("rfid"))
+            guard case .string(let hex)? = head["hex"], case .string(let material)? = head["material"] else {
+                Issue.record("no colour on a tagged head"); continue
+            }
+            #expect(hex.count == 7 && hex.hasPrefix("#") && hex != "#FF0000" && hex != "#00FF00")
+            #expect(!material.isEmpty && material != "PETG")
+        }
+        // No reading: what the machine is recorded as holding.
+        let listed = heads(try await Self.engine.perHeadPatch(order: order, historyJob: job, machineLoaded: loaded))
+        #expect(listed.map { $0["hex"] } == [.string("#FF0000"), .string("#00FF00")])
+        #expect(listed.allSatisfy { $0["colourFrom"] == .string("loaded") && $0["material"] == .string("PETG") })
+        // Neither: the split as it always was, with no colour fields at all.
+        let bare = heads(try await Self.engine.perHeadPatch(order: order, historyJob: job))
+        #expect(bare.count == 2)
+        #expect(bare.allSatisfy { Set($0.keys) == ["head", "grams", "estimateG"] })
+        // The grams are the same whichever way the colour was found.
+        #expect(tagged.map { $0["grams"] } == bare.map { $0["grams"] })
+        // Not an answer: nothing to read.
+        #expect(HeadActuals.filamentDetect(in: ["result": .object(["status": .object([:])])]) == nil)
+        #expect(HeadActuals.filamentDetect(in: [:]) == nil)
+    }
+
+    @Test("the shared colour vectors, through the bundled rule")
+    func colourVectors() async throws {
+        let v = Self.obj(try Self.json("per-head-actuals-vectors.json"))
+        guard case .array(let cases)? = v["colour"] else { Issue.record("no vectors"); return }
+        #expect(cases.count >= 8)
+        for c in cases.map(Self.obj) {
+            let got = try await Self.engine.headColour(head: c["head"] ?? .null, at: c["at"] ?? .null)
+            #expect(got == (c["want"] ?? .null), Comment(rawValue: "\(c["why"] ?? .null)"))
+        }
     }
 
     @Test("the write is the printer's own record: asked of the lock as a system write, never as a person's edit")
@@ -192,6 +265,46 @@ extension LibraryEditPerfTests {
             // One print, one job: the same run is refused on another job.
             #expect(await shop.writeHeadActuals(historyJob: job, jobId: "JPERF2") == false)
             #expect(try #require(try Self.onDisk(url, "printLog", "JPERF2"))["actualHeadsJobId"] == nil)
+        }
+    }
+
+    @Test("a print Khayt itself sent, named khayt-<time>.gcode on the printer, gets its per-head figures written")
+    func khaytSentPrintGetsItsFigures() async throws {
+        var root = Self.shopBook(models: 10)
+        // JPERF1 is printing on MPERF1 and its part is the library's file, not the name on the printer.
+        root["printLog"] = .array(Shop.rows(root, "printLog").map { row in
+            guard case .object(var o) = row, Shop.recordId(row) == "JPERF1" else { return row }
+            o["parts"] = .array([.object(["fileRef": .string("Models/td-swatch.3mf")])])
+            return .object(o)
+        })
+        try await withPerfBook(root) { shop, url in
+            let engine = try #require(shop.engine)
+            let remote = "khayt-mb1x2y3.gcode"
+            // Before the send is recorded, nothing ties the printer's name to the job.
+            #expect(try await engine.headActualsJob(printLog: shop.orderRows, machineId: "MPERF1", filename: remote) == nil)
+            // The send, as `sendToPrinter` records it.
+            await shop.recordPrintRun(jobId: "JPERF1", machineId: "MPERF1", started: true, file: "td-swatch.3mf", sentAs: remote)
+            #expect(shop.moveProblem == nil)
+            // The print ends: the printer says its own name for the file.
+            let figuresJob = try await engine.headActualsJob(printLog: shop.orderRows, machineId: "MPERF1", filename: remote)
+            #expect(figuresJob == "JPERF1")
+            // Its history row, under that same name, a few seconds before Khayt saw the end.
+            let end = Date(timeIntervalSince1970: 1_795_000_000)
+            let history: [String: JSONValue] = ["result": .object(["jobs": .array([.object([
+                "job_id": .string("0000A1"), "filename": .string(remote), "status": .string("completed"),
+                "end_time": .number(end.timeIntervalSince1970 - 4), "filament_used": .number(2238.6),
+                "metadata": .object(["filament_weight": .array([.number(4.38), .number(2.27)]), "filament_total": .number(2232.6)]),
+            ])])])]
+            let found = await HeadActuals.job(in: history, filename: remote, endedAt: end,
+                                              taken: HeadActuals.taken(shop.orderRows), engine: engine)
+            let run = try #require(found)
+            #expect(await shop.writeHeadActuals(historyJob: run, jobId: try #require(figuresJob)))
+            let onDisk = try #require(try Self.onDisk(url, "printLog", "JPERF1"))
+            #expect(onDisk["actualHeadsJobId"] == .string("0000A1"))
+            guard case .array(let heads)? = onDisk["actualHeads"] else { Issue.record("no figures on the job"); return }
+            #expect(heads.count == 2)
+            // And the other job, which was never sent there, is not offered.
+            #expect(try await engine.headActualsJob(printLog: shop.orderRows, machineId: "MPERF1", filename: "khayt-other.gcode") == nil)
         }
     }
 }

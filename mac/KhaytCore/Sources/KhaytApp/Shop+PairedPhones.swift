@@ -59,8 +59,13 @@ extension Shop {
         lanPhonePairing.close()
     }
 
+    /// Sign a phone out, from the screen as it was: whoever may change
+    /// settings. A phone only: a slicer is removed from its own list. The
+    /// page-26 list removes through `removePhone`, which also lets a manager
+    /// remove a phone a manager could have paired.
     func signOutPhone(_ id: String) {
         guard permitted("settings", "edit") else { return }
+        guard lanDeviceStore.list().contains(where: { $0.id == id && $0.kind == nil }) else { return }
         lanDeviceStore.remove(id)
         refreshPairedPhones()
     }
@@ -72,6 +77,16 @@ struct PairedPhones: View {
     @State private var signingOut: LanDevices.Listed?
 
     var body: some View {
+        // Pairing by code on: the page-26 screens, with each phone's role.
+        if PhonePairingUI.on {
+            PairedPhonesByCode(shop: shop)
+        } else {
+            classic
+        }
+    }
+
+    /// Settings ▸ Online as it has been: the PIN, one line per phone.
+    @ViewBuilder private var classic: some View {
         LabeledContent(shop.words.callIt("mac.phones_title")) {
             if shop.pairedPhones.isEmpty {
                 Text(shop.words.callIt("mac.phones_none")).foregroundStyle(.secondary)

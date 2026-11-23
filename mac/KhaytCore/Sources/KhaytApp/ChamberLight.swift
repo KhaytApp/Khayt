@@ -24,7 +24,7 @@ struct ChamberLightButton: View {
                     .background(.regularMaterial, in: Capsule())
             }
             .buttonStyle(.plain)
-            .disabled(busy || !shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
+            .disabled(busy || !shop.canMoveJobs || !shop.printerAllows("control"))
             .opacity(busy ? 0.5 : 1)
             .help(words.callIt("mac.light_chamber"))
         }
@@ -76,7 +76,7 @@ struct CameraAndLight: View {
                         Task { await camera.setLight(machine, on: want, shop: shop) }
                     }))
                     .labelsHidden().toggleStyle(.switch).controlSize(.small)
-                    .disabled(busy || !shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
+                    .disabled(busy || !shop.canMoveJobs || !shop.printerAllows("control"))
                 }
                 if case .failed(let was) = light {
                     Text(words.callIt(was ? "mac.light_failed_on" : "mac.light_failed_off"))

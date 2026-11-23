@@ -562,7 +562,7 @@ jobs:
           # fixtures and vectors are read by named Mac tests.
           # test/ci-mac-relevant.test.js checks that every repo path the Mac tests
           # name matches this pattern, so a new one can't be missed silently.
-          pattern='^(mac/|lib/|main\.js$|renderer/(app-state\.js|index\.html|inventory\.js|invoice\.css|labels\.js|order-flows\.js|locales/)|test/fixtures/|docs/lan-device-keys\.vectors\.json$|docs/phone-pair\.vectors\.json$|ios/KhaytCompanion/Services/BookWriter\.swift$|\.github/workflows/ci\.yml$)'
+          pattern='^(mac/|lib/|main\.js$|renderer/(app-state\.js|index\.html|inventory\.js|invoice\.css|labels\.js|order-flows\.js|locales/)|test/fixtures/|docs/lan-device-keys\.vectors\.json$|docs/phone-pair\.vectors\.json$|docs/LAN_API\.md$|ios/KhaytCompanion/Services/BookWriter\.swift$|\.github/workflows/ci\.yml$)'
           # A here-string, not `printf | grep -q`: under pipefail grep's early
           # exit can SIGPIPE printf on a long list and flip the answer.
           if grep -qE "$pattern" <<< "$files"; then run=true; else run=false; fi

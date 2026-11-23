@@ -147,7 +147,9 @@ struct PrintedOnTests {
         let sheet = try SmartPlugTests.source("SendToPrinterSheet.swift")
         #expect(sheet.contains("startPrint: go, jobId: jobId"), "the sheet sends without saying which job")
         let printers = try SmartPlugTests.source("Shop+Printers.swift")
-        let send = try #require(printers.range(of: "let sent = try await PrinterSend.send("))
+        // The send runs inside `commanding`, so the poll yields to it (#2624);
+        // what it returns is still what the record waits for.
+        let send = try #require(printers.range(of: "let sent = try await printers.commanding(machine, shop: self) {\n                try await PrinterSend.send("))
         let record = try #require(printers.range(of: "await recordPrintRun(jobId: jobId"))
         #expect(send.upperBound < record.lowerBound, "recorded before the printer accepted it")
         #expect(printers.contains("try await StoreWriter.updateAsync(build) { root in\n                _ = try await Self.applyPrintRun("),

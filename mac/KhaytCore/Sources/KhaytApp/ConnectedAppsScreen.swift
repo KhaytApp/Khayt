@@ -34,6 +34,7 @@ struct ConnectedAppsScreen: View {
         .task {
             guard refreshes else { return }
             shop.refreshConnectedApps()
+            shop.refreshConnectorPrices()
             shop.refreshSlicerInbox()
         }
         .askFirst($removing,
@@ -48,6 +49,7 @@ struct ConnectedAppsScreen: View {
     private var page: some View {
         VStack(alignment: .leading, spacing: 20) {
             header
+            prices
             slicers
             inbox
             plugin
@@ -63,6 +65,67 @@ struct ConnectedAppsScreen: View {
             Text(shop.words.callIt("mac.apps_screen_sub"))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: - Show prices in OrcaSlicer (page 24)
+
+    private var prices: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(get: { shop.connectorPricesOn }, set: { shop.setConnectorPrices($0) })) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(shop.words.callIt("mac.apps_prices")).font(.body.weight(.medium))
+                    Text(shop.words.callIt(shop.connectorPricesOn ? "mac.apps_prices_on" : "mac.apps_prices_off"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .toggleStyle(.switch)
+            .disabled(!shop.mayChangeConnectorPrices)
+            if !shop.mayChangeConnectorPrices {
+                Text(shop.words.callIt("mac.apps_prices_owner")).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color(nsColor: .separatorColor)))
+    }
+
+    /// One slicer's grant: None, Price, or Price and cost, each saying what
+    /// the device learns. Shown only while the switch is on.
+    private func grantPicker(_ app: LanDevices.Listed) -> some View {
+        HStack(spacing: 6) {
+            Text(shop.words.callIt("mac.apps_grant_label")).font(.caption).foregroundStyle(.secondary)
+            Menu {
+                ForEach(Self.grants, id: \.self) { grant in
+                    Button {
+                        shop.setConnectorPriceGrant(app.id, grant)
+                    } label: {
+                        Text(Shop.connectorGrantName(grant, words: shop.words))
+                        Text(shop.words.callIt(Self.grantNote(grant)))
+                    }
+                    .disabled(grant == "cost" && !shop.mayGrantConnectorCost)
+                }
+            } label: {
+                Text(Shop.connectorGrantName(app.priceGrant, words: shop.words))
+            }
+            .fixedSize()
+            .disabled(!shop.mayChangeConnectorPrices)
+        }
+    }
+
+    /// The picker's three choices, in the frame's order.
+    static let grants: [String?] = [nil, "price", "cost"]
+
+    /// What each choice lets a device learn, said under it. "Price" says the
+    /// part a shop would not guess: by trying plates, a device can estimate
+    /// material costs from the prices alone (release security review, LOW 3).
+    static func grantNote(_ grant: String?) -> String {
+        switch grant {
+        case "price": "mac.apps_grant_price_note"
+        case "cost": "mac.apps_grant_cost_note"
+        default: "mac.apps_grant_none_note"
         }
     }
 
@@ -84,7 +147,8 @@ struct ConnectedAppsScreen: View {
                         Text(shop.words.callIt("mac.phones_seen", ["date": .string(
                             shop.words.say(app.lastSeenAt, .dateTime.day().month(.abbreviated).year()))]))
                             .font(.caption).foregroundStyle(.secondary)
-                        Text(shop.words.callIt("mac.apps_does")).font(.caption).foregroundStyle(.secondary)
+                        Text(Shop.connectorDoes(grant: app.priceGrant, pricesOn: shop.connectorPricesOn, words: shop.words))
+                            .font(.caption).foregroundStyle(.secondary)
                         let waiting = Self.filesFrom(app.id, shop: shop)
                         if waiting > 0 {
                             Text(shop.words.counting(waiting, "mac.apps_files_from"))
@@ -92,6 +156,7 @@ struct ConnectedAppsScreen: View {
                         }
                     }
                     Spacer(minLength: 0)
+                    if shop.connectorPricesOn { grantPicker(app) }
                     Button(shop.words.callIt("mac.apps_remove") + "\u{2026}") { removing = app }
                         .disabled(!shop.lockAllows("settings", "edit"))
                 }
