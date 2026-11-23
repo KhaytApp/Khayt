@@ -158,6 +158,8 @@ final class ConnectionSettings: ObservableObject {
     @Published var device: DeviceKey.Credential? {
         didSet {
             guard device != oldValue else { return }
+            // A role is the Mac's grant to THIS enrolment: gone with it.
+            if device == nil, deviceRole != nil { deviceRole = nil }
             if let device, let json = try? JSONEncoder().encode(device) {
                 KeychainHelper.set(String(decoding: json, as: UTF8.self), for: Keys.deviceKeychain)
             } else {
@@ -168,6 +170,41 @@ final class ConnectionSettings: ObservableObject {
     @Published var isPaired: Bool {
         didSet { UserDefaults.standard.set(isPaired, forKey: Keys.paired) }
     }
+    /// The role the Mac gave this phone when it approved the pairing (C9), as
+    /// `GET /api/devices/self` reports it. Text, never an enum: a role this
+    /// build does not know reads as viewer (`DeviceRole.effective`). A UI
+    /// convenience: the Mac checks the role on every request regardless.
+    @Published var deviceRole: String? {
+        didSet { UserDefaults.standard.set(deviceRole, forKey: Keys.deviceRole) }
+    }
+    /// Paired by a number approved on the Mac rather than the owner PIN. Such a
+    /// phone is never the owner by default: no role reads as viewer.
+    @Published var pairedByCode: Bool {
+        didSet { UserDefaults.standard.set(pairedByCode, forKey: Keys.pairedByCode) }
+    }
+    /// The role this phone acts on (`lib/device-roles.js` `roleOf`), for what
+    /// only a role may do: the owner's switches and the scopes a screen offers.
+    /// A Khayt Cloud member never paired with a Mac acts on their cloud role,
+    /// and an unknown role is a viewer (`DeviceRole.acting`).
+    var effectiveRole: String {
+        let cloud = CloudSession.savedRole()
+        return DeviceRole.acting(role: deviceRole, pairedByCode: pairedByCode,
+                                 heldByMac: device != nil || !pin.isEmpty,
+                                 cloudSignedIn: cloud.signedIn, cloudRole: cloud.role, sampleShop: isSampleShop)
+    }
+    /// The role that decides whether this phone keeps the book and which
+    /// screens it shows: the Mac pairing's (`DeviceRole.effective`), unchanged.
+    /// Kept apart from `effectiveRole` on purpose: a cloud member's phone holds
+    /// the book the cloud gave it, and a stricter role here would make it
+    /// forget that book (floor mode).
+    private var bookRole: String { DeviceRole.effective(role: deviceRole, pairedByCode: pairedByCode) }
+    /// Whether this phone may keep the shop's book (`book:read`): manager and
+    /// owner. Below that it is a floor phone with no local book (D-P6 a).
+    var mayHoldBook: Bool { DeviceRole.mayHoldBook(bookRole) }
+    /// Whether this phone's role holds `scope` (what to show; the Mac checks).
+    func can(_ scope: String) -> Bool { DeviceRole.allows(effectiveRole, scope) }
+    /// Operator or viewer: the floor screens (no book, prices or clients).
+    var isFloorPhone: Bool { DeviceRole.isFloor(bookRole) }
     /// The Mac signed this phone out (`device-revoked`). The pairing screen
     /// says so, until a PIN is typed again.
     @Published var signedOutByMac: Bool {
@@ -265,6 +302,8 @@ final class ConnectionSettings: ObservableObject {
         static let signedOutByMac = "khayt.signedOutByMac"
         static let needsPairAgain = "khayt.needsPairAgain"
         static let phoneName = "khayt.phoneName"
+        static let deviceRole = "khayt.deviceRole"
+        static let pairedByCode = "khayt.pairedByCode"
     }
 
     init() {
@@ -275,6 +314,8 @@ final class ConnectionSettings: ObservableObject {
         phoneName = defaults.string(forKey: Keys.phoneName) ?? Self.defaultPhoneName
         serviceName = defaults.string(forKey: Keys.serviceName) ?? ""
         isPaired = defaults.bool(forKey: Keys.paired)
+        deviceRole = defaults.string(forKey: Keys.deviceRole)
+        pairedByCode = defaults.bool(forKey: Keys.pairedByCode)
         signedOutByMac = defaults.bool(forKey: Keys.signedOutByMac)
         needsPairAgain = defaults.bool(forKey: Keys.needsPairAgain)
         pin = KeychainHelper.get(Keys.pinKeychain) ?? ""
@@ -359,6 +400,8 @@ final class ConnectionSettings: ObservableObject {
         pin = ""
         macIdentityKey = ""
         device = nil
+        deviceRole = nil
+        pairedByCode = false
         signedOutByMac = false
         needsPairAgain = false
         KeychainHelper.delete(Keys.pinKeychain)

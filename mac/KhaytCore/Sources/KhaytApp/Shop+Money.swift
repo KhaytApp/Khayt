@@ -788,6 +788,7 @@ extension Shop {
 
         var created: String?
         var quoted = false
+        let actor = actorHere
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
@@ -815,9 +816,10 @@ extension Shop {
                 Self.clearPrintNext(&root, forJob: record)
                 Self.appendActivity(&root,
                                     text: "\(id)" + (record["project"].flatMap(Self.plainString).map { $0.isEmpty ? "" : " · \($0)" } ?? ""),
-                                    ref: id, settings: out.settings, root: root,
+                                    ref: id, root: root,
                                     action: Self.plainString(record["status"]) == "quote"
-                                            ? "quote_created" : "order_created")
+                                            ? "quote_created" : "order_created",
+                                    actor: actor)
                 created = id
                 quoted = Self.plainString(record["status"]) == "quote"
             }
@@ -1673,6 +1675,9 @@ extension Shop {
                 guard let target = orders.first(where: { Self.recordId($0) == id }) else {
                     throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
                 }
+                // A `.system` write is not a person's (a payment the
+                // provider confirmed): nobody at this Mac is credited for it.
+                let actor = self.actor(for: gate)
                 let edit = try await change(target, engine, root)
                 Self.write(&root, "printLog", changed: [edit.order], before: orders, into: &undo)
                 // The shared rules ask for this and it is the app's to write. A
@@ -1680,8 +1685,7 @@ extension Shop {
                 // one status change a shop most often has to explain later,
                 // recorded nowhere.
                 if let text = edit.activity {
-                    Self.appendActivity(&root, text: text, ref: id,
-                                        settings: Self.settings(root), root: root)
+                    Self.appendActivity(&root, text: text, ref: id, root: root, actor: actor)
                 }
             }
             // `undoable: false` for a write whose undo would do harm: putting

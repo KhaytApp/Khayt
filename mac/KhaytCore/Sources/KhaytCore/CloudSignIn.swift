@@ -165,6 +165,7 @@ public enum CloudSignIn {
         guard let endpoint = URL(string: base + path) else {
             throw Failure.badAddress("That address cannot be read")
         }
+        try OutboundGate.shared.require(.cloud)
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = timeout

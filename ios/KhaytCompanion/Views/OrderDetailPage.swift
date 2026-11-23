@@ -22,6 +22,7 @@ import KhaytCore
 /// the money region when the Quotes list handed the record over.
 struct OrderDetailPage: View {
     @EnvironmentObject private var api: KhaytAPIClient
+    @EnvironmentObject private var settings: ConnectionSettings
     @EnvironmentObject private var printers: LivePrinters
 
     @State private var order: QueueOrder
@@ -47,6 +48,8 @@ struct OrderDetailPage: View {
     @State private var printPhotos: [JobPrintPhoto] = []
     /// What the print drew from a metering plug, when one measured it.
     @State private var energy: JobEnergy?
+    /// Filament per head (U1), when the Mac or the desktop wrote the split.
+    @State private var heads: HeadFilament?
     /// A phone the Mac enrolled can send a photo of the print (not a quote).
     private var canAddPhoto: Bool { api.canAddJobPhoto && order.status != "quote" && order.status != "cancelled" }
     @State private var showingInvoice = false
@@ -83,6 +86,9 @@ struct OrderDetailPage: View {
 
     private var isQuote: Bool { order.status == OrderStatus.quote.rawValue }
     private var isCancelled: Bool { order.status == "cancelled" }
+    /// Steps that are money or the customer (a quote, a payment, a hand-over
+    /// or shipment with its address): never offered on a floor phone.
+    static let moneySteps: Set<String> = ["send_quote", "take_job", "record_payment", "hand_over", "ship"]
     private var canShip: Bool { !(shipChoices ?? []).isEmpty }
     private var canRecordPayment: Bool { payment.map { $0.status != "paid" } ?? false }
 
@@ -97,7 +103,12 @@ struct OrderDetailPage: View {
     /// The page's next step and the others, from the shared rule (`JobSteps`).
     private var steps: (primary: JobSteps.Step?, secondary: [JobSteps.Step]) {
         guard let rule else { return (nil, []) }
-        return JobSteps.arranged(rule, hasCustomerLink: customerLink != nil)
+        let all = JobSteps.arranged(rule, hasCustomerLink: customerLink != nil)
+        // A floor phone moves the job along; a quote and a payment are money
+        // and stay on the Mac (frame 255:28; the Mac refuses them anyway).
+        guard settings.isFloorPhone else { return all }
+        let kept = { (s: JobSteps.Step) in !Self.moneySteps.contains(s.code) }
+        return (all.primary.flatMap { kept($0) ? $0 : nil }, all.secondary.filter(kept))
     }
     private var stepCodes: Set<String> {
         Set(([steps.primary].compactMap { $0 } + steps.secondary).map(\.code))
@@ -120,6 +131,10 @@ struct OrderDetailPage: View {
                 // 1 · Header. Asked where the sale is, as on the Mac: a model
                 // that may not be sold has a designer on the other end.
                 OrderDetailHeader(order: order, pillStage: rule?.pill.stage, late: rule?.late)
+                if settings.isFloorPhone {
+                    FloorBanner(text: L10n.tr(settings.can("orders:write") ? "floor.job.banner.operator"
+                                                                           : "floor.job.banner.viewer"))
+                }
                 if !saleProblems.isEmpty {
                     LicenceNote(problems: saleProblems)
                 }
@@ -134,8 +149,8 @@ struct OrderDetailPage: View {
                     // A viewer's cloud sign-in moves nothing (`ReadOnlyGate`).
                     .disabled(!api.canWrite)
                 partsExtras
-                // 5 · Money.
-                moneyRegion
+                // 5 · Money. Not on a floor phone (D-P6 a): no prices there.
+                if !settings.isFloorPhone { moneyRegion }
                 // 6 · Activity.
                 if hasActivity { activityRegion }
             }
@@ -200,7 +215,7 @@ struct OrderDetailPage: View {
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                if api.holdsBook, !isCancelled {
+                if api.holdsBook, !settings.isFloorPhone, !isCancelled {
                     Button(L10n.tr("edit.title")) { Task { await startEditing() } }
                         .disabled(!api.canWrite)
                 }
@@ -224,6 +239,7 @@ struct OrderDetailPage: View {
             photoAccess = api.photoAccess(orderId: order.id)
             printPhotos = api.printPhotos(orderId: order.id)
             energy = api.jobEnergy(orderId: order.id)
+            heads = api.headFilament(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
             if isQuote { quoteState = await api.quoteState(orderId: order.id) }
             #if DEBUG
@@ -263,6 +279,9 @@ struct OrderDetailPage: View {
         // enough of it. Nothing at all otherwise.
         if let energy {
             EnergyCard(energy: energy).id("energy")
+        }
+        if let heads {
+            HeadFilamentCard(split: heads)
         }
     }
 
@@ -310,15 +329,15 @@ struct OrderDetailPage: View {
     private var activityRegion: some View {
         VStack(alignment: .leading, spacing: 16) {
             JobRegionTitle(text: L10n.tr("job.section.activity"))
-            if canShip {
+            if canShip, !settings.isFloorPhone {
                 Button { shipping = true } label: { ShipCard() }
                     .buttonStyle(.plain)
                     .disabled(!api.canWrite)
             }
-            if let whatsApp {
+            if let whatsApp, !settings.isFloorPhone {
                 WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
             }
-            if let customer, customer.dialNumber != nil || !(customer.email ?? "").isEmpty {
+            if let customer, !settings.isFloorPhone, customer.dialNumber != nil || !(customer.email ?? "").isEmpty {
                 ContactCard(client: customer)
             }
             // The finished print, as the Mac and the desktop keep it — the
@@ -332,23 +351,25 @@ struct OrderDetailPage: View {
             }
             // The papers besides the invoice, from the book. A quote is not
             // work yet; a cancelled job is nothing to pack or make.
-            if api.holdsBook, !isQuote, !isCancelled {
+            if api.holdsBook, !settings.isFloorPhone, !isQuote, !isCancelled {
                 JobPapersCard { kind in paper = .job(kind, orderId: order.id) }
             }
             // Only an order the Mac has published has a page to put a photo on.
-            if let photoAccess, photoAccess != .notPublished {
+            if let photoAccess, photoAccess != .notPublished, !settings.isFloorPhone {
                 OrderPhotosCard(access: photoAccess)
             }
             // The customer's page: its link, and the messages on it.
             // On a quote, a share from here is a send, stamped as Send quote's is.
-            if case .ready(let token)? = photoAccess {
+            if settings.isFloorPhone {
+                // The customer's page is the customer's: not on a floor phone.
+            } else if case .ready(let token)? = photoAccess {
                 PortalCard(token: token, quoteId: isQuote ? order.id : nil, onQuoteShared: quoteShared)
             } else if case .viewOnly(let token)? = photoAccess {
                 PortalCard(token: token, quoteId: isQuote ? order.id : nil, onQuoteShared: quoteShared)
             }
             // The shop's connectors: their buttons for a job, and their own
             // fields on it (read-only). Nothing is drawn without one.
-            if api.holdsBook {
+            if api.holdsBook, !settings.isFloorPhone {
                 ConnectorsCard(place: .order(order.id), outer: EdgeInsets())
                     .id("connectors")
             }
@@ -381,6 +402,14 @@ struct OrderDetailPage: View {
                     .disabled(step.blocked != nil || !api.canWrite || isUpdating)
             }
         }
+        // Below this line everything is money, a customer or the book's
+        // papers: none of it is a floor phone's (D-P6 a), whatever is left
+        // in a book it could not yet forget.
+        if !settings.isFloorPhone { ownerMore }
+    }
+
+    @ViewBuilder
+    private var ownerMore: some View {
         if isQuote {
             if quoteState != nil {
                 Button { Task { await startRevising() } } label: { Label(L10n.tr("quote.revise"), systemImage: "pencil.and.list.clipboard") }
@@ -688,9 +717,10 @@ struct OrderDetailHeader: View {
     /// The shared rule's late flag, when it has answered.
     var late: Bool? = nil
     var today = Date()
+    @Environment(\.hidesClients) private var hidesClients
 
     private var line: String {
-        var parts = [order.reference, order.displayClient]
+        var parts = hidesClients ? [order.reference] : [order.reference, order.displayClient]
         if let due = order.formattedDueDate { parts.append(L10n.format("job.header.due", due)) }
         return parts.joined(separator: " · ")
     }

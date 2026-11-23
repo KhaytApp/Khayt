@@ -50,6 +50,7 @@ struct ShopWindow: View {
     /// and which every registration in `Shop` is guarded for.
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
 
     /// Does the screen you are on have a panel at all?
@@ -380,6 +381,7 @@ struct ShopWindow: View {
         // or a Dock drop arriving with this window closed reopens it through
         // this (`ShopWindowOpener`).
         .task { ShopWindowOpener.openWindow = openWindow }
+        .task { SettingsOpener.open = openSettings }
         .task {
             // Only after the book has loaded: a group shelf means nothing until
             // the groups are known, and restoring one that no longer exists

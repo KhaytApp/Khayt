@@ -96,6 +96,8 @@ Companion apps should call `GET /api/status` first (reachability), then `GET /ap
 
 Public aggregate counts for the active queue.
 
+**For a paired phone (Mac only).** When the request carries a paired device's signature that verifies, the answer also has `"network": {"offline": true|false, "keep": ["updates", …]}`: the shop's "make no internet calls" switch and the purposes kept while it is on, as `lib/outbound.js` reads the book (`isOffline`, `keptOf`). The answer is signed with `x-khayt-reply-mac`, as `/api/devices/self` is. A phone in a floor role has no copy of the book and learns the switch here. An unsigned request, the PIN, or a signature that does not verify gets the public counts only, with no `network` and no reply MAC. **A phone that signed its request and gets an answer with no `network`, or one whose reply MAC does not verify, must read that as "unknown" and keep the last state it verified (failing closed), never as "online":** something on the network can strip the block, and a revoked device or a clock that is off gets the same plain answer. This Mac's own "Also on this Mac only" switch is not included.
+
 **Response 200**
 
 ```json
@@ -206,7 +208,7 @@ computer refuses, with **401**:
 | Body | When | The phone |
 |---|---|---|
 | `{"reason":"device-unknown"}` | no such device, or removed | forgets it, retries once with the PIN, enrols again |
-| `{"reason":"device-revoked"}` | the shop signed this phone out (Mac: Settings → Online → Paired phones; Windows and Linux: Settings → Online → LAN API → Paired phones) | **signed** (its `x-khayt-reply-mac` verifies over the nonce just sent; see "Signed answers a phone can trust"): forgets its key AND the PIN and asks the person to pair again. **Unsigned, or not verified**: wipes nothing, stops showing the book as live and asks the person to pair again. Never enrols by itself either way |
+| `{"reason":"device-revoked"}` | the shop signed this phone out (Mac: Settings → Online → Paired phones; Windows and Linux: Settings → Online → LAN API → Paired phones) | **signed** (its `x-khayt-reply-mac` verifies over the nonce just sent; see "A signed `device-revoked`"): forgets its key, the PIN and its copy of the book, and asks the person to pair again. **Unsigned, or not verified**: wipes nothing; it keeps its key, its enrolment and the PIN, stops showing the book as live and asks the person to pair again. Never enrols by itself either way |
 | `{"reason":"device-clock","now":<unix seconds>}` | `time` more than 120 s from the computer's clock | keeps the difference and retries once |
 | `{"reason":"device-replay"}` | the nonce was seen for this device in the last 300 s | fails the request |
 | `{"reason":"device-auth"}` | anything else: a bad MAC, missing or malformed headers | fails the request |
@@ -1146,6 +1148,17 @@ A phone paired with this Mac carries a **role**: owner, manager, operator or vie
 
 Signed by a paired device. Answers what that device is: `{"deviceId":"dev_…","role":"operator","scopes":["queue:read", …]}`. A request with the owner PIN and no device signature is 403 `device-auth`. A role change takes effect on the next request; nothing is re-keyed.
 
+#### A signed `device-revoked` (Mac only)
+
+When the shop signs a phone out, that phone's next signed request is answered `401 {"reason":"device-revoked"}`. **This refusal is signed**: `x-khayt-reply-mac` = `replyMac(key, nonce, status, body)` exactly as `/api/devices/self` answers are, where `key` is the key the phone had, `nonce` is this request's `x-khayt-nonce`, `status` is `401` and `body` is the bytes of the answer. The key is per device, so the MAC is bound to the device id through it.
+
+- The Mac signs it only when the request's own `x-khayt-mac` verifies under the phone's old key and its `x-khayt-time` is within the usual skew. A forged request naming the phone's id gets the same 401 with **no** reply MAC.
+- **The phone must drop its key and its book only on a `device-revoked` whose reply MAC verifies over the nonce it just sent.** An unsigned one is not proof of anything.
+- The Mac keeps a signed-out phone's old key for this only (it opens nothing), for the 256 most recent sign-outs. A phone signed out longer ago than that, or by an older Mac, gets an unsigned `device-revoked`, as does any connector.
+- `device-unknown` (a PIN change, or an id never seen) is not signed: the Mac holds no key for it.
+- **A large upload is refused from its headers alone, before its body is read, and that refusal is unsigned** (a receipt or job photo over 1 MB, a large estimate file): the phone's MAC covers the body, so the Mac cannot yet tell that the request is the phone's own. A phone that gets an unsigned `device-revoked` there should ask something small and signed, such as `GET /api/devices/self`, and act on that answer.
+- **When no signed one ever comes** (signed out by an older Mac, or longer ago than the Mac remembers) every request keeps answering an unsigned 401. The phone should not wipe on that; it should stop showing the book as live and ask the person to pair again. What it does with the copy it holds is the phone's decision (iPhone #2641).
+
 #### `POST /api/devices/pair` (pairing by code; **off** until the phone ships it)
 
 The slicer plugin's commit-then-reveal flow (`POST /api/connectors/pair`) with the phone's own prefixes: `khayt-phone-commit-v1` (the commitment), `khayt-enrol-phone-v1` (what the Mac's identity signs in its offer) and `khayt-phone-check-v1` (the 6-digit check number). A commitment, an offer or a number made for one kind can never stand for the other. No PIN is sent.
@@ -1199,8 +1212,8 @@ still lists it, and the phone hides it either way:
 
 ### Khayt Cloud: the same rows away from the shop (`PUT /v1/shops/{shopId}/live/printers`)
 
-> **Published by both apps** (the Mac since Sep 2026, `LivePrinterPublisher.swift`
-> and `LivePrinters.swift`; Windows/Linux since Nov 2026,
+> **Published by both apps** (the Mac since Sep 2026, `LivePrinterPublisher.swift`,
+> which asks `lib/live-snapshot.js` and seals in `LivePrinters.swift`; Windows/Linux since Nov 2026,
 > `lib/main/live-printer-publisher.js` and `lib/live-snapshot.js`). The route is
 > khayt-cloud's: its `docs/api-contract.md`, "Live channel & live printers", is
 > the source of truth. This is what the two publishers share; where they differ it is said below.
@@ -1223,7 +1236,7 @@ Cloud, so a phone or the PWA away from the shop sees the same printers.
 - **Size.** `JSON.stringify(ciphertext)` at most 65,536 characters. Over it, the
   snapshot is sealed again with `filename` and `error` set to `null` on every
   row; if that is still over, nothing is sent. No printer is dropped.
-- **Who publishes.** Every unlocked computer of the shop may, and the cloud keeps one snapshot, newest wins. On Windows/Linux a computer publishes only while it is hearing from the printers: at least one row answered in the last 3 minutes. The owner's laptop away from the shop, or a computer whose polling stopped, sends nothing rather than replacing the real picture with "not heard". (The Mac does not check this yet.)
+- **Who publishes.** Every unlocked computer of the shop may, and the cloud keeps one snapshot, newest wins. A computer publishes only while it is hearing from the printers: at least one row answered in the last 3 minutes (`lib/live-snapshot.js hasFreshPoll`, asked by both apps; the Mac through its bundled copy). The owner's laptop away from the shop, or a computer whose polling stopped, sends nothing rather than replacing the real picture with "not heard". A shop none of whose machines Khayt can ask therefore publishes nothing.
 - **When.** On a change, at most every 2 s (the server's per-shop 429 line);
   with nothing changed, a heartbeat every 45 s, so a viewer can tell idle from
   a computer that is off. "Changed" compares the rows without `lastUpdated` and
@@ -1236,8 +1249,8 @@ Cloud, so a phone or the PWA away from the shop sees the same printers.
   and while the "make no internet calls" switch allows Khayt Cloud (purpose
   `cloud`). Locking or signing out stops it; so does quitting.
 - **Answers.** `200 { ok, receivedAt }`: sent. `429 { retryAfter }` (and
-  `Retry-After`): wait that many seconds; Windows/Linux reads only the body and
-  honours at most 5 minutes. `403`: stop for this session. `401`: the Mac treats
+  `Retry-After`): wait that many seconds, at most 5 minutes on either app (Windows/Linux reads
+  only the body; the Mac reads the header, then the body). `403`: stop for this session. `401`: the Mac treats
   it as `403`; Windows/Linux stops until the shop signs in to Khayt Cloud again.
   Anything else (`413`, a `5xx`, a deploy): try again 45 s later. No answer at
   all: try at the next check.

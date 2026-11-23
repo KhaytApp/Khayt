@@ -391,10 +391,24 @@ final class Telemetry {
 
     @ObservationIgnored private var lane: Task<Void, Never>?
 
+    /// What "make no internet calls" says about one kind, apart from the
+    /// opt-in (the caller's `consent`, read from the same settings, so the
+    /// rule's own "opted-out" is not a second veto).
+    enum SwitchSays { case allows, refuses, notKnownYet }
+
+    nonisolated static func switchSays(_ purpose: OutboundPurpose) -> SwitchSays {
+        let verdict = OutboundGate.shared.verdict(purpose)
+        if verdict.allowed || verdict.reason == "opted-out" { return .allows }
+        return verdict.reason == "settings-unknown" ? .notKnownYet : .refuses
+    }
+
     private func enqueueNow(_ kind: Kind, _ raw: [String: JSONValue], consent: TelemetryConsent,
                             engine: KhaytEngine, file: TelemetryQueueFile,
                             live: (() -> TelemetryConsent)?) async -> Bool {
         guard kind == .crash ? consent.crash : consent.usage else { return false }
+        // Not recorded at all while the switch refuses this kind: an event
+        // that is never queued cannot be sent later (D5).
+        guard Self.switchSays(kind == .crash ? .crashReports : .usageStats) != .refuses else { return false }
         var raw = raw
         raw["installId"] = .string(consent.installId)
         let payload: [String: JSONValue]?
@@ -472,6 +486,38 @@ final class Telemetry {
     @discardableResult
     func flush(consent: TelemetryConsent, engine: KhaytEngine, file: TelemetryQueueFile) async -> String {
         guard sendsFromThisBuild else { return "development-build" }
+        // "Make no internet calls" only takes away: each kind is sent when the
+        // shop opted in AND the switch allows it. A kind the switch refuses is
+        // planned as not consented, so its events are dropped, never queued
+        // for later (D5). With both refused nothing is asked of the network.
+        //
+        // The opt-in itself is the caller's `consent`, read from the same
+        // settings the gate holds; the gate is asked here only for what the
+        // switch adds, so its own "opted-out" answer is not a second veto.
+        let crashSwitch = Self.switchSays(.crashReports), usageSwitch = Self.switchSays(.usageStats)
+        let crashOk = consent.crash && crashSwitch == .allows
+        let usageOk = consent.usage && usageSwitch == .allows
+        // DROPPED, NOT KEPT FOR LATER (D5). A kind the switch refuses is taken
+        // out of the queue file here, so nothing recorded while the shop was
+        // offline goes out when the switch is turned off again. While the
+        // book is still unread nothing is dropped: that is not a refusal.
+        var refusedKinds: Set<String> = []
+        if consent.crash, crashSwitch == .refuses { refusedKinds.insert(Kind.crash.rawValue) }
+        if consent.usage, usageSwitch == .refuses { refusedKinds.insert(Kind.usage.rawValue) }
+        if !refusedKinds.isEmpty {
+            let queue = file.read()
+            let kept = queue.filter { item in
+                guard case .object(let o) = item, case .string(let kind)? = o["kind"] else { return true }
+                return !refusedKinds.contains(kind)
+            }
+            if kept.count != queue.count { file.write(kept) }
+            for kind in refusedKinds { _ = OutboundGate.shared.allows(kind == Kind.crash.rawValue ? .crashReports : .usageStats) }
+        }
+        guard crashOk || usageOk || !(consent.crash || consent.usage) else { return "blocked" }
+        var allowed = consent
+        allowed.crash = crashOk
+        allowed.usage = usageOk
+        let consent = allowed
         let nowMs = now().timeIntervalSince1970 * 1000
         guard let plan = try? await engine.telemetryPlan(queue: file.read(), crash: consent.crash,
                                                          usage: consent.usage, nowMs: nowMs,
@@ -779,8 +825,16 @@ extension Shop {
     @discardableResult
     func setTelemetry(crash: Bool? = nil, usage: Bool? = nil) async -> Bool {
         writeProblem = nil
-        guard source.isReal else { writeProblem = words.callIt("mac.move_sample"); return false }
-        guard permitted("settings", "edit") else { return false }
+        // The owner's under the staff lock (`security`/`edit`, as the outbound
+        // switch), and said in its own words: this used to ask `settings`/
+        // `edit` and refuse with nothing on screen.
+        guard ownerAllowsPrivacy(saying: "mac.priv_owner_telemetry") else { return false }
+        guard source.isReal else {
+            writeProblem = words.callIt("mac.move_sample")
+            privacyProblem = writeProblem
+            privacyProblemKey = "mac.priv_owner_telemetry"
+            return false
+        }
         guard let build = source.build else { return false }
         var was = telemetryConsent
         var chosen = was

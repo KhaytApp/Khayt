@@ -247,7 +247,52 @@ final class Shop {
     /// The tax's name in the app's language — "VAT", «ضريبة القيمة المضافة» —
     /// for a line that labels a figure with it. Nil for an unregistered shop.
     private(set) var taxName: String?
-    var settingsValue: JSONValue = .object([:]) { didSet { refreshLibraryRemote() } }
+    var settingsValue: JSONValue = .object([:]) { didSet { refreshLibraryRemote(); tellOutboundGate() } }
+    /// Whether this Shop tells the app's one outbound gate its settings
+    /// (`Shop+Outbound`). The app's shop does. A test's does not unless it
+    /// says so: a suite that turned the switch on would otherwise block every
+    /// other suite's requests through the shared gate.
+    var feedsOutboundGate = Shop.inTheApp
+    /// Settings ▸ General should open on Internet use (`OpenInternetUse`).
+    var opensInternetUse = false
+    /// Why a privacy switch (the install count, crash reports, usage
+    /// statistics) was not changed, said beside the switch in Settings: the
+    /// shop window's banner is behind that window.
+    var privacyProblem: String?
+    /// Which switch that sentence belongs beside (its word key).
+    var privacyProblemKey: String?
+    /// Moves whenever the gate is told something, so a view that asks the
+    /// gate (which is not observable) is redrawn.
+    var outboundRevision = 0
+    /// A refusal of something a person asked for, said on every screen with
+    /// a way to the setting (page 27, frame D). Nil when closed.
+    var outboundNotice: String?
+    /// A value from Khayt Cloud's network-switch route that waits for a
+    /// person before it is applied (`Shop+NetworkSwitch`). Nil when none.
+    var networkSwitchAsk: NetworkSwitchAsk?
+    var networkSwitchHeld: NetworkSwitch.Value?
+    /// Why the owner's last answer to `networkSwitchAsk` changed nothing (the
+    /// newer setting could not be read). Shown under the question, which stays.
+    var networkSwitchAnswerProblem: String?
+    /// The owner's answer is reading the newer setting: its buttons wait.
+    var networkSwitchAnswering = false
+    /// How the network-switch route is asked. Nil is Khayt Cloud's session;
+    /// a test answers as the server would.
+    var networkSwitchFetch: NetworkSwitchFetch?
+    var networkSwitchTask: Task<Void, Never>?
+    /// A test's own Khayt Cloud session (where to ask, a token, the shop key).
+    var networkSwitchSessionForTests: (CloudReader.Connection, String, Data)?
+    /// A test's own book for `settings.network`, in place of the file.
+    var networkBookForTests: NetworkBookForTests?
+    /// The owner is changing the switch here right now: a second change and a
+    /// check from Khayt Cloud both wait their turn.
+    var outboundChanging = false
+    /// A retry of an unsent "off" is in flight (`retryUnsentOff`): one at a time.
+    var networkSwitchRetrying = false
+    /// The gate this shop tells and asks; the app's, unless a test hands one in.
+    var outboundGate: OutboundGate = .app
+    /// Where this Mac keeps its own "make no internet calls" switch.
+    var outboundDefaults: UserDefaults = .standard
 
     /// Give a shop a mail provider, for a test. The book on disk is not
     /// touched — `pretendMode`'s sibling, and there for the same reason.
@@ -946,7 +991,7 @@ final class Shop {
         // are read (`lockReady`), and nobody signed in. A reload of the same
         // book keeps both — every write reloads, and a sign-in screen flashing
         // after each would be the lock punishing the person it let in.
-        if source != next { lockReady = false; lockSessionId = nil }
+        if source != next { lockReady = false; lockSessionId = nil; clearPrivacyProblem() }
         source = next
         problem = nil
         skipped = []
@@ -1603,6 +1648,7 @@ final class Shop {
             // is putting that up, and blanking the screen over it would show
             // an open book as one that would not open.
             if overtaken() { return }
+            outboundLoadFailed()
             siteScope = nil
             orders = []
             printHistory = [:]
@@ -2532,6 +2578,8 @@ final class Shop {
         // (alpha.62 review). Undo is the person's, not the Mac's.
         didSet {
             guard lockSessionId != oldValue else { return }
+            // What the last person was refused is not said to the next one.
+            clearPrivacyProblem()
             undoManager?.removeAllActions()
             // And every sheet or dialog the last person had open: a sheet
             // stays on screen over the sign-in screen otherwise, half filled

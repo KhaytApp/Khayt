@@ -310,7 +310,9 @@ extension Shop {
         guard let build = source.build else { moveProblem = words.callIt("mac.move_sample"); return }
         guard let engine else { moveProblem = words.callIt("mac.move_no_engine"); return }
         let gone = words.callIt("mac.move_gone")
-        let who = Self.plainString(settingsDict["activeOperatorId"])
+        // Who is at THIS Mac, never the book's `activeOperatorId` (the other
+        // app's sign-in, on another computer).
+        let who = actorHere?.id
         var made: String?
         do {
             try await StoreWriter.update(

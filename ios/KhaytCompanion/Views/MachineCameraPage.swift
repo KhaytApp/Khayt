@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import KhaytCore
 
 /// A printer's camera: a still frame, fetched from the printer on the shop's
 /// Wi-Fi every few seconds while the page is open.
@@ -49,6 +50,11 @@ struct MachineCameraPage: View {
     }
 
     private func fetch() async {
+        // A camera is the shop's own network (P8 `lan`): always on at a
+        // private address, refused at a public one while the shop is offline.
+        guard (try? OutboundGate.shared.require(.lan, url: source.url)) != nil else {
+            problem = L10n.tr("camera.offline"); return
+        }
         var request = URLRequest(url: source.url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8)
         request.httpMethod = "GET"
         do {

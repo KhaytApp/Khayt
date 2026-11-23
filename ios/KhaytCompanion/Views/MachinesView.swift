@@ -24,6 +24,9 @@ struct MachinesView: View {
     /// Why nothing is moving. A relayed snapshot that has gone quiet says how
     /// long ago the Mac last spoke — "asleep for an hour" and "just dropped
     /// off" are different things to a shop deciding whether to drive in.
+    /// Paired by number as a viewer: no `machines:control`.
+    private var viewerPhone: Bool { settings.isFloorPhone && !settings.can("machines:control") }
+
     private var staleNote: String {
         if let reported = printers.reportedAt {
             return L10n.format("machines.reported", reported.formatted(.relative(presentation: .named).locale(L10n.locale)))
@@ -127,25 +130,38 @@ struct MachinesView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 44)
                     } else {
+                        // A viewer phone sees the floor and changes nothing
+                        // (frame 255:55): no pause, stop or camera.
+                        if viewerPhone {
+                            FloorBanner(text: L10n.tr("floor.printers.banner.viewer"))
+                        }
                         LiveStamp()
                         LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
                             ForEach(rows) { m in
                                 VStack(spacing: 10) {
                                     MachineCard(live: m, fallbackStatus: statusById[m.id], offline: offline.contains(m.id))
+                                    if !m.problems.isEmpty || !m.waiting.isEmpty {
+                                        PrinterNeedsPanel(live: m)
+                                    }
                                     jobLink(m)
                                     if let care {
                                         MachineCareLink(name: m.displayName, machineId: m.id, care: care) { await load() }
                                     }
                                     // A print on the bed, on a printer the Mac drives.
-                                    if m.hasPrinterApi, m.isPrinting || m.isPaused, !settings.isSampleShop {
+                                    if m.hasPrinterApi, m.isPrinting || m.isPaused, !settings.isSampleShop,
+                                       settings.can("machines:control") {
                                         PrinterControls(machine: m)
                                     }
-                                    cameraLink(m)
+                                    if settings.can("machines:control") { cameraLink(m) }
                                 }
                                 .frame(maxHeight: .infinity, alignment: .top)
                             }
                         }
                         .readsFold($fold)
+                        if viewerPhone {
+                            V2Note(text: L10n.tr("floor.printers.no_controls"))
+                                .padding(.top, 6)
+                        }
                         if !printers.isLive {
                             Text(staleNote)
                                 .font(.khayt(12, relativeTo: .caption))
@@ -251,44 +267,84 @@ struct LiveStamp: View {
 /// doing, and — while it prints — how far along, with the two temperatures.
 /// A running machine earns the orange rail, a faulted one the red; an idle
 /// one has none.
-private struct MachineCard: View {
+struct MachineCard: View {
     let live: MachineLiveStatus
     let fallbackStatus: String?
     var offline = false
 
-    private enum Mode { case printing, idle, error, offline }
+    /// The card's looks, from the shared state set (C2) as the signed-off
+    /// frames draw them (iPhone Figma "Printer states · iPhone (Nov 21)",
+    /// signed off by Turki Nov 22): Paused, Needs you, Reconnecting and
+    /// Access refused beside the four the card had.
+    enum Mode: Equatable { case printing, paused, idle, needsYou, error, reconnecting, refused, offline }
 
-    private var mode: Mode {
+    static func mode(_ live: MachineLiveStatus, offline: Bool, fallbackStatus: String?) -> Mode {
+        let status = live.status
+        if offline && !live.isBusy { return .offline }
+        if live.hasPrinterApi, status?.link == "unauthorized" { return .refused }
+        // A failing poll the Mac reported, or a word that says the printer is
+        // not linked. A machine with no reading at all is not "reconnecting":
+        // the phone simply has no live view of it.
+        if live.hasPrinterApi, live.hasError || live.saysUnlinked,
+           ["reconnecting", "connecting", "offline"].contains(status?.link ?? "") { return .reconnecting }
+        if status?.needsPerson == true { return .needsYou }
         if live.hasError { return .error }
-        if offline && !live.isPrinting { return .offline }
+        if live.isPaused { return .paused }
         if live.isPrinting { return .printing }
         if let s = fallbackStatus?.lowercased(), s.contains("print") { return .printing }
         return .idle
     }
 
+    private var mode: Mode { Self.mode(live, offline: offline, fallbackStatus: fallbackStatus) }
+
     private var tone: Color {
         switch mode {
         case .printing: return KhaytDesign.attention  // printing is amber (Nov 11)
-        case .idle, .offline: return KhaytDesign.note
-        case .error: return KhaytDesign.late
+        case .paused: return KhaytDesign.pending
+        case .idle, .offline, .reconnecting: return KhaytDesign.note
+        case .error, .needsYou, .refused: return KhaytDesign.late
         }
     }
 
     private var statusLabel: String {
         switch mode {
         case .printing: return L10n.tr("status.printing")
+        case .paused: return L10n.tr("machines.state.paused")
         case .idle: return L10n.tr("machines.idle")
+        case .needsYou: return L10n.tr("machines.state.needs_you")
         case .error: return L10n.tr("machines.error")
+        case .reconnecting: return L10n.tr("machines.state.reconnecting")
+        case .refused: return L10n.tr("machines.state.refused")
         case .offline: return L10n.tr("machines.offline")
         }
     }
 
     private var sub: String? {
         switch mode {
-        case .printing: return live.filename.flatMap { $0.isEmpty ? nil : $0 }
+        case .printing, .paused, .needsYou: return live.filename.flatMap { $0.isEmpty ? nil : $0 }
         case .idle: return live.hasPrinterApi ? L10n.tr("machines.ready") : L10n.tr("machines.no_live")
-        case .error: return live.error
+        case .error: return live.error.flatMap { $0.isEmpty ? nil : $0 } ?? live.state
+        // Not "last heard": the Mac stamps `lastUpdated` on a failed poll too,
+        // so it would read "just now" for a printer gone for hours (review of
+        // #2657). Shown again once the Mac sends when it last answered.
+        case .reconnecting: return nil
+        case .refused: return L10n.tr("machines.refused.sub")
         case .offline: return L10n.tr("machines.offline.sub")
+        }
+    }
+
+    /// The message the card shows in place of the progress (frames: Needs
+    /// you, Reconnecting, Access refused).
+    private var message: (title: String, body: String)? {
+        switch mode {
+        case .needsYou:
+            return (L10n.tr("machines.needs_you.title"),
+                    L10n.format("machines.needs_you.body", live.state ?? ""))
+        case .reconnecting:
+            return (L10n.tr("machines.reconnecting.title"), L10n.tr("machines.reconnecting.body"))
+        case .refused:
+            return (L10n.tr("machines.refused.title"), L10n.tr("machines.refused.body"))
+        default: return nil
         }
     }
 
@@ -300,7 +356,7 @@ private struct MachineCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: mode == .error ? "exclamationmark.triangle" : "printer")
+                Image(systemName: mode == .error || mode == .needsYou || mode == .refused ? "exclamationmark.triangle" : "printer")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(mode == .idle || mode == .offline ? KhaytDesign.ink : tone)
                     .frame(width: 42, height: 42)
@@ -329,16 +385,33 @@ private struct MachineCard: View {
                 .padding(.horizontal, 9).padding(.vertical, 4)
                 .background(mode == .printing ? KhaytDesign.threadWash : tone.opacity(0.16), in: Capsule())
             }
-            if mode == .printing, let progress = live.progress {
+            if let message {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(message.title)
+                        .font(.khayt(15, .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(mode == .reconnecting ? KhaytDesign.ink : KhaytDesign.late)
+                    Text(message.body)
+                        .font(.khayt(13, relativeTo: .footnote))
+                        .foregroundStyle(KhaytDesign.note)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 12)
+            }
+            if mode == .printing || mode == .paused, let progress = live.progress {
                 HStack(alignment: .lastTextBaseline, spacing: 8) {
                     Text(progress.formatted(.number.locale(L10n.locale)) + "%")
                         .font(.khaytDisplay(42, .bold, relativeTo: .largeTitle).monospacedDigit())
                         .tracking(-1.2)
-                        .foregroundStyle(KhaytDesign.ink)
+                        .foregroundStyle(mode == .paused ? KhaytDesign.note : KhaytDesign.ink)
                         .environment(\.layoutDirection, .leftToRight)
                     Spacer(minLength: 0)
+                    if mode == .paused {
+                        Text(L10n.tr("machines.state.paused"))
+                            .font(.khayt(15, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(KhaytDesign.ink)
+                    }
                     // What a shop plans by: how long, and what time on the clock.
-                    if let eta = live.etaLocalized, let done = live.finishesAt() {
+                    else if let eta = live.etaLocalized, let done = live.finishesAt() {
                         Text(L10n.format("machines.left_until", eta,
                                     done.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale))))
                             .font(.khaytMono(12, .medium))
@@ -348,11 +421,13 @@ private struct MachineCard: View {
                     }
                 }
                 .padding(.top, 12)
-                LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.thread, height: 8)
+                LevelBar(fraction: Double(min(100, max(0, progress))) / 100,
+                         color: mode == .paused ? KhaytDesign.pending : KhaytDesign.thread, height: 8)
                     .padding(.top, 8)
                     .animation(.easeOut(duration: 0.45), value: progress)
             }
-            if mode == .printing, live.tempNozzle != nil || live.tempBed != nil {
+            if mode == .printing || mode == .paused || mode == .needsYou || mode == .reconnecting || mode == .refused,
+               live.tempNozzle != nil || live.tempBed != nil {
                 HStack(spacing: 16) {
                     temp(L10n.tr("machines.nozzle"), live.tempNozzle)
                     temp(L10n.tr("machines.bed"), live.tempBed)
@@ -363,11 +438,12 @@ private struct MachineCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(mode == .error ? KhaytDesign.late.opacity(0.12) : .clear)
+        .background(mode == .error || mode == .needsYou ? KhaytDesign.late.opacity(0.12) : .clear)
         .background(KhaytDesign.surface)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .strokeBorder(mode == .printing || mode == .error ? tone.opacity(0.6) : KhaytDesign.hairline, lineWidth: 1))
+            .strokeBorder([.printing, .paused, .error, .needsYou, .refused].contains(mode) ? tone.opacity(0.6) : KhaytDesign.hairline,
+                          lineWidth: 1))
         .accessibilityElement(children: .combine)
     }
 

@@ -209,6 +209,7 @@ final class Camera {
         guard let aimed = await PrinterWatch.pinned(url, engine: engine, lookUp: lookUp) else {
             return .failed("refused")
         }
+        guard OutboundGate.shared.allows(.lan, host: aimed.host()) else { return .failed("refused") }
         var request = URLRequest(url: aimed)
         request.timeoutInterval = 5
         request.httpMethod = "GET"

@@ -369,6 +369,9 @@ enum Multipart {
 
     /// Every part, in order, up to `maxParts`; nil when the body is not
     /// well-formed multipart for this boundary.
+    /// Spaces or tabs allowed between a delimiter and its line break.
+    static let maxPadding = 64
+
     static func parts(_ data: Data, boundary: String, maxParts: Int = 32) -> [Part]? {
         let dash = Array(("--" + boundary).utf8)
         let next = Array(("\r\n--" + boundary).utf8)
@@ -380,7 +383,15 @@ enum Multipart {
             guard cursor + 2 <= end else { return nil }
             if data[cursor] == UInt8(ascii: "-"), data[cursor + 1] == UInt8(ascii: "-") { return out }
             // Transport padding, then the line break that ends the delimiter.
-            while cursor < end, data[cursor] == UInt8(ascii: " ") || data[cursor] == UInt8(ascii: "\t") { cursor += 1 }
+            // A few bytes of it at most (`maxPadding`): megabytes of spaces
+            // after a delimiter are not padding. This reader walks a spooled
+            // body once and copies nothing, so they would cost time, not
+            // memory; the limit is the one agreed for the other app's reader
+            // (64 bytes), so the two refuse the same request.
+            let padStart = cursor
+            while cursor < end, cursor - padStart <= maxPadding,
+                  data[cursor] == UInt8(ascii: " ") || data[cursor] == UInt8(ascii: "\t") { cursor += 1 }
+            guard cursor - padStart <= maxPadding else { return nil }
             guard cursor + 2 <= end, data[cursor] == 13, data[cursor + 1] == 10 else { return nil }
             let headStart = cursor + 2
             // A part's own headers are a few lines; a megabyte of them is not.
