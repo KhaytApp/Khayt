@@ -232,14 +232,19 @@ final class LanDevices: @unchecked Sendable {
         var role: String? = nil
         var rolesVersion: Int? = nil
         var codePaired: Bool = false
+        /// A connector's price grant: nil (none), `price` or `cost`.
+        var priceGrant: String? = nil
     }
 
     /// Every paired phone, the one seen most recently first.
     func list() -> [Listed] {
         lock.lock(); defer { lock.unlock() }
         return saved.devices
-            .map { Listed(id: $0.id, name: $0.name, createdAt: $0.createdAt, lastSeenAt: $0.lastSeenAt, kind: $0.kind,
-                           role: $0.role, rolesVersion: $0.rolesVersion, codePaired: $0.codePaired) }
+            .map { d in
+                Listed(id: d.id, name: d.name, createdAt: d.createdAt, lastSeenAt: d.lastSeenAt, kind: d.kind,
+                       role: d.role, rolesVersion: d.rolesVersion, codePaired: d.codePaired,
+                       priceGrant: d.kind == Self.kindConnector ? d.priceGrant.flatMap { Self.priceGrants.contains($0) ? $0 : nil } : nil)
+            }
             .sorted { $0.lastSeenAt > $1.lastSeenAt }
     }
 

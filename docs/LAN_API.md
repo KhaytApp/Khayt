@@ -1183,7 +1183,18 @@ still lists it, and the phone hides it either way:
 **When it last answered, and why it is not answering** (both apps, Nov 2026, draft; the Mac's names):
 
 - `lastOkAt`: when the printer last ANSWERED, ISO 8601, or `null` if it has not since the app started watching it. `lastUpdated` moves on a failed poll too; `lastOkAt` does not.
-- `errorCode`: `null` while the printer answers, else one word no language changes: `access-refused` (HTTP 401/403, an access code turned down), `http` (any other status; see `httpStatus`), `not-set-up` (no address, a bad port, a missing serial: nothing was asked), `certificate`, `unreadable`, `unreachable`. A client treats a word it does not know as `unreachable`. On the desktop the word comes from `lib/printer-poll-cache.js` `failureCode`, never from `error` (a sentence in the shop's language). Two differences from the Mac: the desktop connects to a Bambu without pinning its certificate, so it never sends `certificate`; and an SDCP (Elegoo) printer that turns the connection down reads `unreachable`, not `access-refused`. A machine that is `not-set-up` is never counted as offline, so it starts no search for a printer that moved.
+- `errorCode`: `null` while the printer answers. Otherwise one word that no language changes, to match on instead of `error` (a sentence in the shop's language):
+
+  | `errorCode` | Meaning |
+  |---|---|
+  | `access-refused` | the printer answered and said no: HTTP 401 or 403, a handshake or an access code turned down |
+  | `http` | any other HTTP status; `httpStatus` says which |
+  | `not-set-up` | no address, a bad port, or a missing serial or mainboard id: nothing was asked |
+  | `certificate` | a Bambu's certificate is not the one expected |
+  | `unreadable` | it answered with something that is not its protocol |
+  | `unreachable` | no answer: off, asleep, on another network, or it hung up |
+
+  A client must treat a word it does not know as `unreachable`. On the desktop the word comes from `lib/printer-poll-cache.js` `failureCode`, never from `error` (a sentence in the shop's language). Two differences from the Mac: the desktop connects to a Bambu without pinning its certificate, so it never sends `certificate`; and an SDCP (Elegoo) printer that turns the connection down reads `unreachable`, not `access-refused`. A machine that is `not-set-up` is never counted as offline, so it starts no search for a printer that moved.
 - `httpStatus`: the HTTP status of the failed poll when there was one, else `null`.
 
 ### Khayt Cloud: the same rows away from the shop (`PUT /v1/shops/{shopId}/live/printers`)
@@ -1219,7 +1230,7 @@ Cloud, so a phone or the PWA away from the shop sees the same printers.
   `lastOkAt`: both move on every answered poll, and a healthy printer would
   otherwise mean a snapshot every poll. A printer that stops answering changes
   `error` and `errorCode`, so it is a change. Nothing is sent for a book with
-  no machines.
+  no printer Khayt polls (no machine with a printer connection).
 - **Only while** Khayt Cloud is signed in and unlocked on that computer, for the
   book's own shop, for a role that may write (a viewer's snapshot is a 403),
   and while the "make no internet calls" switch allows Khayt Cloud (purpose

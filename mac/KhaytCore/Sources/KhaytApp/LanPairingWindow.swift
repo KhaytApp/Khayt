@@ -78,6 +78,10 @@ final class LanPairingWindow {
     private(set) var deadline: TimeInterval?
     var isOpenNow: Bool { deadline != nil }
     private(set) var lastClosed: Closed?
+    /// How many times this window has shut. `lastClosed` can be the same value
+    /// twice running (two phones of one name, two timeouts), so whoever needs
+    /// to act on EVERY ending watches this.
+    private(set) var closes = 0
     /// Wrong PINs in the window now open, from every address.
     private(set) var wrong = 0
     /// Wrong PINs in the window now open, by address (`pinThrottleKey`).
@@ -164,6 +168,7 @@ final class LanPairingWindow {
         wrong = 0
         wrongBy = [:]
         lastClosed = why
+        closes += 1
     }
 
     /// The 403 body outside the window. A `reason` the phone keys on, and a
