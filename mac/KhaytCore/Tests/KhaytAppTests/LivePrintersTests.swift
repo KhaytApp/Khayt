@@ -68,6 +68,22 @@ struct LivePrintersTests {
         #expect(LivePrinters.signature([Self.row("m1", at: "2026-09-25T10:15:02Z")])
                 == LivePrinters.signature([Self.row("m1", at: "2026-09-25T10:15:09Z")]))
         #expect(LivePrinters.signature([Self.row("m1", progress: 42)]) != LivePrinters.signature([Self.row("m1", progress: 43)]))
+        // Nor is lastOkAt, which moves on every poll a healthy printer answers:
+        // counted as a change, it would be a snapshot every sweep instead of every 45 s.
+        func answered(_ at: String) -> JSONValue {
+            guard case .object(var o) = Self.row("m1", at: at) else { return .null }
+            o["lastOkAt"] = .string(at)
+            return .object(o)
+        }
+        #expect(LivePrinters.signature([answered("2026-09-25T10:15:02Z")]) == LivePrinters.signature([answered("2026-09-25T10:15:12Z")]))
+        // To the cloud both stamps go as epoch milliseconds, never one ISO beside one number.
+        guard case .object(let sent) = LivePrinters.cloudRow(answered("2026-09-25T10:15:02Z")) else { return }
+        #expect(sent["lastOkAt"] == sent["lastUpdated"])
+        if case .number(let ms)? = sent["lastOkAt"] { #expect(ms > 1_700_000_000_000) } else { Issue.record("lastOkAt is not a number") }
+        // But a printer that stops answering IS a change.
+        guard case .object(var refused) = answered("2026-09-25T10:15:02Z") else { return }
+        refused["errorCode"] = .string("access-refused")
+        #expect(LivePrinters.signature([.object(refused)]) != LivePrinters.signature([answered("2026-09-25T10:15:02Z")]))
     }
 
     @Test("the publisher: PUT once, quiet while nothing changes, stops for good on a 403")

@@ -69,7 +69,7 @@
    * The fields a send writes onto a job, or null when it writes none.
    *
    * @param {object} order  the job as it is on disk
-   * @param {{machineId:string, at:string, started?:boolean, file?:string}} run
+   * @param {{machineId:string, at:string, started?:boolean, file?:string, sentAs?:string}} run
    * @returns {null | {machineId:string, plannedMachineId:(string|null), printRuns:object[]}}
    *   `plannedMachineId: null` means the key comes OFF the record — the job
    *   was sent to the machine it was planned for.
@@ -92,6 +92,12 @@
     const entry = { machineId, at, started: !!(run && run.started) };
     const file = leaf(run && run.file);
     if (file) entry.file = file;
+    // The name the file was given ON THE PRINTER, when it is not its own
+    // (Khayt uploads as `khayt-<time>.gcode`). It is the only name the
+    // printer ever says back, so it is what ties a finished print to this
+    // job (lib/printer-actuals.js actualsJob). Bounded: 120 characters.
+    const sentAs = leaf(run && run.sentAs).slice(0, 120);
+    if (sentAs && sentAs !== file) entry.sentAs = sentAs;
 
     return {
       machineId,

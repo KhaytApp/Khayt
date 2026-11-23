@@ -1459,12 +1459,6 @@ final class LanServer {
             let body = (try? String(decoding: JSONEncoder().encode(page), as: UTF8.self)) ?? "{}"
             return .json(200, body)
 
-        // ── A PHONE TELLS A PRINTER WHAT TO DO ───────────────────────────
-        //
-        // SIGNED PHONES ONLY. Every other phone route also opens to the owner
-        // PIN sent bare; this one moves a machine mid-print, so it takes the
-        // enrolled device's signature (`LanDevices`) and nothing less. The
-        // gate still runs first, for the host check and the PIN being set.
         // ── A PHONE SAYS THE BED IS CLEAR ────────────────────────────────
         //
         // `POST /api/printer/{machineId}/bed-clear`: the phone's "Bed is
@@ -1481,6 +1475,12 @@ final class LanServer {
             let (status, body) = await host.bedClear!(Self.bedClearPath(path)!)
             return .json(status, body)
 
+        // ── A PHONE TELLS A PRINTER WHAT TO DO ───────────────────────────
+        //
+        // SIGNED PHONES ONLY. Every other phone route also opens to the owner
+        // PIN sent bare; this one moves a machine mid-print, so it takes the
+        // enrolled device's signature (`LanDevices`) and nothing less. The
+        // gate still runs first, for the host check and the PIN being set.
         case (_, false) where request.method == "POST" && host.printerCommand != nil
                 && Self.printerPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
@@ -4018,6 +4018,12 @@ extension LanServer {
             "tempBed": int(s?.tempBed),
             "error": text(reading?.problem),
             "lastUpdated": reading.map { .string(StoreWriter.iso($0.at)) } ?? .null,
+            // When it last ANSWERED (`lastUpdated` moves on a failed poll
+            // too), and why it is not answering in a word no language
+            // changes: `error` is a sentence in the shop's language.
+            "lastOkAt": (reading?.lastOkAt).map { .string(StoreWriter.iso($0)) } ?? .null,
+            "errorCode": text(reading?.problem == nil ? nil : (reading?.problemCode ?? "unreachable")),
+            "httpStatus": (reading?.problem == nil ? nil : reading?.httpStatus).map { .number(Double($0)) } ?? .null,
             // The printer's own word for itself, else the type the shop set.
             "apiType": text((s?.type ?? "").isEmpty ? type : s?.type),
             // What it needs from a person, worked out HERE by the shared rules

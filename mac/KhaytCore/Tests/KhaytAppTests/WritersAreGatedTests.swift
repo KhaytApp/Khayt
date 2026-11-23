@@ -48,7 +48,9 @@ struct WritersAreGatedTests {
     }
 
     static func asksTheLock(_ text: String) -> Bool {
-        ["permitted(", "permittedRestoring(", "lockAllows("].contains { text.contains($0) }
+        // `permittedPrinter(`/`printerAllows(` are the printers area's own gate
+        // (P5, `lib/rbac.js canPrinter`): the lock, asked about a printer.
+        ["permitted(", "permittedRestoring(", "lockAllows(", "permittedPrinter(", "printerAllows("].contains { text.contains($0) }
     }
 
     // MARK: - Reading the sources

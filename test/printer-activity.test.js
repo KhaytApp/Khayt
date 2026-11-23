@@ -79,3 +79,31 @@ test('FIX: a printer whose own state says it is not linked reads reconnecting, n
     for (const progress of [0, 40]) assert.equal(A.machineState(m, { state: w, progress }), 'reconnecting', w);
   }
 });
+
+test('the chip is the legacy value with paused told apart, over every vector', () => {
+  let paused = 0;
+  for (const c of V.cases) {
+    const s = PA.machineStatus(c.machine, c.entry);
+    const six = PA.legacy(s, c.entry);
+    const chip = PA.chip(s, c.entry);
+    assert.ok(PA.CHIPS.includes(chip), c.why);
+    if (chip === 'paused') {
+      paused++;
+      assert.equal(six, 'printing', `${c.why}: paused counts as busy`);
+      assert.equal(s.activity, 'paused', c.why);
+    } else {
+      assert.equal(chip, six, c.why);
+    }
+  }
+  assert.ok(paused >= 5, `only ${paused} paused vectors`);
+  // The plain cases, spelled out.
+  const m = { id: 'M1', printerApi: { type: 'moonraker' } };
+  assert.equal(PA.chip(PA.machineStatus(m, { state: 'paused', progress: 40 }), { state: 'paused', progress: 40 }), 'paused');
+  assert.equal(PA.chip(PA.machineStatus(m, { state: 'printing', progress: 40 }), { state: 'printing', progress: 40 }), 'printing');
+  assert.equal(PA.chip(PA.machineStatus(m, undefined), undefined), 'unknown');
+  const miss = { state: 'offline', error: 'no answer', consecutiveFailures: 1 };
+  assert.equal(PA.chip(PA.machineStatus(m, miss), miss), 'reconnecting');
+  const gone = { ...miss, consecutiveFailures: 3 };
+  assert.equal(PA.chip(PA.machineStatus(m, gone), gone), 'offline');
+  assert.equal(PA.chip(PA.machineStatus({ ...m, isOffline: true }, miss), miss), 'offline');
+});

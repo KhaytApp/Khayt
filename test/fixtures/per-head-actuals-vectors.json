@@ -252,6 +252,342 @@
    "want": null
   }
  ],
+ "colour": [
+  {
+   "why": "a tag that was read names the head's colour and material",
+   "head": 0,
+   "at": {
+    "trays": [
+     {
+      "vendor": "Snapmaker",
+      "manufacturer": null,
+      "material": "PLA",
+      "sub": "Basic",
+      "colours": [
+       "#080A0D"
+      ],
+      "weightG": 500,
+      "diameterMm": 1.75,
+      "lengthM": 150,
+      "sku": 900001,
+      "official": true
+     },
+     null
+    ],
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "#FF0000",
+      "material": "PETG"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#080A0D",
+    "material": "PLA Basic",
+    "colourFrom": "rfid"
+   }
+  },
+  {
+   "why": "no tag on the head: what the machine is recorded as holding",
+   "head": 1,
+   "at": {
+    "trays": [
+     {
+      "vendor": "Snapmaker",
+      "manufacturer": null,
+      "material": "PLA",
+      "sub": "Basic",
+      "colours": [
+       "#080A0D"
+      ],
+      "weightG": 500,
+      "diameterMm": 1.75,
+      "lengthM": 150,
+      "sku": 900001,
+      "official": true
+     },
+     null
+    ],
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "#FF0000",
+      "material": "PETG"
+     },
+     {
+      "slot": 1,
+      "hex": "00aa11",
+      "material": " PLA Silk "
+     }
+    ]
+   },
+   "want": {
+    "hex": "#00AA11",
+    "material": "PLA Silk",
+    "colourFrom": "loaded"
+   }
+  },
+  {
+   "why": "neither says: nothing is guessed",
+   "head": 2,
+   "at": {
+    "trays": [
+     null,
+     null,
+     null
+    ],
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "#FF0000",
+      "material": "PETG"
+     }
+    ]
+   },
+   "want": null
+  },
+  {
+   "why": "a loaded row with no slot is its position in the list",
+   "head": 1,
+   "at": {
+    "loaded": [
+     {
+      "hex": "#111111",
+      "material": "PLA"
+     },
+     {
+      "hex": "#222222",
+      "material": "ABS"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#222222",
+    "material": "ABS",
+    "colourFrom": "loaded"
+   }
+  },
+  {
+   "why": "a tag with no readable colour falls back to what is recorded as loaded",
+   "head": 0,
+   "at": {
+    "trays": [
+     {
+      "vendor": "Snapmaker",
+      "manufacturer": null,
+      "material": "PLA",
+      "sub": null,
+      "colours": [],
+      "weightG": 500,
+      "diameterMm": 1.75,
+      "lengthM": 150,
+      "sku": 900001,
+      "official": true
+     }
+    ],
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "#ABCDEF",
+      "material": "PLA"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#ABCDEF",
+    "material": "PLA",
+    "colourFrom": "loaded"
+   }
+  },
+  {
+   "why": "a multi-colour tag gives its first colour",
+   "head": 0,
+   "at": {
+    "trays": [
+     {
+      "vendor": "Snapmaker",
+      "manufacturer": null,
+      "material": "PLA",
+      "sub": "Silk",
+      "colours": [
+       "#112233",
+       "#445566"
+      ],
+      "weightG": 500,
+      "diameterMm": 1.75,
+      "lengthM": 150,
+      "sku": 900001,
+      "official": true
+     }
+    ]
+   },
+   "want": {
+    "hex": "#112233",
+    "material": "PLA Silk",
+    "colourFrom": "rfid"
+   }
+  },
+  {
+   "why": "a loaded row whose colour is not one names nothing by itself",
+   "head": 0,
+   "at": {
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "red",
+      "material": "PLA"
+     }
+    ]
+   },
+   "want": null
+  },
+  {
+   "why": "nothing known about the printer",
+   "head": 0,
+   "at": null,
+   "want": null
+  },
+  {
+   "why": "an eight-digit colour (RRGGBBAA) is its first six",
+   "head": 0,
+   "at": {
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "#FF0000FF",
+      "material": "PLA"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#FF0000",
+    "material": "PLA",
+    "colourFrom": "loaded"
+   }
+  },
+  {
+   "why": "a row spelled color is read",
+   "head": 0,
+   "at": {
+    "loaded": [
+     {
+      "slot": 0,
+      "color": "#00ff00",
+      "material": "PETG"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#00FF00",
+    "material": "PETG",
+    "colourFrom": "loaded"
+   }
+  },
+  {
+   "why": "a bad row for a head does not hide a good one after it",
+   "head": 0,
+   "at": {
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "red",
+      "material": "PLA"
+     },
+     {
+      "slot": 0,
+      "hex": "#123456",
+      "material": "ABS"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#123456",
+    "material": "ABS",
+    "colourFrom": "loaded"
+   }
+  },
+  {
+   "why": "a long material is cut at 40 characters and never through one",
+   "head": 0,
+   "at": {
+    "loaded": [
+     {
+      "slot": 0,
+      "hex": "#123456",
+      "material": "a😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+     }
+    ]
+   },
+   "want": {
+    "hex": "#123456",
+    "material": "a😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+    "colourFrom": "loaded"
+   }
+  }
+ ],
+ "patchWithColour": {
+  "why": "the split carries what was in each head; a head nobody can name has no colour fields",
+  "order": {
+   "id": "J1"
+  },
+  "split": "000A2",
+  "at": {
+   "trays": [
+    {
+     "vendor": "Snapmaker",
+     "manufacturer": null,
+     "material": "PLA",
+     "sub": "Basic",
+     "colours": [
+      "#080A0D"
+     ],
+     "weightG": 500,
+     "diameterMm": 1.75,
+     "lengthM": 150,
+     "sku": 900001,
+     "official": true
+    },
+    null,
+    null,
+    null
+   ],
+   "loaded": [
+    {
+     "slot": 1,
+     "hex": "#FFFFFF",
+     "material": "PETG"
+    }
+   ]
+  },
+  "want": {
+   "actualHeads": [
+    {
+     "head": 0,
+     "grams": 18,
+     "estimateG": 20,
+     "hex": "#080A0D",
+     "material": "PLA Basic",
+     "colourFrom": "rfid"
+    },
+    {
+     "head": 1,
+     "grams": 9,
+     "estimateG": 10,
+     "hex": "#FFFFFF",
+     "material": "PETG",
+     "colourFrom": "loaded"
+    },
+    {
+     "head": 3,
+     "grams": 9,
+     "estimateG": 10
+    }
+   ],
+   "actualHeadsJobId": "000A2",
+   "actualHeadsBasis": "proportional"
+  }
+ },
  "actualsJob": [
   {
    "why": "printing on this machine and naming the file",
@@ -369,6 +705,85 @@
    ],
    "machineId": "M1",
    "filename": "",
+   "want": null
+  },
+  {
+   "why": "a print Khayt sent: the printer says the upload name, and the send recorded it",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "Models/Cube.gcode"
+      }
+     ],
+     "printRuns": [
+      {
+       "machineId": "M1",
+       "at": "2026-11-22T10:00:00.000Z",
+       "started": true,
+       "file": "Cube.gcode",
+       "sentAs": "khayt-mb1x2y3.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "khayt-mb1x2y3.gcode",
+   "want": "J1"
+  },
+  {
+   "why": "the same upload name recorded for a send to ANOTHER machine is not this machine's print",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "Cube.gcode"
+      }
+     ],
+     "printRuns": [
+      {
+       "machineId": "M2",
+       "at": "2026-11-22T10:00:00.000Z",
+       "started": true,
+       "sentAs": "khayt-mb1x2y3.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "khayt-mb1x2y3.gcode",
+   "want": null
+  },
+  {
+   "why": "another Khayt upload (a different time) is not this job's",
+   "printLog": [
+    {
+     "id": "J1",
+     "machineId": "M1",
+     "status": "printing",
+     "parts": [
+      {
+       "fileRef": "Cube.gcode"
+      }
+     ],
+     "printRuns": [
+      {
+       "machineId": "M1",
+       "at": "2026-11-22T10:00:00.000Z",
+       "started": true,
+       "sentAs": "khayt-mb1x2y3.gcode"
+      }
+     ]
+    }
+   ],
+   "machineId": "M1",
+   "filename": "khayt-zzzzzzz.gcode",
    "want": null
   }
  ],

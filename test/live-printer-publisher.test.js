@@ -284,3 +284,11 @@ test('too large is not sealed again before the next heartbeat; a huge retryAfter
   k.advance(5 * 60 * 1000 + 1000);
   assert.equal((await k.p.tick()).sent, true, 'a day-long retryAfter waits 5 minutes, not a day');
 });
+
+test('a shop with no printer Khayt polls publishes nothing (the Mac\'s #2670)', async () => {
+  const h = harness();
+  h.set({ rows: [Object.assign(row('m1'), { hasPrinterApi: false, state: null })] });
+  const r = await h.p.start();
+  assert.deepEqual([r.sent, r.why], [false, 'no-printers']);
+  assert.equal(h.calls.length, 0);
+});
