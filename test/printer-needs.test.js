@@ -154,3 +154,15 @@ test('review fixes: not set up is never "offline" (no relocation scan) and drops
   assert.equal(PC.failureCode(err({ message: 'Bambu rejected the access code (CONNACK 3)' })), 'unreachable', 'server unavailable is not a refusal');
   assert.equal(PC.failureCode(err({ message: 'Unexpected redirect from printer', code: 'ERR_REDIRECT' })), 'unreadable', 'the Mac\'s .redirected');
 });
+
+test('a deleted or voided job is not a print on the bed (page-136 review)', () => {
+  const PN = require('../lib/printer-needs.js');
+  const machines = [{ id: 'M', printerApi: { type: 'octoprint', host: '192.0.2.1' }, bedClearedAt: '2026-11-20T10:00:00Z' }];
+  const at = '2026-11-21T10:00:00Z';
+  for (const o of [{ id: 'a', machineId: 'M', completedAt: at, deleted: true }, { id: 'b', machineId: 'M', completedAt: at, voidedAt: at }]) {
+    const r = PN.printerNeeds({ machines, cache: {}, completions: {}, orders: [o] });
+    assert.deepEqual(r.M.waiting, [], JSON.stringify(o));
+  }
+  const live = PN.printerNeeds({ machines, cache: {}, completions: {}, orders: [{ id: 'c', machineId: 'M', completedAt: at }] });
+  assert.equal(live.M.waiting[0].reason, 'print-to-take-off');
+});

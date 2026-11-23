@@ -140,6 +140,21 @@
       </div>`;
   }
 
+  async function localisedMajor(info) {
+    const major = info && info.majorChanges;
+    const lang = (typeof i18n !== 'undefined' && i18n && i18n.current) || 'en';
+    if (!major || !Array.isArray(major.items) || !major.items.length || lang === 'en' || !global.hubAPI?.updateGateText) return major || null;
+    let r = null;
+    try {
+      r = await Promise.race([
+        global.hubAPI.updateGateText({ version: info.version, items: major.items, lang }),
+        new Promise((res) => setTimeout(() => res(null), 5500)),
+      ]);
+    } catch (_) { r = null; }
+    const t = r && Array.isArray(r.items) && r.items.length === major.items.length ? r.items : null;
+    return t ? Object.assign({}, major, { items: t, itemsEn: major.items }) : major;
+  }
+
   function renderReviewState(notesHtml) {
     const version = escapeHtml(activeUpdateInfo.version);
     const current = escapeHtml(activeUpdateInfo.currentVersion || '');
@@ -351,6 +366,11 @@
 
     closeUpdateModal();
 
+    // The items in the shop's language, from the new release's own
+    // release-gates.json (lib/update-gate-text.js). Waited for at most 5 s;
+    // anything else leaves them in English. The gate itself is unchanged.
+    activeUpdateInfo.majorChanges = await localisedMajor(activeUpdateInfo);
+
     const notesHtml = await formatNotes(activeUpdateInfo);
     const version = escapeHtml(activeUpdateInfo.version);
 
@@ -466,7 +486,9 @@
    */
   async function showLaunchGateIfNeeded() {
     let gate = null;
-    try { gate = await global.hubAPI?.launchGate?.(); } catch (_) { gate = null; }
+    // The items in the shop's language (release-gates.json i18n), else English.
+    const lang = (typeof i18n !== 'undefined' && i18n && i18n.current) || 'en';
+    try { gate = await global.hubAPI?.launchGate?.(lang); } catch (_) { gate = null; }
     if (!gate || !Array.isArray(gate.items) || !gate.items.length) return false;
     const overlay = document.createElement('div');
     overlay.id = 'launchGateOverlay';

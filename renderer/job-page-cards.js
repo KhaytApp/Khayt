@@ -46,15 +46,68 @@
       <input type="file" accept="image/*" data-jpc="photo-input" hidden></div>`);
   }
 
+  /* ── A U1's time-lapse, kept as the customer's proof only on request
+   * (Figma 134:359, U1-3; lib/main/timelapse-keep.js). Five states: found on
+   * the printer, copying, kept, too large to keep, couldn't copy. ── */
+  const lapseState = new Map();   // job id → { copying: {got,total} } | { failed: reason, bytes?, maxBytes? }
+  const MB = (n) => (Number(n) > 0 ? (Number(n) / 1048576).toFixed(Number(n) >= 10 * 1048576 ? 0 : 1) : '0');
+  function machineName(id) {
+    const list = typeof machines !== 'undefined' && Array.isArray(machines) ? machines : [];
+    const m = list.find((x) => x && String(x.id) === String(id));
+    return m ? (m.name || '') : '';
+  }
+  function lapseHtml(o) {
+    const rec = o.printerTimelapse;
+    if (!rec || !rec.video) return '';
+    const files = Array.isArray(o.attachedFiles) ? o.attachedFiles : [];
+    const kept = files.findIndex((f) => f && f.kind === 'timelapse' && f.from && f.from.video === rec.video);
+    const name = `<bdi>${escapeHtml(machineName(rec.machineId))}</bdi>`;
+    const when = rec.at ? new Date(rec.at) : null;
+    const whenText = when && Number.isFinite(when.getTime()) ? when.toLocaleString(localeTag(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    const st = lapseState.get(o.id) || {};
+    const box = (eyebrow, title, sub, acts, extra) => `<div class="jp-lapse"><div class="jp-lapse-eyebrow">${escapeHtml(eyebrow)}</div>
+      <div class="jp-lapse-row"><div class="jp-lapse-text"><div class="jp-row-name">${title}</div>${sub ? `<div class="jp-hint">${sub}</div>` : ''}${extra || ''}</div>
+      <div class="jp-row-acts">${acts}</div></div></div>`;
+    if (kept !== -1) {
+      const f = files[kept];
+      return box(t('tl.kept_eyebrow'), escapeHtml(t('tl.kept_title', { size: MB(f.size) })), `${escapeHtml(t('tl.from'))} ${name}${whenText ? ' · ' + escapeHtml(whenText) : ''}`,
+        `<button type="button" class="linkish" data-jpc="open-file" data-i="${kept}">${escapeHtml(t('tl.show'))}</button>
+         <button type="button" class="linkish" data-jpc="rm-file" data-i="${kept}">${escapeHtml(t('tl.remove'))}</button>`);
+    }
+    if (st.copying) {
+      const total = st.copying.total || Number(rec.bytes) || 0;
+      const pct = total ? Math.min(100, Math.round((st.copying.got / total) * 100)) : 0;
+      return box(t('tl.copying_eyebrow'), `${escapeHtml(t('tl.copying_title'))} ${name}`,
+        escapeHtml(t('tl.copying_of', { got: MB(st.copying.got), total: MB(total) })),
+        `<button type="button" class="linkish" data-jpc="lapse-cancel">${escapeHtml(t('common.cancel'))}</button>`,
+        `<div class="jp-lapse-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>`);
+    }
+    const max = (st.failed === 'over-budget' && st.maxBytes) || 150 * 1048576;
+    const bytes = st.bytes || Number(rec.bytes) || 0;
+    if (st.failed === 'over-budget' || (bytes && bytes > max)) {
+      return box(t('tl.large_eyebrow'), escapeHtml(t('tl.large_title', { size: MB(bytes) })), escapeHtml(t('tl.large_sub', { max: MB(max) })),
+        `<button type="button" class="btn small" data-jpc="lapse-open">${escapeHtml(t('tl.open_on_printer'))}</button>`);
+    }
+    const stem = String(rec.video).replace(/\.mp4$/i, '');
+    const sub = [`<bdi>${escapeHtml(stem)}</bdi>`, bytes ? `<bdi>${escapeHtml(t('tl.mb', { n: MB(bytes) }))}</bdi>` : '', whenText ? `<bdi>${escapeHtml(t('tl.finished', { when: whenText }))}</bdi>` : ''].filter(Boolean).join(' · ');
+    if (st.failed === 'unreachable' || st.failed === 'cancelled') {
+      return box(t('tl.offline_eyebrow'), `${escapeHtml(t('tl.found_title'))} ${name}`, escapeHtml(t(st.failed === 'cancelled' ? 'tl.cancelled_sub' : 'tl.offline_sub')),
+        `<button type="button" class="btn small" data-jpc="lapse-keep">${escapeHtml(t('tl.try_again'))}</button>`);
+    }
+    return box(t('tl.found_eyebrow'), `${escapeHtml(t('tl.found_title'))} ${name}`, sub,
+      `<button type="button" class="btn small" data-jpc="lapse-keep">${escapeHtml(t('tl.keep'))}</button>`,
+      `<div class="jp-hint">${escapeHtml(t('tl.found_note'))}</div>`);
+  }
+
   function filesHtml(o) {
     const files = Array.isArray(o.attachedFiles) ? o.attachedFiles : [];
-    const rows = files.map((f, i) => `<div class="jp-row jp-file">
+    const rows = files.map((f, i) => (f && f.kind === 'timelapse' && o.printerTimelapse && f.from && f.from.video === o.printerTimelapse.video) ? '' : `<div class="jp-row jp-file">
         <div><div class="jp-row-name">${escapeHtml(f.originalName || f.filename)}</div><div class="jp-hint">${escapeHtml(t('jpc.attached', { size: sizeText(+f.size || 0) }))}</div></div>
         <div class="jp-row-acts"><button type="button" class="linkish" data-jpc="open-file" data-i="${i}">${escapeHtml(t('oe.open_file'))}</button>
         <button type="button" class="linkish" data-jpc="rm-file" data-i="${i}">${escapeHtml(t('jpc.remove'))}</button></div></div>`).join('');
     const h = hub();
     return card('jp-files', escapeHtml(t('oe.files')),
-      `${rows}<div data-jpc="copies"></div>
+      `${lapseHtml(o)}${rows}<div data-jpc="copies"></div>
       ${!files.length ? `<p class="jp-empty" data-jpc="files-empty">${escapeHtml(t('jpc.no_files'))}</p>` : ''}
       <div class="jp-actions">
         ${h.pickAndSaveOrderFile ? `<button type="button" class="btn" data-jpc="attach">${escapeHtml(t('oe.attach_file'))}</button>` : ''}
@@ -129,6 +182,46 @@
     }
   }
 
+  function redrawLapse(id) {
+    const o = byId(id);
+    const box = document.querySelector(`#jobPage .jp-cards[data-jpc-job="${CSS.escape(String(id))}"] .jp-lapse`);
+    if (!o || !box) return;
+    const html = lapseHtml(o);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    if (tmp.firstElementChild) box.replaceWith(tmp.firstElementChild);
+  }
+  async function keepLapse(o) {
+    const h = hub();
+    if (!h.timelapseKeep || (lapseState.get(o.id) || {}).copying) return;
+    lapseState.set(o.id, { copying: { got: 0, total: Number(o.printerTimelapse && o.printerTimelapse.bytes) || 0 } });
+    redrawLapse(o.id);
+    let r;
+    try { r = await h.timelapseKeep(o.id); } catch (_) { r = { ok: false, reason: 'unreachable' }; }
+    const now = byId(o.id);
+    // Copied, but the job is gone meanwhile: the file would belong to nothing.
+    if (r && r.ok && r.row && !now) { if (h.deleteOrderFile) h.deleteOrderFile(r.row.filename); lapseState.delete(o.id); return; }
+    // Already copying (a reload lost this window's state): say so, not "found".
+    if (r && r.reason === 'busy') { lapseState.set(o.id, { copying: { got: 0, total: Number(o.printerTimelapse && o.printerTimelapse.bytes) || 0 } }); redrawLapse(o.id); return; }
+    if (r && r.ok && r.row && now) {
+      lapseState.delete(o.id);
+      if (!Array.isArray(now.attachedFiles)) now.attachedFiles = [];
+      if (!now.attachedFiles.some((f) => f && f.kind === 'timelapse' && f.from && r.row.from && f.from.video === r.row.from.video)) now.attachedFiles.push(r.row);
+      global.saveAll();
+      return;
+    }
+    if (r && r.error === 'not_permitted') { lapseState.delete(o.id); toast(explainRefusal('not_permitted'), 'error'); redrawLapse(o.id); return; }
+    lapseState.set(o.id, { failed: (r && r.reason) || 'unreachable', bytes: r && r.bytes, maxBytes: r && r.maxBytes });
+    redrawLapse(o.id);
+  }
+  if (hub().onTimelapseProgress) {
+    hub().onTimelapseProgress((d) => {
+      if (!d || !lapseState.has(d.id) || !(lapseState.get(d.id) || {}).copying) return;
+      lapseState.set(d.id, { copying: { got: Number(d.got) || 0, total: Number(d.total) || 0 } });
+      redrawLapse(d.id);
+    });
+  }
+
   async function onClick(b, o, el) {
     const act = b.dataset.jpc;
     const h = hub();
@@ -169,6 +262,9 @@
       }
       return;
     }
+    if (act === 'lapse-keep') { keepLapse(o); return; }
+    if (act === 'lapse-cancel') { if (h.timelapseCancel) h.timelapseCancel(o.id); return; }
+    if (act === 'lapse-open') { if (h.timelapseOpen) h.timelapseOpen(o.id); return; }
     if (act === 'open-copy') { if (h.openFile) h.openFile(b.dataset.path); return; }
     if (act === 'rm-copy') {
       if (await removeFile('vault', b.dataset.path, b.dataset.name, () => h.deleteVaultFile(b.dataset.path))) drawCopies(el, o);
