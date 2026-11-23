@@ -1782,7 +1782,7 @@
   "set.nav_group_workshop": "Werkstatt",
   "set.nav_group_online": "Online",
   "set.nav_biz": "Unternehmen",
-  "set.nav_prefs": "Einstellungen",
+  "set.nav_prefs": "Präferenzen",
   "set.nav_stock": "Lager",
   "set.nav_invoice": "Rechnung & Steuern",
   "set.nav_payments": "Zahlungen",
