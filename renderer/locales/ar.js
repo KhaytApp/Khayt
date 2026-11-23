@@ -6287,7 +6287,7 @@
   "ca.prices_sub": "يعرض تبويب خيط سعرك للوحة المقطّعة، محسوباً هنا من بكراتك وأسعارك وهامشك. لا يراه إلا برامج التقطيع التي تختارها.",
   "ca.prices_owner_only": "وحده المالك يمكنه تغيير هذا.",
   "ca.paired_title": "برامج التقطيع المقترنة",
-  "ca.app_orca": "Khayt for OrcaSlicer",
+  "ca.app_orca": "إضافة خيط لبرنامج OrcaSlicer",
   "ca.unnamed": "برنامج تقطيع بلا اسم",
   "ca.active": "نشِط",
   "ca.last_seen": "آخر ظهور {date}",

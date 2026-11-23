@@ -28,8 +28,7 @@ test('the Arabic desktop never calls Khayt Cloud "كلاود"', () => {
 test('the Arabic desktop writes the brand in Arabic letters, except where Latin is the thing itself', () => {
   const src = fs.readFileSync(path.join(__dirname, '../renderer/locales/ar.js'), 'utf8');
   const latin = src.split('\n').map((l) => l.match(/^\s*"([^"]+)": ".*Khayt/)).filter(Boolean).map((m) => m[1]);
-  // ca.app_orca: "Khayt for OrcaSlicer", the plugin's own product name, as the signed-off Arabic frame writes it (Figma 132:220).
-  assert.deepEqual(latin.sort(), ['app.title', 'ca.app_orca', 'ewh.hint', 'set.icloud_hint', 'set.plib_gd_disconnected']);
+  assert.deepEqual(latin.sort(), ['app.title', 'ewh.hint', 'set.icloud_hint', 'set.plib_gd_disconnected']);
   assert.match(src, /"app\.title": "Khayt · خيط"/);
   assert.doesNotMatch(src, /Khayt Cloud/);
 });

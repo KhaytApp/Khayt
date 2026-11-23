@@ -43,6 +43,7 @@ const OTHERS = Object.keys(L).filter((k) => k !== 'en').sort();
  * is the correct state and the guard must not nag about it.
  */
 const SAME_ON_PURPOSE = new Set([
+  'ca.app_orca',        // "Khayt for OrcaSlicer" — the plugin's name, as the Mac writes it; Arabic writes its own (إضافة خيط لبرنامج OrcaSlicer)
   'calc.elec_preview',  // "≈ {rate} {base}/kWh" — no words, only units
   'sm.exp_month',       // "{month} · {total}" — two placeholders and a dot
   'cplan.vault',        // "Khayt Vault — {size}" — the product's name and a size; Arabic writes its own name
@@ -50,7 +51,6 @@ const SAME_ON_PURPOSE = new Set([
   'set.supplier_ph',    // "+966 5x xxx xxxx" — a Saudi phone mask
   'splug.kind_shelly',  // "Shelly (Gen 1)" — a product and its generation; Arabic and Japanese write their own
   'zatca2.egs_cn',      // "EGS Common Name" — the X.509 term German PKI keeps
-  'ca.app_orca',        // "Khayt for OrcaSlicer" — the plugin's own product name; the signed-off Arabic frame (Figma 132:220) keeps it
 ]);
 
 /** A real sentence, not a cognate. "Material" is German; "Choose CSV file" is not. */
