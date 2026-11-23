@@ -402,6 +402,7 @@ async function openDropObject(machineId) {
  * seconds.
  */
 function updateMachinesLiveStatus() {
+  renderMachineNeeds();
   document.querySelectorAll('#machinesList [data-machine-live]').forEach((el) => {
     const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === el.dataset.machineLive);
     if (m) el.innerHTML = machineLiveBadge(m);
@@ -414,6 +415,83 @@ function updateMachinesLiveStatus() {
     const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === el.dataset.machineCtl);
     if (m) el.innerHTML = machineControlsHtml(m);
   });
+}
+
+/* ── What a printer needs from a person (Figma 136:153, N1) ──────────────
+ *
+ * Under each card: the printer's own problems while it answers, worst first,
+ * and "waiting at the machine" for a bed, which is read from what Khayt
+ * stored and so survives a restart and a printer that is off. Both come from
+ * main's lib/printer-needs.js (hub:printer-needs), the same lists a paired
+ * phone reads from /api/machines/live. A filament runout or "needs attention"
+ * is shown once, as a problem; the waiting rows here are the bed's. "Bed is
+ * clear" is the same stamp as the queue's and a phone's (machine.bedClearedAt).
+ */
+let _machineNeedsSeq = 0;
+/** `given`: a needs map to draw instead of asking main (tests and screenshots). */
+async function renderMachineNeeds(given) {
+  const blocks = document.querySelectorAll('#machinesList [data-machine-needs]');
+  if (!blocks.length || (!given && !window.hubAPI?.printerNeeds)) return;
+  const seq = ++_machineNeedsSeq;
+  let needs = {};
+  if (given && typeof given === 'object') needs = given;
+  else { try { needs = (await window.hubAPI.printerNeeds()) || {}; } catch (_) { needs = {}; } }
+  if (seq !== _machineNeedsSeq) return;   // a newer render is under way
+  document.querySelectorAll('#machinesList [data-machine-needs]').forEach((el) => {
+    const id = el.dataset.machineNeeds;
+    const html = machineNeedsHtml((typeof machines !== 'undefined' ? machines : []).find((x) => x.id === id), needs[id]);
+    el.innerHTML = html;
+    el.hidden = !html;
+  });
+}
+
+function machineNeedsHtml(m, need) {
+  if (!m || !need) return '';
+  const problems = Array.isArray(need.problems) ? need.problems : [];
+  // A bed the window has already said is clear is not drawn again while main
+  // catches up with the save (a poll can redraw from main's older book).
+  const cleared = Date.parse(String(m.bedClearedAt || ''));
+  const waiting = (Array.isArray(need.waiting) ? need.waiting : []).filter((w) => w && (w.reason === 'print-to-take-off' || w.reason === 'bed-to-clear')
+    && !(Number.isFinite(cleared) && Number(w.since) < cleared));
+  if (!problems.length && !waiting.length) return '';
+  const rows = problems.slice(0, 6).map((p) => {
+    const tone = p.severity === 'info' ? 'info' : (p.severity === 'common' ? 'warn' : 'bad');
+    const own = (p.code === 'printer-exception' || p.code === 'printer-error' || p.code === 'printer-attention') && p.message;
+    // The printer's own words keep their own direction (<bdi>): an English
+    // message inside an Arabic sentence otherwise pulls the quote marks round.
+    let title;
+    if (own) title = escapeHtml(t('needs.printer_says', { message: '\u0001' })).replace('\u0001', () => `<bdi>${escapeHtml(String(p.message))}</bdi>`);
+    else {
+      title = t('needs.problem.' + p.code) || p.code;
+      if (Number.isInteger(p.head)) title = t('needs.on_tool', { what: title, n: String(p.head + 1) });
+      title = escapeHtml(title);
+    }
+    const actKey = own ? 'needs.own_message' : (p.code === 'power-lost' ? 'needs.action.power-lost' : 'needs.action.' + p.action);
+    const act = p.action === 'none' && !own ? '' : t(actKey);
+    return `<div class="mn-row"><span class="mn-ico mn-${tone}" aria-hidden="true">${tone === 'info' ? 'i' : '!'}</span>
+      <div class="mn-text"><div class="mn-title">${title}</div>${act ? `<div class="mn-sub">${escapeHtml(act)}</div>` : ''}</div></div>`;
+  }).join('');
+  const cache = (typeof machineStatusCache !== 'undefined' && machineStatusCache) || {};
+  const entry = cache[m.id];
+  const answering = !!(entry && !entry.error) && !m.isOffline;
+  const waits = waiting.slice(0, 2).map((w) => `<div class="mn-row mn-wait">
+      <div class="mn-text"><div class="mn-title mn-amber">${escapeHtml(t('needs.wait.' + w.reason))}</div>
+      <div class="mn-sub">${escapeHtml([machineNeedsSince(w.since), t(answering ? 'needs.wait_live' : 'needs.wait_offline')].filter(Boolean).join(' '))}</div></div>
+      <button type="button" class="btn small mn-clear" data-machine-bed-clear="${escapeHtml(m.id)}">${escapeHtml(t('needs.bed_clear'))}</button>
+    </div>`).join('');
+  return rows + waits;
+}
+
+/** "Since 14:10 today." / "Since yesterday, 18:40." / "Since 20 Nov, 09:05." in the shop's language. */
+function machineNeedsSince(since) {
+  const at = typeof since === 'number' ? since : Date.parse(String(since || ''));
+  if (!Number.isFinite(at)) return '';
+  const d = new Date(at), now = new Date();
+  const time = d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' });
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (at >= dayStart) return t('needs.since_today', { time });
+  if (at >= dayStart - 86400000) return t('needs.since_yesterday', { time });
+  return t('needs.since_date', { date: d.toLocaleDateString(localeTag(), { day: 'numeric', month: 'short' }), time });
 }
 
 function renderMachines() {
@@ -520,6 +598,7 @@ function renderMachines() {
           ? `<button class="btn small" data-act="unretire-mach" data-id="${m.id}">${escapeHtml(t('mach.unretire'))}</button>`
           : `<button class="btn danger small" data-act="del-mach" data-id="${m.id}">${escapeHtml(t('common.delete'))}</button>`}
         <div data-machine-detail="${escapeHtml(m.id)}" style="flex-basis:100%;">${retired ? '' : machineLiveDetailHtml(m)}</div>
+        ${retired ? '' : `<div class="mach-needs" data-machine-needs="${escapeHtml(m.id)}" hidden></div>`}
         ${nozzleHtml}
         ${specsHtml}
         ${(typeof KhaytWebcam !== 'undefined' && KhaytWebcam.hasCamera(m)) ? `
@@ -528,6 +607,7 @@ function renderMachines() {
         </div>` : ''}
       </div>`;
   }).join('');
+  renderMachineNeeds();
   // The support link opens in the shop's browser, not in the app window.
   // Wired here rather than in the markup because the list is rebuilt on every
   // render and an inline handler would be a CSP violation in this renderer.
@@ -2340,6 +2420,9 @@ function machineWearRate(m) {
     openWaSendModal,
     estimateMachineQueueClearDate,
     machineLiveBadge,
+    renderMachineNeeds,
+    machineNeedsHtml,
+    machineNeedsSince,
     updateMachinesLiveStatus,
     machineRecentHours,
     machineWearRate,

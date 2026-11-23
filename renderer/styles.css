@@ -6134,3 +6134,17 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .machine-live-state.is-paused { color: var(--info); }
 .machine-live-state.is-reconnecting { color: var(--warning); }
 .machine-live-state.is-error { color: var(--danger); }
+/* ── Machines: what a printer needs (Figma 136:153, N1) ───────────────────── */
+.mach-needs { flex-basis: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+.mach-needs[hidden] { display: none; }
+.mn-row { display: flex; align-items: flex-start; gap: 10px; }
+.mn-row.mn-wait { align-items: center; }
+.mn-ico { flex: none; width: 22px; height: 22px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.mn-ico.mn-bad { background: var(--danger-soft); color: var(--danger); }
+.mn-ico.mn-warn { background: var(--warn-soft); color: var(--warning); }
+.mn-ico.mn-info { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
+.mn-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mn-title { font-size: 13px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.mn-title.mn-amber { color: var(--warning); }
+.mn-sub { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+.mn-clear { flex: none; border-radius: 999px; }

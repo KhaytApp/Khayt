@@ -1702,7 +1702,20 @@ function wireEvents() {
   // Machine profiles (settings section)
   $('#btnAddMachine')?.addEventListener('click', () => openMachineEditor(null));
   $('#btnPartsToBuy')?.addEventListener('click', () => openPartsToBuy());
-  $('#machinesList')?.addEventListener('click', (e) => {
+  $('#machinesList')?.addEventListener('click', async (e) => {
+    // "Bed is clear" under a card (Figma 136:153): the same stamp as the
+    // queue's and a phone's; main reads it once the save lands.
+    const bed = e.target.closest('[data-machine-bed-clear]');
+    if (bed) {
+      const m = machines.find((x) => x.id === bed.dataset.machineBedClear);
+      if (!m) return;
+      bed.disabled = true;
+      m.bedClearedAt = new Date().toISOString();
+      saveAll();
+      try { if (typeof flushSave === 'function') await flushSave(); } catch (_) { /* the next save carries it */ }
+      if (typeof renderMachineNeeds === 'function') renderMachineNeeds();
+      return;
+    }
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
     if (btn.dataset.act === 'maint-log') openMaintLog(btn.dataset.id);

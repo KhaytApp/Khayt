@@ -446,6 +446,10 @@ jobs:
       # lib/send-checks.js, a stop keeps Send off. Nothing is sent.
       - name: E2E smoke (send checks)
         run: xvfb-run -a npm run test:e2e:sendchecks
+      # What a printer needs under each machine card, Bed is clear, and the
+      # Machine P&L's prints / came-out-right columns (Figma page 136).
+      - name: E2E smoke (machine needs and success rate)
+        run: xvfb-run -a npm run test:e2e:needs
 
       - name: E2E smoke (Internet use settings)
         run: xvfb-run -a npm run test:e2e:internetuse
