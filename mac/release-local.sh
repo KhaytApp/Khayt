@@ -75,6 +75,21 @@ else
 fi
 cd "$WT"
 
+# ── THE "BEFORE YOU UPDATE" ITEMS SHIP INSIDE THE APP ────────────────────
+# The first-launch sheet ("Khayt was updated") reads this release's items
+# from lib/release-gates.json, generated from CHANGELOG.md. A cut whose file
+# was not regenerated ships a sheet that says nothing about this release.
+#
+# HERE, in the release worktree, and not at the top of the script: what ships
+# is origin/main as checked out in "$WT", not whatever checkout this was
+# started from, and mac/sync-js.sh WRITES (harmless in a tree that is reset
+# on every run, not in somebody's working copy).
+node scripts/write-release-gates.js --check \
+  || fail "lib/release-gates.json on origin/main is stale — run 'npm run release:gates', land it with the cut, and start again"
+bash mac/sync-js.sh >/dev/null
+git diff --quiet -- mac/KhaytCore/Sources/KhaytCore/JS/release-gates.json \
+  || fail "the bundled release-gates.json on origin/main is not lib's — run mac/sync-js.sh, land what it writes, and start again"
+
 V="$(node -p "require('./mac/version.json').version")"
 B="$(node -p "require('./mac/version.json').build")"
 TAG="v$V"

@@ -175,6 +175,10 @@ struct KhaytApp: App {
                     if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] == nil {
                         WebSaveInbox.shared.start(shop: shop)
                     }
+                    // "Khayt was updated": what this Mac has not read since
+                    // the version it last ran. Never in a snapshot run, which
+                    // would photograph the sheet over every screen.
+                    if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] == nil { await shop.checkLaunchGate() }
                     // The steel count on Settings ▸ Integrations, from the book.
                     await shop.refreshConnectorUpdatesWaiting()
                     // EVERY MOVED MODEL, ASKED FOR: on launch and once a day
