@@ -331,6 +331,7 @@ enum AiClient {
                              engine: KhaytEngine,
                              timeout: TimeInterval = AiClient.timeout) async throws -> JSONValue {
         guard let url = URL(string: shaped.url) else { throw Failure.refused("bad address") }
+        try OutboundGate.shared.require(.ai)
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         for (name, value) in shaped.headers { req.setValue(value, forHTTPHeaderField: name) }

@@ -1338,6 +1338,10 @@ struct GeneralPane: View {
                 // it. Found by photographing the pane, which had never been
                 // done: the snapshot runner could not open the settings window
                 // while an orphaned Khayt held the status bar.
+                // WHAT KHAYT SENDS OVER THE INTERNET, and the switch that stops
+                // it (page 27). A page of its own: seventeen rows do not fit
+                // in a form section.
+                InternetUseRow(shop: shop)
                 Section(shop.words.callIt("mac.on_this_mac")) {
                     // WHICH DIGITS — first, because it sits with the language
                     // above: Western 0–9 in both languages unless this Mac's

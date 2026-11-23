@@ -93,6 +93,12 @@ final class LanDevices: @unchecked Sendable {
         /// its PIN and asks for it again instead of quietly enrolling anew
         /// with the one it kept. Optional: a store saved before it has none.
         var revoked: [String: Date]? = nil
+        /// The key each signed-out PHONE had, kept for one purpose: signing
+        /// the `device-revoked` refusal, so the phone can tell a real sign-out
+        /// from something on the Wi-Fi forging one (`revokedReplyKey`). It
+        /// opens nothing: `verify` only ever accepts an enrolled device.
+        /// Forgotten with its `revoked` entry.
+        var revokedKeys: [String: Data]? = nil
     }
 
     /// What the server answers a signed request.
@@ -256,14 +262,19 @@ final class LanDevices: @unchecked Sendable {
     func remove(_ id: String) -> Bool {
         lock.lock(); defer { lock.unlock() }
         guard let at = saved.devices.firstIndex(where: { $0.id == id }) else { return false }
-        saved.devices.remove(at: at)
+        let gone = saved.devices.remove(at: at)
         seen[id] = nil
         var revoked = saved.revoked ?? [:]
+        var keys = saved.revokedKeys ?? [:]
         revoked[id] = Date()
+        // A phone's only: a connector's answers are sealed another way.
+        if gone.kind == nil { keys[id] = gone.key }
         while revoked.count > Self.maxRevoked, let oldest = revoked.min(by: { $0.value < $1.value }) {
             revoked[oldest.key] = nil
+            keys[oldest.key] = nil
         }
         saved.revoked = revoked
+        saved.revokedKeys = keys.isEmpty ? nil : keys
         save()
         return true
     }
@@ -539,6 +550,31 @@ final class LanDevices: @unchecked Sendable {
         var diff: UInt8 = 0
         for (x, y) in zip(a, b) { diff |= x ^ y }
         return diff == 0
+    }
+
+    /// The key to sign a `device-revoked` refusal with, or nil.
+    ///
+    /// ONLY for a request that the signed-out phone itself made: its id is on
+    /// the revoked list, its old key is still held, the request's own MAC
+    /// verifies under that key, and its clock agrees. Signing a refusal for a
+    /// request nobody proved they made would hand anyone who names a phone's
+    /// id a signed "you are signed out" to play back at that phone.
+    /// Spends no nonce and changes nothing.
+    func revokedReplyKey(headers: [String: String], method: String, target: String, body: Data, now: Date) -> Data? {
+        guard let id = headers["x-khayt-device"], Self.plausibleId(id),
+              let timeText = headers["x-khayt-time"], let time = Int(timeText), String(time) == timeText,
+              let nonce = headers["x-khayt-nonce"], Self.plausibleNonce(nonce),
+              let macText = headers["x-khayt-mac"], let sent = Data(base64Encoded: macText), sent.count == 32
+        else { return nil }
+        lock.lock(); defer { lock.unlock() }
+        guard saved.revoked?[id] != nil, let key = saved.revokedKeys?[id],
+              !saved.devices.contains(where: { $0.id == id }) else { return nil }
+        let expected = Self.mac(key: key, canonical: Self.canonical(method: method, target: target, time: timeText,
+                                                                   nonce: nonce, body: body, bodyHash: nil))
+        guard Self.constantTimeEqual(expected, sent) else { return nil }
+        let nowSeconds = Int(now.timeIntervalSince1970.rounded(.down))
+        guard abs(time - nowSeconds) <= Int(Self.skew) else { return nil }
+        return key
     }
 
     /// The 401 body for a refusal.

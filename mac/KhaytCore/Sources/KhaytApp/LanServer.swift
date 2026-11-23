@@ -1147,6 +1147,34 @@ final class LanServer {
             // Without `?format=json` a browser gets the intake form, as on the PC.
             if request.query["format"] != "json" { return .redirect("/intake") }
             let body = (try? await engine.lanStatusBody(store: store, today: Self.localDay(host.now()))) ?? "{}"
+            // ── THE SHOP'S "MAKE NO INTERNET CALLS", FOR A PAIRED PHONE ───
+            //
+            // A phone in a floor role (operator, viewer) holds no copy of the
+            // book, so it cannot read `settings.network` and would go on
+            // calling out. Its status answer carries `network: {offline,
+            // keep}`, the rule's own reading. ONLY for a request whose device
+            // signature verified, and signed back (`signedForPhone`) so a
+            // device on the Wi-Fi cannot tell the phone the switch is off.
+            // Anyone else gets the public counts, unchanged.
+            //
+            // `!request.tokenScoped`: a scoped API token makes `pinGate`
+            // answer nil without verifying anything. This route is always
+            // public, so a token is never judged here today; said outright so
+            // that stays true if it ever is.
+            if !request.tokenScoped, LanDevices.isSigned(request.headers), await pinGate(request) == nil,
+               case .object(var counts)? = try? JSONDecoder().decode(JSONValue.self, from: Data(body.utf8)),
+               case .object(let book) = store,
+               let network = try? await engine.outboundShopSwitch(settings: book["settings"] ?? .object([:])) {
+                counts["network"] = network
+                var answer = signedForPhone(.json(200, Self.jsonText(.object(counts))), request)
+                // NEVER the block without its signature: a phone removed
+                // while the rule was being asked has no key to sign with, and
+                // gets the public counts like anyone else.
+                if answer.headers["x-khayt-reply-mac"] != nil {
+                    answer.headers["Cache-Control"] = "no-store"
+                    return answer
+                }
+            }
             return .json(200, body)
 
         // ── WHO THIS MAC IS (see `LanIdentity`) ──────────────────────────
@@ -2883,7 +2911,26 @@ final class LanServer {
                                               target: request.target.isEmpty ? request.path : request.target,
                                               body: request.body, pin: host.pin,
                                               now: host.now(), headOnly: headOnly)
-            guard verdict == .pass else { return .json(401, LanDevices.body(verdict)) }
+            guard verdict == .pass else {
+                var refusal = Response.json(401, LanDevices.body(verdict))
+                // ── "YOU ARE SIGNED OUT" IS SIGNED ───────────────────────
+                //
+                // A phone that hears `device-revoked` drops its key and its
+                // copy of the book. Unsigned, anything on the Wi-Fi could say
+                // it. So the refusal carries `x-khayt-reply-mac` under the
+                // key the phone had, over this request's nonce, the status
+                // and the body (`replyMac`, as `/api/devices/self`), and only
+                // when the request itself verified under that key.
+                if verdict == .refused("device-revoked", now: nil), !headOnly,
+                   let nonce = request.headers["x-khayt-nonce"],
+                   let key = host.devices.revokedReplyKey(headers: request.headers, method: request.method,
+                                                          target: request.target.isEmpty ? request.path : request.target,
+                                                          body: request.body, now: host.now()) {
+                    refusal.headers["x-khayt-reply-mac"] = Self.replyMac(key: key, nonce: nonce, status: refusal.status, body: refusal.body)
+                    refusal.headers["Cache-Control"] = "no-store"
+                }
+                return refusal
+            }
             // The key is good: now what this PHONE's role opens (C9).
             return await roleRefusal(request)
         }

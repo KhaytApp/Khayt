@@ -783,6 +783,7 @@ public actor MakerRunClient {
     }
 
     private func doRefresh(_ used: String, nowSecs: Double) async throws -> String {
+        try OutboundGate.shared.require(.makerrun)
         var req = URLRequest(url: base.appendingPathComponent("api/app-token"), timeoutInterval: MakerRun.readTimeout)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "content-type")
@@ -852,6 +853,7 @@ public actor MakerRunClient {
         guard let url = URL(string: base.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/api/v1" + pathAndQuery) else {
             throw MakerRun.Failure("bad_request", "MakerRun could not read that request.")
         }
+        try OutboundGate.shared.require(.makerrun)
         var req = URLRequest(url: url, timeoutInterval: timeout ?? (parts == nil ? MakerRun.readTimeout : MakerRun.uploadTimeoutBase))
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "accept")
@@ -934,6 +936,9 @@ public actor MakerRunClient {
 
     private func fetch(_ url: URL, to dest: URL, limit: Int, label: String,
                        timeout: TimeInterval = 120) async throws {
+        // Asked FIRST: the host check below looks the name up, and a refused
+        // download must not make even that query.
+        try OutboundGate.shared.require(.makerrun)
         let guardedSession = session
         let check: @Sendable (URL) -> Bool = { MakerRun.safeDownloadHost($0) }
         // The first hop is checked here, off the main thread (it looks the

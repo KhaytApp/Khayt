@@ -96,6 +96,23 @@ extension Shop {
         return op
     }
 
+    /// Who to credit for something done at this Mac: the person signed in, or
+    /// nil when nobody is (the lock is off, or not in force). The activity log
+    /// and a return's "reported by" take this and NOT the book's
+    /// `settings.activeOperatorId`, which is the other app's sign-in.
+    var actorHere: (id: String, name: String)? {
+        guard lockInForce, let who = signedIn else { return nil }
+        return (who.id, who.name)
+    }
+
+    /// Who to credit for a write made under `gate`: a person's action is the
+    /// person here; a `.system` write is nobody's, whoever happens to be
+    /// signed in while it runs.
+    func actor(for gate: LockGate) -> (id: String, name: String)? {
+        if case .system = gate { return nil }
+        return actorHere
+    }
+
     /// The sign-in screen stands in front of everything.
     var needsSignIn: Bool { lockInForce && signedIn == nil }
 

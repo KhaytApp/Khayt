@@ -5,6 +5,8 @@
 #
 #   ./mac/release-local.sh            a prerelease (every 4.0 alpha)
 #   ./mac/release-local.sh --final    a full release
+#   RELEASE_SHA=<sha> ./mac/release-local.sh   the same, built from that commit
+#                                     on main (the cut's merge), not main's tip
 #
 # It builds whatever `main` on GitHub holds, in its own worktree
 # (~/Khayt-release), so the checkout you work in is never switched, and never
@@ -59,11 +61,17 @@ for wf in mac-release.yml mac-publish.yml; do
 done
 
 git -C "$REPO_DIR" fetch -q origin main
+# RELEASE_SHA pins the build to a commit already on main, normally the cut's
+# merge, so main need not stay frozen while a locked Mac waits to release
+# (beta.41 waited six hours for an unlock). Unset, it builds main as before.
+WHAT="${RELEASE_SHA:-origin/main}"
+git -C "$REPO_DIR" merge-base --is-ancestor "$WHAT" origin/main \
+  || fail "$WHAT is not on main — release only what main holds"
 if [ -d "$WT/.git" ] || [ -f "$WT/.git" ]; then
-  git -C "$WT" checkout -q --detach origin/main
-  git -C "$WT" reset -q --hard origin/main
+  git -C "$WT" checkout -q --detach "$WHAT"
+  git -C "$WT" reset -q --hard "$WHAT"
 else
-  git -C "$REPO_DIR" worktree add -q --detach "$WT" origin/main
+  git -C "$REPO_DIR" worktree add -q --detach "$WT" "$WHAT"
 fi
 cd "$WT"
 

@@ -9,7 +9,8 @@ struct LockReviewTests {
 
     static func shop() async -> Shop { await OperatorLockTests.shop() }
 
-    static let refusals: Set<String> = ["mac.lock_not_allowed", "mac.lock_sign_in_first"]
+    static let refusals: Set<String> = ["mac.lock_not_allowed", "mac.lock_sign_in_first",
+                                        "mac.priv_owner_telemetry", "mac.priv_owner_count"]
     static func refused(_ shop: Shop) -> Bool {
         guard let said = shop.moveProblem else { return false }
         return refusals.map { shop.words.callIt($0) }.contains(said)

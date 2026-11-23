@@ -142,9 +142,12 @@ enum SmartPlug {
                      fetch: (URLRequest) async throws -> (Data, URLResponse) = { r in
                          try await SmartPlug.session.data(for: r) }) async throws -> JSONValue {
         guard let url = URL(string: request.url) else { throw URLError(.badURL) }
+        // Asked before the plug's name is looked up.
+        try OutboundGate.shared.require(.lan, url: url)
         guard let target = await target(url, engine: engine, resolve: resolve) else {
             throw Failure.notALanAddress(url.host(percentEncoded: false) ?? request.url)
         }
+        try OutboundGate.shared.require(.lan, url: target.url)
         var r = URLRequest(url: target.url, timeoutInterval: 6)
         r.httpMethod = request.method
         for (k, v) in request.headers { r.setValue(v, forHTTPHeaderField: k) }

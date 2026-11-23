@@ -268,6 +268,10 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
     /// every printer on the screen. It is read leniently and kept as text.
     let lastUpdated: String?
     let apiType: String?
+    /// What the printer needs, worst first (#2612), when the Mac sends it.
+    var problems: [PrinterProblem] = []
+    /// Why it waits for a person, most urgent first (#2613), when the Mac sends it.
+    var waiting: [WaitingReason] = []
 
     init(id: String, name: String?, hasPrinterApi: Bool, state: String?, progress: Int?, filename: String?,
          timeRemaining: Int?, tempNozzle: Int?, tempBed: Int?, error: String?, lastUpdated: String?,
@@ -280,7 +284,7 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, hasPrinterApi, state, progress, filename, timeRemaining, tempNozzle, tempBed, error,
-             lastUpdated, apiType
+             lastUpdated, apiType, problems, waiting
     }
 
     init(from decoder: Decoder) throws {
@@ -310,14 +314,15 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
             lastUpdated = nil
         }
         apiType = try? c.decodeIfPresent(String.self, forKey: .apiType)
+        problems = c.lossyList(PrinterProblem.self, forKey: .problems)
+        waiting = c.lossyList(WaitingReason.self, forKey: .waiting)
     }
 
     var displayName: String { name ?? id }
 
-    var isPrinting: Bool { (state ?? "").lowercased().contains("print") }
-    /// Paused is a print still on the bed, not an ending — a pause raised a
-    /// "Print finished" alert while `isPrinting` was the only question asked.
-    var isPaused: Bool { (state ?? "").lowercased().contains("pause") }
+    // isPrinting, isPaused, isBusy, needsPerson and saysUnlinked are in
+    // Services/PrinterActivity.swift: they ask the shared rule, and this file
+    // must compile on its own (scripts/ios-contract.sh decodes with it alone).
     var hasError: Bool { !(error ?? "").isEmpty }
     /// No state at all: the Mac's last poll of this printer failed (an
     /// unreachable printer comes back as `state: null` plus the poll's error).
@@ -796,4 +801,65 @@ enum KhaytAPIError: Error, Sendable {
     case pinTooShort
     case server(String)
     case transport(Error)
+}
+
+// MARK: - What a printer needs (#2612, #2613)
+// Here, not in a file of its own: scripts/ios-contract.sh compiles this file alone.
+
+/// What a printer needs from a person, in the shared closed sets the apps
+/// translate (#2612, #2613). The Mac works them out (`lib/printer-problems.js`
+/// `problemsFor`, `lib/waiting-at-machine.js` `waiting`) and, once it serves
+/// them on the live printer route, the phone reads them here. Nothing here
+/// decides anything: the phone never re-derives a problem from raw printer
+/// words, so it can never disagree with the Mac.
+///
+/// Screens for these are drawn in the iPhone Figma file ("Printer states ·
+/// iPhone (Nov 21)") and wait for Turki's sign-off.
+
+/// One problem, worst first: `problem.<code>` and `problem.action.<action>`
+/// are the words.
+struct PrinterProblem: Codable, Equatable, Sendable {
+    let code: String
+    let severity: String
+    /// `problem.action.<action>`. The rule always gives one; a row without it
+    /// (an older or partial sender) is still a problem, shown with no action.
+    let action: String?
+    let source: String?
+    /// The head (tool) a filament problem is on, when the printer said which.
+    let head: Int?
+    /// The printer's own message, control characters stripped, 200 characters at most.
+    let message: String?
+    /// A code to look the fault up by, when the catalogue has no meaning for it.
+    let ref: String?
+
+    static let severities = ["fatal", "serious", "common", "info"]
+    var isBlocking: Bool { severity == "fatal" || severity == "serious" }
+}
+
+/// A reason the printer is waiting for a person, most urgent first.
+struct WaitingReason: Codable, Equatable, Sendable {
+    /// `filament-runout`, `printer-attention`, `print-to-take-off` or `bed-to-clear`.
+    let reason: String
+    /// Epoch milliseconds, as the rule gives it; null for a live reason
+    /// (a runout) the printer did not date.
+    let since: Double?
+    /// The head a filament runout is on, when the printer said which (#2621).
+    var head: Int? = nil
+
+    static let reasons = ["filament-runout", "printer-attention", "print-to-take-off", "bed-to-clear"]
+    var sinceDate: Date? { since.map { Date(timeIntervalSince1970: $0 / 1000) } }
+}
+
+/// One row of a list from the wire, kept only when it decodes: a bad row
+/// never empties the list, and never throws the whole printer away (the
+/// lesson of `lastUpdated`'s two spellings).
+struct Lossy<T: Decodable>: Decodable {
+    let value: T?
+    init(from decoder: Decoder) throws { value = try? T(from: decoder) }
+}
+
+extension KeyedDecodingContainer {
+    func lossyList<T: Decodable>(_ type: T.Type, forKey key: Key) -> [T] {
+        ((try? decodeIfPresent([Lossy<T>].self, forKey: key)) ?? nil)?.compactMap(\.value) ?? []
+    }
 }

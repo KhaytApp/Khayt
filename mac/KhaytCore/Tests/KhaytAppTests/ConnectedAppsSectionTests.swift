@@ -116,7 +116,7 @@ struct ConnectedAppsSectionTests {
                                          "settings": .object(["activeOperatorId": .string("op_owner")])]
         let snapshot = root
         Shop.appendActivity(&root, text: Shop.slicerArrivalText("Bracket_PLA.gcode", plugin: "OrcaSlicer on Studio PC"),
-                            ref: "SU-1", settings: Shop.settings(root), root: snapshot,
+                            ref: "SU-1", root: snapshot,
                             action: "slicer_inbox", actor: ("connector:dev_SampleStudioPC0001", "OrcaSlicer on Studio PC"))
         guard case .array(let log)? = root["auditLog"], case .object(let row)? = log.last else {
             Issue.record("no line written"); return

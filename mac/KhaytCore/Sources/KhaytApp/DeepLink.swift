@@ -67,6 +67,13 @@ extension Shop {
                 Task { await receive(job) }
             }
         }
+        // "Install in Khayt" (`PluginInstallLink`): the consent sheet, or why not.
+        if let install = Self.openedInstallLinks.last {
+            Self.openedInstallLinks = []
+            if !Self.isStale(arrivedAt: Self.openedLinksArrived, windowOpenedAt: windowOpenedAt) {
+                Task { await receive(install) }
+            }
+        }
         guard let link = Self.openedLinks.last else { return }
         Self.openedLinks = []
         guard !Self.isStale(arrivedAt: Self.openedLinksArrived, windowOpenedAt: windowOpenedAt) else { return }

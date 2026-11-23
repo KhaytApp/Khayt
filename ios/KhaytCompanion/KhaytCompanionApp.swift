@@ -47,6 +47,10 @@ struct KhaytCompanionApp: App {
     init() {
         let s = ConnectionSettings()
         let apiClient = KhaytAPIClient(settings: s)
+        // Before anything can call out: the shop's internet switch, from the
+        // book on disk (P8).
+        PhoneOutbound.start(book: apiClient.book, countInstall: s.countInstall,
+                            paired: { MainActor.assumeIsolated { s.isPaired || s.device != nil } })
         let healthMonitor = ConnectionHealth(api: apiClient, settings: s)
         _settings = StateObject(wrappedValue: s)
         _api = StateObject(wrappedValue: apiClient)
@@ -118,6 +122,12 @@ struct KhaytCompanionApp: App {
             settings.isSampleShop = false
             settings.host = "192.168.1.42"
             settings.needsPairAgain = true
+        }
+        // `-KhaytRole operator|viewer` (with the sample shop): the floor
+        // screens of a phone paired by number with that role (frames 255:*).
+        if let role = defaults.string(forKey: "KhaytRole"), DeviceRole.ladder.contains(role) {
+            settings.pairedByCode = true
+            settings.deviceRole = role
         }
         if let tab = defaults.string(forKey: "KhaytTab") {
             defaults.set(tab, forKey: "khayt.pending.tab")

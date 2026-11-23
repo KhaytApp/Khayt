@@ -114,12 +114,31 @@ public enum CloudReader {
         guard let url = URL(string: base.absoluteString.trimmingTrailingSlash + path) else {
             throw Failure.badAddress(connection.url)
         }
+        // Asked HERE, where every signed Khayt Cloud request is built: a
+        // request that was refused does not exist to be sent.
+        try OutboundGate.shared.require(purpose(forTail: tail))
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = 30
         request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
         request.setValue("1", forHTTPHeaderField: "x-delta-capable")
         return request
+    }
+
+    /// The storefront's routes on Khayt Cloud: the catalogue, the store's
+    /// figures and the delivery date it quotes. They are the shop's ONLINE
+    /// STORE (`storefront`), which a shop can keep while everything else on
+    /// Khayt Cloud is off; the desktop asks the same three routes the same
+    /// way (`lib/cloud-client.js` STOREFRONT). Every other route is `cloud`.
+    nonisolated public static let storefrontTails = ["/catalog", "/sfstats", "/lead-time"]
+
+    nonisolated public static func purpose(forTail tail: String) -> OutboundPurpose {
+        let path = tail.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? tail
+        // The shop's switch itself (`NetworkSwitch`): its own purpose, so the
+        // one call an offline computer keeps is never kept by `cloud`, and
+        // keeping `cloud` never keeps it.
+        if path == NetworkSwitch.tail { return .switchSync }
+        return storefrontTails.contains { path == $0 || path.hasPrefix($0 + "/") } ? .storefront : .cloud
     }
 
     /// The session every request built by `request(...)` goes through.
