@@ -47,6 +47,8 @@ struct OrderDetailPage: View {
     @State private var printPhotos: [JobPrintPhoto] = []
     /// What the print drew from a metering plug, when one measured it.
     @State private var energy: JobEnergy?
+    /// Filament per head (U1), when the Mac or the desktop wrote the split.
+    @State private var heads: HeadFilament?
     /// A phone the Mac enrolled can send a photo of the print (not a quote).
     private var canAddPhoto: Bool { api.canAddJobPhoto && order.status != "quote" && order.status != "cancelled" }
     @State private var showingInvoice = false
@@ -224,6 +226,7 @@ struct OrderDetailPage: View {
             photoAccess = api.photoAccess(orderId: order.id)
             printPhotos = api.printPhotos(orderId: order.id)
             energy = api.jobEnergy(orderId: order.id)
+            heads = api.headFilament(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
             if isQuote { quoteState = await api.quoteState(orderId: order.id) }
             #if DEBUG
@@ -263,6 +266,9 @@ struct OrderDetailPage: View {
         // enough of it. Nothing at all otherwise.
         if let energy {
             EnergyCard(energy: energy).id("energy")
+        }
+        if let heads {
+            HeadFilamentCard(split: heads)
         }
     }
 
