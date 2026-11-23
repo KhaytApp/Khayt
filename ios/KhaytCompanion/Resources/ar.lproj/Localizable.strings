@@ -1558,3 +1558,12 @@
 "floor.job.banner.viewer" = "مشاهد: يمكنك رؤية هذا الطلب دون تغيير شيء. السعر والعميل يبقيان على جهاز Mac.";
 "floor.printers.banner.viewer" = "هاتف مشاهد: ترى كل ما في الورشة ولا تغيّر شيئًا.";
 "floor.printers.no_controls" = "لا أزرار إيقاف مؤقت أو إيقاف أو كاميرا: المشاهد لا يملك machines:control.";
+/* The shop's "Make no internet calls" switch (P8): the desktop's words (#2633), signed off for photos on Nov 22. */
+"outbound.blocked.offline" = "خيط مضبوط على عدم الاتصال بالإنترنت. هذا الإجراء يحتاج إلى %@.";
+"outbound.blocked.settings-unknown" = "خيط قيد التشغيل. حاول مرة أخرى بعد لحظة.";
+"outbound.purpose.cloud" = "سحابة خيط";
+"outbound.purpose.lookups" = "عمليات البحث";
+"outbound.purpose.internet" = "الإنترنت";
+"outbound.purpose.webhooks" = "Webhooks";
+"photos.blocked.detail" = "لا يمكن عرض الصور أو إضافتها من هذا الهاتف. يمكن للمالك إبقاء سحابة خيط في «استخدام الإنترنت» على الماك.";
+"photos.blocked.nothing_sent" = "لم يُرسَل شيء.";

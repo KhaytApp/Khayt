@@ -1558,3 +1558,12 @@
 "floor.job.banner.viewer" = "İzleyici: bu işi görürsünüz, hiçbir şey değiştirmezsiniz. Fiyat ve müşteri Mac’te kalır.";
 "floor.printers.banner.viewer" = "İzleyici telefonu: atölyedeki her şeyi görür, hiçbir şey değiştirmezsiniz.";
 "floor.printers.no_controls" = "Duraklatma, durdurma veya kamera yok: izleyicinin machines:control yetkisi yok.";
+/* The shop's "Make no internet calls" switch (P8): the desktop's words (#2633), signed off for photos on Nov 22. */
+"outbound.blocked.offline" = "Khayt internet bağlantısı yapmayacak şekilde ayarlı. Bunun için %@ gerekiyor.";
+"outbound.blocked.settings-unknown" = "Khayt başlatılıyor. Birazdan tekrar deneyin.";
+"outbound.purpose.cloud" = "Khayt Cloud";
+"outbound.purpose.lookups" = "sorgular";
+"outbound.purpose.internet" = "internet";
+"outbound.purpose.webhooks" = "webhook’lar";
+"photos.blocked.detail" = "Fotoğraflar bu telefondan gösterilemez veya eklenemez. Sahip, Mac’teki İnternet kullanımı bölümünde Khayt Cloud’u koruyabilir.";
+"photos.blocked.nothing_sent" = "Hiçbir şey gönderilmedi.";

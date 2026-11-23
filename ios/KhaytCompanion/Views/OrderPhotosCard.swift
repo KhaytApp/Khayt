@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import KhaytCore
 
 /// The order page's photos: what the customer sees on their tracking page, and
 /// the button that adds the finished part to it.
@@ -16,6 +17,22 @@ struct OrderPhotosCard: View {
     @State private var showCamera = false
     @State private var shot: UIImage?
     @State private var removing: KhaytAPIClient.OrderPhoto?
+    /// A tap the shop's internet switch refused (frame B): its words and
+    /// "Nothing was sent.", shown under the photos.
+    @State private var refusedTap: OutboundBlocked?
+
+    init(access: KhaytAPIClient.PhotoAccess) { self.access = access }
+
+    #if DEBUG
+    /// A card already showing photos and a refused tap: how the screenshot
+    /// test draws frame B. The app uses the init above.
+    init(access: KhaytAPIClient.PhotoAccess, photos: [KhaytAPIClient.OrderPhoto], refusedTap: OutboundBlocked?) {
+        self.access = access
+        _photos = State(initialValue: photos)
+        _loaded = State(initialValue: true)
+        _refusedTap = State(initialValue: refusedTap)
+    }
+    #endif
 
     private var token: String? {
         switch access {
@@ -29,6 +46,20 @@ struct OrderPhotosCard: View {
     }
     private var canRemove: Bool { if case .ready = access { return true } else { return false } }
 
+    /// The shop's "Make no internet calls" switch, as it stands for Khayt
+    /// Cloud (P8). Asked, not counted: only a refused tap counts.
+    private var switchRefusal: OutboundGate.Verdict? {
+        _ = gateSeen   // read so the body redraws when the gate changes
+        let v = OutboundGate.shared.verdict(.cloud)
+        return v.allowed ? nil : v
+    }
+
+    /// Bumped on each change the phone tells the gate (review of #2654): the
+    /// card redraws and loads again when the switch lets it, so "Khayt is
+    /// starting." moves on by itself.
+    @State private var gateSeen = 0
+    private struct LoadKey: Equatable { let token: String?; let refused: String? }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             Text(L10n.tr("photos.title").uppercased())
@@ -40,6 +71,13 @@ struct OrderPhotosCard: View {
                     Text(L10n.tr("photos.needs_cloud"))
                         .font(.khayt(13.5, relativeTo: .subheadline))
                         .foregroundStyle(KhaytDesign.note)
+                } else if let refusal = switchRefusal, refusedTap == nil, photos.isEmpty {
+                    // Frames A and C (signed off, Nov 22): nothing is asked of
+                    // the cloud, and Add is shown but cannot be used.
+                    RefusalNote(text: PhoneOutbound.words(purpose: .cloud, reason: refusal.reason),
+                                detail: refusal.reason == "settings-unknown" ? nil : L10n.tr("photos.blocked.detail"),
+                                starting: refusal.reason == "settings-unknown")
+                    if case .ready = access { addRow.disabled(true).opacity(0.45) }
                 } else {
                     if !photos.isEmpty { strip }
                     else if loaded {
@@ -55,7 +93,12 @@ struct OrderPhotosCard: View {
                     Text(L10n.tr("photos.note"))
                         .font(.khayt(12, relativeTo: .caption)).foregroundStyle(KhaytDesign.note)
                 }
-                if let problem {
+                if let refusedTap {
+                    // Frame B: the tap was refused before anything was sent.
+                    RefusalNote(text: refusedTap.localizedDescription,
+                                detail: refusedTap.reason == "settings-unknown" ? nil : L10n.tr("photos.blocked.nothing_sent"),
+                                starting: refusedTap.reason == "settings-unknown")
+                } else if let problem {
                     Text(problem).font(.khayt(12.5, relativeTo: .caption)).foregroundStyle(KhaytDesign.late)
                 }
             }
@@ -63,7 +106,11 @@ struct OrderPhotosCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .card()
         }
-        .task(id: token) { await load() }
+        .task(id: LoadKey(token: token, refused: switchRefusal?.reason)) { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: PhoneOutbound.changedNotification)) { _ in
+            gateSeen &+= 1
+            if switchRefusal == nil { refusedTap = nil }
+        }
         .sheet(isPresented: $showCamera) { LabelCameraPicker(image: $shot) }
         .onChange(of: shot) { _, image in
             guard let image else { return }
@@ -78,6 +125,7 @@ struct OrderPhotosCard: View {
                     await add(image)
                 } else {
                     problem = KhaytAPIClient.PhotoFailure.notAnImage.errorDescription
+                    refusedTap = nil
                 }
             }
         }
@@ -130,20 +178,31 @@ struct OrderPhotosCard: View {
 
     private func load() async {
         guard let token else { return }
+        // Switched off: no call at all and no failure to show (frame A), and
+        // not "loaded": an empty list here is unknown, not "no photos yet".
+        if switchRefusal != nil { return }
         do {
             photos = try await api.orderPhotos(token: token)
             problem = nil
+            refusedTap = nil
+        } catch let blocked as OutboundBlocked {
+            refusedTap = blocked
+            problem = nil
+            return
         } catch {
             problem = error.localizedDescription
+            refusedTap = nil
         }
         loaded = true
     }
 
     private func add(_ image: UIImage) async {
         guard let token else { return }
+        guard allowedNow() else { return }
         busy = true
         defer { busy = false }
         guard let bytes = OrderPhotoPrep.upright(image) else {
+            refusedTap = nil
             problem = KhaytAPIClient.PhotoFailure.tooLarge.errorDescription
             return
         }
@@ -151,21 +210,86 @@ struct OrderPhotosCard: View {
             photos.append(try await api.addOrderPhoto(token: token, bytes: bytes))
             problem = nil
             CompanionHaptics.success()
+        } catch let blocked as OutboundBlocked {
+            refusedTap = blocked
+            problem = nil
+            CompanionHaptics.warning()
         } catch {
+            refusedTap = nil
             problem = error.localizedDescription
             CompanionHaptics.warning()
+        }
+    }
+
+    /// Asks the switch before a tap does anything (frame B): a refused tap
+    /// shows the words and "Nothing was sent.", and is counted like any
+    /// refused call. True when the call may go ahead.
+    private func allowedNow() -> Bool {
+        do {
+            try OutboundGate.shared.require(.cloud)
+            refusedTap = nil
+            return true
+        } catch let blocked as OutboundBlocked {
+            refusedTap = blocked
+            problem = nil
+            CompanionHaptics.warning()
+            return false
+        } catch {
+            return false
         }
     }
 
     private func remove(_ photo: KhaytAPIClient.OrderPhoto) async {
         guard let token else { return }
         removing = nil
+        guard allowedNow() else { return }
         do {
             try await api.deleteOrderPhoto(token: token, id: photo.id)
             photos.removeAll { $0.id == photo.id }
             problem = nil
         } catch {
+            refusedTap = nil
             problem = error.localizedDescription
         }
+    }
+}
+
+/// The callout the signed-off frames draw for a refused call: a dot (amber
+/// when the switch is on, grey while Khayt is starting), the sentence, and a
+/// smaller line under it.
+struct RefusalNote: View {
+    let text: String
+    var detail: String?
+    var starting = false
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 9) {
+            Circle()
+                .fill(starting ? KhaytDesign.note : KhaytDesign.attention)
+                .frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(text)
+                    .font(.khayt(13.5, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail {
+                    Text(detail)
+                        .font(.khayt(12, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.note)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            if !starting {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(KhaytDesign.attention.opacity(0.7), lineWidth: 1)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }

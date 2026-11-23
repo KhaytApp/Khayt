@@ -190,6 +190,7 @@ enum PhoneOutbound {
     /// counting itself (Settings › Count this install), which is per device.
     static func local(countInstall: Bool) {
         OutboundGate.shared.update(local: .init(offline: false, installCountOff: !countInstall))
+        announce()
     }
 
     /// Where the notification extension reads the switch (`OutboundMirror`).
@@ -210,5 +211,60 @@ enum PhoneOutbound {
         // The extension runs in its own process and asks a gate of its own:
         // it follows what this one follows.
         OutboundMirror.write(book, to: mirror)
+        announce()
     }
+
+    /// Posted whenever the phone tells the gate something, so a screen that
+    /// shows the switch (the photo card's "Khayt is starting.") moves on by
+    /// itself instead of waiting for an unrelated redraw (review of #2654).
+    static let changedNotification = Notification.Name("khayt.outbound.changed")
+
+    private static func announce() {
+        if Thread.isMainThread { NotificationCenter.default.post(name: changedNotification, object: nil) }
+        else { DispatchQueue.main.async { NotificationCenter.default.post(name: changedNotification, object: nil) } }
+    }
+}
+
+// ── THE WORDS FOR A REFUSED CALL (signed off by Turki, Nov 22) ───────────
+//
+// The desktop's sentences (#2633, `outbound.blocked.*`), so a shop reads the
+// same words on every app: "Khayt is set to make no internet calls. This
+// needs Khayt Cloud." and, before the switch is read, "Khayt is starting.
+// Try again in a moment." Never "network error": a refused call was never
+// tried.
+extension PhoneOutbound {
+    /// The sentence for one refusal. `settings-unknown` is the app still
+    /// reading the switch; every other reason the phone can meet means the
+    /// shop's switch is on.
+    static func words(purpose: OutboundPurpose, reason: String) -> String {
+        switch reason {
+        case "settings-unknown":
+            return L10n.tr("outbound.blocked.settings-unknown")
+        case "offline", "offline-here", "lan-host-public", "lan-host-missing":
+            // The phone has no switch of its own (`offline-here` cannot
+            // happen here) and asks `lan` only with a host the shop typed;
+            // each still means "the shop makes no internet calls".
+            return L10n.format("outbound.blocked.offline", purposeName(purpose))
+        default:
+            // A reason the rule may add later: the sentence that is true for
+            // any refusal, naming no purpose it might get wrong.
+            return L10n.format("outbound.blocked.offline", L10n.tr("outbound.purpose.internet"))
+        }
+    }
+
+    /// What a purpose is called in the sentence: the desktop's `iu.in.*`
+    /// names for the purposes this phone calls.
+    static func purposeName(_ purpose: OutboundPurpose) -> String {
+        switch purpose {
+        case .cloud: return L10n.tr("outbound.purpose.cloud")
+        case .lookups: return L10n.tr("outbound.purpose.lookups")
+        case .webhooks: return L10n.tr("outbound.purpose.webhooks")
+        default: return L10n.tr("outbound.purpose.internet")
+        }
+    }
+}
+
+/// So every place that shows `error.localizedDescription` says why in words.
+extension OutboundBlocked: @retroactive LocalizedError {
+    public var errorDescription: String? { PhoneOutbound.words(purpose: purpose, reason: reason) }
 }

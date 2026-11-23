@@ -1558,3 +1558,12 @@
 "floor.job.banner.viewer" = "Viewer: you can see this job and change nothing. The price and client stay on the Mac.";
 "floor.printers.banner.viewer" = "Viewer phone: you can see everything on the floor and change nothing.";
 "floor.printers.no_controls" = "No pause, stop or camera controls: a viewer has no machines:control.";
+/* The shop's "Make no internet calls" switch (P8): the desktop's words (#2633), signed off for photos on Nov 22. */
+"outbound.blocked.offline" = "Khayt is set to make no internet calls. This needs %@.";
+"outbound.blocked.settings-unknown" = "Khayt is starting. Try again in a moment.";
+"outbound.purpose.cloud" = "Khayt Cloud";
+"outbound.purpose.lookups" = "lookups";
+"outbound.purpose.internet" = "the internet";
+"outbound.purpose.webhooks" = "webhooks";
+"photos.blocked.detail" = "Photos can’t be shown or added from this phone. The owner can keep Khayt Cloud in Internet use on the Mac.";
+"photos.blocked.nothing_sent" = "Nothing was sent.";
