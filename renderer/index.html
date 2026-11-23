@@ -103,6 +103,11 @@
             <span class="nav-icon" aria-hidden="true">△</span>
             <span class="nav-label grow" data-i18n="tab.waste">Waste Log</span>
           </button>
+          <!-- Connected apps (Figma page 131, CA4): shown only while "Pair a slicer" is on (renderer/connected-apps.js); the count is files waiting. -->
+          <button type="button" class="tab-btn khayt-navitem ca-off" data-tab="connectedapps-tab" role="tab" id="tabbtn-connectedapps-tab" aria-selected="false" aria-controls="connectedapps-tab" tabindex="-1">
+            <span class="nav-icon" aria-hidden="true">⇆</span>
+            <span class="nav-label grow" data-i18n="tab.connectedapps">Connected apps</span>
+          </button>
         </div>
         <div class="khayt-navsec nav-group biz-only">
           <div class="eyebrow khayt-navhead nav-group-label" data-i18n="nav.group.sales">Sales</div>
@@ -1445,6 +1450,10 @@
     </section>
 
     <!-- ===================== WASTE LOG ===================== -->
+    <section id="connectedapps-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-connectedapps-tab" aria-hidden="true" tabindex="-1">
+      <div id="connectedAppsRoot"></div>
+    </section>
+
     <section id="waste-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-waste-tab" aria-hidden="true" tabindex="-1">
       <div class="toolbar" style="margin-bottom:8px;">
         <h3 class="card-head" style="margin:0; flex:1;"><span class="swatch"></span><span data-i18n="waste.title">Failed Prints &amp; Waste Log</span></h3>
@@ -2923,6 +2932,7 @@
 <script src="../lib/duet.js"></script>
 <script src="../lib/sdcp.js"></script>
 <script src="../lib/printer-commands.js"></script>
+<script src="../lib/printer-capabilities.js"></script>
 <script src="../lib/quote-followup.js"></script>
 <script src="../lib/quote-revision.js"></script>
 <script src="../lib/payment-reminder.js"></script>
@@ -2985,6 +2995,7 @@
 <script src="../lib/printer-actuals.js"></script>
 <script src="../lib/printer-poll-cache.js"></script>
 <script src="../lib/run-result.js"></script>
+<script src="../lib/printer-success.js"></script>
 <script src="../lib/print-setups.js"></script>
 <script src="../lib/geometry-key.js"></script>
 <script src="../lib/model-identity.js"></script>
@@ -3207,6 +3218,10 @@
 <script src="../lib/print-library-tier.js"></script>
 <!-- Library Health and Find Similar: ports of the Mac rules (print-fit for "too big"). -->
 <script src="../lib/print-fit.js"></script>
+<!-- Send to printer, checked first (Figma 129, S1): the findings, the file-type rule they use, and the dialog. -->
+<script src="../lib/printer-upload.js"></script>
+<script src="../lib/send-checks.js"></script>
+<script src="send-checks-dialog.js"></script>
 <script src="../lib/library-health.js"></script>
 <script src="../lib/library-hash-plan.js"></script>
 <script src="../lib/library-similar.js"></script>
@@ -3219,6 +3234,7 @@
 <script src="colorstudio.js"></script>
 <script src="color-planner.js"></script>
 <script src="../lib/spool-match.js"></script>
+<script src="../lib/rfid-tray.js"></script>
 <script src="converter-spools.js"></script>
 <script src="converter.js"></script>
 <script src="bedready-icons.js"></script>
@@ -3260,6 +3276,7 @@
 <script src="simple-screens-ui.js"></script>
 <script src="operations-extras.js"></script>
 <script src="plugins.js"></script>
+<script src="connected-apps.js"></script>
 <script src="tour.js"></script>
 <script src="coach-tips.js"></script>
 <script src="wire-events.js"></script>

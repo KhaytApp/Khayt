@@ -703,6 +703,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       saveAll();
     });
   }
+  // A finished U1 print's time-lapse, found and named on the job by main
+  // (lib/main/timelapse-keep.js): this copy of the book takes it too.
+  if (window.hubAPI?.onPrinterTimelapse) {
+    window.hubAPI.onPrinterTimelapse((payload) => {
+      const rec = payload && payload.record;
+      if (!rec || typeof rec !== 'object' || !rec.video) return;
+      const order = printLog.find((o) => o && o.id === payload.id);
+      if (!order || order.printerTimelapse) return;
+      order.printerTimelapse = rec;
+      saveAll();
+    });
+  }
   if (window.hubAPI?.onLanOrderUpdated) {
     window.hubAPI.onLanOrderUpdated((payload) => {
       const { id, status } = payload;

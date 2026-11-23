@@ -43,6 +43,7 @@ const OTHERS = Object.keys(L).filter((k) => k !== 'en').sort();
  * is the correct state and the guard must not nag about it.
  */
 const SAME_ON_PURPOSE = new Set([
+  'ca.app_orca',        // "Khayt for OrcaSlicer" — the plugin's name, as the Mac writes it; Arabic writes its own (إضافة خيط لبرنامج OrcaSlicer)
   'calc.elec_preview',  // "≈ {rate} {base}/kWh" — no words, only units
   'sm.exp_month',       // "{month} · {total}" — two placeholders and a dot
   'cplan.vault',        // "Khayt Vault — {size}" — the product's name and a size; Arabic writes its own name

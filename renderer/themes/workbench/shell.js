@@ -19,7 +19,7 @@
   // their original position (e.g. dashboard stays at top, settings in footer).
   const GROUPS = [
     { key: 'work', labelKey: 'workbench.group.work', label: 'Work',
-      tabs: ['calculator-tab', 'queue-tab', 'printfiles-tab', 'colorstudio-tab', 'converter-tab', 'hueforge-tab', 'inventory-tab', 'waste-tab'] },
+      tabs: ['calculator-tab', 'queue-tab', 'printfiles-tab', 'colorstudio-tab', 'converter-tab', 'hueforge-tab', 'inventory-tab', 'waste-tab', 'connectedapps-tab'] },
     { key: 'catalog', labelKey: 'workbench.group.catalog', label: 'Catalog',
       tabs: ['catalog-tab', 'clients-tab', 'gift-cards-tab', 'portfolio-tab'] },
     { key: 'money', labelKey: 'workbench.group.money', label: 'Money',
@@ -31,7 +31,7 @@
   // hand, the shop's stock and catalogue, the money, and the standalone tools.
   const KHAYT_GROUPS = [
     { key: 'work', labelKey: 'workbench.group.work', label: 'Work',
-      tabs: ['queue-tab', 'calculator-tab', 'clients-tab'] },
+      tabs: ['queue-tab', 'calculator-tab', 'clients-tab', 'connectedapps-tab'] },
     { key: 'shop', labelKey: 'workbench.group.shop', label: 'Shop',
       tabs: ['inventory-tab', 'printfiles-tab', 'catalog-tab', 'portfolio-tab', 'gift-cards-tab'] },
     { key: 'money', labelKey: 'workbench.group.money', label: 'Money',
