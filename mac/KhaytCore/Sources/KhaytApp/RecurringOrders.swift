@@ -65,8 +65,9 @@ enum RecurringOrders {
             } ?? ""
             let snapshot = root
             Shop.appendActivity(&root, text: id + (project.isEmpty ? "" : " · \(project)"),
-                                ref: id, settings: out.settings, root: snapshot,
-                                action: "order_created")
+                                ref: id, root: snapshot,
+                                // Fell due by itself: nobody at this Mac made it.
+                                action: "order_created", actor: nil)
         }
         return Outcome(created: out.created, changed: true)
     }

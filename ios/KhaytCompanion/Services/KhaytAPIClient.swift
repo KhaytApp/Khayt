@@ -47,6 +47,9 @@ final class KhaytAPIClient: ObservableObject {
         #if DEBUG
         if Self.debugReadOnly { return false }
         #endif
+        // A viewer phone paired by number changes nothing (no write scope);
+        // the Mac refuses it too, this keeps the buttons from being offered.
+        if !settings.isSampleShop, settings.pairedByCode, !settings.can("orders:write") { return false }
         return Self.mayEdit(cloudRole: cloud?.role, macPaired: macPaired, sample: settings.isSampleShop)
     }
 
@@ -454,10 +457,27 @@ final class KhaytAPIClient: ObservableObject {
     /// something true rather than "done".
     @discardableResult
     func pullBook(into book: CompanionBook) async throws -> Int {
+        // A floor phone (operator or viewer, D-P6 a) keeps no book and does
+        // not ask for one: the Mac would answer 403 role-scope anyway.
+        guard settings.mayHoldBook else {
+            forgetBookForFloorMode()
+            // Not `.unauthorized`: the pairing screen reads that as a refused PIN.
+            throw KhaytAPIError.notConfigured
+        }
         let (data, response) = try await request(path: "/api/store", method: "GET",
                                                  body: nil, requiresPin: true)
         guard let http = response as? HTTPURLResponse else {
             throw KhaytAPIError.transport(URLError(.badServerResponse))
+        }
+        // The Mac says this phone's role does not reach the book: whatever the
+        // phone believed, it is a floor phone now, and a book it holds is one
+        // it may no longer have.
+        // NOT acted on by itself: replies to a phone carry no MAC, so anyone on
+        // the Wi-Fi could send this 403. The role is asked again with a signed
+        // request instead, and only a code-paired phone's role ever moves.
+        if DeviceRole.refusedScope(status: http.statusCode, body: data) == "book:read" {
+            if settings.pairedByCode { Task { await self.refreshDeviceRole() } }
+            throw KhaytAPIError.notConfigured
         }
         guard (200...299).contains(http.statusCode) else {
             throw try decodeAPIError(data, status: http.statusCode)
@@ -592,6 +612,9 @@ final class KhaytAPIClient: ObservableObject {
     /// phone — just re-paired or signed in) adopts the cloud's store, whose
     /// settings hold no `plugins`, and the Mac's read must be the one that wins.
     func refreshEverywhere(_ book: CompanionBook) async {
+        // The Mac may have changed this phone's role since: ask before deciding
+        // whether there is a book to keep (a code-paired phone only).
+        if settings.pairedByCode { await refreshDeviceRole() }
         if settings.isConfigured, (try? await sendPendingChanges()) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
         }
@@ -710,6 +733,9 @@ final class KhaytAPIClient: ObservableObject {
     /// answer; an edit made meanwhile stays pending for the next one.
     @discardableResult
     func syncThroughCloud() async -> CloudSync.Pushed? {
+        // A floor phone (operator or viewer) keeps no book, from the cloud
+        // either (D-P6 a). Every caller comes through here.
+        guard settings.mayHoldBook else { return nil }
         if let running = cloudRound { return await running.value }
         let round = Task { await self.oneCloudRound() }
         cloudRound = round
@@ -2289,7 +2315,10 @@ final class KhaytAPIClient: ObservableObject {
         guard requiresPin else { return try await send(url, method: method, body: body, auth: .none, contentType: contentType) }
         guard let device = usableDevice else { return try await send(url, method: method, body: body, auth: .pin, contentType: contentType) }
 
-        let (data, response) = try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
+        // This request's nonce, kept: a signed refusal (#2643) is signed over it.
+        let nonce = MacIdentity.nonce()
+        let (data, response) = try await send(url, method: method, body: body, auth: .device(device),
+                                              contentType: contentType, nonce: nonce)
         let status = (response as? HTTPURLResponse)?.statusCode
         if let status, (200...299).contains(status), settings.needsPairAgain {
             // A signed request went through: whatever said this phone was
@@ -2325,12 +2354,87 @@ final class KhaytAPIClient: ObservableObject {
             return try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
         case .revoked?:
             // Signed out on the Mac: never back to the PIN, never enrol.
+            //
+            // ── BUT ONLY WHEN THE MAC SAYS SO ────────────────────────────
+            //
+            // A 401 is unsigned: anything on the shop's Wi-Fi can send
+            // `device-revoked`, and acting on it forgot the PIN, the
+            // enrolment and the pinned key, so one forged reply signed the
+            // phone out for good. As with `.unknown`, the answerer first
+            // proves it holds the PINNED Mac key (`/api/proof`). Proven: the
+            // Mac really signed this phone out. Not proven, or no answer:
+            // nothing changes and the request fails as a network fault.
+            //
+            // SIGNED BY THE MAC (#2643): a Mac that has it signs the refusal
+            // with `x-khayt-reply-mac` over THIS request's nonce, the status
+            // and the body, under this phone's key, as /api/devices/self does.
+            // That closes what the proof alone leaves open (an attacker in the
+            // middle relaying /api/proof to the real Mac). A signature that is
+            // present is believed only when it verifies; it is never "repaired"
+            // by the proof. No signature (an older Mac, a sign-out over 256
+            // ago): the /api/proof check below, as before.
+            //
+            // The proof alone shows the real Mac is reachable, not that it sent
+            // this refusal (Opus review), which is why the signature wins.
+            let replyMac = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "x-khayt-reply-mac")
+            if let replyMac {
+                guard DeviceKey.verifiesReply(device, nonce: nonce, status: 401, body: data, replyMac: replyMac) else {
+                    throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+                }
+            } else {
+                // Unsigned. A Mac with #2643 refuses a LARGE upload (a photo
+                // over 1 MB, a big estimate file) from its headers, before the
+                // body, and that refusal carries no signature (docs/LAN_API.md).
+                // So ask the small signed route and act on ITS answer.
+                switch await signedRevocation(device) {
+                case .revoked:
+                    break   // signed and verified: signed out, below
+                case .notRevoked:
+                    // The Mac took a signed request: the unsigned refusal was
+                    // not the Mac's word about this phone.
+                    throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+                case .noSignedAnswer:
+                    // An older Mac (it never signs), or an impostor. NEVER a
+                    // wipe on unsigned words alone (Dev Hub, from #2643's
+                    // review): the answerer proves the pinned key, and then the
+                    // phone stops showing the book as live and asks to pair
+                    // again, as for `.unknown`, keeping its PIN, enrolment and
+                    // key. A good signed request later clears it.
+                    let key = settings.macIdentityKey
+                    if !key.isEmpty, await proves(host: settings.host, port: settings.port, key: key) {
+                        settings.needsPairAgain = true
+                        throw KhaytAPIError.unauthorized
+                    }
+                    throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
+                }
+            }
             settings.forgetMac(keepShop: cloud != nil)
             enrolNotBefore = nil
             throw KhaytAPIError.server(L10n.tr("pair.signed_out"))
         case nil:
             return (data, response)
         }
+    }
+
+    private enum Revocation { case revoked, notRevoked, noSignedAnswer }
+
+    /// After an UNSIGNED `device-revoked`: one small signed request
+    /// (`GET /api/devices/self`), whose refusal a Mac with #2643 signs over
+    /// its nonce. `.revoked` only for a 401 `device-revoked` whose reply MAC
+    /// verifies; `.notRevoked` when the Mac took the signed request (2xx);
+    /// anything else (an older Mac's unsigned 401 or 404, no answer) is
+    /// `.noSignedAnswer`.
+    private func signedRevocation(_ device: DeviceKey.Credential) async -> Revocation {
+        guard let url = try? makeURL(path: "/api/devices/self") else { return .noSignedAnswer }
+        let nonce = MacIdentity.nonce()
+        guard let (data, response) = try? await send(url, method: "GET", body: nil, auth: .device(device), nonce: nonce),
+              let http = response as? HTTPURLResponse else { return .noSignedAnswer }
+        if (200...299).contains(http.statusCode) { return .notRevoked }
+        guard http.statusCode == 401, DeviceKey.refusal(data) == .revoked,
+              DeviceKey.verifiesReply(device, nonce: nonce, status: 401, body: data,
+                                      replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+        else { return .noSignedAnswer }
+        return .revoked
     }
 
     private enum Auth { case none, pin, device(DeviceKey.Credential) }
@@ -2346,10 +2450,12 @@ final class KhaytAPIClient: ObservableObject {
     private var clockOffset: TimeInterval = 0
 
     private func send(_ url: URL, method: String, body: Data?, auth: Auth,
-                      contentType: String = "application/json") async throws -> (Data, URLResponse) {
+                      contentType: String = "application/json",
+                      headers: [String: String] = [:], nonce: String? = nil) async throws -> (Data, URLResponse) {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
+        for (name, value) in headers { req.setValue(value, forHTTPHeaderField: name) }
         if body != nil {
             req.setValue(contentType, forHTTPHeaderField: "Content-Type")
             req.httpBody = body
@@ -2362,7 +2468,8 @@ final class KhaytAPIClient: ObservableObject {
             if !pin.isEmpty { req.setValue(pin, forHTTPHeaderField: "x-khayt-pin") }
         case .device(let device):
             guard let h = DeviceKey.headers(device, method: method, url: url, body: body,
-                                            now: Date().addingTimeInterval(clockOffset)) else {
+                                            now: Date().addingTimeInterval(clockOffset),
+                                            nonce: nonce ?? MacIdentity.nonce()) else {
                 throw KhaytAPIError.unauthorized
             }
             req.setValue(h.device, forHTTPHeaderField: "x-khayt-device")
@@ -2385,7 +2492,7 @@ final class KhaytAPIClient: ObservableObject {
 
     /// The Mac takes a job photo only from a phone it enrolled (signed), never
     /// on the PIN alone: `POST /api/orders/{id}/photos` (docs/LAN_API.md).
-    var canAddJobPhoto: Bool { usableDevice != nil && !settings.isSampleShop }
+    var canAddJobPhoto: Bool { usableDevice != nil && !settings.isSampleShop && settings.can("orders:write") }
 
     /// Send one photo of the finished print to the Mac, which keeps it full
     /// size beside the book, makes the small copy every app shows, and adds it
@@ -2475,6 +2582,9 @@ final class KhaytAPIClient: ObservableObject {
                                                     sig: answer.sig, phonePrivate: phone,
                                                     identityKey: identity) else { return .failed }
         settings.device = credential
+        // Enrolled on the owner PIN: the owner, as before roles (D-P1).
+        settings.pairedByCode = false
+        settings.deviceRole = nil
         // Signed from here on: the PIN is not kept for a reply to ask for.
         settings.dropPinAfterEnrolment()
         return .enrolled
@@ -2584,5 +2694,206 @@ enum PushRegistration {
 
     static func save(token: Data?, _ defaults: UserDefaults = .standard) {
         if let token { defaults.set(token, forKey: tokenKey) } else { defaults.removeObject(forKey: tokenKey) }
+    }
+}
+
+// MARK: - Pairing by a number approved on the Mac (C1 + C9)
+
+extension KhaytAPIClient {
+    /// How starting a code pairing went.
+    enum CodePairStart: Equatable {
+        /// Show `check` (6 digits) and poll until someone at the Mac decides.
+        case number(CodePairTicket)
+        /// The Mac has no code pairing (404/405, or a v1 answer): offer the PIN.
+        case unsupported
+        /// No "Pair a phone" window is open on the Mac.
+        case closed
+        /// The Mac is pairing something else; try again in a moment.
+        case busy
+        /// The Mac's answer did not check out (signature, key, ids), or the
+        /// reveal was refused. Nothing is shown; start again.
+        case refused
+        case unreachable
+    }
+
+    /// One code pairing in flight: the phone's key, the Mac's offer and the number.
+    struct CodePairTicket: Equatable, Sendable {
+        let pairing: CodePairing
+        let offer: PairOffer
+        let check: String
+        static func == (a: Self, b: Self) -> Bool { a.offer == b.offer && a.check == b.check }
+    }
+
+    enum CodePairState: Equatable { case waiting, approved, denied, expired, unknown, unreachable }
+
+    /// Steps 1–3: commit, check the Mac's signed offer, reveal. No PIN.
+    func startCodePairing(name: String, version: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0") async -> CodePairStart {
+        guard !settings.isSampleShop, let url = try? makeURL(path: "/api/devices/pair") else { return .unreachable }
+        let pairing = CodePairing()
+        guard let body = try? JSONEncoder().encode(pairing.startBody(name: name, version: version)),
+              let (data, response) = try? await send(url, method: "POST", body: body, auth: .none),
+              let status = (response as? HTTPURLResponse)?.statusCode else { return .unreachable }
+        switch status {
+        case 404, 405: return .unsupported
+        case 400 where Self.pairingReason(data) == "pairing-upgrade": return .unsupported
+        case 403 where Self.pairingReason(data) == "pairing-closed": return .closed
+        case 409: return .busy
+        case 200: break
+        default: return .refused
+        }
+        guard let offer = try? JSONDecoder().decode(PairOffer.self, from: data),
+              case .success(let check) = pairing.accept(offer),
+              let revealURL = try? makeURL(path: "/api/devices/pair/\(offer.pairId)/reveal"),
+              let reveal = try? JSONEncoder().encode(pairing.revealBody),
+              let (answer, revealed) = try? await send(revealURL, method: "POST", body: reveal, auth: .none,
+                                                        headers: ["x-khayt-poll": offer.pollSecret]),
+              (revealed as? HTTPURLResponse)?.statusCode == 200,
+              Self.pairState(answer) == .waiting else { return .refused }
+        return .number(CodePairTicket(pairing: pairing, offer: offer, check: check))
+    }
+
+    /// Step 4: what the Mac decided so far.
+    func pollCodePairing(_ ticket: CodePairTicket) async -> CodePairState {
+        guard let url = try? makeURL(path: "/api/devices/pair/\(ticket.offer.pairId)"),
+              let (data, response) = try? await send(url, method: "GET", body: nil, auth: .none,
+                                                     headers: ["x-khayt-poll": ticket.offer.pollSecret]),
+              let status = (response as? HTTPURLResponse)?.statusCode else { return .unreachable }
+        if status == 404 { return .unknown }
+        return status == 200 ? (Self.pairState(data) ?? .unknown) : .unknown
+    }
+
+    /// What giving a number up told the Mac (`DELETE /api/devices/pair/<pairId>`, #2631).
+    enum CodePairCancel: Equatable {
+        /// The Mac dropped the request and went back to waiting.
+        case cancelled
+        /// Too late: someone at the Mac had already approved this phone. An
+        /// approval is not undone by a cancel, so the phone finishes it.
+        case approved
+        /// Already denied or run out: nothing to give up.
+        case denied, expired
+        /// A wrong id or secret (404), or an answer that is not the route's.
+        case unknown
+        case unreachable
+    }
+
+    /// Gives this phone's own pairing request up, so the Mac stops showing
+    /// the number (Cancel, Use the PIN, or the screen going away). Unsigned,
+    /// like the poll: the poll secret is what says the request is this phone's.
+    func cancelCodePairing(_ ticket: CodePairTicket) async -> CodePairCancel {
+        guard let url = try? makeURL(path: "/api/devices/pair/\(ticket.offer.pairId)"),
+              let (data, response) = try? await send(url, method: "DELETE", body: nil, auth: .none,
+                                                     headers: ["x-khayt-poll": ticket.offer.pollSecret]),
+              let status = (response as? HTTPURLResponse)?.statusCode else { return .unreachable }
+        return Self.cancelAnswer(status: status, body: data)
+    }
+
+    nonisolated static func cancelAnswer(status: Int, body: Data) -> CodePairCancel {
+        var state: String?
+        if case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body),
+           case .string(let s)? = o["state"] { state = s }
+        switch (status, state) {
+        case (200, "cancelled"?): return .cancelled
+        case (409, "approved"?): return .approved
+        case (409, "denied"?): return .denied
+        case (409, "expired"?): return .expired
+        default: return .unknown
+        }
+    }
+
+    /// Step 5, after `.approved`. The poll is unsigned, so the approval is
+    /// PROVED first, with one request signed by the new key (`GET
+    /// /api/devices/self`): only a Mac that enrolled this exact key answers it.
+    /// Nothing in the settings changes until then. Then: the PIN goes (without
+    /// the PIN's didSet throwing the new enrolment away), the identity that
+    /// signed the offer is pinned, the key kept, the role taken.
+    @discardableResult
+    /// `stillWanted` is asked after the Mac answers and before anything is
+    /// written: a person who cancelled meanwhile keeps the phone as it was.
+    func finishCodePairing(_ ticket: CodePairTicket, markPaired: Bool = true,
+                           stillWanted: () -> Bool = { true }) async -> Bool {
+        guard let credential = ticket.pairing.credential(ticket.offer),
+              case .some(let role) = await deviceSelf(credential),
+              !Task.isCancelled, stillWanted() else { return false }
+        settings.dropPinAfterEnrolment()
+        settings.signedOutByMac = false
+        settings.needsPairAgain = false
+        // Identity first: changing it drops any older enrolment (its didSet).
+        settings.macIdentityKey = ticket.offer.identity
+        settings.device = credential
+        settings.pairedByCode = true
+        settings.deviceRole = role
+        // The approved screen says which role first; its Continue marks the
+        // phone paired (frame "Pair 2 · Approved").
+        if markPaired { settings.isPaired = true }
+        if !settings.mayHoldBook { forgetBookForFloorMode() }
+        return usableDevice == credential
+    }
+
+    /// The role the Mac holds for `credential`, from a signed request: nil when
+    /// the Mac did not answer 200 (not enrolled, unreachable), `.some(nil)` for
+    /// an answer with no role. A role that is not text reads as "viewer".
+    private func deviceSelf(_ credential: DeviceKey.Credential) async -> String?? {
+        // The role is believed only when the Mac signed this very answer
+        // (`x-khayt-reply-mac` over this request's nonce): a forged "owner"
+        // from something else on the Wi-Fi would otherwise make this phone
+        // ask for the book and show prices it was never meant to hold.
+        let nonce = MacIdentity.nonce()
+        guard let url = try? makeURL(path: "/api/devices/self"),
+              let (data, response) = try? await send(url, method: "GET", body: nil, auth: .device(credential),
+                                                     nonce: nonce),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              DeviceKey.replyVerifies(credential, nonce: nonce, status: 200, body: data,
+                                      header: http.value(forHTTPHeaderField: "x-khayt-reply-mac")),
+              case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: data) else { return nil }
+        switch o["role"] {
+        case .string(let r)?: return .some(r)
+        case nil, .null?: return .some(nil)
+        default: return .some("viewer")
+        }
+    }
+
+    /// Keep the screens in step with the role the Mac holds (a role change on
+    /// the Mac takes effect at its next request anyway). Only a code-paired
+    /// phone has a role to read: a phone enrolled on the owner PIN is the
+    /// owner, and no reply can make it less.
+    ///
+    /// The answer is believed only with a reply MAC that verifies over this
+    /// request's nonce (`deviceSelf`): something else on the Wi-Fi cannot
+    /// raise this phone to owner, nor push it down to a floor phone.
+    func refreshDeviceRole() async {
+        guard settings.pairedByCode, let device = usableDevice,
+              case .some(let role) = await deviceSelf(device) else { return }
+        settings.deviceRole = role
+        if !settings.mayHoldBook { forgetBookForFloorMode() }
+    }
+
+    /// D-P6 a: an operator or viewer phone keeps no book, nor anything taken
+    /// from one: the book with its rollback copy, the cached answers (clients,
+    /// orders, stock), the library pictures and the shop's traces (Spotlight,
+    /// the feed, widgets), as unpairing clears them. Never while edits are
+    /// waiting to be sent: those are the person's work, not the shop's book.
+    func forgetBookForFloorMode() {
+        // Only on the way down (a book is held): a floor phone's own cached
+        // answers are what it is allowed to see, and clearing them each round
+        // would leave its screens blank offline.
+        guard settings.pairedByCode, !settings.mayHoldBook, !settings.isSampleShop, pendingCount == 0,
+              holdsBookOnDisk || holdsBook else { return }
+        book?.forget()
+        Task { await CompanionCache.shared.clear() }
+        Task { await LibraryThumbs.shared.clear() }
+        ShopTraces.forget()
+        refreshHoldsBook()
+    }
+
+    nonisolated static func pairState(_ body: Data) -> CodePairState? {
+        guard case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body),
+              case .string(let s)? = o["state"] else { return nil }
+        switch s {
+        case "waiting": return .waiting
+        case "approved": return .approved
+        case "denied": return .denied
+        case "expired": return .expired
+        default: return .unknown
+        }
     }
 }

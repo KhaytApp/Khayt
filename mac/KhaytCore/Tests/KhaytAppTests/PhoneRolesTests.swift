@@ -299,6 +299,115 @@ struct PhoneRolesTests {
         #expect(gone.0 == 401 && gone.1["reason"] as? String == "device-revoked")
     }
 
+    @Test("/api/status tells a paired phone the shop's switch, signed; nobody else is told anything new")
+    func statusCarriesTheSwitch() async throws {
+        let bench = try await Self.bench()
+        func network(_ json: [String: Any]) -> (offline: Bool?, keep: [String]?) {
+            let n = json["network"] as? [String: Any]
+            return (n?["offline"] as? Bool, n?["keep"] as? [String])
+        }
+        for role in ["operator", "viewer", "manager", "owner"] {
+            let phone = try Self.codePaired(bench.devices, role: role, name: "Phone \(role)")
+            let headers = phone.headers("GET", "/api/status?format=json")
+            let reply = try await bench.send("GET", "/api/status?format=json", headers: headers, timeout: 30)
+            #expect(reply.status == 200, Comment(rawValue: role))
+            #expect(network(reply.json).offline == false && network(reply.json).keep == [], Comment(rawValue: role))
+            #expect(reply.json["queued"] != nil, "the public counts are still there")
+            #expect(reply.headers["x-khayt-reply-mac"] == LanServer.replyMac(key: phone.key, nonce: headers["x-khayt-nonce"] ?? "",
+                                                                             status: 200, body: reply.body), Comment(rawValue: role))
+        }
+        // The shop turns it on and keeps updates; `lan` and a made-up id are not kept.
+        var settings: [String: JSONValue] = { if case .object(let s)? = bench.book.value["settings"] { return s }; return [:] }()
+        settings["network"] = .object(["offline": .bool(true), "keep": .array([.string("updates"), .string("lan"), .string("nonsense")])])
+        bench.book.value["settings"] = .object(settings)
+        let op = try Self.codePaired(bench.devices, role: "operator", name: "Floor")
+        var on = try await bench.send("GET", "/api/status?format=json", headers: op.headers("GET", "/api/status?format=json"), timeout: 30)
+        #expect(network(on.json).offline == true && network(on.json).keep == ["updates"])
+        // A malformed block fails closed, with nothing kept.
+        settings["network"] = .string("x")
+        bench.book.value["settings"] = .object(settings)
+        on = try await bench.send("GET", "/api/status?format=json", headers: op.headers("GET", "/api/status?format=json"), timeout: 30)
+        #expect(network(on.json).offline == true && network(on.json).keep == [])
+        // Nobody else: no headers, the PIN, and a signature that is not the phone's own.
+        let open = try await bench.get("/api/status?format=json")
+        #expect(open.status == 200 && open.json["network"] == nil && open.headers["x-khayt-reply-mac"] == nil)
+        let pin = try await bench.get("/api/status?format=json", headers: ["x-khayt-pin": Self.pin])
+        #expect(pin.status == 200 && pin.json["network"] == nil && pin.headers["x-khayt-reply-mac"] == nil)
+        var forged = op.headers("GET", "/api/status?format=json")
+        forged["x-khayt-mac"] = Data(repeating: 1, count: 32).base64EncodedString()
+        let bad = try await bench.send("GET", "/api/status?format=json", headers: forged, timeout: 30)
+        #expect(bad.status == 200 && bad.json["network"] == nil && bad.headers["x-khayt-reply-mac"] == nil)
+        // The counts are still whole numbers after the block is added.
+        let text = String(decoding: on.body, as: UTF8.self)
+        #expect(!text.contains(".0") && text.contains("\"queued\":"), Comment(rawValue: text))
+        #expect(on.headers["Cache-Control"] == "no-store" || on.headers["cache-control"] == "no-store")
+        // A phone that was removed is told nothing new, and nothing is signed for it.
+        #expect(bench.devices.remove(op.id))
+        let gone = try await bench.send("GET", "/api/status?format=json", headers: op.headers("GET", "/api/status?format=json"), timeout: 30)
+        #expect(gone.status == 200 && gone.json["network"] == nil && gone.headers["x-khayt-reply-mac"] == nil)
+        // The public answer is byte for byte what it was.
+        let expected = try await bench.engine.lanStatusBody(store: .object(bench.book.value), today: LanServer.localDay(bench.box.now))
+        #expect(String(decoding: open.body, as: UTF8.self) == expected)
+    }
+
+    @Test("device-revoked is signed for the phone that was signed out, and for nobody who only names it")
+    func revokedIsSigned() async throws {
+        let bench = try await Self.bench()
+        let phone = try Self.codePaired(bench.devices, role: "manager", name: "Signed out")
+        let other = try Self.codePaired(bench.devices, role: "manager", name: "Still here")
+        #expect(bench.devices.remove(phone.id))
+        func ask(_ headers: [String: String], _ path: String = "/api/queue") async throws -> LanServerTests.Bench.Reply {
+            try await bench.send("GET", path, headers: headers, timeout: 30)
+        }
+        // Its own request: refused, and the refusal verifies under the key it had.
+        var headers = phone.headers("GET", "/api/queue")
+        var reply = try await ask(headers)
+        #expect(reply.status == 401 && reply.json["reason"] as? String == "device-revoked")
+        #expect(reply.headers["x-khayt-reply-mac"] == LanServer.replyMac(key: phone.key, nonce: headers["x-khayt-nonce"] ?? "",
+                                                                         status: 401, body: reply.body))
+        // The same on the route the phone asks first.
+        headers = phone.headers("GET", "/api/devices/self")
+        reply = try await ask(headers, "/api/devices/self")
+        #expect(reply.status == 401)
+        #expect(reply.headers["x-khayt-reply-mac"] == LanServer.replyMac(key: phone.key, nonce: headers["x-khayt-nonce"] ?? "",
+                                                                         status: 401, body: reply.body))
+        // Somebody who only knows its id: the same words, nothing signed.
+        headers = phone.headers("GET", "/api/queue")
+        headers["x-khayt-mac"] = Data(repeating: 1, count: 32).base64EncodedString()
+        reply = try await ask(headers)
+        #expect(reply.status == 401 && reply.json["reason"] as? String == "device-revoked")
+        #expect(reply.headers["x-khayt-reply-mac"] == nil)
+        // A request signed for another path, played at this one: not signed.
+        reply = try await ask(phone.headers("GET", "/api/store"))
+        #expect(reply.status == 401 && reply.headers["x-khayt-reply-mac"] == nil)
+        // An id nobody ever enrolled: unknown, unsigned.
+        let stranger = LanConnectorRoutesTests.Peer(id: LanDevices.freshId(), key: Data(repeating: 7, count: 32))
+        reply = try await ask(stranger.headers("GET", "/api/queue"))
+        #expect(reply.status == 401 && reply.json["reason"] as? String == "device-unknown" && reply.headers["x-khayt-reply-mac"] == nil)
+        // The old key opens nothing, and the phone that is still paired is untouched.
+        #expect(bench.devices.phoneKey(phone.id) == nil && bench.devices.rulesRecord(phone.id) == nil)
+        #expect(try await ask(other.headers("GET", "/api/queue")).status == 200)
+        #expect(reply.headers["x-khayt-reply-mac"] == nil)
+        // A target with a query string is bound like any other.
+        headers = phone.headers("GET", "/api/status?format=json")
+        reply = try await ask(headers, "/api/status?format=json")
+        #expect(reply.status == 200, "the public route stays public, and tells a signed-out phone nothing new")
+        // The signed refusal is not to be cached.
+        headers = phone.headers("GET", "/api/queue")
+        reply = try await ask(headers)
+        #expect(reply.headers["Cache-Control"] == "no-store" || reply.headers["cache-control"] == "no-store")
+        // A connector that is removed keeps no key: its refusals are not signed this way.
+        let plugin = try LanConnectorRoutesTests.enrol(bench)
+        #expect(bench.devices.remove(plugin.id))
+        #expect(bench.devices.revokedReplyKey(headers: plugin.headers("GET", "/api/queue"), method: "GET", target: "/api/queue",
+                                              body: Data(), now: Date(timeIntervalSince1970: TimeInterval(LanConnectorRoutesTests.now))) == nil)
+        // The key is given for the phone's own fresh request, and for no stale one.
+        #expect(bench.devices.revokedReplyKey(headers: phone.headers("GET", "/api/queue"), method: "GET", target: "/api/queue",
+                                              body: Data(), now: Date(timeIntervalSince1970: TimeInterval(LanConnectorRoutesTests.now))) == phone.key)
+        #expect(bench.devices.revokedReplyKey(headers: phone.headers("GET", "/api/queue"), method: "GET", target: "/api/queue", body: Data(),
+                                              now: Date(timeIntervalSince1970: TimeInterval(LanConnectorRoutesTests.now + 3600))) == nil, "a stale request is not answered with a signature")
+    }
+
     @Test("the role answers are signed back to the phone, and only to a request that verified")
     func replyMacs() async throws {
         let bench = try await Self.bench()

@@ -839,6 +839,28 @@ struct QuoteFormImportTests {
         #expect(name("a:b\u{0}.stl") == "ab.stl")
         #expect(name("/") == "model")
         #expect(name(String(repeating: "x", count: 300) + ".3mf").utf8.count <= 200)
+        // Safe on Windows too: the file can end up on one.
+        #expect(name("a<b>c\"d|e?f*g.stl") == "abcdefg.stl")
+        #expect(name("part.stl. . .") == "part.stl")
+        #expect(name("CON.gcode") == "_CON.gcode")
+        #expect(name("nul") == "_nul")
+        #expect(name("com1.3mf") == "_com1.3mf" && name("LPT9.stl") == "_LPT9.stl")
+        #expect(name("console.gcode") == "console.gcode" && name("COM10.stl") == "COM10.stl", "only the device names themselves")
+        #expect(name("???") == "model" && name(" . ") == "model")
+        let long = name(String(repeating: "x", count: 180) + String(repeating: ".", count: 40) + "stl")
+        #expect(long.utf8.count <= 200 && !long.hasSuffix(".") && !long.hasSuffix(" "))
+        // A cut that lands on a space leaves no space at the end.
+        #expect(name(String(repeating: "x", count: 179) + " " + String(repeating: "y", count: 30)) == String(repeating: "x", count: 179))
+        // A cut must not UNCOVER a device name: these are not one before the cut.
+        let spaces = String(repeating: " ", count: 250)
+        #expect(name("CON" + spaces + "x") == "_CON")
+        let cut = name("CON" + spaces + "x.gcode")
+        #expect(cut.hasPrefix("_CON") && cut.hasSuffix(".gcode") && cut.utf8.count <= 200)
+        #expect(name("CONa" + String(repeating: "\u{301}", count: 100) + ".stl") == "_CON.stl")
+        // An "extension" of thousands of bytes is not one: the bound holds.
+        #expect(name("a.x" + String(repeating: "\u{301}", count: 1000)).utf8.count <= 200)
+        // The rest of Microsoft's list.
+        #expect(name("COM0.stl") == "_COM0.stl" && name("lpt\u{B2}") == "_lpt\u{B2}" && name("COM\u{B9}.3mf") == "_COM\u{B9}.3mf")
     }
 
     @Test("the payload's file is read; an intake row shows its name, size and expiry")

@@ -1,3 +1,4 @@
+import KhaytCore
 import Foundation
 
 /**
@@ -44,7 +45,13 @@ struct BarcodeLookup {
         }
     }
 
-    var fetch: Fetch = { try await URLSession.shared.data(for: $0) }
+    /// Asks the shop's internet switch first (P8, `lookups`): a refused
+    /// lookup throws `OutboundBlocked`, which reads as "couldn't reach the
+    /// lookup" (the same note as no connection), never as "not found".
+    var fetch: Fetch = { request in
+        try OutboundGate.shared.require(.lookups)
+        return try await URLSession.shared.data(for: request)
+    }
 
     static let endpoint = "https://api.upcitemdb.com/prod/trial/lookup"
 

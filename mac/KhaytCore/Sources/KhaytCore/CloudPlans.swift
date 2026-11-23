@@ -255,6 +255,7 @@ public enum CloudPlans {
               let url = URL(string: (b.absoluteString.hasSuffix("/") ? String(b.absoluteString.dropLast()) : b.absoluteString) + path) else {
             throw CloudReader.Failure.badAddress(base)
         }
+        try OutboundGate.shared.require(.cloud)
         var request = URLRequest(url: url)
         request.timeoutInterval = 30
         return request

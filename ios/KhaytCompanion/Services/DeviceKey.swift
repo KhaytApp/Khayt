@@ -99,12 +99,55 @@ enum DeviceKey {
         return Data(code).base64EncodedString()
     }
 
+    /// `x-khayt-reply-mac`: the Mac signs its answer to a signed request with
+    /// the same key, `HMAC(K, "khayt-reply-v1\n" + requestNonce + "\n" +
+    /// status + "\n" + hex(sha256(body)))`, base64 (docs/LAN_API.md, the
+    /// connector's formula). Something else on the Wi-Fi cannot forge it.
+    static func replyMac(key: String, nonce: String, status: Int, body: Data) -> String? {
+        guard let raw = Data(base64Encoded: key), raw.count == 32 else { return nil }
+        let digest = SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
+        let text = ["khayt-reply-v1", nonce, String(status), digest].joined(separator: "\n")
+        return Data(HMAC<SHA256>.authenticationCode(for: Data(text.utf8), using: SymmetricKey(data: raw)))
+            .base64EncodedString()
+    }
+
+    /// Whether an answer carries a reply MAC that verifies, compared in
+    /// constant time.
+    static func replyVerifies(_ credential: Credential, nonce: String, status: Int, body: Data,
+                              header: String?) -> Bool {
+        guard let header, let want = replyMac(key: credential.key, nonce: nonce, status: status, body: body),
+              let a = Data(base64Encoded: header), let b = Data(base64Encoded: want), a.count == b.count else { return false }
+        return zip(a, b).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0
+    }
+
     static func headers(_ credential: Credential, method: String, url: URL, body: Data?,
                         now: Date, nonce: String = MacIdentity.nonce()) -> Headers? {
         let time = Int(now.timeIntervalSince1970.rounded(.down))
         let text = canonical(method: method, target: requestTarget(url), time: time, nonce: nonce, body: body)
         guard let mac = mac(key: credential.key, canonical: text) else { return nil }
         return Headers(device: credential.deviceId, time: String(time), nonce: nonce, mac: mac)
+    }
+
+    /// What the Mac signs an answer to a SIGNED request with
+    /// (`x-khayt-reply-mac`, `LanServer.replyMac`): `HMAC(K, "khayt-reply-v1\n"
+    /// + requestNonce + "\n" + status + "\n" + sha256hex(body))`, base64.
+    static let replyPrefix = "khayt-reply-v1"
+
+    static func replyText(nonce: String, status: Int, body: Data) -> Data {
+        let hash = SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
+        return Data([replyPrefix, nonce, String(status), hash].joined(separator: "\n").utf8)
+    }
+
+    /// True only when `replyMac` is the Mac's signature over THIS answer to
+    /// the request sent with `nonce`, under this phone's own key. Compared in
+    /// constant time. A missing header, a key that is not 32 bytes or a MAC
+    /// that is not base64 is false: an answer nobody signed is not the Mac's.
+    static func verifiesReply(_ credential: Credential, nonce: String, status: Int, body: Data,
+                              replyMac: String?) -> Bool {
+        guard let replyMac, let mac = Data(base64Encoded: replyMac),
+              let raw = Data(base64Encoded: credential.key), raw.count == 32 else { return false }
+        return HMAC<SHA256>.isValidAuthenticationCode(mac, authenticating: replyText(nonce: nonce, status: status, body: body),
+                                                      using: SymmetricKey(data: raw))
     }
 
     /// Why a signed request was refused, from a 401's `reason`.

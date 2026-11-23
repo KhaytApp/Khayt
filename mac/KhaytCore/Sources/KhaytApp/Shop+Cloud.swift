@@ -182,7 +182,7 @@ extension Shop {
         guard case .store(let build) = source else { return }
         let connection = try? CloudReader.connection(settingsDict)
         await livePublisher.publishIfDue(
-            rows: machinesLive(), connection: connection, dek: cloudDek, canWrite: cloudRoleCanWrite,
+            rows: machinesLive(), engine: engine, connection: connection, dek: cloudDek, canWrite: cloudRoleCanWrite,
             token: { [weak self] in
                 guard let self, let c = connection else { return nil }
                 _ = self
@@ -765,6 +765,8 @@ extension Shop {
     ///   valid and nothing here has to reach into another app's bookkeeping.
     func pullFromCloud() async {
         guard permitted("cloud", "edit") else { return }
+        // Beside each sync: the shop's switch as Khayt Cloud holds it.
+        await checkNetworkSwitch()
         cloudProblem = nil
         cloudSent = nil
         cloudPulled = nil

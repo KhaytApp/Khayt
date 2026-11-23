@@ -47,6 +47,7 @@ public enum BnplClient {
         guard let url = URL(string: plan.url), url.scheme == "https" else {
             throw URLError(.badURL)
         }
+        try OutboundGate.shared.require(.payments)
         var request = URLRequest(url: url, timeoutInterval: (plan.timeoutMs ?? 15000) / 1000)
         request.httpMethod = plan.method
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")

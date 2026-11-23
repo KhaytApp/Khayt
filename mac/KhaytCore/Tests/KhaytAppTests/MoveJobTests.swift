@@ -90,7 +90,8 @@ struct MoveJobTests {
 
     static func move(_ root: inout [String: JSONValue], _ id: String, _ stage: Stage,
                      holdReason: String? = nil, qcNotes: String? = nil,
-                     actuals: Shop.Actuals? = nil)
+                     actuals: Shop.Actuals? = nil,
+                     actor: (id: String, name: String)? = nil)
     async throws -> (undo: [Shop.ChangedRecord], notices: [String]) {
         let engine = try KhaytEngine()
         // Words loaded, not bare: a notice is only useful if it comes back as a
@@ -103,7 +104,7 @@ struct MoveJobTests {
         // back everything, for the cases that are about what goes out.
         let out = try await Shop.applyMove(to: &root, id: id, stage: stage, engine: engine,
                                            words: words, holdReason: holdReason, qcNotes: qcNotes,
-                                           actuals: actuals)
+                                           actuals: actuals, actor: actor)
         return (out.undo, out.notices)
     }
 
@@ -173,10 +174,12 @@ struct MoveJobTests {
 
     @Test("the move is written in the team's activity log, the way Khayt writes it")
     func activityLog() async throws {
+        // The book says somebody else is signed in on the OTHER app: OP2.
         var root = Self.book(settings: ["autoDeduct": .bool(true),
-                                        "activeOperatorId": .string("OP1")])
-        root["operators"] = .array([.object(["id": .string("OP1"), "name": .string("Sara")])])
-        _ = try await Self.move(&root, "J1", .pending)
+                                        "activeOperatorId": .string("OP2")])
+        root["operators"] = .array([.object(["id": .string("OP1"), "name": .string("Sara")]),
+                                    .object(["id": .string("OP2"), "name": .string("Desktop Dana")])])
+        _ = try await Self.move(&root, "J1", .pending, actor: ("OP1", "Sara"))
 
         let log = Self.rows(root, "auditLog")
         #expect(log.count == 1)
@@ -188,6 +191,58 @@ struct MoveJobTests {
         #expect(Self.string(entry["operatorName"]) == "Sara", "who did it, not just what")
         #expect(Self.string(entry["id"])?.hasPrefix("AL-") == true)
         #expect(Self.string(entry["at"])?.hasSuffix("Z") == true)
+    }
+
+    @Test("a move here is never credited to the person signed in on the other app")
+    func notTheDesktopsPerson() async throws {
+        var root = Self.book(settings: ["activeOperatorId": .string("OP2")])
+        root["operators"] = .array([.object(["id": .string("OP2"), "name": .string("Desktop Dana")])])
+        _ = try await Self.move(&root, "J1", .pending)     // nobody named: the lock is off, or it came over the LAN
+        let entry = try #require(Self.rows(root, "auditLog").first)
+        #expect(entry["operatorId"] == .null, "credited to the book's activeOperatorId")
+        #expect(Self.string(entry["operatorName"]) == "")
+        #expect(!String(describing: entry).contains("Dana"))
+    }
+
+    @Test("who is credited: the person signed in here; nobody with the lock off, before sign-in, or for a system write")
+    func whoIsCredited() async throws {
+        let shop = await OperatorLockTests.shop()
+        #expect(shop.lockInForce)
+        #expect(shop.actorHere == nil, "nobody is signed in yet")
+        #expect(await shop.signIn("OP-o", pin: "1111") == .ok)
+        let here = try #require(shop.actorHere)
+        #expect(here.id == "OP-o" && !here.name.isEmpty)
+        #expect(shop.actor(for: .person("orders", "edit"))?.id == "OP-o")
+        #expect(shop.actor(for: .system("a payment the provider confirmed")) == nil,
+                "a system write was credited to whoever was signed in")
+        // The lock off: there is no person this Mac can name, whatever the book says.
+        let open = await OperatorLockTests.shop(on: false, extra: ["activeOperatorId": .string("OP-o")])
+        #expect(open.actorHere == nil && open.actor(for: .person("orders", "edit")) == nil)
+        // The portal watch's move says it is nobody's.
+        let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let watch = try String(contentsOf: app.appending(path: "Shop+PortalWatch.swift"), encoding: .utf8)
+        #expect(watch.contains("moveJob(job.id, to: .pending, byPersonHere: false)"))
+    }
+
+    @Test("no Mac source reads the book's activeOperatorId, and the log's writer cannot be handed the settings")
+    func nobodyReadsIt() throws {
+        let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let files = try FileManager.default.subpathsOfDirectory(atPath: app.path).filter { $0.hasSuffix(".swift") }
+        #expect(files.count > 100)
+        for file in files {
+            let text = try String(contentsOf: app.appending(path: file), encoding: .utf8)
+            for line in text.split(separator: "\n") where line.contains("activeOperatorId") {
+                let code = line.trimmingCharacters(in: .whitespaces)
+                #expect(code.hasPrefix("//"), Comment(rawValue: "\(file): \(code)"))
+            }
+        }
+        let jobs = try String(contentsOf: app.appending(path: "Shop+Jobs.swift"), encoding: .utf8)
+        let start = try #require(jobs.range(of: "nonisolated static func appendActivity("))
+        let signature = jobs[start.lowerBound...].prefix(400)
+        #expect(!signature.contains("settings:"))
+        #expect(signature.contains("actor: (id: String, name: String)?) {"), "the actor has a default again")
     }
 
     @Test("a move the rules refuse changes nothing at all")

@@ -61,6 +61,15 @@ struct CloudSession: Equatable, Sendable {
         UserDefaults(suiteName: "group.com.khaytapp.companion") ?? .standard
     }
 
+    /// Whether a session is saved, and the member's role as saved, read from
+    /// the shared defaults only (no Keychain), for the phone's role checks.
+    /// A session saved without a role gives nil: the caller fails closed.
+    static func savedRole(defaults: UserDefaults = Self.defaults) -> (signedIn: Bool, role: String?) {
+        let url = defaults.string(forKey: Keys.url) ?? "", shop = defaults.string(forKey: Keys.shopId) ?? ""
+        guard !url.isEmpty, !shop.isEmpty else { return (false, nil) }
+        return (true, defaults.string(forKey: Keys.role))
+    }
+
     /// The saved session, or nil when this phone is not signed in to the cloud.
     static func load(defaults: UserDefaults = Self.defaults) -> CloudSession? {
         guard let url = defaults.string(forKey: Keys.url), !url.isEmpty,

@@ -159,6 +159,10 @@ extension Shop {
     /// since removed or switched off is dropped, never sent.
     func retryDueWebhooks() async {
         guard let engine, let build = source.build, StoreLock.weOwnIt(build) else { return }
+        // "Make no internet calls": what is queued WAITS. A retry made now
+        // would only be refused, and each refusal would use up one of the
+        // delivery's tries until it was dropped unsent.
+        guard outboundGate.verdict(.webhooks).allowed else { return }
         let nowMs = Date().timeIntervalSince1970 * 1000
         let at = ISO8601DateFormatter().string(from: Date())
         guard let due = try? await engine.webhookDue(settingsDict["webhooks"] ?? .null, nowMs: nowMs),
@@ -312,7 +316,7 @@ extension Shop {
         var headers: [(String, String)] = [("Content-Type", req.contentType ?? "application/json")]
         for (k, v) in (req.headers ?? [:]).sorted(by: { $0.key < $1.key }) { headers.append((k, v)) }
         do {
-            let status = try await WebhookClient.post(Data(body.utf8), to: url, headers: headers, engine: engine)
+            let status = try await WebhookClient.post(Data(body.utf8), to: url, headers: headers, engine: engine, purpose: .messaging)
             let read = try await engine.smsResult(status: status, text: "")
             return read.ok ? nil : (read.error ?? "HTTP \(status)")
         } catch let failure as WebhookClient.Failure {
@@ -439,7 +443,7 @@ extension Shop {
             let secret = try await Secrets.open(Self.plainString(cfg["secret"]) ?? "", for: source)
             let req = try await engine.accountingRequest(payload: payload, secret: secret)
             let headers = req.headers.sorted(by: { $0.key < $1.key }).map { ($0.key, $0.value) }
-            let status = try await WebhookClient.post(Data(req.body.utf8), to: url, headers: headers, engine: engine)
+            let status = try await WebhookClient.post(Data(req.body.utf8), to: url, headers: headers, engine: engine, purpose: .webhooks)
             return (200..<300).contains(status) ? nil : "HTTP \(status)"
         } catch let failure as WebhookClient.Failure {
             return failure.errorDescription ?? "failed"
