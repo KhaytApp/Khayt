@@ -76,6 +76,19 @@
   const isNewer = (a, b) => compareVersions(a, b) > 0;
 
   /**
+   * One version's items in `lang`, aligned by index with its English, or null
+   * (English). An array of another length is not trusted at all: it was made
+   * for different English, and a shifted item would warn about the wrong thing.
+   */
+  function translated(text, version, lang, length) {
+    const l = String(lang || '');
+    if (!l || l === 'en' || !text || typeof text !== 'object') return null;
+    const byLang = text[version];
+    const arr = byLang && typeof byLang === 'object' ? byLang[l] : null;
+    return Array.isArray(arr) && arr.length === length ? arr : null;
+  }
+
+  /**
    * @param {object} o
    * @param {string} o.current          this build's version
    * @param {object|null} o.seen        the parsed file, or null
@@ -83,9 +96,12 @@
    * @param {boolean} o.hasBook         a shop's book exists (an upgrade, not a fresh install)
    * @param {(a: string, b: string) => boolean} o.isNewer  a newer than b
    * @param {string} [o.floor]        where a book with no record counts as coming from (default FLOOR, the desktop's)
+ * @param {object} [o.text]         the product's translations (release-gates.json `i18n.gates` or `i18n.mac`):
+ *                                   { version: { lang: [items aligned with the English] } }
+ * @param {string} [o.lang]         the app's language; English when absent or not translated
    * @returns {{ items: string[], versions: string[] }}
    */
-  function pending({ current, seen, gates, hasBook, isNewer, floor }) {
+  function pending({ current, seen, gates, hasBook, isNewer, floor, text, lang }) {
     const none = { items: [], versions: [] };
     const cur = String(current || '');
     if (!cur) return none;
@@ -104,15 +120,18 @@
     const items = [];
     const seenItems = new Set();
     for (const v of versions) {
-      for (const it of Array.isArray(g[v]) ? g[v] : []) {
+      const en = Array.isArray(g[v]) ? g[v] : [];
+      const tr = translated(text, v, lang, en.length);
+      en.forEach((it, i) => {
         const x = String(it);
-        if (!seenItems.has(x)) { seenItems.add(x); items.push(x); }
-      }
+        // Once per ENGLISH item: the same item in two versions shows once.
+        if (!seenItems.has(x)) { seenItems.add(x); items.push(tr && typeof tr[i] === 'string' && tr[i].trim() ? tr[i] : x); }
+      });
     }
     return { items, versions: items.length ? versions : [] };
   }
 
-  const api = { pending, compareVersions, isNewer, FILE, FLOOR };
+  const api = { pending, translated, compareVersions, isNewer, FILE, FLOOR };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytLaunchGate = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

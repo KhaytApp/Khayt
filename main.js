@@ -2408,6 +2408,7 @@ require('./lib/main/launch-gate.js').registerLaunchGate({
   userDataDir: () => app.getPath('userData'),
   current: app.getVersion(),
   gates: (() => { try { return require('./lib/release-gates.json').gates || {}; } catch (_) { return {}; } })(),
+  text: (() => { try { const f = require('./lib/release-gates.json'); return (f.i18n && f.i18n.gates) || null; } catch (_) { return null; } })(),
   // Asked once, as the app starts: the window writes a fresh install's first
   // book before it asks for the gate, and that is not an upgrade.
   hasBook: (() => { let had = false; try { had = fs.existsSync(dataFilePath()); } catch (_) { had = false; } return () => had; })(),
