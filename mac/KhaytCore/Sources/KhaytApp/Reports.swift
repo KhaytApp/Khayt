@@ -18,6 +18,7 @@ struct Reports: View {
     @State private var owed: Receivables?
     @State private var best: KhaytEngine.TopLists?
     @State private var machinePL: KhaytEngine.MachineProfitReport?
+    @State private var success: [KhaytEngine.SuccessRow] = []
     /// What the shop must bill this month to cover what it pays anyway.
     /// Beside the quarters rather than on a page of its own: a shop reading
     /// what it made is the shop that wants to know whether it was enough.
@@ -132,7 +133,7 @@ struct Reports: View {
                                   power: power,
                                   maintenance: maintenance,
                                   downtime: downtime, downtimeMonths: downtimeMonths,
-                                  sites: sites)
+                                  sites: sites, success: success)
             } else if shop.reportPage == .custom {
                 CustomReportPage(shop: shop)
             } else if rows.isEmpty {
@@ -888,6 +889,17 @@ struct Reports: View {
         // chosen range, so "This month" charged January's belt overhaul against
         // July's revenue and a profitable printer read as loss-making.
         let done = await shop.completedInPeriod()
+        // How often each printer's prints came out right, over the same
+        // range, by the day each run was SENT (a reprint is its own run):
+        // every job's runs, finished or not, because a failed print belongs
+        // to a job that may still be open.
+        let sent = Shop.periodSpan(shop.period, dates: shop.orderRows.compactMap { row in
+            if case .object(let o) = row, case .string(let d)? = o["date"] { return d }
+            return nil
+        })
+        success = (try? await engine.successRates(orders: shop.orderRows, machines: shop.machineRows,
+                                                  from: sent.from.isEmpty ? nil : sent.from,
+                                                  to: sent.to.isEmpty ? nil : sent.to)) ?? []
         machinePL = try? await engine.machineProfit(
             machines: shop.machineRows,
             completed: done.orders,
