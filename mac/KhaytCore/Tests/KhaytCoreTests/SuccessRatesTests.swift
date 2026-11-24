@@ -11,7 +11,8 @@ struct SuccessRatesTests {
     struct Case: Decodable {
         struct Input: Decodable { let machines: [JSONValue]?; let orders: [JSONValue]?; let from: String?; let to: String? }
         /// The caller's calendar, on cases that have one (the Windows/Linux app's #2702).
-        struct CalendarOf: Decodable { let utcOffsetMinutes: Int }
+        /// A fixed offset, or a zone by name (whose offset changes through the year).
+        struct CalendarOf: Decodable { let utcOffsetMinutes: Int?; let timeZone: String? }
         let why: String
         let input: Input
         let calendar: CalendarOf?
@@ -33,7 +34,11 @@ struct SuccessRatesTests {
         var sawWindow = false, sawNil = false, sawNotEnough = false
         for c in cases {
             var zone: Calendar?
-            if let minutes = c.calendar?.utcOffsetMinutes {
+            if let named = c.calendar?.timeZone {
+                var made = Calendar(identifier: .gregorian)
+                made.timeZone = try #require(TimeZone(identifier: named), Comment(rawValue: named))
+                zone = made
+            } else if let minutes = c.calendar?.utcOffsetMinutes {
                 var made = Calendar(identifier: .gregorian)
                 made.timeZone = try #require(TimeZone(secondsFromGMT: minutes * 60))
                 zone = made
