@@ -3189,6 +3189,7 @@
  "mac.proof_remove_note": "このジョブに保存したコピーは削除されます。プリンターに動画が残っていれば、もう一度保存できます。",
  "mac.proof_remove_yes": "削除",
  "mac.proof_stays": "タイムラプス · {size} · プリンターに残ります",
+ "mac.proof_stays_plain": "タイムラプス · プリンターに残ります",
  "mac.proof_too_large": "ジョブに保存できる {max} を超えています。何もコピーしていません。",
  "mac.proof_no_size": "プリンターがサイズを知らせなかったため、コピーしません。",
  "mac.proof_open": "プリンターで開く",

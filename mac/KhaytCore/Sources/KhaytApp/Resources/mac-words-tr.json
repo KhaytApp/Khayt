@@ -3189,6 +3189,7 @@
  "mac.proof_remove_note": "Bu işle saklanan kopya silinir. Video yazıcıda duruyorsa yeniden saklayabilirsiniz.",
  "mac.proof_remove_yes": "Kaldır",
  "mac.proof_stays": "Hızlandırılmış video · {size} · yazıcıda kalır",
+ "mac.proof_stays_plain": "Hızlandırılmış video · yazıcıda kalır",
  "mac.proof_too_large": "Bir işin sakladığı {max} sınırından büyük. Hiçbir şey kopyalanmadı.",
  "mac.proof_no_size": "Yazıcı boyutunu bildirmedi, bu yüzden kopyalanmıyor.",
  "mac.proof_open": "Yazıcıda aç",

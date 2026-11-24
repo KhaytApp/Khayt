@@ -3189,6 +3189,7 @@
  "mac.proof_remove_note": "Die mit diesem Auftrag behaltene Kopie wird gelöscht. Hat der Drucker das Video noch, können Sie es erneut behalten.",
  "mac.proof_remove_yes": "Entfernen",
  "mac.proof_stays": "Zeitraffer · {size} · bleibt auf dem Drucker",
+ "mac.proof_stays_plain": "Zeitraffer · bleibt auf dem Drucker",
  "mac.proof_too_large": "Größer als die {max}, die ein Auftrag behält. Es wurde nichts kopiert.",
  "mac.proof_no_size": "Der Drucker hat die Größe nicht genannt, daher wird es nicht kopiert.",
  "mac.proof_open": "Auf dem Drucker öffnen",

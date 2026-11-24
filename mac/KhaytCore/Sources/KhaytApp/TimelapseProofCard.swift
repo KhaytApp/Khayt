@@ -161,6 +161,8 @@ struct TimelapseProofCard: View {
         return shop.timelapseCopying.contains(jobId) ? (shop.timelapseProgress[jobId] ?? TimelapseProgress(got: 0, total: nil)) : nil
     }
     private var problem: String? { pretend.map { $0.problem } ?? shop.timelapseProblem[jobId] }
+    /// A capture draws the card as a shop that may edit jobs sees it (the sample book lets nobody).
+    private var mayEdit: Bool { shop.canMoveJobs || pretend != nil }
 
     /// The two lines of a state, as the frame words them.
     @MainActor static func lines(_ proof: Shop.TimelapseProof, copying: TimelapseProgress?, problem: String?, shop: Shop) -> (title: String, sub: String) {
@@ -181,7 +183,9 @@ struct TimelapseProofCard: View {
             return (words.callIt("mac.proof_kept", ["size": .string(size(bytes))]),
                     words.callIt("mac.proof_kept_sub", ["machine": .string(shop.proofMachineName(machineId)), "when": .string(when(at))]))
         case .stays(let bytes, let most, let reason, _):
-            return (words.callIt("mac.proof_stays", ["size": .string(size(bytes))]),
+            // No size, no size in the title: "· — ·" says nothing.
+            let title = (bytes ?? 0) > 0 ? words.callIt("mac.proof_stays", ["size": .string(size(bytes))]) : words.callIt("mac.proof_stays_plain")
+            return (title,
                     reason == "over-budget" ? words.callIt("mac.proof_too_large", ["max": .string(size(most))]) : words.callIt("mac.proof_no_size"))
         }
     }
@@ -233,14 +237,14 @@ struct TimelapseProofCard: View {
             } else {
                 Button(words.callIt(problem == nil ? "mac.proof_keep" : "mac.proof_again")) { shop.startKeepTimelapse(jobId) }
                     .controlSize(.small)
-                    .disabled(!shop.canMoveJobs)
+                    .disabled(!mayEdit)
             }
         case .kept:
             Button(words.callIt("mac.proof_show")) {
                 if let file = shop.keptTimelapseFile(jobId), FileManager.default.fileExists(atPath: file.path) { NSWorkspace.shared.open(file) }
                 else { shop.timelapseProblem[jobId] = words.callIt("mac.proof_gone") }
             }.controlSize(.small)
-            Button(words.callIt("mac.proof_remove")) { removing = true }.controlSize(.small).disabled(!shop.canMoveJobs)
+            Button(words.callIt("mac.proof_remove")) { removing = true }.controlSize(.small).disabled(!mayEdit)
         case .stays:
             // Plays from the printer, as "Watch timelapse" does: nothing is copied.
             Button(words.callIt("mac.proof_open")) {

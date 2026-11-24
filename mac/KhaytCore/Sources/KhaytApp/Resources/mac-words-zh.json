@@ -3189,6 +3189,7 @@
  "mac.proof_remove_note": "随此任务保留的副本将被删除。如果打印机上仍有该视频,你可以再次保留。",
  "mac.proof_remove_yes": "移除",
  "mac.proof_stays": "延时视频 · {size} · 保留在打印机上",
+ "mac.proof_stays_plain": "延时视频 · 保留在打印机上",
  "mac.proof_too_large": "超过任务可保留的 {max}。未复制任何内容。",
  "mac.proof_no_size": "打印机未说明其大小,因此不会复制。",
  "mac.proof_open": "在打印机上打开",

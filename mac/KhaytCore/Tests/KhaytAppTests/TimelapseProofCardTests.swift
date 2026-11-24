@@ -61,7 +61,9 @@ struct TimelapseProofCardTests {
         #expect(kept.title == "Time-lapse · 42 MB · kept as proof" && kept.sub.hasPrefix("From Workshop U1 · ") && kept.sub.contains("Nov 21"))
         let large = lines(.stays(bytes: 310_000_000, maxBytes: 150_000_000, reason: "over-budget", machineId: "U1"))
         #expect(large.title == "Time-lapse · 310 MB · stays on the printer" && large.sub == "Larger than the 150 MB a job keeps. Nothing was copied.")
-        #expect(lines(.stays(bytes: nil, maxBytes: nil, reason: "size-unknown", machineId: "U1")).sub == "The printer did not say how large it is, so it is not copied.")
+        let unsized = lines(.stays(bytes: nil, maxBytes: nil, reason: "size-unknown", machineId: "U1"))
+        #expect(unsized.sub == "The printer did not say how large it is, so it is not copied.")
+        #expect(unsized.title == "Time-lapse · stays on the printer", "a size nobody knows was drawn as a dash between two dots")
         // Could not copy: the same title, the reason, and "Try again" where "Keep as proof" was.
         let failed = lines(.found(bytes: 42_000_000, machineId: "U1", at: when), problem: shop.words.callIt("mac.proof_offline"))
         #expect(failed.title == "Time-lapse found on Workshop U1" && failed.sub == "Couldn't reach the printer. Nothing was copied; the video is still there.")
@@ -71,6 +73,10 @@ struct TimelapseProofCardTests {
         await shop.words.load("ar", engine: Self.engine)
         #expect(lines(.kept(bytes: 42_000_000, machineId: "U1", at: when, filename: "x")).title.contains("محفوظ كإثبات"))
         #expect(shop.words.callIt("mac.proof_gone") == "لا يجد خيط الملف المحفوظ.")
+        // A printer's Latin name, then a date that starts with a number: the direction is restated after the
+        // name, or the day's number is drawn on the wrong side of the dot (seen in the first photograph).
+        let keptAr = lines(.kept(bytes: 42_000_000, machineId: "U1", at: when, filename: "x")).sub
+        #expect(keptAr.contains("Workshop U1\u{200F} · "), Comment(rawValue: keptAr))
     }
 
     @Test("what a try that kept nothing says, and what needs no sentence")

@@ -3189,6 +3189,7 @@
  "mac.proof_remove_note": "A cópia guardada com este trabalho é apagada. Se a impressora ainda tiver o vídeo, você pode guardá-lo de novo.",
  "mac.proof_remove_yes": "Remover",
  "mac.proof_stays": "Time-lapse · {size} · fica na impressora",
+ "mac.proof_stays_plain": "Time-lapse · fica na impressora",
  "mac.proof_too_large": "Maior que os {max} que um trabalho guarda. Nada foi copiado.",
  "mac.proof_no_size": "A impressora não informou o tamanho, então ele não é copiado.",
  "mac.proof_open": "Abrir na impressora",
