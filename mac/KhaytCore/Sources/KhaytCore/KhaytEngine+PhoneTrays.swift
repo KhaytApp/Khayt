@@ -16,7 +16,7 @@ extension KhaytEngine {
     ///       tag: { vendor, manufacturer, material, sub, colours, weightG,
     ///              diameterMm, official } | null,
     ///       key: "…",                   // what this tag is; "" with no tag
-    ///       match: { kind: "link", spoolId }
+    ///       match: { kind: "link", spoolId, candidates: [spoolId…] }   // the one strong match, then the near ones
     ///            | { kind: "ask", candidates: [spoolId…] }   // best first
     ///            | { kind: "new" } | { kind: "none" },
     ///       prefill: { material, color, brand, weight } | null,   // what "Add spool from the tag" would add
@@ -40,10 +40,20 @@ extension KhaytEngine {
               var known = Object.create(null);
               shelf.forEach(function (s) { if (s && s.id != null && !s.deleted) known[String(s.id)] = true; });
               var held = linked && typeof linked === 'object' && !Array.isArray(linked) ? linked : {};
+              var live = shelf.filter(function (s) { return s && !s.deleted; });
               return RT.trays(detect).map(function (tag, i) {
-                var m = RT.spoolMatch(tag, shelf.filter(function (s) { return s && !s.deleted; }));
+                var m = RT.spoolMatch(tag, live);
                 var match = { kind: m.action };
-                if (m.action === 'link') match.spoolId = m.spoolId;
+                if (m.action === 'link') {
+                  match.spoolId = m.spoolId;
+                  // "Choose another" needs something to list. The rule names
+                  // only its one strong match, so it is asked again WITHOUT
+                  // that spool: what it then offers are the near ones, by the
+                  // same rule and the same exclusions (deleted, used up, resin).
+                  var rest = RT.spoolMatch(tag, live.filter(function (s) { return String(s.id) !== String(m.spoolId); }));
+                  var near = rest.action === 'link' ? [rest.spoolId] : (rest.action === 'ask' ? rest.candidates.map(function (c) { return c.spoolId; }) : []);
+                  match.candidates = [m.spoolId].concat(near);
+                }
                 if (m.action === 'ask') match.candidates = m.candidates.map(function (c) { return c.spoolId; });
                 var p = tag ? (RT.spoolMatch(tag, []).prefill || null) : null;
                 var l = Object.prototype.hasOwnProperty.call(held, String(i)) ? held[String(i)] : null;
