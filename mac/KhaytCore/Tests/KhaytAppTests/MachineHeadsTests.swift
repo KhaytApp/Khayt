@@ -92,6 +92,13 @@ struct MachineHeadsTests {
         let (one, _) = await Self.shop()
         let strong = try #require(await one.machineHeads("U1"))[0]
         #expect(strong.match == "link" && LinkHeadSheet.said("S1", row: strong, shop: one).sub == "Best match: same material, colour and size")
+        // One strong match AND a near one (another maker's, same colour): frame 2's two lines.
+        let (two, _) = await Self.shop(spools: [LanTraysTests.spool("S7", "PLA", "#080A0D", brand: "Polymaker", weight: 1000),
+                                                LanTraysTests.spool("S9b", "PLA", "#080A0D", brand: "Other", weight: 220)])
+        let both = try #require(await two.machineHeads("U1"))[0]
+        #expect(both.match == "link" && both.candidates == ["S7", "S9b"])
+        #expect(LinkHeadSheet.said("S7", row: both, shop: two) == ("Polymaker PLA · 1 kg left", "Best match: same material, colour and size"))
+        #expect(LinkHeadSheet.said("S9b", row: both, shop: two) == ("Other PLA · 220 g left", "Same material and colour"))
         // Already linked to something else: that spool is first, and stays chosen.
         let (linked, _) = await Self.shop(headSpools: .object(["0": .string("S9")]))
         let now = try #require(await linked.machineHeads("U1"))[0]

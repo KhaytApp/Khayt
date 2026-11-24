@@ -147,6 +147,12 @@ extension KhaytEngine {
                 var tray = tag && tag.material ? tag
                   : (slot && slot.material ? { material: String(slot.material).split(' ')[0], sub: '', colours: slot.hex ? [slot.hex] : [], manufacturer: '', vendor: '' } : null);
                 var m = tray ? RT.spoolMatch(tray, shelf) : { action: 'none' };
+                // The one strong match first, then the near ones: the rule asked again without it (as for a phone).
+                var offered = [];
+                if (m.action === 'link') {
+                  var rest = RT.spoolMatch(tray, shelf.filter(function (s) { return String(s.id) !== String(m.spoolId); }));
+                  offered = [m.spoolId].concat(rest.action === 'link' ? [rest.spoolId] : (rest.action === 'ask' ? rest.candidates.map(function (c) { return c.spoolId; }) : []));
+                } else if (m.action === 'ask') offered = m.candidates.map(function (c) { return c.spoolId; });
                 var p = tag ? (RT.spoolMatch(tag, []).prefill || null) : null;
                 rows.push({
                   head: i,
@@ -156,7 +162,7 @@ extension KhaytEngine {
                   hex: (tag && tag.colours && tag.colours[0]) || (slot && slot.hex) || (spool && typeof spool.color === 'string' && spool.color) || '',
                   spoolId: spool ? String(spool.id) : null,
                   match: m.action,
-                  candidates: m.action === 'link' ? [m.spoolId] : (m.action === 'ask' ? m.candidates.map(function (c) { return c.spoolId; }) : []),
+                  candidates: offered,
                   prefill: p ? { material: p.material, color: p.color, brand: p.brand, weight: p.weight } : null
                 });
               }
