@@ -156,5 +156,19 @@
 			<string>経費%d件</string>
 		</dict>
 	</dict>
+	<key>internet.blocked_count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>other</key>
+			<string>%d 回ブロック</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

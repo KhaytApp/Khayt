@@ -219,6 +219,9 @@ jobs:
           # The key is for sign_update alone: these never see it.
           NODE="env -u SPARKLE_PRIVATE_KEY node"
           $NODE scripts/changelog-section.js "$V" > "$RUNNER_TEMP/notes.md" 2>/dev/null || : > "$RUNNER_TEMP/notes.md"
+          # Entries still in changelog.d/ are not in these notes (mac/release-local.sh refuses; this says so).
+          $NODE scripts/changelog-fold.js --check >/dev/null 2>&1 \
+            || echo "::warning::changelog.d/ still holds fragments — their entries are NOT in the $V notes. Fold them (npm run changelog:fold)."
           $NODE scripts/mac-appcast.js \
             --archive "$ARCHIVE" \
             --signature "$SIG" \
