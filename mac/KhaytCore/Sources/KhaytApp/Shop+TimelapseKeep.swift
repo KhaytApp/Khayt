@@ -136,6 +136,9 @@ extension Shop {
             base = real
         }
         guard let url = Self.cameraFile(base, video) else { return .none }
+        // Asked HERE, where the request is built (the ratchet's rule), as well
+        // as where the address was made and where the bytes are read.
+        guard (try? OutboundGate.shared.require(.lan, url: url)) != nil else { return .unreachable }
         var request = URLRequest(url: url)
         request.timeoutInterval = CappedDownload.idle
         if let sealed = machine.printerApi?.apiKey, !sealed.isEmpty {
