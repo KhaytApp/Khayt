@@ -99,26 +99,40 @@ final class AppLockCurtain {
     private var window: UIWindow?
     private weak var keyBefore: UIWindow?
 
-    func show(lock: AppLock, shopName: String, interactive: Bool) {
+    /// `locked`: Khayt is locked, as opposed to merely covered on its way
+    /// out of the front. Only then does the curtain take the keyboard and
+    /// key status: a cover for Control Centre or a permission alert must not
+    /// cost an unlocked person the field they were typing in (review of #2691).
+    func show(lock: AppLock, settings: ConnectionSettings, shopName: String, interactive: Bool, locked: Bool) {
         let view = AnyView(AppLockView(shopName: shopName, interactive: interactive)
             .environmentObject(lock)
+            // The app's language and direction: this window is outside the
+            // app's own view tree, so it is given them itself.
+            .companionLocale(settings)
             .tint(KhaytDesign.accent))
-        if let host = window?.rootViewController as? UIHostingController<AnyView> {
+        if let made = window, let host = made.rootViewController as? UIHostingController<AnyView> {
             host.rootView = view
+            if locked, !made.isKeyWindow { takeTheKeyboard(made) }
             return
         }
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
         keyBefore = scene.keyWindow
-        // A field being typed in gives up the keyboard before it is covered.
-        keyBefore?.endEditing(true)
         let made = UIWindow(windowScene: scene)
         made.windowLevel = .alert + 1
         let host = UIHostingController(rootView: view)
         host.view.accessibilityViewIsModal = true
         made.rootViewController = host
-        made.makeKeyAndVisible()
+        made.isHidden = false
         window = made
+        if locked { takeTheKeyboard(made) }
+    }
+
+    /// Locked: a field being typed in gives up the keyboard, and the curtain
+    /// becomes the key window so nothing typed reaches the app under it.
+    private func takeTheKeyboard(_ made: UIWindow) {
+        keyBefore?.endEditing(true)
+        made.makeKey()
     }
 
     func hide() {
@@ -139,6 +153,7 @@ struct AppLockGate: ViewModifier {
     let enabled: Bool
     let shopName: String
     @EnvironmentObject private var lock: AppLock
+    @EnvironmentObject private var settings: ConnectionSettings
     @Environment(\.scenePhase) private var scenePhase
     @State private var curtain = AppLockCurtain()
 
@@ -148,7 +163,8 @@ struct AppLockGate: ViewModifier {
 
     private func sync(_ phase: ScenePhase) {
         if covers(phase) {
-            curtain.show(lock: lock, shopName: shopName, interactive: lock.locked && phase == .active)
+            curtain.show(lock: lock, settings: settings, shopName: shopName, interactive: lock.locked && phase == .active,
+                         locked: lock.locked)
         } else {
             curtain.hide()
         }

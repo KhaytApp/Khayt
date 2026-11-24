@@ -39,9 +39,11 @@ struct JobSearchEntity: IndexedEntity {
 struct JobSearchQuery: EntityStringQuery {
     @MainActor
     static func all() async -> [JobSearchEntity] {
+        // Read BEFORE the book is: an index begun with the lock off must not
+        // decide after a wait that customers may be named.
+        let hide = JobSearch.hidesCustomers
         guard let book = try? CompanionBook.inSharedContainer(), book.exists,
               let rows = try? await BookReader(book: book).recentOrders(limit: 400) else { return [] }
-        let hide = JobSearch.hidesCustomers
         return rows.map { o in
             entity(id: o.id, title: o.displayTitle, client: o.client,
                    stage: OrderStatus(rawValue: o.status)?.localizedLabel ?? o.status, hideCustomer: hide)
@@ -105,6 +107,7 @@ enum JobSearch {
     static func lockChanged(inForce: Bool, into spotlight: any JobIndex = CSSearchableIndex.default()) async {
         guard defaults.object(forKey: lockKey) as? Bool != inForce else { return }
         defaults.set(inForce, forKey: lockKey)
+        generation += 1
         indexedAt = nil
         await index(into: spotlight)
     }
@@ -117,8 +120,17 @@ enum JobSearch {
     static func index(now: Date = Date(), into spotlight: any JobIndex = CSSearchableIndex.default()) async {
         if let last = indexedAt, now.timeIntervalSince(last) < 600 { return }
         indexedAt = now
-        await reindex(await JobSearchQuery.all(), into: spotlight)
+        // An index that was under way when the lock changed is stale: it may
+        // hold customers the lock now hides (or lack ones it now shows). It
+        // drops its write; the lock's own index replaces what is there.
+        let mine = generation
+        let jobs = await JobSearchQuery.all()
+        guard mine == generation else { return }
+        await reindex(jobs, into: spotlight)
     }
+
+    /// Counts the lock's changes, so a stale index can tell it is one.
+    private static var generation = 0
 
     static func reindex(_ jobs: [JobSearchEntity], into spotlight: any JobIndex) async {
         try? await spotlight.deleteJobs()
