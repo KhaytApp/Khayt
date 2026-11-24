@@ -1570,7 +1570,7 @@
 
 /* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
 "waiting.do.taken_off" = "أُزيلت";
-"waiting.do.bed_clear" = "السرير فارغ";
-"printer.why.read_only" = "الـ Mac يعرض المتجر التجريبي، ولا يمكن تغييره.";
-"printer.why.not_saved" = "تعذّر على الـ Mac حفظه الآن. حاول مجددًا.";
+"waiting.do.bed_clear" = "اللوح فارغ";
+"printer.why.read_only" = "الماك يعرض المتجر التجريبي، ولا يمكن تغييره.";
+"printer.why.not_saved" = "تعذّر على الماك حفظه الآن. حاول مجددًا.";
 "printer.why.role" = "دور هذا الهاتف لا يسمح بذلك. اسأل المالك.";
