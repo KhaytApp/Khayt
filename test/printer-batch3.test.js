@@ -28,7 +28,73 @@ for (const c of vec('run-result').cases) test('P4 ' + c.why, () => {
   }
   assert.deepEqual(o.printRuns, c.want);
 });
-for (const c of vec('printer-success').cases) test('P6 ' + c.why, () => assert.deepEqual(PS.successRates(c.input), c.want));
+/** A vector's `calendar`: the day of `at` on a fixed-offset clock (what the Mac's book calendar does with a TimeZone). */
+const fixedOffsetDayOf = (minutes) => (at) => {
+  const s = String(at == null ? '' : at);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? new Date(t + minutes * 60000).toISOString().slice(0, 10) : '';
+};
+/** A vector's `calendar: { timeZone }`: the day of `at` in that IANA zone, daylight saving included. */
+const zoneDayOf = (timeZone) => {
+  // From the parts, not a locale's date pattern (CLDR has changed en-CA's before).
+  const fmt = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  return (at) => {
+    const s = String(at == null ? '' : at);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const t = Date.parse(s);
+    if (!Number.isFinite(t)) return '';
+    const p = Object.fromEntries(fmt.formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+    return `${p.year}-${p.month}-${p.day}`;
+  };
+};
+const calendarDayOf = (cal) => (cal.timeZone ? zoneDayOf(cal.timeZone) : fixedOffsetDayOf(cal.utcOffsetMinutes));
+for (const c of vec('printer-success').cases) test('P6 ' + c.why, () => {
+  const input = c.calendar ? Object.assign({}, c.input, { dayOf: calendarDayOf(c.calendar) }) : c.input;
+  assert.deepEqual(PS.successRates(input), c.want);
+});
+
+for (const c of vec('printer-success').percent.cases) test('P6 successPercent: ' + c.why + ' (' + JSON.stringify(c.rate) + ')', () => assert.equal(PS.successPercent(c.rate), c.want));
+
+test('P6: a rate never rounds a failure (or a success) away, however many runs', () => {
+  const runs = (ok, bad) => [{ printRuns: [
+    ...Array.from({ length: ok }, () => ({ machineId: 'A', at: '2026-11-01', result: 'finished' })),
+    ...Array.from({ length: bad }, () => ({ machineId: 'A', at: '2026-11-01', result: 'failed' })),
+  ] }];
+  const one = (ok, bad) => PS.successRates({ orders: runs(ok, bad) })[0];
+  assert.equal(one(2999, 1).rate, 0.999, '1 failure in 3000 is not 1');
+  assert.equal(PS.successPercent(one(2999, 1).rate), 99);
+  assert.equal(one(1, 2999).rate, 0.001, '1 success in 3000 is not 0');
+  assert.equal(PS.successPercent(one(1, 2999).rate), 1);
+  assert.equal(one(3000, 0).rate, 1);
+  assert.equal(one(0, 3000).rate, 0);
+});
+
+test('P6: localDayOf reads a UTC stamp on this computer\'s calendar, and leaves a bare day as written', () => {
+  const was = process.env.TZ;
+  try {
+    process.env.TZ = 'America/New_York';
+    assert.equal(PS.localDayOf('2026-12-01T01:00:00.000Z'), '2026-11-30', 'an evening print west of UTC');
+    assert.equal(PS.localDayOf('2026-11-01'), '2026-11-01', 'a bare day is not read as UTC midnight');
+    process.env.TZ = 'Asia/Riyadh';
+    assert.equal(PS.localDayOf('2026-10-31T21:30:00.000Z'), '2026-11-01', 'an early-morning print east of UTC');
+    assert.equal(PS.localDayOf('2026-11-30T21:00:00.000Z'), '2026-12-01', 'local midnight is the next day');
+    for (const junk of [null, undefined, '', 'yesterday', '2026', '2026-13-45T00:00:00Z', 1764000000000]) assert.equal(PS.localDayOf(junk), '', String(junk));
+    // The desktop's call, end to end: the west-of-UTC vector, on this computer's own calendar.
+    const ny = vec('printer-success').cases.find((c) => c.calendar && c.calendar.utcOffsetMinutes === -300 && c.input.orders && c.input.orders[0].printRuns && c.input.orders[0].printRuns.length);
+    process.env.TZ = 'America/New_York';
+    assert.deepEqual(PS.successRates(Object.assign({}, ny.input, { dayOf: PS.localDayOf })), ny.want);
+    // Across the daylight-saving change, the desktop's own calendar holds both edges,
+    // and either fixed offset alone does not (so the vector really tests the zone).
+    const dst = vec('printer-success').cases.find((c) => c.calendar && c.calendar.timeZone);
+    assert.deepEqual(PS.successRates(Object.assign({}, dst.input, { dayOf: PS.localDayOf })), dst.want);
+    for (const off of [-240, -300]) {
+      assert.notDeepEqual(PS.successRates(Object.assign({}, dst.input, { dayOf: fixedOffsetDayOf(off) })), dst.want, String(off));
+    }
+  } finally {
+    if (was === undefined) delete process.env.TZ; else process.env.TZ = was;
+  }
+});
 for (const c of vec('waiting-at-machine').cases) test('C4 ' + c.why, () => assert.deepEqual(W.waiting(c.machine, c.opts), c.want));
 
 test('P4: the poll cache keeps how a job ended, from the word it ended on', () => {
