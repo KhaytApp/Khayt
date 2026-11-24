@@ -1567,3 +1567,29 @@
 "outbound.purpose.webhooks" = "Webhooks";
 "photos.blocked.detail" = "无法在此手机上显示或添加照片。店主可以在 Mac 的“互联网使用”中保留 Khayt Cloud。";
 "photos.blocked.nothing_sent" = "未发送任何内容。";
+
+/* The lock when Khayt opens (signed frames L1-L4, L3b) */
+"lock.title" = "安全";
+"lock.toggle" = "使用 %@ 锁定 Khayt";
+"lock.toggle.search" = "使用 Face ID 锁定 Khayt";
+"lock.passcode" = "密码";
+"lock.after" = "锁定时间";
+"lock.after.immediately" = "立即";
+"lock.after.1" = "1 分钟后";
+"lock.after.5" = "5 分钟后";
+"lock.after.15" = "15 分钟后";
+"lock.foot" = "店主和经理的手机默认开启。Khayt 启动时，以及在后台停留超过上述时间后，需用 Face ID 或这部 iPhone 的密码打开。无论哪种情况，账本都保留在手机上。";
+"lock.no_passcode" = "这部 iPhone 没有设置密码，因此 Khayt 无法锁定。请在 iPhone 的设置中设置密码。";
+"lock.floor.title" = "无需锁定";
+"lock.floor.body" = "这是一部车间手机：它不保存店铺账本的副本，因此没有需要锁定的内容。连接店铺 Wi-Fi 时，它显示队列和打印机。";
+"lock.hide_names" = "在锁定屏幕上隐藏订单名称";
+"lock.hide_names.foot" = "默认关闭。开启后，打印提醒和实时活动会显示“一次打印”，而不是订单标题或打印机的文件名，这样标题中的客户姓名就不会出现在锁定的手机上。";
+"lock.locked" = "已锁定。你店铺的账本在这部手机上。";
+"lock.failed" = "%@ 不匹配。请重试，或使用这部 iPhone 的密码。";
+"lock.failed.passcode" = "未能解锁 Khayt。请重试。";
+"lock.unlock_with" = "使用 %@ 解锁";
+"lock.try_again" = "再次尝试 %@";
+"lock.unlock" = "解锁";
+"lock.use_passcode" = "使用密码";
+"lock.reason" = "解锁 Khayt 以查看你的店铺。";
+"alert.print.a_print" = "一次打印";

@@ -1,3 +1,4 @@
 "NSCameraUsageDescription" = "Khayt usa la cámara para leer etiquetas de bobinas y códigos de barras, fotografiar recibos y tomar fotos de impresiones terminadas.";
 "NFCReaderUsageDescription" = "Khayt lee y escribe las etiquetas NFC de las bobinas de filamento.";
 "NSLocalNetworkUsageDescription" = "Khayt se conecta a Khayt en tu Mac o PC en la misma red Wi‑Fi para mostrar la cola, el inventario y el estado de las impresoras.";
+"NSFaceIDUsageDescription" = "Khayt usa Face ID para desbloquear la app, para que el libro de tu tienda siga siendo privado.";

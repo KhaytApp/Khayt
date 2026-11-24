@@ -1567,3 +1567,29 @@
 "outbound.purpose.webhooks" = "los webhooks";
 "photos.blocked.detail" = "Las fotos no se pueden ver ni añadir desde este teléfono. El propietario puede mantener Khayt Cloud en Uso de internet en el Mac.";
 "photos.blocked.nothing_sent" = "No se envió nada.";
+
+/* The lock when Khayt opens (signed frames L1-L4, L3b) */
+"lock.title" = "Seguridad";
+"lock.toggle" = "Bloquear Khayt con %@";
+"lock.toggle.search" = "Bloquear Khayt con Face ID";
+"lock.passcode" = "el código";
+"lock.after" = "Bloquear tras";
+"lock.after.immediately" = "Inmediatamente";
+"lock.after.1" = "Tras 1 minuto";
+"lock.after.5" = "Tras 5 minutos";
+"lock.after.15" = "Tras 15 minutos";
+"lock.foot" = "Activado por defecto en los teléfonos del propietario y del gerente. Face ID o el código de este iPhone abre Khayt al iniciarse, y de nuevo tras estar en segundo plano el tiempo indicado arriba. Tu libro permanece en el teléfono en cualquier caso.";
+"lock.no_passcode" = "Este iPhone no tiene código, así que Khayt no puede bloquearse. Configura uno en los Ajustes del iPhone.";
+"lock.floor.title" = "No hace falta bloqueo";
+"lock.floor.body" = "Este es un teléfono de taller: no guarda copia del libro de la tienda, así que no hay nada que bloquear. Muestra la cola y las impresoras mientras está en la Wi-Fi de la tienda.";
+"lock.hide_names" = "Ocultar los nombres de los trabajos en la pantalla de bloqueo";
+"lock.hide_names.foot" = "Desactivado por defecto. Cuando está activado, los avisos de impresión y la Actividad en directo dicen «Una impresión» en lugar del título del trabajo o del nombre de archivo de la impresora, para que el nombre de un cliente en un título nunca se vea en un teléfono bloqueado.";
+"lock.locked" = "Bloqueado. El libro de tu tienda está en este teléfono.";
+"lock.failed" = "%@ no coincidió. Inténtalo de nuevo o usa el código de este iPhone.";
+"lock.failed.passcode" = "Eso no desbloqueó Khayt. Inténtalo de nuevo.";
+"lock.unlock_with" = "Desbloquear con %@";
+"lock.try_again" = "Probar %@ de nuevo";
+"lock.unlock" = "Desbloquear";
+"lock.use_passcode" = "Usar el código";
+"lock.reason" = "Desbloquea Khayt para ver tu tienda.";
+"alert.print.a_print" = "Una impresión";

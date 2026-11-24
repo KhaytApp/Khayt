@@ -20,3 +20,4 @@
 "PUSH_MESSAGE" = "Bir müşteri mesaj gönderdi";
 "PUSH_PAYMENT" = "Bir ödeme geldi";
 "PUSH_GENERIC" = "Atölyende bakılması gereken bir şey var";
+"alert.print.a_print" = "Bir baskı";

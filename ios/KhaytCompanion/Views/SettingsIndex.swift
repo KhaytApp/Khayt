@@ -4,7 +4,7 @@ import Foundation
 /// label, the words its page holds (so a search for "PIN" finds the Mac),
 /// and where it goes. The screen draws these; the tests read them.
 enum SettingsRoute: String, CaseIterable, Hashable, Identifiable {
-    case appearance, notifications, privacy
+    case appearance, notifications, privacy, security
     case shop
     case mac, cloud, connectors
     case help, diagnostics
@@ -27,7 +27,7 @@ enum SettingsRoute: String, CaseIterable, Hashable, Identifiable {
 
     var group: Group {
         switch self {
-        case .appearance, .notifications, .privacy: return .thisPhone
+        case .appearance, .notifications, .privacy, .security: return .thisPhone
         case .shop: return .shop
         case .mac, .cloud, .connectors: return .connected
         case .help, .diagnostics: return .about
@@ -49,6 +49,7 @@ enum SettingsRoute: String, CaseIterable, Hashable, Identifiable {
         case .appearance: return "settings.appearance"
         case .notifications: return "settings.notifications"
         case .privacy: return "settings.privacy"
+        case .security: return "lock.title"
         case .shop: return "settings.shop_details"
         case .mac: return "settings.phones_wifi"
         case .cloud: return "cloud.title"
@@ -67,6 +68,7 @@ enum SettingsRoute: String, CaseIterable, Hashable, Identifiable {
                     "settings.notify.low_stock", "settings.notify.overdue", "settings.notify.connection",
                     "settings.notifications.allow"]
         case .privacy: return ["settings.count_install", "settings.privacy_policy"]
+        case .security: return ["lock.toggle.search", "lock.after", "lock.hide_names"]
         case .shop: return ["settings.shop_name", "settings.shop.readonly"]
         case .mac:
             return ["settings.mac_in_reach", "settings.connection", "settings.host", "settings.pin", "settings.retest",

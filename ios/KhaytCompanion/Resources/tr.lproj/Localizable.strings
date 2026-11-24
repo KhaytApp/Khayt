@@ -1567,3 +1567,29 @@
 "outbound.purpose.webhooks" = "webhook’lar";
 "photos.blocked.detail" = "Fotoğraflar bu telefondan gösterilemez veya eklenemez. Sahip, Mac’teki İnternet kullanımı bölümünde Khayt Cloud’u koruyabilir.";
 "photos.blocked.nothing_sent" = "Hiçbir şey gönderilmedi.";
+
+/* The lock when Khayt opens (signed frames L1-L4, L3b) */
+"lock.title" = "Güvenlik";
+"lock.toggle" = "Khayt’ı %@ ile kilitle";
+"lock.toggle.search" = "Khayt’ı Face ID ile kilitle";
+"lock.passcode" = "parola";
+"lock.after" = "Şu süreden sonra kilitle";
+"lock.after.immediately" = "Hemen";
+"lock.after.1" = "1 dakika sonra";
+"lock.after.5" = "5 dakika sonra";
+"lock.after.15" = "15 dakika sonra";
+"lock.foot" = "Sahip ve yönetici telefonlarında varsayılan olarak açıktır. Face ID veya bu iPhone’un parolası Khayt’ı açılışta ve yukarıdaki süre kadar arka planda kaldıktan sonra yeniden açar. Defteriniz her durumda telefonda kalır.";
+"lock.no_passcode" = "Bu iPhone’da parola yok, bu yüzden Khayt kilitlenemez. iPhone Ayarları’ndan bir parola belirleyin.";
+"lock.floor.title" = "Kilide gerek yok";
+"lock.floor.body" = "Bu bir atölye telefonu: atölye defterinin kopyasını tutmaz, bu yüzden kilitlenecek bir şey yoktur. Atölyenin Wi-Fi’ındayken kuyruğu ve yazıcıları gösterir.";
+"lock.hide_names" = "Kilit ekranında iş adlarını gizle";
+"lock.hide_names.foot" = "Varsayılan olarak kapalıdır. Açıkken baskı uyarıları ve Canlı Etkinlik, işin başlığı veya yazıcının dosya adı yerine “Bir baskı” der; böylece başlıktaki müşteri adı kilitli telefonda hiç görünmez.";
+"lock.locked" = "Kilitli. Atölyenizin defteri bu telefonda.";
+"lock.failed" = "%@ eşleşmedi. Yeniden deneyin veya bu iPhone’un parolasını kullanın.";
+"lock.failed.passcode" = "Khayt’ın kilidi açılmadı. Yeniden deneyin.";
+"lock.unlock_with" = "%@ ile kilidi aç";
+"lock.try_again" = "%@ ile yeniden dene";
+"lock.unlock" = "Kilidi aç";
+"lock.use_passcode" = "Parolayı kullan";
+"lock.reason" = "Atölyenizi görmek için Khayt’ın kilidini açın.";
+"alert.print.a_print" = "Bir baskı";

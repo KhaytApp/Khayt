@@ -1567,3 +1567,29 @@
 "outbound.purpose.webhooks" = "Webhook";
 "photos.blocked.detail" = "この iPhone では写真を表示・追加できません。オーナーは Mac の「インターネット利用」で Khayt Cloud を維持できます。";
 "photos.blocked.nothing_sent" = "何も送信されていません。";
+
+/* The lock when Khayt opens (signed frames L1-L4, L3b) */
+"lock.title" = "セキュリティ";
+"lock.toggle" = "%@ で Khayt をロック";
+"lock.toggle.search" = "Face ID で Khayt をロック";
+"lock.passcode" = "パスコード";
+"lock.after" = "ロックまでの時間";
+"lock.after.immediately" = "すぐに";
+"lock.after.1" = "1 分後";
+"lock.after.5" = "5 分後";
+"lock.after.15" = "15 分後";
+"lock.foot" = "オーナーとマネージャーの電話では初期設定でオンです。Khayt の起動時と、上の時間だけバックグラウンドにあった後に、Face ID またはこの iPhone のパスコードで開きます。どちらの場合も帳簿は電話に残ります。";
+"lock.no_passcode" = "この iPhone にはパスコードがないため、Khayt をロックできません。iPhone の設定でパスコードを設定してください。";
+"lock.floor.title" = "ロックは不要です";
+"lock.floor.body" = "これは現場用の電話です。ショップの帳簿のコピーを保持しないため、ロックするものがありません。ショップの Wi-Fi 上にある間、キューとプリンタを表示します。";
+"lock.hide_names" = "ロック画面でジョブ名を隠す";
+"lock.hide_names.foot" = "初期設定はオフです。オンにすると、印刷の通知とライブアクティビティには、ジョブのタイトルやプリンタのファイル名の代わりに「印刷」と表示され、タイトルに含まれる顧客名がロック中の電話に表示されません。";
+"lock.locked" = "ロック中。ショップの帳簿はこの電話にあります。";
+"lock.failed" = "%@ が一致しませんでした。もう一度試すか、この iPhone のパスコードを使ってください。";
+"lock.failed.passcode" = "Khayt のロックを解除できませんでした。もう一度お試しください。";
+"lock.unlock_with" = "%@ でロック解除";
+"lock.try_again" = "%@ をもう一度試す";
+"lock.unlock" = "ロック解除";
+"lock.use_passcode" = "パスコードを使う";
+"lock.reason" = "ショップを表示するには Khayt のロックを解除してください。";
+"alert.print.a_print" = "印刷";
