@@ -1568,6 +1568,32 @@
 "photos.blocked.detail" = "لا يمكن عرض الصور أو إضافتها من هذا الهاتف. يمكن للمالك إبقاء سحابة خيط في «استخدام الإنترنت» على الماك.";
 "photos.blocked.nothing_sent" = "لم يُرسَل شيء.";
 
+/* The lock when Khayt opens (signed frames L1-L4, L3b) */
+"lock.title" = "الأمان";
+"lock.toggle" = "قفل خيط بـ %@";
+"lock.toggle.search" = "قفل خيط بـ Face ID";
+"lock.passcode" = "رمز الدخول";
+"lock.after" = "القفل بعد";
+"lock.after.immediately" = "فورًا";
+"lock.after.1" = "بعد دقيقة واحدة";
+"lock.after.5" = "بعد 5 دقائق";
+"lock.after.15" = "بعد 15 دقيقة";
+"lock.foot" = "مفعّل افتراضيًا على هواتف المالك والمدير. يفتح Face ID أو رمز دخول هذا الـ iPhone خيط عند تشغيله، ومرة أخرى بعد بقائه في الخلفية للمدة أعلاه. يبقى دفترك على الهاتف في الحالتين.";
+"lock.no_passcode" = "لا يوجد رمز دخول على هذا الـ iPhone، لذلك لا يمكن قفل خيط. اضبط رمزًا من إعدادات الـ iPhone.";
+"lock.floor.title" = "لا حاجة إلى قفل";
+"lock.floor.body" = "هذا هاتف لأرضية الورشة: لا يحتفظ بنسخة من دفتر المتجر، فلا شيء عليه يحتاج إلى قفل. يعرض قائمة الانتظار والطابعات ما دام على واي فاي المتجر.";
+"lock.hide_names" = "إخفاء أسماء الطلبات على شاشة القفل";
+"lock.hide_names.foot" = "متوقف افتراضيًا. عند تفعيله، تقول تنبيهات الطباعة والنشاط المباشر «طباعة» بدل عنوان الطلب أو اسم ملف الطابعة، ولا يذكر تذكير الطلبات اسم العميل.";
+"lock.locked" = "مقفل. دفتر متجرك على هذا الهاتف.";
+"lock.failed" = "لم يطابق %@. حاول مجددًا، أو استخدم رمز دخول هذا الـ iPhone.";
+"lock.failed.passcode" = "لم يُفتح خيط. حاول مجددًا.";
+"lock.unlock_with" = "فتح بـ %@";
+"lock.try_again" = "حاول %@ مجددًا";
+"lock.unlock" = "فتح";
+"lock.use_passcode" = "استخدام رمز الدخول";
+"lock.reason" = "افتح خيط لعرض متجرك.";
+"alert.print.a_print" = "طباعة";
+"intake.remind.alert.hidden" = "طلب عميل ينتظر ردّك.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
 "internet.title" = "استخدام الإنترنت";
 "internet.switch" = "عدم الاتصال بالإنترنت";

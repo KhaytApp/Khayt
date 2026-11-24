@@ -20,3 +20,4 @@
 "PUSH_MESSAGE" = "أرسل عميل رسالة";
 "PUSH_PAYMENT" = "وصلت دفعة";
 "PUSH_GENERIC" = "في متجرك ما يحتاج نظرة";
+"alert.print.a_print" = "طباعة";

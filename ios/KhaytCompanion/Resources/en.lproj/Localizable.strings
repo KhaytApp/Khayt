@@ -1568,6 +1568,32 @@
 "photos.blocked.detail" = "Photos can’t be shown or added from this phone. The owner can keep Khayt Cloud in Internet use on the Mac.";
 "photos.blocked.nothing_sent" = "Nothing was sent.";
 
+/* The lock when Khayt opens (signed frames L1-L4, L3b) */
+"lock.title" = "Security";
+"lock.toggle" = "Lock Khayt with %@";
+"lock.toggle.search" = "Lock Khayt with Face ID";
+"lock.passcode" = "the passcode";
+"lock.after" = "Lock after";
+"lock.after.immediately" = "Immediately";
+"lock.after.1" = "After 1 minute";
+"lock.after.5" = "After 5 minutes";
+"lock.after.15" = "After 15 minutes";
+"lock.foot" = "On by default on owner and manager phones. Face ID or this iPhone's passcode opens Khayt when it starts, and again after it has been in the background for the time above. Your book stays on the phone either way.";
+"lock.no_passcode" = "This iPhone has no passcode, so Khayt cannot lock. Set one in the iPhone's Settings.";
+"lock.floor.title" = "No lock needed";
+"lock.floor.body" = "This is a floor phone: it keeps no copy of the shop's book, so there is nothing on it to lock. It shows the queue and printers while it is on the shop's Wi-Fi.";
+"lock.hide_names" = "Hide job names on the lock screen";
+"lock.hide_names.foot" = "Off by default. When on, print alerts and the Live Activity say \"A print\" instead of the job's title or the printer's file name, and a request reminder does not name the customer.";
+"lock.locked" = "Locked. Your shop's book is on this phone.";
+"lock.failed" = "%@ did not match. Try again, or use this iPhone's passcode.";
+"lock.failed.passcode" = "That did not unlock Khayt. Try again.";
+"lock.unlock_with" = "Unlock with %@";
+"lock.try_again" = "Try %@ again";
+"lock.unlock" = "Unlock";
+"lock.use_passcode" = "Use passcode";
+"lock.reason" = "Unlock Khayt to see your shop.";
+"alert.print.a_print" = "A print";
+"intake.remind.alert.hidden" = "A customer request is waiting for your answer.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
 "internet.title" = "Internet use";
 "internet.switch" = "Make no internet calls";
