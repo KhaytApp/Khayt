@@ -18,7 +18,12 @@ struct LanTraysTests {
 
     @Test("the paths name one machine, and one head from 1 to 16")
     func paths() {
-        #expect(LanServer.trayPath("/api/printer/M1/trays")?.id == "M1" && LanServer.trayPath("/api/printer/M1/trays")?.head == .some(nil))
+        #expect(LanServer.trayReadPath("/api/printer/M1/trays") == "M1" && LanServer.trayLinkPath("/api/printer/M1/trays") == nil)
+        #expect(LanServer.trayLinkPath("/api/printer/M1/trays/2/spool")?.head == 2 && LanServer.trayReadPath("/api/printer/M1/trays/2/spool") == nil)
+        // A path that is not a tray path is neither: the read route must not answer for a printer's other routes.
+        for other in ["/api/printer/M1/bed-clear", "/api/printer/M1/pause", "/api/printer/M1", "/api/machines", "/api/printer/M1/trays/x/spool"] {
+            #expect(LanServer.trayReadPath(other) == nil && LanServer.trayLinkPath(other) == nil, Comment(rawValue: other))
+        }
         #expect(LanServer.trayPath("/api/printer/M%201/trays/2/spool")?.id == "M 1")
         #expect(LanServer.trayPath("/api/printer/M1/trays/16/spool")?.head == 16)
         for bad in ["/api/printer//trays", "/api/printer/M1/trays/", "/api/printer/M1/trays/2", "/api/printer/M1/trays/0/spool",
@@ -44,6 +49,10 @@ struct LanTraysTests {
         #expect(try await bench.get("/api/printer/M1/trays").status == 401)
         #expect(try await bench.post("/api/printer/M1/trays/1/spool", json: "{}").status == 401)
         #expect(bench.trayCalls.calls.isEmpty)
+        // The printer's other routes are still theirs, and what is not a route is still not one.
+        #expect(try await bench.get("/api/printer/M1/bed-clear", headers: pin).status == 404)
+        #expect(try await bench.get("/api/printer/M1/trays/1/spool", headers: pin).status == 404)
+        #expect(try await bench.post("/api/printer/M1/trays", json: "{}", headers: pin).status == 404)
     }
 
     /// One test per role, as the Mac's own write is checked per role.
@@ -241,7 +250,7 @@ struct LanTraysTests {
         #expect(after["headSpools"] == .object(["0": .string("S1"), "1": .string("S9"), "3": .string("S9")]))
         #expect(Shop.rows(book, "inventory") == [s1, s9])
         // And the next read says so.
-        #expect(Self.rows(await shop.phoneTrays("U1").1).map { $0["linked"] as? String } == ["S1", "S9", nil, nil])
+        #expect(Self.rows(await shop.phoneTrays("U1").1).map { $0["linked"] as? String } == ["S1", "S9", nil, "S9"])
     }
 
     @Test("\"Add spool from the tag\" adds one spool, with no price, and links it")
@@ -329,7 +338,8 @@ struct LanTraysTests {
         }
         #expect(await tried("removed", 1, .link("S1")) == "not-found")
         #expect(await tried("U1", 1, .link("removed")) == "no-spool")
-        #expect(await tried("U1", 0, .link("S1")) == "not-found" && await tried("U1", 17, .link("S1")) == "not-found")
+        #expect(await tried("U1", 0, .link("S1")) == "not-found")
+        #expect(await tried("U1", 17, .link("S1")) == "not-found")
         // A tag with no material is not a spool: nothing added, nothing linked.
         #expect(await tried("U1", 1, .create, prefill: ["weight": .number(500)]) == "tag-unusable")
         #expect(root == before)

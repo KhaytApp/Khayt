@@ -245,4 +245,21 @@ extension LanServer {
               let head = Int(parts[5]), (1...16).contains(head) else { return nil }
         return (id, head)
     }
+
+    /// The machine, for the path that READS the tags; nil for any other.
+    ///
+    /// Asked by name, not as `trayPath(path)?.head == nil`: optional chaining
+    /// flattens, so that is also true of every path that is not a tray path
+    /// at all, and the route swallowed `GET /api/printer/M1/bed-clear`
+    /// (caught by `LanBedClearTests`).
+    nonisolated static func trayReadPath(_ path: String) -> String? {
+        guard let found = trayPath(path), found.head == nil else { return nil }
+        return found.id
+    }
+
+    /// The machine and the head, for the path that LINKS a spool; nil for any other.
+    nonisolated static func trayLinkPath(_ path: String) -> (id: String, head: Int)? {
+        guard let found = trayPath(path), let head = found.head else { return nil }
+        return (found.id, head)
+    }
 }

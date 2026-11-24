@@ -1536,26 +1536,25 @@ final class LanServer {
         // read, each matched against the shelf. SIGNED PHONES ONLY (never an
         // API token, never the PIN alone): the answer names the shop's
         // spools. The gate's role check asks `inventory:read`.
-        case (_, true) where request.method == "GET" && host.trays != nil && Self.trayPath(path)?.head == .some(nil):
+        case (_, true) where request.method == "GET" && host.trays != nil && Self.trayReadPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
             guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
-            let (status, body) = await host.trays!(Self.trayPath(path)!.id)
+            let (status, body) = await host.trays!(Self.trayReadPath(path)!)
             return .json(status, body)
 
         // `POST /api/printer/{machineId}/trays/{head}/spool`: which spool is
         // in that head. It writes the machine's record and may add one spool,
         // so: a signed phone, and `inventory:write` (`lib/device-roles.js`),
         // which a viewer's phone does not hold.
-        case (_, false) where request.method == "POST" && host.linkTray != nil && Self.trayPath(path)?.head != .some(nil)
-                && Self.trayPath(path) != nil:
+        case (_, false) where request.method == "POST" && host.linkTray != nil && Self.trayLinkPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
             guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
-            let asked = Self.trayPath(path)!
-            let (status, body) = await host.linkTray!(asked.id, asked.head!, request.body)
+            let asked = Self.trayLinkPath(path)!
+            let (status, body) = await host.linkTray!(asked.id, asked.head, request.body)
             return .json(status, body)
 
         // ── A PHONE TELLS A PRINTER WHAT TO DO ───────────────────────────
