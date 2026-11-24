@@ -2607,6 +2607,19 @@ final class Shop {
     /// Where this Mac keeps the wrong-PIN record. `.standard` in the app; a
     /// test gives each shop its own, so two tests never share a count.
     var lockDefaults: UserDefaults = .standard
+    /// Where this Mac keeps the version it last ran (`LaunchGate`). Per Mac,
+    /// never in the book. A test hands in its own.
+    var launchGateDefaults: UserDefaults = .standard
+    /// The gated releases this Mac has not read yet; empty when there are
+    /// none. Set once at start (`checkLaunchGate`).
+    var launchGatePending: [KhaytEngine.GatedRelease] = []
+    var launchGateCurrent: String?
+    var launchGateFrom: String?
+    /// TESTS ONLY: the gate file's text instead of the bundled one, and
+    /// whether this Mac has a book (a test must not depend on the machine
+    /// it runs on having one).
+    var launchGateFileForTests: String?
+    var launchGateHasBookForTests: Bool?
 
     /// What is low and has not already been ordered.
     private(set) var needsOrdering: [KhaytEngine.ToOrder] = []

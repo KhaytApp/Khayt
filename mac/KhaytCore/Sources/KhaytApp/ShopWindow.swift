@@ -763,6 +763,9 @@ struct WindowSheets: ViewModifier {
             // The desktop's order tools (`Shop+OrderTools.swift`), as one
             // modifier so this chain does not grow by eight.
             .modifier(OrderToolSheets(shop: shop))
+            // "Khayt was updated": over the window at the first start after
+            // an update with "Before you update" items, until they are read.
+            .shopSheet(isPresented: Binding(get: { shop.showsLaunchGate }, set: { _ in })) { LaunchGateSheet(shop: shop) }
             .shopSheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }
             .shopSheet(isPresented: $shop.settingUpShop) { ShopSetupSheet(shop: shop) }
             .shopSheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
