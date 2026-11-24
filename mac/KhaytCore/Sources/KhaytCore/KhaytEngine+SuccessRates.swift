@@ -43,11 +43,89 @@ extension KhaytEngine {
     ///
     /// - `from`, `to`: `YYYY-MM-DD` on the day a run was sent, inclusive; nil
     ///   for no bound. A run with no date is left out of a bounded count.
+    /// - `calendar`: WHOSE day that is. Pass the book's calendar
+    ///   (`Calendar.book`), never the device's.
+    ///
+    /// WHOSE DAY. A real run's `at` is a full UTC timestamp, and left to
+    /// itself the rule takes its first ten characters: the UTC day, which in
+    /// Riyadh is yesterday until 03:00, and at a month's edge last month.
+    /// JavaScript cannot be handed a Swift function and JavaScriptCore has no
+    /// time zones to ask, so with a `calendar` the days are worked out HERE,
+    /// one per run, and the rule is given them ready-made: its `dayOf` hook
+    /// (the Windows/Linux app's #2702) becomes a lookup. That is exact for
+    /// any zone, through daylight-saving changes too. A bare `YYYY-MM-DD` is
+    /// kept as written; an `at` that cannot be read has no day. A bundled
+    /// rule from before the hook ignores it and slices as it always did.
     public func successRates(orders: [JSONValue], machines: [JSONValue],
-                             from: String? = nil, to: String? = nil) throws -> [SuccessRow] {
-        try runtime.call2("globalThis.KhaytPrinterSuccess.successRates({ orders: ARG0, machines: ARG1, from: ARG2, to: ARG3 })",
-                          [.array(orders), .array(machines), from.map(JSONValue.string) ?? .null, to.map(JSONValue.string) ?? .null],
-                          as: [SuccessRow].self)
+                             from: String? = nil, to: String? = nil, calendar: Calendar? = nil) throws -> [SuccessRow] {
+        var days: JSONValue = .null
+        if let calendar, from != nil || to != nil { days = .object(Self.runDays(orders, calendar: calendar)) }
+        return try runtime.call2("""
+            (function (orders, machines, from, to, days) {
+              var input = { orders: orders, machines: machines, from: from, to: to };
+              if (days && typeof days === 'object') {
+                var has = Object.prototype.hasOwnProperty;
+                input.dayOf = function (at) {
+                  var key = typeof at === 'number' ? '#' + Math.round(at) : (at == null ? '' : String(at));
+                  if (has.call(days, key)) return days[key];
+                  return String(at == null ? '' : at).slice(0, 10);
+                };
+              }
+              return globalThis.KhaytPrinterSuccess.successRates(input);
+            })(ARG0, ARG1, ARG2, ARG3, ARG4)
+            """, [.array(orders), .array(machines), from.map(JSONValue.string) ?? .null, to.map(JSONValue.string) ?? .null, days],
+            as: [SuccessRow].self)
+    }
+
+    /// The day each run was sent, in `calendar`, keyed by the run's `at` as
+    /// the rule will ask for it (a number as `#<milliseconds>`). "" for an
+    /// `at` that is neither a bare day, a timestamp, nor milliseconds.
+    static func runDays(_ orders: [JSONValue], calendar: Calendar) -> [String: JSONValue] {
+        var days: [String: JSONValue] = [:]
+        for order in orders {
+            guard case .object(let o) = order, case .array(let runs)? = o["printRuns"] else { continue }
+            for run in runs {
+                guard case .object(let r) = run else { continue }
+                switch r["at"] {
+                case .string(let text)?:
+                    guard days[text] == nil else { continue }
+                    if text.wholeMatch(of: /[0-9]{4}-[0-9]{2}-[0-9]{2}/) != nil { days[text] = .string(text) }
+                    else if let instant = Calendar.instant(text) { days[text] = .string(calendar.dayString(instant)) }
+                    else { days[text] = .string("") }
+                case .number(let ms)? where ms.isFinite:
+                    let key = "#" + String(Int64(ms.rounded()))
+                    days[key] = .string(ms > 0 ? calendar.dayString(Date(timeIntervalSince1970: ms / 1000)) : "")
+                default: continue
+                }
+            }
+        }
+        return days
+    }
+
+    /// A rate as the whole per cent a person reads (95 for 0.95), by the
+    /// rule's own `successPercent` (every app says it the same): rounded as
+    /// usual, except that a rate under one never reads as 100 (199 of 200 is
+    /// 99) and a rate over nothing never reads as 0 (1 of 200 is 1). Nil for
+    /// no rate, or for anything that is not a number from 0 to 1: shown "—".
+    public func successPercent(_ rate: Double?) throws -> Int? {
+        guard let rate, rate.isFinite else { return nil }
+        let said = try runtime.call2("""
+            (function (rate) {
+              var f = globalThis.KhaytPrinterSuccess.successPercent;
+              if (typeof f === 'function') return f(rate);
+              // The same rule, for a bundled copy from before the helper.
+              if (typeof rate !== 'number' || !(rate >= 0 && rate <= 1)) return null;
+              var p = Math.round(rate * 100);
+              if (p >= 100 && rate < 1) return 99;
+              if (p <= 0 && rate > 0) return 1;
+              return p;
+            })(ARG0)
+            """, [.number(rate)], as: JSONValue.self)
+        switch said {
+        case .number(let n): return Int(n.rounded())
+        case .string(let text): return Int(text.prefix { $0.isNumber })
+        default: return nil
+        }
     }
 
     /// How many decided runs a printer needs before its rate is shown

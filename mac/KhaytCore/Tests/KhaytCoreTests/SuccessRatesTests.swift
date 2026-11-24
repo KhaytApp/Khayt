@@ -9,12 +9,20 @@ import Testing
 struct SuccessRatesTests {
 
     struct Case: Decodable {
-        struct Input: Decodable { let machines: [JSONValue]; let orders: [JSONValue]; let from: String?; let to: String? }
+        struct Input: Decodable { let machines: [JSONValue]?; let orders: [JSONValue]?; let from: String?; let to: String? }
+        /// The caller's calendar, on cases that have one (the Windows/Linux app's #2702).
+        struct CalendarOf: Decodable { let utcOffsetMinutes: Int }
         let why: String
         let input: Input
+        let calendar: CalendarOf?
         let want: [KhaytEngine.SuccessRow]
     }
-    struct Vectors: Decodable { let cases: [Case] }
+    /// `percent.cases`, on a fixture new enough to have them.
+    struct Percent: Decodable {
+        struct One: Decodable { let why: String; let rate: Double?; let want: Int? }
+        let cases: [One]
+    }
+    struct Vectors: Decodable { let cases: [Case]; let percent: Percent? }
 
     @Test("the desktop's vectors: worst first, cancelled and unknown outside the rate, too few is not enough, the date window")
     func vectors() async throws {
@@ -24,7 +32,14 @@ struct SuccessRatesTests {
         #expect(cases.count >= 2, "the fixture lost its cases")
         var sawWindow = false, sawNil = false, sawNotEnough = false
         for c in cases {
-            let got = try await engine.successRates(orders: c.input.orders, machines: c.input.machines, from: c.input.from, to: c.input.to)
+            var zone: Calendar?
+            if let minutes = c.calendar?.utcOffsetMinutes {
+                var made = Calendar(identifier: .gregorian)
+                made.timeZone = try #require(TimeZone(secondsFromGMT: minutes * 60))
+                zone = made
+            }
+            let got = try await engine.successRates(orders: c.input.orders ?? [], machines: c.input.machines ?? [], from: c.input.from, to: c.input.to,
+                                                    calendar: zone)
             #expect(got == c.want, Comment(rawValue: c.why))
             sawWindow = sawWindow || c.input.from != nil
             sawNil = sawNil || c.want.contains { $0.rate == nil }
@@ -32,6 +47,66 @@ struct SuccessRatesTests {
         }
         // The vectors still cover what this test's name says.
         #expect(sawWindow && sawNil && sawNotEnough)
+    }
+
+    @Test("the days are the calendar's: the same instants, read in Riyadh, New York and UTC, with a daylight-saving change in between")
+    func whoseDay() async throws {
+        func zone(_ id: String) throws -> Calendar {
+            var c = Calendar(identifier: .gregorian); c.timeZone = try #require(TimeZone(identifier: id)); return c
+        }
+        func run(_ at: JSONValue) -> JSONValue { .object(["machineId": .string("M"), "at": at]) }
+        let orders: [JSONValue] = [.object(["id": .string("1"), "printRuns": .array([
+            run(.string("2026-10-31T22:30:00.000Z")),      // Nov 1, 01:30 in Riyadh; Oct 31, 18:30 in New York
+            run(.string("2026-11-01T03:30:00Z")),          // Nov 1 in Riyadh and UTC; Oct 31, 23:30 in New York (still daylight time)
+            run(.string("2026-11-01T06:30:00+00:00")),     // Nov 1 everywhere: 01:30 in New York, just after its clocks went back
+            run(.number(1_793_485_800_000)),               // the first instant again, as milliseconds
+            run(.string("2026-11-01")),                    // a bare day is kept as written, whatever the zone
+            run(.string("soon")), run(.null),
+        ])])]
+        let riyadh = KhaytEngine.runDays(orders, calendar: try zone("Asia/Riyadh"))
+        #expect(riyadh["2026-10-31T22:30:00.000Z"] == .string("2026-11-01") && riyadh["#1793485800000"] == .string("2026-11-01"))
+        #expect(riyadh["2026-11-01"] == .string("2026-11-01") && riyadh["soon"] == .string("") && riyadh.count == 6)
+        let newYork = KhaytEngine.runDays(orders, calendar: try zone("America/New_York"))
+        #expect(newYork["2026-10-31T22:30:00.000Z"] == .string("2026-10-31") && newYork["2026-11-01T03:30:00Z"] == .string("2026-10-31"))
+        #expect(newYork["2026-11-01T06:30:00+00:00"] == .string("2026-11-01"), "the hour the clocks went back was put on the wrong day")
+        // Asked for November 1 only. The counts differ by zone exactly as the days do.
+        let engine = try KhaytEngine()
+        func count(_ calendar: Calendar?) async throws -> Int {
+            let rows = try await engine.successRates(orders: orders, machines: [], from: "2026-11-01", to: "2026-11-01", calendar: calendar)
+            return rows.first.map { $0.finished + $0.failed + $0.cancelled + $0.unknown } ?? 0
+        }
+        // Whether the bundled rule has the hook yet decides what is checked.
+        let inRiyadh = try await count(try zone("Asia/Riyadh")), sliced = try await count(nil)
+        let hooked = inRiyadh != sliced
+        if hooked {
+            #expect(try await count(try zone("Asia/Riyadh")) == 5)      // all four instants and the bare day
+            #expect(try await count(try zone("America/New_York")) == 2)  // the one after midnight there, and the bare day
+            #expect(try await count(try zone("UTC")) == 3)
+        } else {
+            // The rule from before the hook: the UTC slice, whatever calendar is passed. Nothing breaks.
+            #expect(try await count(try zone("Asia/Riyadh")) == 3)
+        }
+        // With no dates, no days are worked out and every run counts.
+        let all = try await engine.successRates(orders: orders, machines: [], calendar: try zone("Asia/Riyadh"))
+        #expect(all.first.map { $0.unknown } == 7)
+    }
+
+    @Test("a rate as a whole per cent never rounds a failure away")
+    func percent() async throws {
+        let engine = try KhaytEngine()
+        #expect(try await engine.successPercent(0.92) == 92)
+        #expect(try await engine.successPercent(1) == 100)
+        #expect(try await engine.successPercent(0) == 0)
+        #expect(try await engine.successPercent(0.995) == 99, "199 of 200 read as 100%")
+        #expect(try await engine.successPercent(0.005) == 1, "1 of 200 read as 0%")
+        #expect(try await engine.successPercent(nil) == nil)
+        #expect(try await engine.successPercent(1.5) == nil)
+        #expect(try await engine.successPercent(-0.1) == nil)
+        // The desktop's own vectors, when the fixture carries them.
+        let file = try Data(contentsOf: CrossAppFixtureTests.fixture("printer-success-vectors.json"))
+        for c in try JSONDecoder().decode(Vectors.self, from: file).percent?.cases ?? [] {
+            #expect(try await engine.successPercent(c.rate) == c.want, Comment(rawValue: c.why))
+        }
     }
 
     @Test("what the phone's line is made of: the counts, the rate, and how many runs are needed")
