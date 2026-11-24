@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import KhaytCore
 
 /// Settings, in four groups (This phone, Shop, Connected, About), each row a
 /// page of its own (`SettingsRoute`). A search on top finds a row by its
@@ -145,6 +146,7 @@ struct SettingsView: View {
             return [settings.shopLabel, L10n.tr("settings.shop.readonly")].filter { !$0.isEmpty }.joined(separator: " · ")
         case .mac:
             return settings.macAddress
+        case .internet: return L10n.tr("internet.switch")
         case .cloud: return L10n.tr("settings.cloud.sub")
         case .connectors:
             let names = connectors.map(\.name)
@@ -158,6 +160,8 @@ struct SettingsView: View {
         switch route {
         case .privacy:
             return ActiveCountSender.ready ? (settings.countInstall ? .on : .off) : nil
+        case .internet:
+            return OutboundGate.shared.isShopOffline ? .on : .off
         case .mac:
             return SettingsState.mac(paired: settings.isPaired && settings.isConfigured,
                                      inReach: health.macInReach, sampleShop: settings.isSampleShop)
@@ -191,6 +195,7 @@ struct SettingsView: View {
         case .notifications: SettingsNotificationsPage()
         case .privacy: SettingsPrivacyPage()
         case .shop: SettingsShopPage()
+        case .internet: SettingsInternetUsePage()
         case .mac: SettingsMacPage()
         case .cloud: SettingsCloudPage()
         case .connectors:

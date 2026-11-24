@@ -134,6 +134,18 @@ updater walks, and a `v4.0.0-alpha.*` tag in it parses as newer than the
 Electron line — it would not merely appear in that feed, it would be chosen.
 Bed Ready learned this first; see the note at the top of `release.yml`.
 
+**The feed is signed, and must not be edited after a cut.** The publish lanes
+sign `appcast.xml` with the key that signs the archive (a comment at the end
+of the file, covering every byte before it) and check it before the release is
+made public. The app does not require the signature yet; when it does
+(`SURequireSignedFeed`, one release after the first signed feed), a feed that
+was re-saved, reformatted or edited by hand in the website repo will be
+refused by every Mac. To check the live one, with the public key only:
+
+```bash
+node scripts/mac-appcast-verify.js --url https://khaytapp.com/mac/appcast.xml
+```
+
 **The version is `mac/version.json`, not `package.json`.** Two fields, and the
 `build` integer is the one Sparkle compares — see [VERSION.md](./VERSION.md)
 for why deriving it from the marketing string silently breaks updates.

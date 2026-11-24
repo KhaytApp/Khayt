@@ -35,6 +35,9 @@ struct PrinterReply: Decodable, Equatable, Sendable {
         case "unsupported": return L10n.tr("printer.why.unsupported")
         case "no-job": return L10n.tr("printer.why.no_job")
         case "busy": return L10n.tr("printer.why.busy")
+        case "read-only": return L10n.tr("printer.why.read_only")
+        case "not-saved": return L10n.tr("printer.why.not_saved")
+        case "role-scope": return L10n.tr("printer.why.role")
         case "not-offered": return L10n.tr("printer.why.old_mac")
         case "no-answer": return L10n.tr("printer.why.no_answer")
         default: return L10n.tr("printer.why.unreachable")
@@ -97,6 +100,30 @@ extension KhaytAPIClient {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if let reply = try? JSONDecoder().decode(PrinterReply.self, from: data) { return reply }
         // A Mac from before the route answers 404 with no body of ours.
+        return .failed(status == 404 ? "not-offered" : "unreachable")
+    }
+
+    /// Tell the Mac a machine's plate is empty: "Taken off" (a finished print)
+    /// and "Bed is clear" (leftovers) both stamp `bedClearedAt` there
+    /// (`POST /api/printer/{id}/bed-clear`, docs/LAN_API.md). On the shop's
+    /// Wi-Fi only, signed by this phone; the printer itself is told nothing.
+    func clearBed(machineId: String) async -> PrinterReply {
+        let id = machineId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? machineId
+        guard let (data, response) = try? await lanRequest(path: "/api/printer/\(id)/bed-clear", method: "POST") else {
+            return .failed("no-answer")
+        }
+        return Self.bedClearReply(status: (response as? HTTPURLResponse)?.statusCode ?? 0, body: data)
+    }
+
+    /// What one answer to bed-clear means. A 404 with a body of ours is
+    /// "no such machine"; without one it is a computer from before the route.
+    nonisolated static func bedClearReply(status: Int, body: Data) -> PrinterReply {
+        if let reply = try? JSONDecoder().decode(PrinterReply.self, from: body) {
+            // Believed as done only on a 200 that says so.
+            return reply.ok && status != 200 ? .failed("unreachable") : reply
+        }
+        struct Refusal: Decodable { let reason: String }
+        if let refusal = try? JSONDecoder().decode(Refusal.self, from: body) { return .failed(refusal.reason) }
         return .failed(status == 404 ? "not-offered" : "unreachable")
     }
 

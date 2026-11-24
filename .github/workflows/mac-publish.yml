@@ -98,6 +98,55 @@ jobs:
           echo "sig=$SIG" >> "$GITHUB_OUTPUT"
           echo "signed with Sparkle $SV's sign_update"
 
+      # ── THE FEED IS SIGNED TOO, AND CHECKED, BEFORE ANYTHING IS PUBLISHED ──
+      # The same key that signs the archive signs the feed (Sparkle 2.9's
+      # signed feeds: a comment at the end of the file covering every byte
+      # before it). An app that requires a signed feed (SURequireSignedFeed,
+      # not yet set: mac-custom-updater-plan.md, decision 4) refuses any other,
+      # so a feed that fails here must fail BEFORE the release is public.
+      #
+      # The key is piped on stdin (`-f -`), never an argument, never a file.
+      # `--disable-signing-warning`: without it sign_update re-serialises the
+      # XML to add a comment, and the bytes signed are no longer the bytes
+      # scripts/mac-appcast.js wrote and its tests describe.
+      #
+      # Checked twice: by Sparkle's own verify, and by ours with the PUBLIC
+      # key read from mac/make-app.sh, the line the app itself is built from.
+      # Nothing may touch the file after this step.
+      - name: Write, sign and check the feed
+        if: ${{ inputs.publish_appcast }}
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          TAG: ${{ inputs.tag }}
+          SIG: ${{ steps.sign.outputs.sig }}
+        run: |
+          set -euo pipefail
+          ARCHIVE="$(ls dist/*.zip | head -1)"
+          FEED="$RUNNER_TEMP/appcast.xml"
+          # The key is for sign_update alone: these never see it.
+          NODE="env -u SPARKLE_PRIVATE_KEY node"
+          $NODE scripts/changelog-section.js "${TAG#v}" > "$RUNNER_TEMP/notes.md" 2>/dev/null || : > "$RUNNER_TEMP/notes.md"
+          $NODE scripts/mac-appcast.js \
+            --archive "$ARCHIVE" \
+            --signature "$SIG" \
+            --url "https://github.com/KhaytApp/khayt-mac/releases/download/$TAG/$(basename "$ARCHIVE")" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --notes-url "https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG" \
+            --out "$FEED"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | sparkle/bin/sign_update -f - --disable-signing-warning "$FEED" >/dev/null
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | sparkle/bin/sign_update -f - --verify "$FEED" >/dev/null \
+            || { echo "::error::Sparkle does not verify the feed it just signed"; exit 1; }
+          # Sparkle's verify proves only that the signing agrees with itself
+          # (it derives the public key from the private one). THIS is the
+          # check against the key inside the app that is about to ship, read
+          # from its own Info.plist.
+          $NODE scripts/mac-appcast-verify.js --feed "$FEED" \
+            --public-key "$(plutil -extract SUPublicEDKey raw "x/Khayt.app/Contents/Info.plist")" \
+            || { echo "::error::the signed feed does not verify with the key inside the app (SUPublicEDKey)"; exit 1; }
+          # And a feed that signs and verifies can still be one no Mac can
+          # parse: signing never reads it as XML.
+          xmllint --noout "$FEED" || { echo "::error::the feed is not well-formed XML"; exit 1; }
+
       # The release FIRST, the feed after: a feed naming an asset that is not
       # published yet sends every install that checks in between to a 404.
       - name: Publish the release
@@ -116,16 +165,12 @@ jobs:
         run: |
           set -euo pipefail
           [ -n "$GH_TOKEN" ] || { echo "::error::WEBSITE_SYNC_TOKEN is not set — the release is published but no install is told"; exit 1; }
-          ARCHIVE="$(ls dist/*.zip | head -1)"
-          node scripts/mac-appcast.js \
-            --archive "$ARCHIVE" \
-            --signature "${{ steps.sign.outputs.sig }}" \
-            --url "https://github.com/KhaytApp/khayt-mac/releases/download/$TAG/$(basename "$ARCHIVE")" \
-            --notes-url "https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG" \
-            --out "$RUNNER_TEMP/appcast.xml"
+          # The file signed and checked above, byte for byte. Checked once
+          # more where it lands: a copy is the last thing that could change it.
           git clone --depth 1 "https://x-access-token:$GH_TOKEN@github.com/KhaytApp/khayt-website.git" site
           mkdir -p site/mac
           cp "$RUNNER_TEMP/appcast.xml" site/mac/appcast.xml
+          node scripts/mac-appcast-verify.js --feed site/mac/appcast.xml
           node scripts/mac-site-version.js site/index.html || echo "::warning::could not update the Mac version on the site"
           cd site
           # ar/index.html is generated from index.html, so the version just written

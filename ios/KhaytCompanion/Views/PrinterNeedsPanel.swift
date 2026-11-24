@@ -6,11 +6,50 @@ import SwiftUI
 /// Turki, Nov 22): the problems worst first, each with what to do, and the
 /// reasons the printer waits, most urgent first.
 ///
-/// Read-only. "Taken off" and "Bed is clear" in the frame write the bed's
-/// state, and the Mac has no route for that yet; until it has, the phone
-/// shows the reason and does not offer the button.
+/// "Taken off" (a finished print) and "Bed is clear" (leftovers) tell the Mac
+/// the plate is empty (`KhaytAPIClient.clearBed`). They show on a phone that
+/// may control machines, in reach of its Mac; elsewhere the reason is shown
+/// with no button. The problems' actions stay labels: they are done at the
+/// printer, not sent by the phone.
 struct PrinterNeedsPanel: View {
     let live: MachineLiveStatus
+
+    /// Tells the Mac the plate is empty, and reads the printers again when it
+    /// took. Nil where the buttons must not show (a viewer's phone, the Mac
+    /// out of reach, the sample shop): the reason is then shown alone.
+    var clearBed: (() async -> PrinterReply)? = nil
+    @State private var clearing = false
+    @State private var note: String?
+
+    /// Which waiting reasons a tap can end, and the button's words.
+    static func clearWords(_ reason: String) -> String? {
+        switch reason {
+        case "print-to-take-off": return L10n.tr("waiting.do.taken_off")
+        case "bed-to-clear": return L10n.tr("waiting.do.bed_clear")
+        default: return nil
+        }
+    }
+
+    /// The button shows for a role that may control machines, on the shop's
+    /// Wi-Fi with the Mac answering, and never on the sample shop.
+    static func mayClear(canControl: Bool, macInReach: Bool, sampleShop: Bool) -> Bool {
+        canControl && macInReach && !sampleShop
+    }
+
+    private func clear() async {
+        guard !clearing else { return }
+        clearing = true
+        defer { clearing = false }
+        guard let clearBed else { return }
+        let reply = await clearBed()
+        if reply.ok {
+            note = nil
+            CompanionHaptics.success()
+        } else {
+            note = reply.sentence
+            CompanionHaptics.warning()
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -31,7 +70,14 @@ struct PrinterNeedsPanel: View {
                     .foregroundStyle(KhaytDesign.ink)
                 ForEach(Array(live.waiting.enumerated()), id: \.offset) { _, w in
                     row(dot: w.reason == "bed-to-clear" || w.reason == "filament-runout" ? KhaytDesign.late : KhaytDesign.attention,
-                        title: Self.reasonWords(w), sub: Self.since(w), action: nil)
+                        title: Self.reasonWords(w), sub: Self.since(w), action: nil,
+                        tap: clearBed != nil ? Self.clearWords(w.reason) : nil)
+                }
+                if let note {
+                    Text(note)
+                        .font(.khayt(12, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.late)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -42,7 +88,7 @@ struct PrinterNeedsPanel: View {
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
     }
 
-    private func row(dot: Color, title: String, sub: String?, action: String?) -> some View {
+    private func row(dot: Color, title: String, sub: String?, action: String?, tap: String? = nil) -> some View {
         HStack(alignment: .center, spacing: 10) {
             Circle().fill(dot).frame(width: 8, height: 8).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -60,6 +106,18 @@ struct PrinterNeedsPanel: View {
             Spacer(minLength: 8)
             // What to do, said on the printer: a label, not a command the
             // phone sends.
+            if let tap {
+                Button { Task { await clear() } } label: {
+                    Group { if clearing { ProgressView() } else { Text(tap) } }
+                        .font(.khayt(12, .semibold, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.ink)
+                        .padding(.horizontal, 10).frame(minHeight: 32)
+                        .background(KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .disabled(clearing)
+            }
             if let action {
                 Text(action)
                     .font(.khayt(12, .semibold, relativeTo: .caption))
@@ -68,7 +126,7 @@ struct PrinterNeedsPanel: View {
                     .background(KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: tap == nil ? .combine : .contain)
     }
 
     // ── Words (closed sets from the shared rules) ───────────────────────
