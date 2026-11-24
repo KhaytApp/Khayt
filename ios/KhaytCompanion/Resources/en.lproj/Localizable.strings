@@ -1585,7 +1585,7 @@
 "internet.lookups" = "Lookups";
 "internet.lookups.sub" = "Looking up a barcode when you scan a spool.";
 "internet.lookups.blocked" = "Barcode lookups are off while the switch is on.";
-"internet.blocked_times" = "Blocked %d times, last at %@";
+"internet.blocked_times" = "%1$@, last at %2$@";
 "internet.install" = "Install count";
 "internet.install.sub" = "This phone's own setting. Anyone can turn it off; only the owner can turn it on.";
 "internet.state.on" = "On";
@@ -1602,3 +1602,6 @@
 "internet.result.read_only" = "The sample shop cannot be changed.";
 "internet.result.busy" = "Khayt on your Mac is starting. Try again in a moment.";
 "internet.result.not_owner" = "Only the owner's phone can change this.";
+"internet.result.unconfirmed" = "Khayt could not confirm this with your Mac. The switch above shows what your Mac says now.";
+"internet.result.saved_not_read" = "Your Mac saved it. This phone follows at its next sync.";
+"internet.blocked_count" = "Blocked %d times";

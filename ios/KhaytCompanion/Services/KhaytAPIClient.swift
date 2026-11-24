@@ -2871,28 +2871,34 @@ extension KhaytAPIClient {
     func refreshMacCan() async {
         guard !settings.isSampleShop, let device = usableDevice,
               let answer = await deviceSelfAnswer(device) else { macCan = []; return }
-        macCan = NetworkSwitch.can(.object(answer))
+        macCan = PhoneNetworkSwitch.can(.object(answer))
     }
 
     /// Flip the shop's switch through the Mac. Signed by this phone's key;
     /// the answer is believed only with the Mac's reply MAC over this nonce.
     /// On done the Mac's settings are read again, so the gate follows at once.
-    func setShopOffline(_ offline: Bool, showing: ShopNetwork?) async -> NetworkSwitch.Outcome {
+    func setShopOffline(_ offline: Bool, showing: PhoneNetworkSwitch.Showing) async -> PhoneNetworkSwitch.Outcome {
         guard !settings.isSampleShop else { return .readOnly }
-        guard let device = usableDevice, let url = try? makeURL(path: NetworkSwitch.path) else { return .failed }
+        guard let device = usableDevice, let url = try? makeURL(path: PhoneNetworkSwitch.path) else { return .unsupported }
         let nonce = MacIdentity.nonce()
-        let body = NetworkSwitch.body(offline: offline, showing: showing)
-        guard let (data, response) = try? await send(url, method: "POST", body: body, auth: .device(device), nonce: nonce),
-              let http = response as? HTTPURLResponse else { return .failed }
-        let verified = DeviceKey.replyVerifies(device, nonce: nonce, status: http.statusCode, body: data,
-                                               header: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
-        let outcome = NetworkSwitch.outcome(status: http.statusCode, body: data, verified: verified)
+        let body = PhoneNetworkSwitch.body(offline: offline, showing: showing)
+        var outcome = PhoneNetworkSwitch.Outcome.failed
+        if let (data, response) = try? await send(url, method: "POST", body: body, auth: .device(device), nonce: nonce),
+           let http = response as? HTTPURLResponse {
+            let verified = DeviceKey.replyVerifies(device, nonce: nonce, status: http.statusCode, body: data,
+                                                   header: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+            outcome = PhoneNetworkSwitch.outcome(status: http.statusCode, body: data, verified: verified)
+        }
         switch outcome {
-        case .done, .changed, .notSaved:
-            if let book { await refreshMacSettings(into: book) }
         case .unsupported, .notOwner:
             await refreshMacCan()
-        default: break
+        case .readOnly, .busy:
+            break
+        default:
+            // Done, changed, not saved, and also no answer or an unsigned
+            // one: the Mac may have made the change even when the phone
+            // never heard so, so its settings are read again every time.
+            if let book { await refreshMacSettings(into: book) }
         }
         return outcome
     }

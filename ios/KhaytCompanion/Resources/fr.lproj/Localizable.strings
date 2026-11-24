@@ -1585,7 +1585,7 @@
 "internet.lookups" = "Recherches";
 "internet.lookups.sub" = "Recherche du code-barres lors du scan d’une bobine.";
 "internet.lookups.blocked" = "Les recherches de code-barres sont désactivées tant que l’interrupteur est activé.";
-"internet.blocked_times" = "Bloqué %d fois, la dernière à %@";
+"internet.blocked_times" = "%1$@, la dernière à %2$@";
 "internet.install" = "Comptage des installations";
 "internet.install.sub" = "Réglage propre à ce téléphone. Tout le monde peut le désactiver ; seul le propriétaire peut l’activer.";
 "internet.state.on" = "Activé";
@@ -1602,3 +1602,6 @@
 "internet.result.read_only" = "L’atelier d’exemple ne peut pas être modifié.";
 "internet.result.busy" = "Khayt démarre sur votre Mac. Réessayez dans un instant.";
 "internet.result.not_owner" = "Seul le téléphone du propriétaire peut modifier ce réglage.";
+"internet.result.unconfirmed" = "Khayt n’a pas pu le confirmer avec votre Mac. L’interrupteur ci-dessus indique ce que votre Mac dit maintenant.";
+"internet.result.saved_not_read" = "Votre Mac l’a enregistré. Ce téléphone suivra à la prochaine synchronisation.";
+"internet.blocked_count" = "Bloqué %d fois";

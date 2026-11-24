@@ -17,23 +17,47 @@ final class NetworkSwitchTests: XCTestCase {
     // MARK: - The request
 
     func testTheRequestSaysWhatThePhoneWasShowing() throws {
-        let showing = ShopNetwork(offline: true, keep: ["cloud", "email"], changedAt: "2026-11-22T14:12:00.000Z")
-        let o = try json(NetworkSwitch.body(offline: false, showing: showing))
+        let showing = PhoneNetworkSwitch.Showing(seen: "2026-11-22T14:12:00.000Z", keep: ["cloud", "messaging"])
+        let o = try json(PhoneNetworkSwitch.body(offline: false, showing: showing))
         XCTAssertEqual(o["offline"], .bool(false))
         XCTAssertEqual(o["seen"], .string("2026-11-22T14:12:00.000Z"))
-        XCTAssertEqual(o["seenKeep"], .array([.string("cloud"), .string("email")]), "the keep list the person confirmed against")
+        XCTAssertEqual(o["seenKeep"], .array([.string("cloud"), .string("messaging")]), "the keep list the person confirmed against")
         XCTAssertNil(o["keep"], "the phone never edits the list: leaving it out leaves the shop's as it is")
-        XCTAssertLessThan(NetworkSwitch.body(offline: false, showing: showing).count, 4096)
+        XCTAssertLessThan(PhoneNetworkSwitch.body(offline: false, showing: showing).count, 4096)
     }
 
     func testAPhoneThatHasSeenNoStampSendsNone() throws {
-        let never = try json(NetworkSwitch.body(offline: true, showing: nil))
+        let never = try json(PhoneNetworkSwitch.body(offline: true, showing: .none))
         XCTAssertEqual(never["offline"], .bool(true))
         XCTAssertNil(never["seen"])
         XCTAssertEqual(never["seenKeep"], .array([]), "nothing shown as kept")
-        let unstamped = try json(NetworkSwitch.body(offline: true, showing: ShopNetwork(offline: false, keep: ["cloud"])))
+        let unstamped = try json(PhoneNetworkSwitch.body(offline: true, showing: .init(seen: nil, keep: ["cloud"])))
         XCTAssertNil(unstamped["seen"])
         XCTAssertEqual(unstamped["seenKeep"], .array([.string("cloud")]))
+    }
+
+    /// `seenKeep` is the list as the Mac shows a phone: only purposes a shop
+    /// can keep that this build knows. Anything else could never equal the
+    /// Mac's list, and every tap would be answered "changed" (review of #2690).
+    func testWhatWasShownIsReadTheWayTheMacShowsIt() {
+        func showing(_ network: JSONValue?) -> PhoneNetworkSwitch.Showing {
+            PhoneNetworkSwitch.Showing.current(.settings(.object(network.map { ["network": $0] } ?? [:])))
+        }
+        let keep: JSONValue = .array([.string("cloud"), .string("lan"), .string("switch-sync"), .string("from-a-newer-app"),
+                                      .number(3), .string("cloud"), .string("tunnel")])
+        XCTAssertEqual(showing(.object(["offline": .bool(true), "keep": keep, "changedAt": .string("2026-11-22T14:12:00.000Z")])),
+                       .init(seen: "2026-11-22T14:12:00.000Z", keep: ["cloud", "tunnel"]))
+        XCTAssertEqual(showing(.object(["offline": .string("true"), "keep": .array([.string("cloud")])])),
+                       .init(seen: nil, keep: ["cloud"]), "a malformed switch beside a real keep list: the list is still what was kept")
+        XCTAssertEqual(showing(nil), .none, "never set")
+        XCTAssertEqual(showing(.string("yes")), .none)
+        XCTAssertEqual(PhoneNetworkSwitch.Showing.current(.none), .none)
+        XCTAssertEqual(PhoneNetworkSwitch.Showing.current(.unread), .none)
+        // The Mac's own answer, used for the next request until the phone has read it back.
+        XCTAssertEqual(PhoneNetworkSwitch.Showing(ShopNetwork(offline: true, keep: ["cloud", "lan"], changedAt: "2026-11-24T09:00:00.000Z")),
+                       .init(seen: "2026-11-24T09:00:00.000Z", keep: ["cloud"]))
+        for id in ["cloud", "lookups", "tunnel", "install-count"] { XCTAssertTrue(PhoneNetworkSwitch.keepable(id), id) }
+        for id in ["lan", "switch-sync", "nope", ""] { XCTAssertFalse(PhoneNetworkSwitch.keepable(id), id) }
     }
 
     // MARK: - The book's value
@@ -51,8 +75,8 @@ final class NetworkSwitchTests: XCTestCase {
 
     // MARK: - The Mac's answers
 
-    private func answer(_ status: Int, _ body: String, verified: Bool = true) -> NetworkSwitch.Outcome {
-        NetworkSwitch.outcome(status: status, body: Data(body.utf8), verified: verified)
+    private func answer(_ status: Int, _ body: String, verified: Bool = true) -> PhoneNetworkSwitch.Outcome {
+        PhoneNetworkSwitch.outcome(status: status, body: Data(body.utf8), verified: verified)
     }
 
     func testEachAnswerTheRouteGives() {
@@ -99,35 +123,39 @@ final class NetworkSwitchTests: XCTestCase {
     func testEveryOutcomeButDoneHasWords() {
         L10n.setLanguage(.en)
         defer { L10n.setLanguage(.system) }
-        XCTAssertNil(NetworkSwitch.words(.done(ShopNetwork(offline: true))), "the switch itself says it")
-        for outcome: NetworkSwitch.Outcome in [.changed(nil), .notSaved(nil), .readOnly, .busy, .notOwner, .unsupported, .unverified, .failed] {
-            let words = NetworkSwitch.words(outcome) ?? ""
+        XCTAssertNil(PhoneNetworkSwitch.words(.done(ShopNetwork(offline: true))), "the switch itself says it")
+        for outcome: PhoneNetworkSwitch.Outcome in [.changed(nil), .notSaved(nil), .readOnly, .busy, .notOwner, .unsupported, .unverified, .failed] {
+            let words = PhoneNetworkSwitch.words(outcome) ?? ""
             XCTAssertFalse(words.isEmpty || words.hasPrefix("internet."), "\(outcome)")
         }
-        XCTAssertEqual(NetworkSwitch.words(.unverified), NetworkSwitch.words(.failed), "never 'done', never a different promise")
+        // No signed answer: the Mac may have made the change, so the phone
+        // never says nothing was changed (review of #2690).
+        XCTAssertEqual(PhoneNetworkSwitch.words(.unverified), PhoneNetworkSwitch.words(.failed))
+        XCTAssertFalse(PhoneNetworkSwitch.words(.failed)!.localizedCaseInsensitiveContains("nothing was changed"))
+        XCTAssertNotEqual(PhoneNetworkSwitch.words(.unsupported), PhoneNetworkSwitch.words(.failed))
     }
 
     // MARK: - When the owner's control shows
 
     func testCanIsReadFromTheMacsAnswer() {
-        XCTAssertEqual(NetworkSwitch.can(.object(["role": .string("owner"), "can": .array([.string("network-switch")])])), ["network-switch"])
-        XCTAssertEqual(NetworkSwitch.can(.object(["can": .array([.string("network-switch"), .number(1), .string("later-thing")])])),
+        XCTAssertEqual(PhoneNetworkSwitch.can(.object(["role": .string("owner"), "can": .array([.string("network-switch")])])), ["network-switch"])
+        XCTAssertEqual(PhoneNetworkSwitch.can(.object(["can": .array([.string("network-switch"), .number(1), .string("later-thing")])])),
                        ["network-switch", "later-thing"])
-        XCTAssertEqual(NetworkSwitch.can(.object(["role": .string("owner")])), [], "an older Mac sends no list")
-        XCTAssertEqual(NetworkSwitch.can(.object(["can": .string("network-switch")])), [], "not a list")
-        XCTAssertEqual(NetworkSwitch.can(nil), [])
+        XCTAssertEqual(PhoneNetworkSwitch.can(.object(["role": .string("owner")])), [], "an older Mac sends no list")
+        XCTAssertEqual(PhoneNetworkSwitch.can(.object(["can": .string("network-switch")])), [], "not a list")
+        XCTAssertEqual(PhoneNetworkSwitch.can(nil), [])
     }
 
     func testTheControlShowsOnlyForAnOwnerInReachOfAMacThatServesIt() {
-        let can: Set<String> = [NetworkSwitch.capability]
-        XCTAssertTrue(NetworkSwitch.mayChange(role: "owner", can: can, macInReach: true, sampleShop: false))
+        let can: Set<String> = [PhoneNetworkSwitch.capability]
+        XCTAssertTrue(PhoneNetworkSwitch.mayChange(role: "owner", can: can, macInReach: true, sampleShop: false))
         for role in ["manager", "operator", "viewer", ""] {
-            XCTAssertFalse(NetworkSwitch.mayChange(role: role, can: can, macInReach: true, sampleShop: false), role)
+            XCTAssertFalse(PhoneNetworkSwitch.mayChange(role: role, can: can, macInReach: true, sampleShop: false), role)
         }
-        XCTAssertFalse(NetworkSwitch.mayChange(role: "owner", can: [], macInReach: true, sampleShop: false), "the Mac did not say so")
-        XCTAssertFalse(NetworkSwitch.mayChange(role: "owner", can: ["something-else"], macInReach: true, sampleShop: false))
-        XCTAssertFalse(NetworkSwitch.mayChange(role: "owner", can: can, macInReach: false, sampleShop: false), "the route is the shop's Wi-Fi only")
-        XCTAssertFalse(NetworkSwitch.mayChange(role: "owner", can: can, macInReach: true, sampleShop: true))
+        XCTAssertFalse(PhoneNetworkSwitch.mayChange(role: "owner", can: [], macInReach: true, sampleShop: false), "the Mac did not say so")
+        XCTAssertFalse(PhoneNetworkSwitch.mayChange(role: "owner", can: ["something-else"], macInReach: true, sampleShop: false))
+        XCTAssertFalse(PhoneNetworkSwitch.mayChange(role: "owner", can: can, macInReach: false, sampleShop: false), "the route is the shop's Wi-Fi only")
+        XCTAssertFalse(PhoneNetworkSwitch.mayChange(role: "owner", can: can, macInReach: true, sampleShop: true))
     }
 
     // MARK: - What the page shows (the gate's own answers)
@@ -166,6 +194,34 @@ final class NetworkSwitchTests: XCTestCase {
         XCTAssertEqual(model(nil).switchOn, false, "never set is off")
     }
 
+    /// A shop that kept Khayt Cloud and then turned the switch OFF: the list
+    /// is still in the book, but nothing is being "kept" (review of #2690).
+    func testTheSwitchOffWithAKeepListSaysAllowedNotKept() {
+        L10n.setLanguage(.en)
+        defer { L10n.setLanguage(.system) }
+        let m = model(.object(["offline": .bool(false), "keep": .array([.string("cloud")])]))
+        XCTAssertFalse(m.switchOn)
+        XCTAssertEqual(m.lines[0].state, .allowed)
+        XCTAssertEqual(m.lines[0].sub, "Sign-in, sync and job photos.")
+    }
+
+    /// The install count on, but held by the shop's switch: blocked, not "On".
+    func testTheInstallCountHeldByTheSwitchSaysBlocked() {
+        XCTAssertEqual(model(.object(["offline": .bool(true)]), countInstall: true).lines.last?.state, .blocked)
+        XCTAssertEqual(model(.object(["offline": .bool(true), "keep": .array([.string("install-count")])]), countInstall: true).lines.last?.state, .on)
+        XCTAssertEqual(model(.object(["offline": .bool(true)]), countInstall: false).lines.last?.state, .off)
+    }
+
+    func testOneBlockedCallIsSaidInTheSingular() {
+        L10n.setLanguage(.en)
+        let once = model(.object(["offline": .bool(true)]), blocked: [.lookups: .init(count: 1, last: Date())])
+        XCTAssertEqual(once.lines[1].sub, "Blocked 1 time, last at 14:12")
+        L10n.setLanguage(.ar)
+        let twice = model(.object(["offline": .bool(true)]), blocked: [.lookups: .init(count: 2, last: Date())])
+        XCTAssertTrue(twice.lines[1].sub.hasPrefix("حُظر مرتين"), twice.lines[1].sub)
+        L10n.setLanguage(.system)
+    }
+
     func testTheSwitchOnWithNothingKeptBlocksBoth() {
         let m = model(.object(["offline": .bool(true)]))
         XCTAssertEqual(m.lines.prefix(2).map(\.state), [.blocked, .blocked])
@@ -193,7 +249,8 @@ final class NetworkSwitchTests: XCTestCase {
                     "internet.state.on", "internet.state.off", "internet.confirm.eyebrow", "internet.confirm.off.title",
                     "internet.confirm.off.body", "internet.confirm.on.title", "internet.confirm.on.body", "internet.turn_off",
                     "internet.turn_on", "internet.result.changed", "internet.result.not_saved", "internet.result.read_only",
-                    "internet.result.busy", "internet.result.not_owner", "internet.result.failed"]
+                    "internet.result.busy", "internet.result.not_owner", "internet.result.failed", "internet.result.unconfirmed",
+                    "internet.result.saved_not_read", "internet.blocked_count"]
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         for lang in ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
             let url = root.appending(path: "KhaytCompanion/Resources/\(lang).lproj/Localizable.strings")
@@ -203,8 +260,7 @@ final class NetworkSwitchTests: XCTestCase {
                 XCTAssertFalse(value.isEmpty, "\(lang): \(key)")
             }
             let times = table["internet.blocked_times"] ?? ""
-            XCTAssertTrue(times.contains("%d") && times.contains("%@"), "\(lang): the count and the time")
-            XCTAssertLessThan(times.range(of: "%d")!.lowerBound, times.range(of: "%@")!.lowerBound, "\(lang): count first")
+            XCTAssertTrue(times.contains("%1$@") && times.contains("%2$@"), "\(lang): the count's words and the time")
         }
     }
 

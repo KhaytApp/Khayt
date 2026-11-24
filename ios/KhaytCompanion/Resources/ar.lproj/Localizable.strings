@@ -1585,7 +1585,7 @@
 "internet.lookups" = "عمليات البحث";
 "internet.lookups.sub" = "البحث عن الباركود عند مسح بكرة.";
 "internet.lookups.blocked" = "البحث عن الباركود متوقف ما دام المفتاح مفعّلًا.";
-"internet.blocked_times" = "حُظر %d مرة، آخرها الساعة %@";
+"internet.blocked_times" = "%1$@، آخرها الساعة %2$@";
 "internet.install" = "عدّ التثبيت";
 "internet.install.sub" = "إعداد خاص بهذا الهاتف. يمكن لأي شخص إيقافه، والمالك وحده يستطيع تشغيله.";
 "internet.state.on" = "مفعّل";
@@ -1602,3 +1602,6 @@
 "internet.result.read_only" = "لا يمكن تغيير المتجر التجريبي.";
 "internet.result.busy" = "خيط على الـ Mac قيد التشغيل. حاول بعد لحظة.";
 "internet.result.not_owner" = "هاتف المالك وحده يستطيع تغيير هذا.";
+"internet.result.unconfirmed" = "تعذّر على خيط تأكيد ذلك مع الـ Mac. المفتاح أعلاه يعرض ما يقوله الـ Mac الآن.";
+"internet.result.saved_not_read" = "حفظه الـ Mac. يتبعه هذا الهاتف عند المزامنة التالية.";
+"internet.blocked_count" = "حُظر %d مرة";

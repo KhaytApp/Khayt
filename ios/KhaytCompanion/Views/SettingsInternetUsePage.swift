@@ -20,9 +20,13 @@ struct SettingsInternetUsePage: View {
     @State private var asking: Bool?
     @State private var sending = false
     @State private var result: String?
+    /// The Mac's last signed word on the switch (a done or a "changed"
+    /// answer), shown until the phone's own gate has caught up: the settings
+    /// re-read after a change can fail, and the toggle must not sit stale.
+    @State private var macSaid: ShopNetwork?
 
     private var mayChange: Bool {
-        NetworkSwitch.mayChange(role: settings.effectiveRole, can: api.macCan, macInReach: health.macInReach,
+        PhoneNetworkSwitch.mayChange(role: settings.effectiveRole, can: api.macCan, macInReach: health.macInReach,
                                 sampleShop: settings.isSampleShop)
     }
 
@@ -53,8 +57,9 @@ struct SettingsInternetUsePage: View {
 
     private func reload() {
         let gate = OutboundGate.shared
+        if let said = macSaid, said.offline == gate.isShopOffline { macSaid = nil }
         model = InternetUseModel.make(
-            shopOffline: gate.isShopOffline, rows: gate.rows(), blocked: gate.blockedCounts(),
+            shopOffline: macSaid?.offline ?? gate.isShopOffline, rows: gate.rows(), blocked: gate.blockedCounts(),
             countInstall: settings.countInstall, countReady: ActiveCountSender.ready,
             clock: { $0.formatted(.dateTime.hour().minute().locale(L10n.locale)) })
     }
@@ -100,7 +105,10 @@ struct SettingsInternetUsePage: View {
                 HStack(spacing: 10) {
                     Button(L10n.tr("common.cancel")) { asking = nil }
                         .buttonStyle(.bordered)
-                    Button(L10n.tr(turnOn ? "internet.turn_on" : "internet.turn_off")) { Task { await send(turnOn) } }
+                    Button(L10n.tr(turnOn ? "internet.turn_on" : "internet.turn_off")) {
+                        guard !sending else { return }
+                        Task { await send(turnOn) }
+                    }
                         .buttonStyle(.borderedProminent)
                         .tint(KhaytDesign.brand)
                     if sending { ProgressView() }
@@ -114,11 +122,24 @@ struct SettingsInternetUsePage: View {
     }
 
     private func send(_ offline: Bool) async {
+        guard !sending else { return }
         sending = true
         defer { sending = false }
-        let outcome = await api.setShopOffline(offline, showing: ShopNetwork.current(OutboundGate.shared.currentBook))
+        // What the person confirmed against: the Mac's last signed word when
+        // the phone has one the gate has not caught up with, else the gate's.
+        let showing = macSaid.map { PhoneNetworkSwitch.Showing($0) } ?? PhoneNetworkSwitch.Showing.current(OutboundGate.shared.currentBook)
+        let outcome = await api.setShopOffline(offline, showing: showing)
         asking = nil
-        result = NetworkSwitch.words(outcome)
+        result = PhoneNetworkSwitch.words(outcome)
+        switch outcome {
+        case .done(let network):
+            macSaid = network
+            // Saved on the Mac, but this phone could not read it back yet.
+            if OutboundGate.shared.isShopOffline != network.offline { result = L10n.tr("internet.result.saved_not_read") }
+        case .changed(let network?), .notSaved(let network?):
+            macSaid = network
+        default: break
+        }
         reload()
     }
 

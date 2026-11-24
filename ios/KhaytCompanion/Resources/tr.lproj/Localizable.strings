@@ -1585,7 +1585,7 @@
 "internet.lookups" = "Sorgular";
 "internet.lookups.sub" = "Bir makara tarandığında barkod sorgusu.";
 "internet.lookups.blocked" = "Anahtar açıkken barkod sorguları kapalıdır.";
-"internet.blocked_times" = "%d kez engellendi, sonuncusu %@";
+"internet.blocked_times" = "%1$@, sonuncusu %2$@";
 "internet.install" = "Kurulum sayımı";
 "internet.install.sub" = "Bu telefonun kendi ayarı. Herkes kapatabilir; yalnızca sahip açabilir.";
 "internet.state.on" = "Açık";
@@ -1602,3 +1602,6 @@
 "internet.result.read_only" = "Örnek atölye değiştirilemez.";
 "internet.result.busy" = "Mac’inizde Khayt başlatılıyor. Birazdan yeniden deneyin.";
 "internet.result.not_owner" = "Bunu yalnızca sahibin telefonu değiştirebilir.";
+"internet.result.unconfirmed" = "Khayt bunu Mac’inizle doğrulayamadı. Yukarıdaki anahtar Mac’inizin şu an söylediğini gösterir.";
+"internet.result.saved_not_read" = "Mac’iniz kaydetti. Bu telefon bir sonraki eşitlemede buna uyar.";
+"internet.blocked_count" = "%d kez engellendi";

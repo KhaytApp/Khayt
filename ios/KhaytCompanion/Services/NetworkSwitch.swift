@@ -37,7 +37,9 @@ struct ShopNetwork: Equatable, Sendable {
 /// (`POST /api/network/switch`, docs/LAN_API.md; iPhone frame 1B, Turki's yes
 /// of Nov 22). The Mac makes the change, by the same path as its own screen;
 /// the phone asks, signed, and believes only a signed answer.
-enum NetworkSwitch {
+/// Named apart from KhaytCore's `NetworkSwitch` (the stamp rule), which a file
+/// importing both modules would otherwise find ambiguous.
+enum PhoneNetworkSwitch {
     static let path = "/api/network/switch"
     /// What `GET /api/devices/self` lists in `can` when this Mac serves the
     /// route for this phone.
@@ -57,6 +59,49 @@ enum NetworkSwitch {
         role == "owner" && macInReach && !sampleShop && can.contains(capability)
     }
 
+    /// What the phone was showing, read the way the Mac shows a phone the
+    /// switch (`networkForPhone`): the keep list holds only purposes a shop
+    /// can keep that this build knows (never `lan` or `switch-sync`, never an
+    /// id from a newer app), each once. Read from the raw block, so a
+    /// malformed `offline` beside a real keep list still says what was kept.
+    /// Otherwise `seenKeep` could never equal the Mac's list, and every tap
+    /// would be answered "changed" (review of #2690).
+    struct Showing: Equatable, Sendable {
+        var seen: String?
+        var keep: [String]
+
+        static let none = Showing(seen: nil, keep: [])
+
+        init(seen: String?, keep: [String]) { self.seen = seen; self.keep = keep }
+
+        init(network: JSONValue?) {
+            guard case .object(let o)? = network else { self = .none; return }
+            var seen: String?
+            if case .string(let at)? = o["changedAt"], !at.isEmpty { seen = at }
+            var keep: [String] = []
+            if case .array(let rows)? = o["keep"] {
+                for case .string(let id) in rows where PhoneNetworkSwitch.keepable(id) && !keep.contains(id) { keep.append(id) }
+            }
+            self.init(seen: seen, keep: keep)
+        }
+
+        init(_ network: ShopNetwork) {
+            self.init(seen: network.changedAt, keep: network.keep.filter(PhoneNetworkSwitch.keepable))
+        }
+
+        /// From the settings the gate follows now.
+        static func current(_ book: OutboundGate.Book) -> Showing {
+            guard case .settings(.object(let s)) = book else { return .none }
+            return Showing(network: s["network"])
+        }
+    }
+
+    /// A purpose a shop can keep, that this build knows.
+    static func keepable(_ id: String) -> Bool {
+        guard let purpose = OutboundPurpose(rawValue: id) else { return false }
+        return purpose != .lan && purpose != .switchSync
+    }
+
     /// The request: the switch, and what the phone was showing, so two people
     /// flipping it at once never overwrite each other blind.
     /// - `seen`: the `changedAt` shown; left out when none was seen.
@@ -65,10 +110,9 @@ enum NetworkSwitch {
     ///   invisible to `seen`; the person confirmed against this list.
     /// - `keep` is never sent: the phone does not edit the list, and leaving
     ///   it out leaves the shop's list as it is.
-    static func body(offline: Bool, showing: ShopNetwork?) -> Data {
-        var o: [String: JSONValue] = ["offline": .bool(offline),
-                                      "seenKeep": .array((showing?.keep ?? []).map(JSONValue.string))]
-        if let seen = showing?.changedAt { o["seen"] = .string(seen) }
+    static func body(offline: Bool, showing: Showing) -> Data {
+        var o: [String: JSONValue] = ["offline": .bool(offline), "seenKeep": .array(showing.keep.map(JSONValue.string))]
+        if let seen = showing.seen { o["seen"] = .string(seen) }
         return (try? JSONEncoder().encode(JSONValue.object(o))) ?? Data()
     }
 
@@ -128,7 +172,10 @@ enum NetworkSwitch {
         case .readOnly: return L10n.tr("internet.result.read_only")
         case .busy: return L10n.tr("internet.result.busy")
         case .notOwner: return L10n.tr("internet.result.not_owner")
-        case .unsupported, .unverified, .failed: return L10n.tr("internet.result.failed")
+        case .unsupported: return L10n.tr("internet.result.failed")
+        // No signed answer: the Mac may or may not have made the change, so
+        // the phone never says "nothing was changed" (review of #2690).
+        case .unverified, .failed: return L10n.tr("internet.result.unconfirmed")
         }
     }
 }
@@ -157,14 +204,16 @@ struct InternetUseModel: Equatable {
                 return shopOffline ? .blocked : .allowed
             }
             if !row.allowed { return .blocked }
-            return row.kept ? .kept : .allowed
+            // `kept` on a row is the shop's list, whatever the switch says;
+            // the reason says whether that is why the call goes through now.
+            return row.reason == "kept" ? .kept : .allowed
         }
         func sub(_ purpose: OutboundPurpose, _ s: State, kept: String, allowed: String, blockedWords: String) -> String {
             switch s {
             case .kept: return kept
             case .blocked:
                 if let b = blocked[purpose], b.count > 0 {
-                    return L10n.format("internet.blocked_times", b.count, clock(b.last))
+                    return L10n.format("internet.blocked_times", L10n.count("internet.blocked_count", b.count), clock(b.last))
                 }
                 return blockedWords
             default: return allowed
@@ -181,7 +230,8 @@ struct InternetUseModel: Equatable {
         ]
         if countReady {
             lines.append(Line(id: "install-count", title: L10n.tr("internet.install"), sub: L10n.tr("internet.install.sub"),
-                              state: countInstall ? .on : .off))
+                              // On, but held by the shop's switch: say blocked, not on.
+                              state: !countInstall ? .off : (state(.installCount) == .blocked ? .blocked : .on)))
         }
         return InternetUseModel(switchOn: shopOffline, lines: lines)
     }

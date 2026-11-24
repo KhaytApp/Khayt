@@ -1585,7 +1585,7 @@
 "internet.lookups" = "Abfragen";
 "internet.lookups.sub" = "Barcode-Abfrage beim Scannen einer Spule.";
 "internet.lookups.blocked" = "Barcode-Abfragen sind aus, solange der Schalter an ist.";
-"internet.blocked_times" = "%d-mal blockiert, zuletzt um %@";
+"internet.blocked_times" = "%1$@, zuletzt um %2$@";
 "internet.install" = "Installationszählung";
 "internet.install.sub" = "Eine eigene Einstellung dieses Telefons. Jeder kann sie ausschalten; nur der Inhaber kann sie einschalten.";
 "internet.state.on" = "An";
@@ -1602,3 +1602,6 @@
 "internet.result.read_only" = "Der Beispiel-Shop kann nicht geändert werden.";
 "internet.result.busy" = "Khayt startet gerade auf Ihrem Mac. Versuchen Sie es gleich noch einmal.";
 "internet.result.not_owner" = "Nur das Telefon des Inhabers kann das ändern.";
+"internet.result.unconfirmed" = "Khayt konnte das nicht mit Ihrem Mac bestätigen. Der Schalter oben zeigt, was Ihr Mac jetzt meldet.";
+"internet.result.saved_not_read" = "Ihr Mac hat es gespeichert. Dieses Telefon folgt bei der nächsten Synchronisierung.";
+"internet.blocked_count" = "%d-mal blockiert";

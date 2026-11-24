@@ -1585,7 +1585,7 @@
 "internet.lookups" = "検索";
 "internet.lookups.sub" = "スプールをスキャンしたときのバーコード検索。";
 "internet.lookups.blocked" = "スイッチがオンの間、バーコード検索は使えません。";
-"internet.blocked_times" = "%d 回ブロック、最後は %@";
+"internet.blocked_times" = "%1$@、最後は %2$@";
 "internet.install" = "インストール数のカウント";
 "internet.install.sub" = "この電話だけの設定です。オフにするのは誰でもできますが、オンにできるのはオーナーだけです。";
 "internet.state.on" = "オン";
@@ -1602,3 +1602,6 @@
 "internet.result.read_only" = "サンプルショップは変更できません。";
 "internet.result.busy" = "Mac の Khayt が起動中です。少ししてからもう一度お試しください。";
 "internet.result.not_owner" = "これを変更できるのはオーナーの電話だけです。";
+"internet.result.unconfirmed" = "Khayt は Mac でこれを確認できませんでした。上のスイッチは Mac の現在の状態を示しています。";
+"internet.result.saved_not_read" = "Mac が保存しました。この電話は次の同期で従います。";
+"internet.blocked_count" = "%d 回ブロック";

@@ -1585,7 +1585,7 @@
 "internet.lookups" = "查询";
 "internet.lookups.sub" = "扫描料盘时查询条形码。";
 "internet.lookups.blocked" = "开关打开时，条形码查询不可用。";
-"internet.blocked_times" = "已拦截 %d 次，最近一次在 %@";
+"internet.blocked_times" = "%1$@，最近一次在 %2$@";
 "internet.install" = "安装计数";
 "internet.install.sub" = "这部手机自己的设置。任何人都可以关闭；只有店主可以开启。";
 "internet.state.on" = "开";
@@ -1602,3 +1602,6 @@
 "internet.result.read_only" = "示例店铺无法更改。";
 "internet.result.busy" = "Mac 上的 Khayt 正在启动。请稍后重试。";
 "internet.result.not_owner" = "只有店主的手机可以更改此项。";
+"internet.result.unconfirmed" = "Khayt 无法与你的 Mac 确认此更改。上方的开关显示 Mac 当前的状态。";
+"internet.result.saved_not_read" = "你的 Mac 已保存。这部手机将在下次同步时遵循。";
+"internet.blocked_count" = "已拦截 %d 次";
