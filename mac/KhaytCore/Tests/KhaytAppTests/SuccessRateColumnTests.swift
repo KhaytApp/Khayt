@@ -52,12 +52,46 @@ struct SuccessRateColumnTests {
         #expect(MachineProfitPage.cameOutRight(Self.row(1, 1, 0, 0), ar) == "الطبعات قليلة بعد")
     }
 
+    @Test("a run counts on the shop's own day, not UTC's: a print sent after midnight in Riyadh is today's")
+    func ownDay() async throws {
+        // 22:30 UTC on Oct 31 is 01:30 on Nov 1 in a shop three hours ahead.
+        let late = "2026-10-31T22:30:00.000Z"
+        let local = Calendar.localDay(ofInstant: late)
+        #expect(Shop.runDay(.string(late)) == local)
+        if TimeZone.current.secondsFromGMT(for: try #require(Calendar.instant(late))) >= 2 * 3600 { #expect(local == "2026-11-01") }
+        // A bare day is itself; milliseconds are read; rubbish and nothing are no day.
+        #expect(Shop.runDay(.string("2026-11-05")) == "2026-11-05")
+        #expect(Shop.runDay(.number(1_795_000_000_000)) == Calendar.book.dayString(Date(timeIntervalSince1970: 1_795_000_000)))
+        for bad in [JSONValue.string("soon"), .string(""), .number(0), .null, .bool(true)] { #expect(Shop.runDay(bad) == nil) }
+        #expect(Shop.runDay(nil) == nil)
+        func run(_ at: JSONValue?, _ result: String = "finished") -> JSONValue {
+            var r: [String: JSONValue] = ["machineId": .string("M"), "result": .string(result), "resultSource": .string("printer")]
+            if let at { r["at"] = at }
+            return .object(r)
+        }
+        let orders: [JSONValue] = [
+            .object(["id": .string("1"), "printRuns": .array([run(.string(late)), run(.string("2026-09-01")), run(nil), run(.string("soon"))])]),
+            .object(["id": .string("2"), "deleted": .bool(true), "printRuns": .array([run(.string(late))])]),
+            .object(["id": .string("3")]),
+        ]
+        // Only the run on that local day, from the job that is not deleted; the job is reduced to its runs.
+        let kept = Shop.runsSent(orders) { $0 == local }
+        #expect(kept == [.object(["printRuns": .array([run(.string(late))])])])
+        // Everything dated, for "All time": the undated and the unreadable are not runs of any day.
+        #expect(Shop.runsSent(orders) { _ in true } == [.object(["printRuns": .array([run(.string(late)), run(.string("2026-09-01"))])])])
+        // And the rule counts exactly those, asked with no dates.
+        let rows = try await OperatorLockTests.sharedEngine.successRates(orders: kept, machines: [.object(["id": .string("M")])])
+        #expect(rows == [.init(machineId: "M", finished: 1, failed: 0, cancelled: 0, unknown: 0, rate: 1, enough: false)])
+    }
+
     @Test("the page is handed the rates for the range it shows, by the shared rule")
     func wiring() throws {
         let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp")
         let reports = try String(contentsOf: app.appending(path: "Reports.swift"), encoding: .utf8)
-        #expect(reports.contains("engine.successRates(orders: shop.orderRows, machines: shop.machineRows,"))
+        // By the shop's own day, picked here; the rule is asked with no dates (its own slice the UTC day).
+        #expect(reports.contains("engine.successRates(orders: sent, machines: shop.machineRows)"))
+        #expect(reports.contains("Shop.runsSent(shop.orderRows)") && !reports.contains("successRates(orders: shop.orderRows"))
         #expect(reports.contains("sites: sites, success: success)"))
         let page = try String(contentsOf: app.appending(path: "MachineProfit.swift"), encoding: .utf8)
         #expect(page.contains("success.first { $0.machineId == row.machineId }") && page.contains(#"words.callIt("mac.mpl_right_note")"#))

@@ -893,13 +893,16 @@ struct Reports: View {
         // range, by the day each run was SENT (a reprint is its own run):
         // every job's runs, finished or not, because a failed print belongs
         // to a job that may still be open.
-        let sent = Shop.periodSpan(shop.period, dates: shop.orderRows.compactMap { row in
-            if case .object(let o) = row, case .string(let d)? = o["date"] { return d }
-            return nil
-        })
-        success = (try? await engine.successRates(orders: shop.orderRows, machines: shop.machineRows,
-                                                  from: sent.from.isEmpty ? nil : sent.from,
-                                                  to: sent.to.isEmpty ? nil : sent.to)) ?? []
+        //
+        // THE DAY IS THE SHOP'S OWN, picked here, and the rule is asked with
+        // no dates. Its own `from`/`to` slice a run's timestamp to ten
+        // characters, which is the UTC day: a print sent at 01:00 in Riyadh
+        // would count on the day before, and at a month's edge in the month
+        // before. The Windows/Linux app's table does the same
+        // (`renderer/analytics.js`, "the run's LOCAL day").
+        let period = shop.period, clock = shop.now
+        let sent = Shop.runsSent(shop.orderRows) { Shop.inPeriod($0, period: period, now: clock) }
+        success = (try? await engine.successRates(orders: sent, machines: shop.machineRows)) ?? []
         machinePL = try? await engine.machineProfit(
             machines: shop.machineRows,
             completed: done.orders,
