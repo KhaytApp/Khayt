@@ -100,7 +100,7 @@ extension Shop {
             await load(source)
             return true
         } catch let refused as TrayRefused {
-            moveProblem = words.callIt(refused.reason == "tag-unusable" ? "inv.material_ph" : "mac.move_gone")
+            moveProblem = refused.reason == "tag-unusable" ? words.callIt("inv.material_ph") : words.callIt("mac.move_gone")
             return false
         } catch {
             moveProblem = said(error)
