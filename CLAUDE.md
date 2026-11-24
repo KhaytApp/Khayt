@@ -168,11 +168,13 @@ with different rules; nothing in this file applies to them.
 
 **What this means in practice:**
 
-- **`CHANGELOG.md` conflicts on nearly every rebase**, because everyone appends
-  to `[Unreleased]`. It is not a real conflict — keep both sides, in either
-  order — but expect it, and prefer one larger PR over several small ones: `main`
-  is strict, checks take 8–12 minutes, and a busy day moves `main` faster than
-  that, so every extra PR costs another rebase cycle.
+- **Write your changelog entry in `changelog.d/<branch>.md`, not `CHANGELOG.md`.**
+  Everyone appending to `[Unreleased]` conflicted on every merge; a file of your
+  own never does. The cut folds them in (`npm run changelog:fold`, VERSIONING
+  step 0), and a release PR is refused while any wait. `CHANGELOG.md` itself is
+  still edited directly for a `### Before you update` item, and at the cut.
+  Checks still take 8–12 minutes and a busy day moves `main` faster than that,
+  so prefer one larger PR over several small ones.
 - **`lib/` is shared by four of the five.** A change there reaches the desktop,
   Bed Ready, the LAN API and — through `/api/store` — the phone. `lib/store-secret-paths.js`
   is the sharpest example: it decides what is masked before a book is handed to
