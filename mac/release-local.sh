@@ -137,6 +137,12 @@ else
   gh release create "$TAG" "$ARCHIVE" --repo KhaytApp/khayt-mac --draft \
     --title "Khayt for macOS $V" --notes-file "$NOTES"
 fi
+# The release carries its own "Before you update" items, in every language:
+# a Mac on an OLDER version reads them from here before it downloads this one
+# ("An update is ready", UpdateGate.swift). The same file the app bundles,
+# checked fresh above. Without it that Mac offers the update as before and
+# the new app's first-launch sheet shows the items instead.
+gh release upload "$TAG" lib/release-gates.json -R KhaytApp/khayt-mac --clobber
 rm -f "$NOTES"
 
 say "signing and publishing on GitHub (a few minutes)"
