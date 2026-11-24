@@ -41,6 +41,17 @@ extension Shop {
         }
     }
 
+    /// The printer's name for the card: the machine's, and for one the
+    /// decoded list does not hold (a record this build cannot fully read),
+    /// the name its raw record carries, before falling back to the id.
+    func proofMachineName(_ id: String) -> String {
+        if machines.contains(where: { $0.id == id }) { return machineName(forId: id) }
+        for row in machineRows where Self.recordId(row) == id {
+            if case .object(let o) = row, case .string(let name)? = o["name"], !name.trimmingCharacters(in: .whitespaces).isEmpty { return name }
+        }
+        return machineName(forId: id)
+    }
+
     /// Changes whenever the card should look again: the job's own record of
     /// the video and its files, and a copy starting or ending.
     func timelapseStamp(_ jobId: String) -> String {
@@ -158,7 +169,7 @@ struct TimelapseProofCard: View {
         func when(_ date: Date?) -> String { date.map { words.say($0, .dateTime.month(.abbreviated).day().hour().minute()) } ?? "" }
         switch proof {
         case .found(let bytes, let machineId, let at):
-            let machine = shop.machineName(forId: machineId)
+            let machine = shop.proofMachineName(machineId)
             if let copying {
                 return (words.callIt("mac.proof_copying", ["machine": .string(machine)]),
                         words.callIt("mac.proof_progress", ["got": .string(size(Double(copying.got))), "total": .string(size(copying.total ?? bytes))]))
@@ -168,7 +179,7 @@ struct TimelapseProofCard: View {
             return (title, at == nil ? size(bytes) : words.callIt("mac.proof_found_sub", ["size": .string(size(bytes)), "when": .string(when(at))]))
         case .kept(let bytes, let machineId, let at, _):
             return (words.callIt("mac.proof_kept", ["size": .string(size(bytes))]),
-                    words.callIt("mac.proof_kept_sub", ["machine": .string(shop.machineName(forId: machineId)), "when": .string(when(at))]))
+                    words.callIt("mac.proof_kept_sub", ["machine": .string(shop.proofMachineName(machineId)), "when": .string(when(at))]))
         case .stays(let bytes, let most, let reason, _):
             return (words.callIt("mac.proof_stays", ["size": .string(size(bytes))]),
                     reason == "over-budget" ? words.callIt("mac.proof_too_large", ["max": .string(size(most))]) : words.callIt("mac.proof_no_size"))
