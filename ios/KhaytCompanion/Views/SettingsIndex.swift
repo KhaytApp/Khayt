@@ -5,7 +5,7 @@ import Foundation
 /// and where it goes. The screen draws these; the tests read them.
 enum SettingsRoute: String, CaseIterable, Hashable, Identifiable {
     case appearance, notifications, privacy
-    case shop
+    case shop, internet
     case mac, cloud, connectors
     case help, diagnostics
 
@@ -28,7 +28,7 @@ enum SettingsRoute: String, CaseIterable, Hashable, Identifiable {
     var group: Group {
         switch self {
         case .appearance, .notifications, .privacy: return .thisPhone
-        case .shop: return .shop
+        case .shop, .internet: return .shop
         case .mac, .cloud, .connectors: return .connected
         case .help, .diagnostics: return .about
         }
@@ -50,6 +50,7 @@ enum SettingsRoute: String, CaseIterable, Hashable, Identifiable {
         case .notifications: return "settings.notifications"
         case .privacy: return "settings.privacy"
         case .shop: return "settings.shop_details"
+        case .internet: return "internet.title"
         case .mac: return "settings.phones_wifi"
         case .cloud: return "cloud.title"
         case .connectors: return "connectors.title"
@@ -68,6 +69,7 @@ enum SettingsRoute: String, CaseIterable, Hashable, Identifiable {
                     "settings.notifications.allow"]
         case .privacy: return ["settings.count_install", "settings.privacy_policy"]
         case .shop: return ["settings.shop_name", "settings.shop.readonly"]
+        case .internet: return ["internet.switch", "internet.uses", "outbound.purpose.cloud", "internet.lookups", "internet.install"]
         case .mac:
             return ["settings.mac_in_reach", "settings.connection", "settings.host", "settings.pin", "settings.retest",
                     "settings.unpair", "settings.secure.button"]
