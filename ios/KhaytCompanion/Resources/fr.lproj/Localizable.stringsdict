@@ -178,5 +178,21 @@
 			<string>%d dépenses</string>
 		</dict>
 	</dict>
+	<key>internet.blocked_count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>Bloqué %d fois</string>
+			<key>other</key>
+			<string>Bloqué %d fois</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

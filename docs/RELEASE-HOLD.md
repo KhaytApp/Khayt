@@ -158,7 +158,10 @@ Promotion was `node scripts/bump-version.js set 3.7.0` — `version:minor` would
 have turned `3.7.0-beta.25` into `3.8.0`. See [VERSIONING.md](../VERSIONING.md).
 
 **Replace-vs-promote is still decided on the day**, with
-`git rev-list --count <tag>..origin/main` and an empty `[Unreleased]`. This
+`git rev-list --count <tag>..origin/main` and an empty `[Unreleased]` **with
+no fragments in `changelog.d/`** (`node scripts/changelog-fold.js --check`):
+since entries wait there until the cut, an empty `[Unreleased]` alone no longer
+means nothing has landed. This
 section says when the question may be asked, not what its answer is.
 
 ## While a hold is active
@@ -170,7 +173,8 @@ tag until a deliberate stable release.
 
 ## Shipping a stable release
 
-1. `npm run check`
+1. `npm run check`, then `npm run changelog:fold` (the pull requests' entries
+   wait in `changelog.d/` until this moves them into `[Unreleased]`)
 2. Move `[Unreleased]` in `CHANGELOG.md` into `## [X.Y.Z]`
 3. `node scripts/bump-version.js set X.Y.Z` — name the version explicitly.
 

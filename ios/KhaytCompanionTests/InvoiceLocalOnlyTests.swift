@@ -94,6 +94,15 @@ final class InvoiceLocalOnlyTests: XCTestCase {
     }
 
     func testAShopsDocumentNeverReachesTheNetwork() async throws {
+        // Two listeners, one per question. The control's web view keeps
+        // fetching (and retrying a refused connection) for seconds after it
+        // is first heard; on one shared listener those late requests landed
+        // after `before` was read and were counted against the blocker, which
+        // failed this test on a slow runner with nothing leaking (Nov 24).
+        // The guarded views name `server`; only the control names `control`.
+        let control = try Listener()
+        let controlPort = try await control.start()
+        defer { control.listener.cancel() }
         let server = try Listener()
         let port = try await server.start()
         defer { server.listener.cancel() }
@@ -108,11 +117,11 @@ final class InvoiceLocalOnlyTests: XCTestCase {
         config.websiteDataStore = .nonPersistent()
         let plain = WKWebView(frame: .zero, configuration: config)
         let w0 = host(plain)
-        plain.loadHTMLString(html, baseURL: nil)
-        await waitUntil(10) { server.count > 0 }
-        XCTAssertGreaterThan(server.count, 0, "an unguarded web view fetches the remote parts")
+        plain.loadHTMLString(remote("http://127.0.0.1:\(controlPort)"), baseURL: nil)
+        await waitUntil(30) { control.count > 0 }
+        XCTAssertGreaterThan(control.count, 0, "an unguarded web view fetches the remote parts")
         _ = w0
-        try? await Task.sleep(for: .seconds(1))
+        XCTAssertEqual(server.count, 0, "nothing has named the guarded listener yet")
         var before = server.count
 
         // The blocker alone: the html loaded straight into the paper's web

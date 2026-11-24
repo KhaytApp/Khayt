@@ -4,6 +4,7 @@ struct MachinesView: View {
     @EnvironmentObject private var api: KhaytAPIClient
     @EnvironmentObject private var printers: LivePrinters
     @EnvironmentObject private var settings: ConnectionSettings
+    @EnvironmentObject private var health: ConnectionHealth
 
     @State private var machines: [MachineInfo] = []
     @State private var errorMessage: String?
@@ -36,6 +37,18 @@ struct MachinesView: View {
 
     private var offline: Set<String> {
         Set(machines.filter(\.isUnderService).map(\.id))
+    }
+
+    /// "Taken off" / "Bed is clear" for one machine: only for a role that may
+    /// control machines, with the Mac in reach, never on the sample shop.
+    private func bedClearer(_ m: MachineLiveStatus) -> (() async -> PrinterReply)? {
+        guard PrinterNeedsPanel.mayClear(canControl: settings.can("machines:control"), macInReach: health.macInReach,
+                                         sampleShop: settings.isSampleShop) else { return nil }
+        return {
+            let reply = await api.clearBed(machineId: m.id)
+            if reply.ok { await printers.refresh() }
+            return reply
+        }
     }
 
     private var statusById: [String: String] {
@@ -141,7 +154,7 @@ struct MachinesView: View {
                                 VStack(spacing: 10) {
                                     MachineCard(live: m, fallbackStatus: statusById[m.id], offline: offline.contains(m.id))
                                     if !m.problems.isEmpty || !m.waiting.isEmpty {
-                                        PrinterNeedsPanel(live: m)
+                                        PrinterNeedsPanel(live: m, clearBed: bedClearer(m))
                                     }
                                     jobLink(m)
                                     if let care {
