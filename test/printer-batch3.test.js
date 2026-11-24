@@ -37,12 +37,15 @@ const fixedOffsetDayOf = (minutes) => (at) => {
 };
 /** A vector's `calendar: { timeZone }`: the day of `at` in that IANA zone, daylight saving included. */
 const zoneDayOf = (timeZone) => {
-  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  // From the parts, not a locale's date pattern (CLDR has changed en-CA's before).
+  const fmt = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
   return (at) => {
     const s = String(at == null ? '' : at);
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
     const t = Date.parse(s);
-    return Number.isFinite(t) ? fmt.format(new Date(t)) : '';
+    if (!Number.isFinite(t)) return '';
+    const p = Object.fromEntries(fmt.formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+    return `${p.year}-${p.month}-${p.day}`;
   };
 };
 const calendarDayOf = (cal) => (cal.timeZone ? zoneDayOf(cal.timeZone) : fixedOffsetDayOf(cal.utcOffsetMinutes));

@@ -1761,6 +1761,111 @@
      "enough": false
     }
    ]
+  },
+  {
+   "why": "with a calendar and no range (\"all\"): a run the calendar cannot date counts nowhere",
+   "calendar": {
+    "utcOffsetMinutes": 0
+   },
+   "input": {
+    "machines": [
+     {
+      "id": "A"
+     }
+    ],
+    "orders": [
+     {
+      "id": "1",
+      "printRuns": [
+       {
+        "machineId": "A",
+        "result": "finished",
+        "resultSource": "printer",
+        "at": "2026-11-10T12:00:00.000Z"
+       },
+       {
+        "machineId": "A",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "result": "failed",
+        "resultSource": "printer",
+        "at": ""
+       },
+       {
+        "machineId": "A",
+        "result": "failed",
+        "resultSource": "printer",
+        "at": "junk"
+       }
+      ]
+     }
+    ]
+   },
+   "want": [
+    {
+     "machineId": "A",
+     "finished": 1,
+     "failed": 0,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": 1,
+     "enough": false
+    }
+   ]
+  },
+  {
+   "why": "the same runs with no dayOf and no range: every run counts, as before",
+   "input": {
+    "machines": [
+     {
+      "id": "A"
+     }
+    ],
+    "orders": [
+     {
+      "id": "1",
+      "printRuns": [
+       {
+        "machineId": "A",
+        "result": "finished",
+        "resultSource": "printer",
+        "at": "2026-11-10T12:00:00.000Z"
+       },
+       {
+        "machineId": "A",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "result": "failed",
+        "resultSource": "printer",
+        "at": ""
+       },
+       {
+        "machineId": "A",
+        "result": "failed",
+        "resultSource": "printer",
+        "at": "junk"
+       }
+      ]
+     }
+    ]
+   },
+   "want": [
+    {
+     "machineId": "A",
+     "finished": 1,
+     "failed": 3,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": 0.25,
+     "enough": false
+    }
+   ]
   }
  ],
  "percent": {

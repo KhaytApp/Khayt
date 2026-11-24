@@ -2309,7 +2309,9 @@ function renderMachinePL() {
   // counted but left out of the rate; under five decided runs, no rate.
   // The run's LOCAL day, as every other date in this table: the lib reads each
   // run's UTC `at` through localDayOf, over the range's own span
-  // (lib/date-range.js bounds, written from the same definitions as inRange).
+  // (lib/date-range.js bounds, written from the same definitions as inRange,
+  // except that a period still running ends today: a run dated after today,
+  // from a computer whose clock is ahead, waits until its day comes).
   const successSpan = (() => {
     const DR = globalThis.KhaytDateRange;
     if (!analyticsRange || analyticsRange === 'all' || !DR) return {};
