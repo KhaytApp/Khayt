@@ -112,6 +112,24 @@ extension Shop {
 /// How the heads section says things: the other app's own sentences.
 @MainActor
 enum HeadWords {
+    /// Parts set side by side with a dot between, IN THE SHOP'S DIRECTION.
+    ///
+    /// A spool's maker and material are Latin words in an Arabic sentence
+    /// ("PLA", "Snapmaker", "1.75"). Left to the bidi rule, two of them with
+    /// only a dot between are one left-to-right run and are drawn in the
+    /// wrong order, a number beside one jumps to its other side, and a line
+    /// that BEGINS with one is laid out left to right altogether (all three
+    /// seen in the first Arabic photographs). So in a right-to-left language
+    /// the line starts by saying its direction and says it again at each dot.
+    static func joined(_ parts: [String], _ words: Words, by separator: String = " · ") -> String {
+        let shown = parts.filter { !$0.isEmpty }
+        guard Direction.rtlLanguages.contains(words.language) else { return shown.joined(separator: separator) }
+        let mark = "\u{200F}"
+        let dot = separator.trimmingCharacters(in: .whitespaces)
+        // A comma sits against the word before it; a dot has a space on each side.
+        return mark + shown.joined(separator: dot == "," ? mark + "، " : " " + mark + dot + " ")
+    }
+
     /// "1 kg" for a whole number of hundreds of grams from a kilo up, else "640 g". "" for nothing.
     static func weight(_ grams: Double?, _ words: Words) -> String {
         guard let g = grams, g > 0 else { return "" }
@@ -150,15 +168,14 @@ enum HeadWords {
         else if let live = row.live { material = live.material }
         else if case .string(let m)? = spool?["material"] { material = m }
         let maker = row.tag.map { $0.manufacturer.isEmpty ? $0.vendor : $0.manufacturer } ?? ""
-        return [words.callIt("mach.heads_tool", n), material, maker].filter { !$0.isEmpty }.joined(separator: " · ")
+        return joined([words.callIt("mach.heads_tool", n), material, maker], words)
     }
 
     /// "Tag read · 1 kg spool", or "Set on the printer · no tag"; "" for neither.
     static func how(_ row: KhaytEngine.HeadRow, _ words: Words) -> String {
         if let tag = row.tag {
             let size = weight(tag.weightG, words)
-            return [words.callIt("mach.heads_tag_read"), size.isEmpty ? "" : words.callIt("mach.heads_spool_of", ["size": .string(size)])]
-                .filter { !$0.isEmpty }.joined(separator: " · ")
+            return joined([words.callIt("mach.heads_tag_read"), size.isEmpty ? "" : words.callIt("mach.heads_spool_of", ["size": .string(size)])], words)
         }
         return row.live == nil ? "" : words.callIt("mach.heads_set_on_printer")
     }
@@ -177,7 +194,7 @@ enum HeadWords {
         guard let tag = row.tag else { return "" }
         let mm = tag.diameterMm.map { words.callIt("mach.heads_mm", ["n": .string(Money.quantity($0, decimals: 2))]) } ?? ""
         let maker = tag.manufacturer.isEmpty ? tag.vendor : tag.manufacturer
-        return [tag.material, maker, weight(tag.weightG, words), mm].filter { !$0.isEmpty }.joined(separator: " · ")
+        return joined([tag.material, maker, weight(tag.weightG, words), mm], words)
     }
 }
 
@@ -191,6 +208,8 @@ struct MachineHeadsSection: View {
     @State private var linking: Linking?
 
     struct Linking: Identifiable { let row: KhaytEngine.HeadRow; let adding: Bool; var id: Int { row.head } }
+    /// A capture draws the buttons as a shop that may edit sees them (the sample book lets nobody).
+    private var mayEdit: Bool { shop.canMoveJobs || pretend != nil }
 
     var body: some View {
         let words = shop.words
@@ -221,9 +240,14 @@ struct MachineHeadsSection: View {
         let link = HeadWords.linkLine(row, spool: spool, words)
         let empty = row.tag == nil && row.live == nil && spool == nil
         HStack(alignment: .top, spacing: 8) {
+            // A head with nothing in it is a dashed ring: a solid one would
+            // read as a white spool, which is a real colour (seen in the
+            // first photograph, where an off-white PETG and an empty head
+            // looked the same).
             Circle()
                 .fill(Swatch.rgb(fromHex: row.hex).map { Color(red: $0.r, green: $0.g, blue: $0.b) } ?? Color.clear)
-                .overlay(Circle().strokeBorder(Color.secondary.opacity(0.4), lineWidth: 1))
+                .overlay(Circle().strokeBorder(Color.secondary.opacity(empty ? 0.5 : 0.55),
+                                               style: StrokeStyle(lineWidth: 1, dash: empty ? [2, 2] : [])))
                 .frame(width: 12, height: 12).padding(.top, 3)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -236,11 +260,11 @@ struct MachineHeadsSection: View {
             Spacer(minLength: 8)
             if !empty {
                 Button(words.callIt(spool == nil ? "mach.heads_link" : "mach.heads_change")) { linking = Linking(row: row, adding: false) }
-                    .controlSize(.small).disabled(!shop.canMoveJobs)
+                    .controlSize(.small).disabled(!mayEdit)
                 // A tag like nothing on the shelf: adding it is offered beside linking, never done by itself.
                 if spool == nil, row.prefill != nil, row.match == "new", shop.mayAddSpoolFromTag {
                     Button(words.callIt("mach.heads_add")) { linking = Linking(row: row, adding: true) }
-                        .controlSize(.small).disabled(!shop.canMoveJobs)
+                        .controlSize(.small).disabled(!mayEdit)
                 }
             }
         }
@@ -337,12 +361,11 @@ struct LinkHeadSheet: View {
     @MainActor static func said(_ id: String, row: KhaytEngine.HeadRow, shop: Shop) -> (title: String, sub: String) {
         let words = shop.words
         if id == new {
-            let what = [row.prefill?.material ?? "", HeadWords.weight(row.prefill?.weight, words)].filter { !$0.isEmpty }.joined(separator: ", ")
+            let what = HeadWords.joined([row.prefill?.material ?? "", HeadWords.weight(row.prefill?.weight, words)], words, by: ", ")
             return (words.callIt("mach.heads_add_new"), words.callIt("mach.heads_add_new_sub", ["what": .string(what)]))
         }
         let spool = shop.headSpool(id)
-        let title = [HeadWords.spoolLabel(spool), words.callIt("mach.heads_left", ["left": .string(HeadWords.left(spool, words))])]
-            .filter { !$0.isEmpty }.joined(separator: " · ")
+        let title = HeadWords.joined([HeadWords.spoolLabel(spool), words.callIt("mach.heads_left", ["left": .string(HeadWords.left(spool, words))])], words)
         // "Best match" is the rule's one strong match; any other candidate is the same material and colour.
         let sub = row.candidates.first == id ? words.callIt(row.match == "link" ? "mach.heads_best" : "mach.heads_same")
             : (row.candidates.contains(id) ? words.callIt("mach.heads_same") : "")

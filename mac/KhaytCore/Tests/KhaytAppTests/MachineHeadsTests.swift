@@ -54,6 +54,14 @@ struct MachineHeadsTests {
         // Not a whole number of hundreds: grams, in the shop's own digits and grouping.
         #expect(HeadWords.weight(1250, words) == words.numeral(1250) + " g")
         #expect(HeadWords.weight(0, words).isEmpty && HeadWords.weight(nil, words).isEmpty)
+        // In Arabic, Latin makers and materials keep their order: the line states its direction at its start
+        // and at each dot (left to the bidi rule, "PLA · Snapmaker" is one left-to-right run, drawn backwards).
+        let ar = Words(); await ar.load("ar", engine: Self.engine)
+        let said = HeadWords.title(rows[0], spool: spool(rows[0]), ar)
+        let mark = "\u{200F}"
+        #expect(said.hasPrefix(mark) && said.contains(" \(mark)· PLA SnapSpeed \(mark)· Polymaker"), Comment(rawValue: said))
+        #expect(HeadWords.joined(["PETG", "1 kg"], ar, by: ", ") == "\(mark)PETG\(mark)، 1 kg")
+        #expect(HeadWords.joined(["a", "", "b"], words) == "a · b" && HeadWords.joined(["a", "b"], words, by: ", ") == "a, b")
         // A spool with nothing but an id is called by it; a spool used up reads "0 g left".
         #expect(HeadWords.spoolLabel(["id": .string("S7")]) == "S7")
         #expect(HeadWords.left(["id": .string("S7"), "weight": .number(0)], words) == "0 g")

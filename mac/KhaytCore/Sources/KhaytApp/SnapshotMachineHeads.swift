@@ -25,14 +25,14 @@ extension Snapshot {
         }
 
         guard let engine = shop.engine else { return }
-        func tag(_ type: String, _ sub: String, _ rgb: Int, grams: Int) -> JSONValue {
+        func spoolTag(_ type: String, _ sub: String, _ rgb: Int, grams: Int) -> JSONValue {
             .object(["VERSION": .number(1), "VENDOR": .string("Snapmaker"), "MANUFACTURER": .string("Snapmaker"), "MAIN_TYPE": .string(type),
                      "SUB_TYPE": .string(sub), "COLOR_NUMS": .number(1), "RGB_1": .number(Double(rgb)), "DIAMETER": .number(175),
                      "WEIGHT": .number(Double(grams)), "LENGTH": .number(330), "SKU": .number(1), "OFFICIAL": .bool(true)])
         }
         let none: JSONValue = .object(["VERSION": .number(0), "VENDOR": .string("NONE"), "MANUFACTURER": .string("NONE"), "MAIN_TYPE": .string("NONE"),
                                        "SUB_TYPE": .string("NONE"), "RGB_1": .number(16777215)])
-        let detect: JSONValue = .object(["info": .array([tag("PLA", "NONE", 0x111111, grams: 1000), tag("PETG", "NONE", 0xF5F5F5, grams: 1000), none, none])])
+        let detect: JSONValue = .object(["info": .array([spoolTag("PLA", "NONE", 0x111111, grams: 1000), spoolTag("PETG", "NONE", 0xF5F5F5, grams: 1000), none, none])])
         func spool(_ id: String, _ brand: String, _ material: String, _ colour: String, _ left: Double) -> JSONValue {
             .object(["id": .string(id), "brand": .string(brand), "material": .string(material), "color": .string(colour), "weight": .number(left)])
         }
@@ -48,7 +48,8 @@ extension Snapshot {
         shop.trayBookForTests = ["inventory": .array(shelf2), "machines": .array([])]
         if let rows = try? await engine.machineHeads(filamentDetect: detect, loaded: loaded, spools: shelf2, linked: .object(["0": .string("S2")])),
            rows.count > 1 {
-            shot("2-link", width: 520, LinkHeadSheet(shop: shop, machineId: "snapshot", row: rows[1], adding: false) {})
+            // The sheet sets its own width (its content's 520 and its margins); the camera only gives it room.
+            shot("2-link", width: 600, LinkHeadSheet(shop: shop, machineId: "snapshot", row: rows[1], adding: false) {})
         }
         shop.trayBookForTests = nil
     }
