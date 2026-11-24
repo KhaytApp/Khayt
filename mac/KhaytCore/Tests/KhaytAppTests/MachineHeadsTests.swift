@@ -61,7 +61,8 @@ struct MachineHeadsTests {
     func nothingToShow() async throws {
         let (plain, _) = await Self.shop(answer: #"{"result":{"status":{}}}"#)
         #expect(await plain.machineHeads("U1") == nil)
-        #expect(await plain.machineHeads("plain") == nil && await plain.machineHeads("nobody") == nil)
+        #expect(await plain.machineHeads("plain") == nil)
+        #expect(await plain.machineHeads("nobody") == nil)
         let (off, _) = await Self.shop(answer: nil, loaded: [.init(slot: 0, hex: "#112233", material: "PETG")])
         let rows = try #require(await off.machineHeads("U1"))
         #expect(rows[0].tag == nil && rows[0].live?.material == "PETG" && rows.count == 4)
