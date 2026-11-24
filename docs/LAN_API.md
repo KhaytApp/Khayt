@@ -1343,7 +1343,7 @@ The spool tags a printer's heads read (a Snapmaker U1), each matched against the
 - `head` counts from one, in the printer's order. One row per head, tagged or not.
 - `tag` is `null` when the head reads no tag. A head with no tag may still hold filament.
 - `key` is everything the tag says. Send it back as `seen` when linking. Two identical spools have the same key: the printer reports no number of the tag's own.
-- `match.kind` is the shared rule's answer (`lib/rfid-tray.js spoolMatch`): `link` (exactly one spool matches strongly: `spoolId`), `ask` (several, or only near ones: `candidates`, spool ids, best first), `new` (nothing like it on the shelf), `none` (no tag).
+- `match.kind` is the shared rule's answer (`lib/rfid-tray.js spoolMatch`): `link` (exactly one spool matches strongly: `spoolId`; `candidates` is that spool first, then the near matches, for **Choose another**), `ask` (several, or only near ones: `candidates`, spool ids, best first), `new` (nothing like it on the shelf), `none` (no tag).
 - `prefill` is what **Add spool from the tag** would add (`null` with no tag). No price: that is the shop's to set.
 - `linked` is the spool already recorded in this head, or `null`. A link to a spool no longer on the shelf is not reported.
 
