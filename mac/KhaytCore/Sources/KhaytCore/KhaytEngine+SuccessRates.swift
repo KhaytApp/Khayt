@@ -102,19 +102,23 @@ extension KhaytEngine {
         return days
     }
 
-    /// A rate as the whole per cent a person reads ("95" for 0.95), by the
-    /// rule's own rounding when the bundled rule has it (`successPercent`,
-    /// the Windows/Linux app's helper) so 199 of 200 does not read as 100%;
-    /// nil for no rate.
+    /// A rate as the whole per cent a person reads (95 for 0.95), by the
+    /// rule's own `successPercent` (every app says it the same): rounded as
+    /// usual, except that a rate under one never reads as 100 (199 of 200 is
+    /// 99) and a rate over nothing never reads as 0 (1 of 200 is 1). Nil for
+    /// no rate, or for anything that is not a number from 0 to 1: shown "—".
     public func successPercent(_ rate: Double?) throws -> Int? {
         guard let rate, rate.isFinite else { return nil }
         let said = try runtime.call2("""
             (function (rate) {
               var f = globalThis.KhaytPrinterSuccess.successPercent;
               if (typeof f === 'function') return f(rate);
-              // Before the helper: never round a rate under one up to a hundred.
+              // The same rule, for a bundled copy from before the helper.
+              if (typeof rate !== 'number' || !(rate >= 0 && rate <= 1)) return null;
               var p = Math.round(rate * 100);
-              return rate < 1 && p >= 100 ? 99 : p;
+              if (p >= 100 && rate < 1) return 99;
+              if (p <= 0 && rate > 0) return 1;
+              return p;
             })(ARG0)
             """, [.number(rate)], as: JSONValue.self)
         switch said {

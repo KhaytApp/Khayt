@@ -17,7 +17,12 @@ struct SuccessRatesTests {
         let calendar: CalendarOf?
         let want: [KhaytEngine.SuccessRow]
     }
-    struct Vectors: Decodable { let cases: [Case] }
+    /// `percent.cases`, on a fixture new enough to have them.
+    struct Percent: Decodable {
+        struct One: Decodable { let why: String; let rate: Double?; let want: Int? }
+        let cases: [One]
+    }
+    struct Vectors: Decodable { let cases: [Case]; let percent: Percent? }
 
     @Test("the desktop's vectors: worst first, cancelled and unknown outside the rate, too few is not enough, the date window")
     func vectors() async throws {
@@ -92,8 +97,16 @@ struct SuccessRatesTests {
         #expect(try await engine.successPercent(0.92) == 92)
         #expect(try await engine.successPercent(1) == 100)
         #expect(try await engine.successPercent(0) == 0)
-        #expect(try await engine.successPercent(0.995) != 100, "199 of 200 read as 100%")
+        #expect(try await engine.successPercent(0.995) == 99, "199 of 200 read as 100%")
+        #expect(try await engine.successPercent(0.005) == 1, "1 of 200 read as 0%")
         #expect(try await engine.successPercent(nil) == nil)
+        #expect(try await engine.successPercent(1.5) == nil)
+        #expect(try await engine.successPercent(-0.1) == nil)
+        // The desktop's own vectors, when the fixture carries them.
+        let file = try Data(contentsOf: CrossAppFixtureTests.fixture("printer-success-vectors.json"))
+        for c in try JSONDecoder().decode(Vectors.self, from: file).percent?.cases ?? [] {
+            #expect(try await engine.successPercent(c.rate) == c.want, Comment(rawValue: c.why))
+        }
     }
 
     @Test("what the phone's line is made of: the counts, the rate, and how many runs are needed")
