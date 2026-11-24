@@ -209,6 +209,37 @@ jobs:
           echo "sig=$SIG" >> "$GITHUB_OUTPUT"
           echo "packed $ARCHIVE ($(stat -f%z "$ARCHIVE") bytes), signed"
 
+          # ── THE FEED IS SIGNED TOO, HERE, WHERE THE KEY IS ────────────────
+          # The same as mac-publish.yml's "Write, sign and check the feed" (see
+          # the note there): written, signed with the key that signed the
+          # archive, verified by Sparkle and by us with the public key. The
+          # publish job has no key, so it publishes THIS file and writes none.
+          TAG="${{ steps.v.outputs.tag }}"
+          FEED="mac/dist/appcast.xml"
+          # The key is for sign_update alone: these never see it.
+          NODE="env -u SPARKLE_PRIVATE_KEY node"
+          $NODE scripts/changelog-section.js "$V" > "$RUNNER_TEMP/notes.md" 2>/dev/null || : > "$RUNNER_TEMP/notes.md"
+          $NODE scripts/mac-appcast.js \
+            --archive "$ARCHIVE" \
+            --signature "$SIG" \
+            --url "https://github.com/KhaytApp/khayt-mac/releases/download/$TAG/$(basename "$ARCHIVE")" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --notes-url "https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG" \
+            --out "$FEED"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN" -f - --disable-signing-warning "$FEED" >/dev/null
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN" -f - --verify "$FEED" >/dev/null \
+            || { echo "::error::Sparkle does not verify the feed it just signed"; exit 1; }
+          # Sparkle's verify proves only that the signing agrees with itself
+          # (it derives the public key from the private one). THIS is the
+          # check against the key inside the app that is about to ship, read
+          # from its own Info.plist.
+          $NODE scripts/mac-appcast-verify.js --feed "$FEED" \
+            --public-key "$(plutil -extract SUPublicEDKey raw "mac/dist/Khayt.app/Contents/Info.plist")" \
+            || { echo "::error::the signed feed does not verify with the key inside the app (SUPublicEDKey)"; exit 1; }
+          # And a feed that signs and verifies can still be one no Mac can
+          # parse: signing never reads it as XML.
+          xmllint --noout "$FEED" || { echo "::error::the feed is not well-formed XML"; exit 1; }
+
       - name: Remove the signing keychain
         if: always()
         run: |
@@ -218,7 +249,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: khayt-mac
-          path: ${{ steps.pack.outputs.archive }}
+          # The archive and its signed feed, side by side.
+          path: |
+            ${{ steps.pack.outputs.archive }}
+            mac/dist/appcast.xml
           retention-days: 7
 
   publish:
@@ -289,19 +323,18 @@ jobs:
             echo "or publish mac/appcast.xml to khayt-website by hand."
             exit 1
           fi
-          ARCHIVE="$(ls dist/*.zip | head -1)"
-          URL="https://github.com/KhaytApp/khayt-mac/releases/download/$TAG/$(basename "$ARCHIVE")"
-          node scripts/mac-appcast.js \
-            --archive "$ARCHIVE" \
-            --signature "${{ needs.build.outputs.sig }}" \
-            --url "$URL" \
-            --notes-url "https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG" \
-            --out "$RUNNER_TEMP/appcast.xml"
+          # The feed the build job wrote and SIGNED (this job has no key).
+          # It is not written again here: any byte changed after signing and
+          # no Mac that requires a signed feed will take it. Checked with the
+          # public key before it goes anywhere.
+          node scripts/mac-appcast-verify.js --feed dist/appcast.xml
+          cp dist/appcast.xml "$RUNNER_TEMP/appcast.xml"
 
           # Committed to the website repo, which is GitHub Pages on khaytapp.com.
           git clone --depth 1 "https://x-access-token:$GH_TOKEN@github.com/KhaytApp/khayt-website.git" site
           mkdir -p site/mac
           cp "$RUNNER_TEMP/appcast.xml" site/mac/appcast.xml
+          node scripts/mac-appcast-verify.js --feed site/mac/appcast.xml
           # The version named under the download button, from the release that
           # is publishing it. The button itself links /releases/latest and
           # resolves on its own; the LINE is a claim, and claims on this
