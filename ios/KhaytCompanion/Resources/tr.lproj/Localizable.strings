@@ -1567,3 +1567,10 @@
 "outbound.purpose.webhooks" = "webhook’lar";
 "photos.blocked.detail" = "Fotoğraflar bu telefondan gösterilemez veya eklenemez. Sahip, Mac’teki İnternet kullanımı bölümünde Khayt Cloud’u koruyabilir.";
 "photos.blocked.nothing_sent" = "Hiçbir şey gönderilmedi.";
+
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "Alındı";
+"waiting.do.bed_clear" = "Tabla boş";
+"printer.why.read_only" = "Mac örnek atölyeyi gösteriyor; değiştirilemez.";
+"printer.why.not_saved" = "Mac şu anda kaydedemedi. Yeniden deneyin.";
+"printer.why.role" = "Bu telefonun rolü buna izin vermiyor. Sahibine sorun.";

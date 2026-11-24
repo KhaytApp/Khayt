@@ -1567,3 +1567,10 @@
 "outbound.purpose.webhooks" = "Webhooks";
 "photos.blocked.detail" = "无法在此手机上显示或添加照片。店主可以在 Mac 的“互联网使用”中保留 Khayt Cloud。";
 "photos.blocked.nothing_sent" = "未发送任何内容。";
+
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "已取下";
+"waiting.do.bed_clear" = "热床已清空";
+"printer.why.read_only" = "Mac 正在显示示例店铺，无法更改。";
+"printer.why.not_saved" = "Mac 暂时无法保存。请重试。";
+"printer.why.role" = "这部手机的角色不能执行此操作。请询问店主。";
