@@ -21,8 +21,21 @@
  * `length` is the archive's byte count and Sparkle checks it. Taken from the
  * file rather than passed in, so it cannot disagree with what was uploaded.
  *
+ * THE RELEASE NOTES ARE IN THE FEED, NOT BEHIND A LINK (Nov 2026). The feed
+ * is signed after this writes it (`sign_update`, in the publish workflows;
+ * checked by scripts/mac-appcast-verify.js). Once the app REQUIRES a signed
+ * feed, Sparkle also requires notes it fetches from a link to be signed, and
+ * the link used to be a GitHub release page, which nobody but GitHub writes.
+ * Notes inside `<description>` are covered by the feed's own signature. The
+ * page stays as `sparkle:fullReleaseNotesLink` ("Version History"), which
+ * Sparkle opens in the browser and does not load into the update window.
+ *
+ * NOTHING AFTER THIS MAY REWRITE THE FILE. The signature covers its bytes: a
+ * formatter, a trailing newline, an editor that re-saves it, and no Mac that
+ * requires a signed feed will take it.
+ *
  *   node scripts/mac-appcast.js --archive <zip> --signature <sig> \
- *        --url <download-url> [--notes-url <url>] [--out appcast.xml]
+ *        --url <download-url> [--notes-file <md>] [--notes-url <url>] [--out appcast.xml]
  */
 const fs = require('fs');
 const path = require('path');
@@ -34,6 +47,24 @@ function xml(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
+/** The most notes a feed carries. A promotion's whole CHANGELOG section can be
+ * 150,000 characters; the update window is not where that is read. */
+const NOTES_MAX = 40000;
+
+/** Markdown inside CDATA: the only sequence that could end it early is split. */
+function cdata(s) {
+  return `<![CDATA[${String(s).replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
+}
+
+/** The notes, whole or cut at a line with a pointer to the rest. */
+function fitNotes(notes, notesUrl) {
+  const text = String(notes == null ? '' : notes).replace(/\r\n?/g, '\n').replace(/\u0000/g, '').trim();
+  if (text.length <= NOTES_MAX) return text;
+  const cut = text.slice(0, NOTES_MAX);
+  const at = cut.lastIndexOf('\n');
+  return `${cut.slice(0, at > 0 ? at : NOTES_MAX).trimEnd()}\n\n…${notesUrl ? `\n\nThe rest is in the full release notes: ${notesUrl}` : ''}`;
+}
+
 /**
  * One release's feed.
  *
@@ -42,7 +73,7 @@ function xml(s) {
  * mistake in an old entry can still be chosen.
  */
 function appcast({ version, build, archiveBytes, signature, url, minimumSystemVersion,
-                   title = 'Khayt for macOS', notesUrl = null, pubDate = new Date() }) {
+                   title = 'Khayt for macOS', notes = null, notesUrl = null, pubDate = new Date() }) {
   if (!version) throw new Error('appcast: version is required');
   if (!Number.isInteger(build) || build < 1) {
     throw new Error(`appcast: build must be a positive integer, got ${build}`);
@@ -55,8 +86,18 @@ function appcast({ version, build, archiveBytes, signature, url, minimumSystemVe
     throw new Error(`appcast: the download URL must be https, got "${url}"`);
   }
 
-  const notes = notesUrl
-    ? `      <sparkle:releaseNotesLink>${xml(notesUrl)}</sparkle:releaseNotesLink>\n`
+  if (notesUrl != null && !/^https:\/\//.test(String(notesUrl))) {
+    throw new Error(`appcast: the notes URL must be https, got "${notesUrl}"`);
+  }
+  // Never `sparkle:releaseNotesLink`: see the header. The notes ride inside
+  // the feed, as markdown (Sparkle shows it as plain text where it cannot
+  // render it), and the page is the "Version History" link.
+  const body = fitNotes(notes, notesUrl);
+  const inline = body
+    ? `      <description sparkle:format="markdown">${cdata(body)}</description>\n`
+    : '';
+  const history = notesUrl
+    ? `      <sparkle:fullReleaseNotesLink>${xml(notesUrl)}</sparkle:fullReleaseNotesLink>\n`
     : '';
 
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -71,7 +112,7 @@ function appcast({ version, build, archiveBytes, signature, url, minimumSystemVe
       <sparkle:version>${build}</sparkle:version>
       <sparkle:shortVersionString>${xml(version)}</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>${xml(minimumSystemVersion || '26.0')}</sparkle:minimumSystemVersion>
-${notes}      <enclosure url="${xml(url)}"
+${inline}${history}      <enclosure url="${xml(url)}"
                  length="${archiveBytes}"
                  type="application/octet-stream"
                  sparkle:edSignature="${xml(signature)}" />
@@ -81,7 +122,7 @@ ${notes}      <enclosure url="${xml(url)}"
 `;
 }
 
-module.exports = { appcast, xml };
+module.exports = { appcast, xml, cdata, fitNotes, NOTES_MAX };
 
 if (require.main === module) {
   const args = {};
@@ -99,6 +140,9 @@ if (require.main === module) {
     archiveBytes: fs.statSync(args.archive).size,
     signature: args.signature,
     url: args.url,
+    // A file that is missing or empty is "no notes", not a failed release:
+    // the feed must still be written and signed.
+    notes: args['notes-file'] && fs.existsSync(args['notes-file']) ? fs.readFileSync(args['notes-file'], 'utf8') : null,
     notesUrl: args['notes-url'] || null,
   });
   if (args.out) { fs.writeFileSync(args.out, out); console.error(`wrote ${args.out}`); }
