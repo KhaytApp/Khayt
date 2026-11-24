@@ -51,7 +51,9 @@ struct MachineHeadsTests {
         #expect(asked.paths == ["GET /printer/objects/query?filament_detect"])
         // Weights, as the other app says them.
         #expect(HeadWords.weight(1000, words) == "1 kg" && HeadWords.weight(1500, words) == "1.5 kg" && HeadWords.weight(640, words) == "640 g")
-        #expect(HeadWords.weight(1250, words) == "1250 g" && HeadWords.weight(0, words).isEmpty && HeadWords.weight(nil, words).isEmpty)
+        // Not a whole number of hundreds: grams, in the shop's own digits and grouping.
+        #expect(HeadWords.weight(1250, words) == words.numeral(1250) + " g")
+        #expect(HeadWords.weight(0, words).isEmpty && HeadWords.weight(nil, words).isEmpty)
         // A spool with nothing but an id is called by it; a spool used up reads "0 g left".
         #expect(HeadWords.spoolLabel(["id": .string("S7")]) == "S7")
         #expect(HeadWords.left(["id": .string("S7"), "weight": .number(0)], words) == "0 g")
