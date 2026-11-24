@@ -2632,6 +2632,8 @@ final class Shop {
     var trayBookForTests: [String: JSONValue]?
     var trayBaseForTests: URL?
     var trayFetchForTests: ((URLRequest) async throws -> (Data, URLResponse))?
+    /// TESTS ONLY: what the printer reports loaded, in place of the poller's reading.
+    var headsLoadedForTests: [KhaytEngine.LoadedSlot]?
     var launchGateHasBookForTests: Bool?
 
     /// What is low and has not already been ordered.
