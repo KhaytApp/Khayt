@@ -1705,5 +1705,70 @@
    "input": {},
    "want": []
   }
- ]
+ ],
+ "percent": {
+  "about": "successPercent(rate): the whole percent every app shows. Rounds as usual, but never 100 unless every decided run succeeded and never 0 unless none did. Not a rate in [0, 1] -> null (shown as a dash).",
+  "cases": [
+   {
+    "why": "199 of 200 is not 100%",
+    "rate": 0.995,
+    "want": 99
+   },
+   {
+    "why": "1 of 200 is not 0%",
+    "rate": 0.005,
+    "want": 1
+   },
+   {
+    "why": "every run came out right",
+    "rate": 1,
+    "want": 100
+   },
+   {
+    "why": "none did",
+    "rate": 0,
+    "want": 0
+   },
+   {
+    "why": "no decided runs",
+    "rate": null,
+    "want": null
+   },
+   {
+    "why": "rounds as usual in between",
+    "rate": 0.833,
+    "want": 83
+   },
+   {
+    "why": "half up",
+    "rate": 0.505,
+    "want": 51
+   },
+   {
+    "why": "just under 100 by rounding is 99",
+    "rate": 0.999,
+    "want": 99
+   },
+   {
+    "why": "just over 0 by rounding is 1",
+    "rate": 0.001,
+    "want": 1
+   },
+   {
+    "why": "not a rate",
+    "rate": 1.2,
+    "want": null
+   },
+   {
+    "why": "not a rate",
+    "rate": -0.1,
+    "want": null
+   },
+   {
+    "why": "not a number",
+    "rate": "0.5",
+    "want": null
+   }
+  ]
+ }
 }

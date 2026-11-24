@@ -2334,7 +2334,9 @@ function renderMachinePL() {
   const rateCell = (s) => {
     if (!s || s.rate === null) return '<span style="color:var(--text-muted);">—</span>';
     if (!s.enough) return `<span style="color:var(--text-muted);">${escapeHtml(t('an.too_few_prints'))}</span>`;
-    const pct = Math.round(s.rate * 100);
+    // Never 100% with a failure, never 0% with a success (lib/printer-success.js, every app).
+    const pct = KhaytPrinterSuccess.successPercent(s.rate);
+    if (pct === null) return '<span style="color:var(--text-muted);">—</span>';
     const col = pct >= 90 ? 'var(--success)' : pct >= 75 ? 'var(--warning)' : 'var(--danger)';
     return `<span style="color:${col};">${pct}%</span>`;
   };

@@ -40,6 +40,22 @@ for (const c of vec('printer-success').cases) test('P6 ' + c.why, () => {
   assert.deepEqual(PS.successRates(input), c.want);
 });
 
+for (const c of vec('printer-success').percent.cases) test('P6 successPercent: ' + c.why + ' (' + JSON.stringify(c.rate) + ')', () => assert.equal(PS.successPercent(c.rate), c.want));
+
+test('P6: a rate never rounds a failure (or a success) away, however many runs', () => {
+  const runs = (ok, bad) => [{ printRuns: [
+    ...Array.from({ length: ok }, () => ({ machineId: 'A', at: '2026-11-01', result: 'finished' })),
+    ...Array.from({ length: bad }, () => ({ machineId: 'A', at: '2026-11-01', result: 'failed' })),
+  ] }];
+  const one = (ok, bad) => PS.successRates({ orders: runs(ok, bad) })[0];
+  assert.equal(one(2999, 1).rate, 0.999, '1 failure in 3000 is not 1');
+  assert.equal(PS.successPercent(one(2999, 1).rate), 99);
+  assert.equal(one(1, 2999).rate, 0.001, '1 success in 3000 is not 0');
+  assert.equal(PS.successPercent(one(1, 2999).rate), 1);
+  assert.equal(one(3000, 0).rate, 1);
+  assert.equal(one(0, 3000).rate, 0);
+});
+
 test('P6: localDayOf reads a UTC stamp on this computer\'s calendar, and leaves a bare day as written', () => {
   const was = process.env.TZ;
   try {
