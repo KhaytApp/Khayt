@@ -87,6 +87,24 @@ struct LanTimelapseTests {
     @Test("a manager's phone may have it kept") func manager() async throws { try await role("manager", keeps: true) }
     @Test("the owner's phone may have it kept") func owner() async throws { try await role("owner", keeps: true) }
 
+    @Test("both answers are signed for the phone that asked: the one with the address to open, and the keep's")
+    func signed() async throws {
+        let bench = try await PhoneRolesTests.bench()
+        defer { bench.stop() }
+        let phone = try PhoneRolesTests.codePaired(bench.devices, role: "operator", name: "Op")
+        for (method, path, want) in [("GET", "/api/orders/J1/timelapse", 200), ("POST", "/api/orders/J1/timelapse/keep", 201)] {
+            let headers = phone.headers(method, path)
+            let reply = try await bench.send(method, path, body: nil, headers: headers, timeout: 30)
+            #expect(reply.status == want, Comment(rawValue: path))
+            let mac = try #require(reply.headers["x-khayt-reply-mac"], Comment(rawValue: path))
+            #expect(mac == LanServer.replyMac(key: phone.key, nonce: headers["x-khayt-nonce"] ?? "", status: reply.status, body: reply.body),
+                    Comment(rawValue: path))
+        }
+        // A viewer's refusal is signed too (the gate's); the PIN-only refusal is not: nobody's key was shown.
+        let pin = try await bench.get("/api/orders/J1/timelapse", headers: ["x-khayt-pin": LanDeviceKeysTests.pin])
+        #expect(pin.status == 403 && pin.headers["x-khayt-reply-mac"] == nil)
+    }
+
     @Test("a paired slicer is refused both; the rule names the scopes and the wrong direction is the owner's")
     func slicerAndRule() async throws {
         let bench = try await PhoneRolesTests.bench()

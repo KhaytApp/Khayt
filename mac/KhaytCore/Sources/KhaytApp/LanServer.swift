@@ -1548,7 +1548,10 @@ final class LanServer {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.timelapse!(Self.timelapseReadPath(path)!)
-            return .json(status, body)
+            // SIGNED BACK. The answer carries `url`, which the phone opens:
+            // unsigned, anything on the Wi-Fi answering in the Mac's place
+            // could hand the phone any address (iPhone lane's review).
+            return signedForPhone(.json(status, body), request)
 
         // `POST /api/orders/{id}/timelapse/keep`: the Mac copies the video
         // from the printer into the job's files. It writes the job and up to
@@ -1560,7 +1563,7 @@ final class LanServer {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.keepTimelapse!(Self.timelapseKeepPath(path)!)
-            return .json(status, body)
+            return signedForPhone(.json(status, body), request)
 
         // `GET /api/printer/{machineId}/trays`: the spool tags the heads
         // read, each matched against the shelf. SIGNED PHONES ONLY (never an
@@ -1572,7 +1575,9 @@ final class LanServer {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.trays!(Self.trayReadPath(path)!)
-            return .json(status, body)
+            // Signed back: the phone offers a spool to link on this answer,
+            // so it must know the Mac said it and nothing on the Wi-Fi did.
+            return signedForPhone(.json(status, body), request)
 
         // `POST /api/printer/{machineId}/trays/{head}/spool`: which spool is
         // in that head. It writes the machine's record and may add one spool,
@@ -1585,7 +1590,7 @@ final class LanServer {
             }
             let asked = Self.trayLinkPath(path)!
             let (status, body) = await host.linkTray!(asked.id, asked.head, request.body)
-            return .json(status, body)
+            return signedForPhone(.json(status, body), request)
 
         // ── A PHONE TELLS A PRINTER WHAT TO DO ───────────────────────────
         //

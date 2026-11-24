@@ -98,6 +98,23 @@ struct LanTraysTests {
         #expect(bench.trayCalls.calls == before)
     }
 
+    @Test("both answers are signed for the phone that asked, and the PIN-only refusal is not")
+    func signed() async throws {
+        let bench = try await PhoneRolesTests.bench()
+        defer { bench.stop() }
+        let phone = try PhoneRolesTests.codePaired(bench.devices, role: "operator", name: "Op")
+        for (method, path, body) in [("GET", "/api/printer/M1/trays", Data()), ("POST", "/api/printer/M1/trays/2/spool", Self.link)] {
+            let headers = phone.headers(method, path, body: body)
+            let reply = try await bench.send(method, path, body: body.isEmpty ? nil : body, headers: headers, timeout: 30)
+            #expect(reply.status == 200, Comment(rawValue: path))
+            let mac = try #require(reply.headers["x-khayt-reply-mac"], Comment(rawValue: path))
+            #expect(mac == LanServer.replyMac(key: phone.key, nonce: headers["x-khayt-nonce"] ?? "", status: reply.status, body: reply.body),
+                    Comment(rawValue: path))
+        }
+        let pin = try await bench.get("/api/printer/M1/trays", headers: ["x-khayt-pin": LanDeviceKeysTests.pin])
+        #expect(pin.status == 403 && pin.headers["x-khayt-reply-mac"] == nil)
+    }
+
     @Test("the rule names the scopes, in the bundled copy the server asks; the wrong direction is the owner's")
     func rule() async throws {
         func ask(_ role: String, _ method: String, _ path: String) async throws -> (Bool, String?) {
@@ -170,6 +187,8 @@ struct LanTraysTests {
         // Head 1: one strong match.
         #expect((rows[0]["match"] as? [String: Any])?["kind"] as? String == "link")
         #expect((rows[0]["match"] as? [String: Any])?["spoolId"] as? String == "S1")
+        // With one strong match and nothing else like it, "Choose another" has only that spool.
+        #expect((rows[0]["match"] as? [String: Any])?["candidates"] as? [String] == ["S1"])
         let tag = try #require(rows[0]["tag"] as? [String: Any])
         #expect(tag["material"] as? String == "PLA" && tag["sub"] as? String == "SnapSpeed" && tag["manufacturer"] as? String == "Polymaker")
         #expect(tag["colours"] as? [String] == ["#080A0D"] && tag["weightG"] as? Int == 500 && tag["official"] as? Bool == true)
@@ -192,6 +211,20 @@ struct LanTraysTests {
         let (two, _) = Self.shop(Self.book(spools: [Self.spool("B", "PLA", "#080A0D"), Self.spool("A", "PLA", "#080A0D")]))
         let ask = try #require(Self.rows(await two.phoneTrays("U1").1).first?["match"] as? [String: Any])
         #expect(ask["kind"] as? String == "ask" && ask["candidates"] as? [String] == ["A", "B"])
+        // One strong match (the tag's own maker) AND near ones: the strong one first, then the near ones,
+        // best first; a used-up spool, a resin one and a deleted one are never offered.
+        let (mixed, _) = Self.shop(Self.book(spools: [
+            // The tag's own maker: strong. Another maker's spool of the same colour: near, not strong.
+            Self.spool("strong", "PLA", "#080A0D", brand: "Polymaker"), Self.spool("near1", "PLA", "#080A0D", brand: "Other"),
+            Self.spool("empty", "PLA", "#080A0D", weight: 0),
+            .object(["id": .string("resin"), "material": .string("PLA"), "color": .string("#080A0D"), "weight": .number(500), "materialType": .string("resin")]),
+            .object(["id": .string("gone"), "material": .string("PLA"), "color": .string("#080A0D"), "weight": .number(500), "deleted": .bool(true)]),
+        ]))
+        let link = try #require(Self.rows(await mixed.phoneTrays("U1").1).first?["match"] as? [String: Any])
+        #expect(link["kind"] as? String == "link" && link["spoolId"] as? String == "strong")
+        let offered = try #require(link["candidates"] as? [String])
+        #expect(offered == ["strong", "near1"], Comment(rawValue: "\(offered)"))
+        for never in ["empty", "resin", "gone"] { #expect(!offered.contains(never), Comment(rawValue: never)) }
     }
 
     @Test("a printer with no tags to read answers ok with no trays, and is not asked when it could not have any")

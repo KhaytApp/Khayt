@@ -1343,9 +1343,11 @@ The spool tags a printer's heads read (a Snapmaker U1), each matched against the
 - `head` counts from one, in the printer's order. One row per head, tagged or not.
 - `tag` is `null` when the head reads no tag. A head with no tag may still hold filament.
 - `key` is everything the tag says. Send it back as `seen` when linking. Two identical spools have the same key: the printer reports no number of the tag's own.
-- `match.kind` is the shared rule's answer (`lib/rfid-tray.js spoolMatch`): `link` (exactly one spool matches strongly: `spoolId`), `ask` (several, or only near ones: `candidates`, spool ids, best first), `new` (nothing like it on the shelf), `none` (no tag).
+- `match.kind` is the shared rule's answer (`lib/rfid-tray.js spoolMatch`): `link` (exactly one spool matches strongly: `spoolId`; `candidates` is that spool first, then the near matches, for **Choose another**), `ask` (several, or only near ones: `candidates`, spool ids, best first), `new` (nothing like it on the shelf), `none` (no tag).
 - `prefill` is what **Add spool from the tag** would add (`null` with no tag). No price: that is the shop's to set.
 - `linked` is the spool already recorded in this head, or `null`. A link to a spool no longer on the shelf is not reported.
+
+**The answer is signed** (`x-khayt-reply-mac`, as `/api/devices/self` is), and so are the link route's answers: a phone should act only on an answer whose signature it has checked.
 
 **A printer with no tags to read answers `200 {"ok":true}` with no `trays`** (not a Moonraker printer, not connected, or firmware with no `filament_detect`). The phone shows nothing for it.
 
@@ -1440,6 +1442,8 @@ Whether a finished job has a time-lapse on its printer, and whether it has been 
 | `available` | On the printer, and small enough to keep. `bytes` is the printer's own figure |
 | `kept` | Copied into the job's files. `bytes` is the size of the copy |
 | `link` | On the printer, and it will not be copied: `reason` is `over-budget` (over `maxBytes`, 150 MB) or `size-unknown` (the printer did not say) |
+
+**The answer is signed** (`x-khayt-reply-mac`), and so are the keep route's answers. **A phone must open `url` only from an answer whose signature it has checked**: unsigned, anything on the network answering in the Mac's place could hand over any address.
 
 `url` (with `available` and `link`) is where the printer serves the video, on the shop's network: for **Open on the printer**. It works only on the shop's Wi-Fi, and stops working when the printer clears its camera folder. `copying` is present while the Mac is copying it.
 
