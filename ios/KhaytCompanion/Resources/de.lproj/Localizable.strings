@@ -1568,6 +1568,43 @@
 "photos.blocked.detail" = "Fotos können auf diesem Telefon nicht angezeigt oder hinzugefügt werden. Der Inhaber kann Khayt Cloud auf dem Mac unter Internetnutzung beibehalten.";
 "photos.blocked.nothing_sent" = "Es wurde nichts gesendet.";
 
+/* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
+"internet.title" = "Internetnutzung";
+"internet.switch" = "Keine Internetverbindungen herstellen";
+"internet.state.allowed" = "Erlaubt";
+"internet.state.kept" = "Beibehalten";
+"internet.state.blocked" = "Blockiert";
+"internet.result.failed" = "Das hat nicht geklappt. Es wurde nichts geändert.";
+"internet.switch.hint" = "Der Schalter des Shops. Jeder Computer und jedes Telefon folgt ihm.";
+"internet.foot.readonly" = "Wird vom Inhaber am Mac eingestellt. Verbindungen zu Ihrem Mac im WLAN des Shops funktionieren immer.";
+"internet.foot.owner" = "Ändert ihn für den ganzen Shop: signiert an Ihren Mac gesendet. Verbindungen zu Ihrem Mac im WLAN des Shops funktionieren immer.";
+"internet.uses" = "Was dieses Telefon nutzt";
+"internet.cloud.kept" = "Am Mac beibehalten: Fotos und Synchronisierung funktionieren weiter.";
+"internet.cloud.allowed" = "Anmeldung, Synchronisierung und Auftragsfotos.";
+"internet.cloud.blocked" = "Fotos und Synchronisierung warten, bis der Shop Internetaufrufe wieder erlaubt.";
+"internet.lookups" = "Abfragen";
+"internet.lookups.sub" = "Barcode-Abfrage beim Scannen einer Spule.";
+"internet.lookups.blocked" = "Barcode-Abfragen sind aus, solange der Schalter an ist.";
+"internet.blocked_times" = "%1$@, zuletzt um %2$@";
+"internet.install" = "Installationszählung";
+"internet.install.sub" = "Eine eigene Einstellung dieses Telefons. Jeder kann sie ausschalten; nur der Inhaber kann sie einschalten.";
+"internet.state.on" = "An";
+"internet.state.off" = "Aus";
+"internet.confirm.eyebrow" = "Bevor es sich ändert";
+"internet.confirm.off.title" = "Den Schalter für den ganzen Shop ausschalten?";
+"internet.confirm.off.body" = "Updates, Khayt Cloud und Nachrichten laufen auf jedem Computer und Telefon wieder normal. Ihr Mac signiert die Änderung.";
+"internet.confirm.on.title" = "Den Schalter für den ganzen Shop einschalten?";
+"internet.confirm.on.body" = "Khayt macht auf jedem Computer und Telefon keine Internetaufrufe mehr, außer was der Shop beibehält. Ihr Mac signiert die Änderung.";
+"internet.turn_off" = "Ausschalten";
+"internet.turn_on" = "Einschalten";
+"internet.result.changed" = "Jemand hat es inzwischen geändert, daher wurde nichts geändert. Das ist jetzt die Einstellung.";
+"internet.result.not_saved" = "Ihr Mac konnte es gerade nicht speichern. Nichts wurde geändert. Versuchen Sie es erneut.";
+"internet.result.read_only" = "Der Beispiel-Shop kann nicht geändert werden.";
+"internet.result.busy" = "Khayt startet gerade auf Ihrem Mac. Versuchen Sie es gleich noch einmal.";
+"internet.result.not_owner" = "Nur das Telefon des Inhabers kann das ändern.";
+"internet.result.unconfirmed" = "Khayt konnte das nicht mit Ihrem Mac bestätigen. Der Schalter oben zeigt, was Ihr Mac jetzt meldet.";
+"internet.result.saved_not_read" = "Ihr Mac hat es gespeichert. Dieses Telefon folgt bei der nächsten Synchronisierung.";
+"internet.blocked_count" = "%d-mal blockiert";
 /* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
 "waiting.do.taken_off" = "Abgenommen";
 "waiting.do.bed_clear" = "Bett ist frei";
