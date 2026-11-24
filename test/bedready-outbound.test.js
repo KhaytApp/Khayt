@@ -33,15 +33,22 @@ const orca = require('../lib/orca-filament-install.js');
 const TERMS = require('../lib/makerrun-terms.js');
 
 /** Run fn with the switch on, counting every fetch and every DNS lookup. */
+/** The gate as main.js builds it, `lookup` included (a `lan` answer resolves the name), read at call time. */
+const mainLikeGate = (network) => createOutboundGate({
+  getSettings: () => ({ network }), readLocal: () => ({}),
+  lookup: (host) => dns.promises.lookup(host, { all: true, verbatim: true }),
+});
+
 async function offline(fn) {
   const sent = { fetch: [], dns: [] };
-  const gate = createOutboundGate({ getSettings: () => ({ network: { offline: true } }), readLocal: () => ({}) });
+  const gate = mainLikeGate({ offline: true });
   const realFetch = globalThis.fetch;
   const realLookup = dns.promises.lookup;
   globalThis.fetch = async (url) => { sent.fetch.push(String(url)); throw new Error('a blocked call reached fetch'); };
   dns.promises.lookup = async (host) => { sent.dns.push(String(host)); throw new Error('a blocked call reached DNS'); };
   Hook.setOutboundGate((purpose, url) => gate.gateFor(purpose, url));
-  try { await fn(); } finally {
+  // Each test file runs in its own process, and nothing else sets the hook here.
+  try { await fn(gate); } finally {
     Hook.setOutboundGate(null);
     globalThis.fetch = realFetch;
     dns.promises.lookup = realLookup;
@@ -118,4 +125,50 @@ test('kept while offline: the same calls are let through, so the test above is t
   } finally { Hook.setOutboundGate(null); globalThis.fetch = realFetch; }
   assert.equal(seen.length, 1);
   assert.match(seen[0], /\/api\/library$/);
+});
+
+test('a design URL on the LAN, or malformed, is refused by its text: no gate, no DNS, nothing counted as blocked (review of #2689)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-outbound-'));
+  try {
+    let gate;
+    const sent = await offline(async (g) => {
+      gate = g;
+      for (const [url, words] of [
+        ['https://files/a.3mf', /private\/internal/],          // a single-label name: resolved by a search domain
+        ['https://nas.local/a.3mf', /private\/internal/],
+        ['https://10.0.0.5/a.3mf', /private\/internal/],
+        ['https://localhost/a.3mf', /private\/internal/],
+        ['http://files.example.com/a.3mf', /non-HTTPS/],
+        ['not a url', /invalid download URL/],
+      ]) {
+        await assert.rejects(library.downloadItem({ slug: 's', title: 't', downloadUrl: url }, dir), (e) => {
+          assert.notEqual(e.code, 'outbound.blocked', url);
+          assert.match(e.message, words, url);
+          return true;
+        });
+      }
+      await assert.rejects(library.fetchCoverDataUrl('https://printer.lan/c.png'), /private\/internal/);
+    });
+    assert.deepEqual(sent, { fetch: [], dns: [] });
+    assert.equal((gate.blocked().makerrun || { count: 0 }).count, 0, 'a call that could never be made is not a blocked call');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('kept while offline, the download path itself goes out: the shape check, the gate, DNS, then fetch', async () => {
+  const gate = mainLikeGate({ offline: true, keep: ['makerrun'] });
+  const order = [];
+  const realFetch = globalThis.fetch;
+  const realLookup = dns.promises.lookup;
+  dns.promises.lookup = async (host) => { order.push('dns ' + host); return [{ address: '93.184.216.34', family: 4 }]; };
+  globalThis.fetch = async (url) => {
+    order.push('fetch ' + new URL(String(url)).hostname);
+    const png = new Uint8Array([137, 80, 78, 71]);
+    return { ok: true, status: 200, headers: { get: (k) => (/content-type/i.test(k) ? 'image/png' : null) }, arrayBuffer: async () => png.buffer };
+  };
+  Hook.setOutboundGate((purpose, url) => gate.gateFor(purpose, url));
+  try {
+    const data = await library.fetchCoverDataUrl('https://covers.example.com/c.png');
+    assert.match(data, /^data:image\/png;base64,/);
+  } finally { Hook.setOutboundGate(null); globalThis.fetch = realFetch; dns.promises.lookup = realLookup; }
+  assert.deepEqual(order, ['dns covers.example.com', 'fetch covers.example.com']);
 });
