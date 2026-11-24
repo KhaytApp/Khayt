@@ -15,7 +15,8 @@ struct SuccessRateColumnTests {
     @Test("the frame's five rows, word for word")
     func frame() async {
         let en = Words(); await en.load("en", engine: OperatorLockTests.sharedEngine)
-        // Old Ender: 14 prints, 3 failed, 1 cancelled: 10 of 13 decided came out right... the frame's 79% is 11 of 14 decided.
+        // Eleven finished, three failed, one cancelled: 11 of the 14 DECIDED came out right. (The frame's own
+        // figures are a sample and do not add up to its 79% as 14 prints; the wording is what is held.)
         let ender = Self.row(11, 3, 1, 0)
         #expect(MachineProfitPage.prints(ender, en) == "15 · 3 failed · 1 cancelled")
         #expect(MachineProfitPage.cameOutRight(ender, en) == "79%")
