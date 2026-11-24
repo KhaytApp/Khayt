@@ -1347,6 +1347,8 @@ The spool tags a printer's heads read (a Snapmaker U1), each matched against the
 - `prefill` is what **Add spool from the tag** would add (`null` with no tag). No price: that is the shop's to set.
 - `linked` is the spool already recorded in this head, or `null`. A link to a spool no longer on the shelf is not reported.
 
+**The answer is signed** (`x-khayt-reply-mac`, as `/api/devices/self` is), and so are the link route's answers: a phone should act only on an answer whose signature it has checked.
+
 **A printer with no tags to read answers `200 {"ok":true}` with no `trays`** (not a Moonraker printer, not connected, or firmware with no `filament_detect`). The phone shows nothing for it.
 
 **Refusals:** `{"ok":false,"reason":…,"message"?:…}`

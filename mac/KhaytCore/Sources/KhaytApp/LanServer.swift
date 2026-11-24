@@ -1572,7 +1572,9 @@ final class LanServer {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.trays!(Self.trayReadPath(path)!)
-            return .json(status, body)
+            // Signed back: the phone offers a spool to link on this answer,
+            // so it must know the Mac said it and nothing on the Wi-Fi did.
+            return signedForPhone(.json(status, body), request)
 
         // `POST /api/printer/{machineId}/trays/{head}/spool`: which spool is
         // in that head. It writes the machine's record and may add one spool,
@@ -1585,7 +1587,7 @@ final class LanServer {
             }
             let asked = Self.trayLinkPath(path)!
             let (status, body) = await host.linkTray!(asked.id, asked.head, request.body)
-            return .json(status, body)
+            return signedForPhone(.json(status, body), request)
 
         // ── A PHONE TELLS A PRINTER WHAT TO DO ───────────────────────────
         //
