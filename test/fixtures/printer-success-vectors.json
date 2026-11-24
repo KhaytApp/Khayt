@@ -1,5 +1,5 @@
 {
- "about": "lib/printer-success.js successRates(input): per printer, finished / (finished + failed) from run results (P6). Synthetic book. A case with `calendar: { utcOffsetMinutes }` passes `dayOf` = that fixed-offset calendar's day of the run's `at` (a full UTC stamp shifted by the offset; a bare YYYY-MM-DD returned as written). Without it, the lib's own fallback: the first ten characters.",
+ "about": "lib/printer-success.js successRates(input): per printer, finished / (finished + failed) from run results (P6). Synthetic book. A case with `calendar: { utcOffsetMinutes }` passes `dayOf` = that fixed-offset calendar's day of the run's `at` (a full UTC stamp shifted by the offset; a bare YYYY-MM-DD returned as written). Without it, the lib's own fallback: the first ten characters. Or `calendar: { timeZone }` (an IANA zone id): dayOf is that zone's local day, daylight saving included; a single fixed offset fails those cases, which is the point of them.",
  "cases": [
   {
    "why": "worst first; cancelled and unknown counted but not in the rate; too few decided runs is not \"enough\"; a deleted job is left out",
@@ -1704,6 +1704,63 @@
    "why": "nothing at all: no printers and no jobs is no rows",
    "input": {},
    "want": []
+  },
+  {
+   "why": "a zone, not an offset: across New York's daylight-saving change (Nov 1) each run is read at its own offset, so both edges hold; any one fixed offset gets one of them wrong",
+   "calendar": {
+    "timeZone": "America/New_York"
+   },
+   "input": {
+    "machines": [
+     {
+      "id": "A"
+     }
+    ],
+    "orders": [
+     {
+      "id": "1",
+      "printRuns": [
+       {
+        "machineId": "A",
+        "at": "2026-10-15T04:30:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-16T04:30:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-10-15T03:30:00.000Z",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-16T05:00:00.000Z",
+        "result": "failed",
+        "resultSource": "printer"
+       }
+      ]
+     }
+    ],
+    "from": "2026-10-15",
+    "to": "2026-11-15"
+   },
+   "want": [
+    {
+     "machineId": "A",
+     "finished": 2,
+     "failed": 0,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": 1,
+     "enough": false
+    }
+   ]
   }
  ],
  "percent": {

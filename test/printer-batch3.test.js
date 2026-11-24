@@ -35,8 +35,19 @@ const fixedOffsetDayOf = (minutes) => (at) => {
   const t = Date.parse(s);
   return Number.isFinite(t) ? new Date(t + minutes * 60000).toISOString().slice(0, 10) : '';
 };
+/** A vector's `calendar: { timeZone }`: the day of `at` in that IANA zone, daylight saving included. */
+const zoneDayOf = (timeZone) => {
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  return (at) => {
+    const s = String(at == null ? '' : at);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const t = Date.parse(s);
+    return Number.isFinite(t) ? fmt.format(new Date(t)) : '';
+  };
+};
+const calendarDayOf = (cal) => (cal.timeZone ? zoneDayOf(cal.timeZone) : fixedOffsetDayOf(cal.utcOffsetMinutes));
 for (const c of vec('printer-success').cases) test('P6 ' + c.why, () => {
-  const input = c.calendar ? Object.assign({}, c.input, { dayOf: fixedOffsetDayOf(c.calendar.utcOffsetMinutes) }) : c.input;
+  const input = c.calendar ? Object.assign({}, c.input, { dayOf: calendarDayOf(c.calendar) }) : c.input;
   assert.deepEqual(PS.successRates(input), c.want);
 });
 
@@ -70,6 +81,13 @@ test('P6: localDayOf reads a UTC stamp on this computer\'s calendar, and leaves 
     const ny = vec('printer-success').cases.find((c) => c.calendar && c.calendar.utcOffsetMinutes === -300 && c.input.orders && c.input.orders[0].printRuns && c.input.orders[0].printRuns.length);
     process.env.TZ = 'America/New_York';
     assert.deepEqual(PS.successRates(Object.assign({}, ny.input, { dayOf: PS.localDayOf })), ny.want);
+    // Across the daylight-saving change, the desktop's own calendar holds both edges,
+    // and either fixed offset alone does not (so the vector really tests the zone).
+    const dst = vec('printer-success').cases.find((c) => c.calendar && c.calendar.timeZone);
+    assert.deepEqual(PS.successRates(Object.assign({}, dst.input, { dayOf: PS.localDayOf })), dst.want);
+    for (const off of [-240, -300]) {
+      assert.notDeepEqual(PS.successRates(Object.assign({}, dst.input, { dayOf: fixedOffsetDayOf(off) })), dst.want, String(off));
+    }
   } finally {
     if (was === undefined) delete process.env.TZ; else process.env.TZ = was;
   }
