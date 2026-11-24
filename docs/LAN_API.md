@@ -1315,6 +1315,42 @@ An **owner's phone** turning the shop's "Make no internet calls" on or off (iPho
 
 **How a phone knows the route is there.** `GET /api/devices/self` carries `"can": ["network-switch"]` for an owner's phone on a computer that serves this route (see below). No `can`, or a list without it: show the switch read-only.
 
+### `GET /api/devices`
+
+> **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it. (`POST /api/devices` is enrolment, as before.)
+
+The shop's paired phones, for the owner's phone. Read only.
+
+**Requires a signed, enrolled phone whose role is `owner`.** The owner PIN sent bare, or an API token, is `403 {"ok":false,"reason":"device-key-required"}`; any other role is `403 {"reason":"role-scope","required":"owner"}`. The path is not in `lib/device-roles.js`, on purpose: a route the table does not name is the owner's. `GET /api/devices/self` lists `"devices"` in `can` for an owner.
+
+**Response 200** (signed, `x-khayt-reply-mac`):
+
+```json
+{"ok":true,"devices":[
+  {"deviceId":"dev_…","name":"Sara's iPhone","role":"owner","pairedBy":"pin","lastSeenAt":"2026-11-24T09:12:00.000Z","self":true},
+  {"deviceId":"dev_…","name":"Floor phone","role":"operator","pairedBy":"code","lastSeenAt":"2026-11-23T16:40:00.000Z"}
+]}
+```
+
+Phones only (paired slicers are below), most recently seen first. `role` is the role the phone HOLDS, as the shared rule reads it (a phone paired with the PIN before roles is `owner`). `pairedBy` is `pin` or `code`. `self` is present, and true, on the phone that asked. `lastSeenAt` is coarse: it is written at most every few minutes.
+
+**Never in the answer:** a device's key, its PIN tag, or anything that could enrol or impersonate a phone.
+
+### `GET /api/devices/connectors`
+
+> **Native Mac only** (Nov 2026).
+
+The paired slicers and whether prices show in them, for the owner's phone. Read only. (Under `/api/devices/`, not `/api/connectors/`: that prefix belongs to the slicers' own routes.)
+
+**Requires a signed, enrolled phone whose role is `owner`**, as above. `can` lists `"slicer-prices"` for an owner.
+
+**Response 200** (signed): `{"ok":true,"slicerPrices":true,"connectors":[{"deviceId":"dev_…","name":"OrcaSlicer on the PC","priceGrant":true,"grant":"price","lastSeenAt":"…"}]}`
+
+- `slicerPrices`: the shop's switch, "Show prices in the slicer", on this Mac.
+- `priceGrant`: whether this slicer may see prices when the switch is on ("May see prices" / "Prices hidden"). `grant` says how much: `"price"`, `"cost"` (price, cost and margin), or `null`.
+
+With `slicerPrices` false, no slicer is shown a price whatever its grant.
+
 ### `POST /api/printer/{machineId}/bed-clear`
 
 > **Served by both apps** (Nov 2026, drafts): the native Mac app and

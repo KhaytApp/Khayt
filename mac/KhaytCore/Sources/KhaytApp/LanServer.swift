@@ -1143,6 +1143,9 @@ final class LanServer {
         // A phone pairing by code, and what a paired device is (`roleRefusal`).
         if let answered = await phonePairRoute(request, path: path) { return answered }
         if path == "/api/devices/self", isGet { return await deviceSelf(request) }
+        // The owner's read-only views: the paired phones, and prices in the
+        // slicer (`LanServer+OwnerViews`). Exact paths, GET only.
+        if let answered = await ownerViewRoute(request, path: path) { return answered }
         if let answered = await connectorRoute(request, path: path) { return answered }
         if let answered = await restRoute(request, path: path, isGet: isGet) { return answered }
 
@@ -2785,6 +2788,8 @@ final class LanServer {
         // list, so later ones can be added; an older Mac sends none.
         var can: [JSONValue] = []
         if host.networkSwitch != nil, role == "owner" { can.append(.string("network-switch")) }
+        // The owner's read-only views (`LanServer+OwnerViews`).
+        if role == "owner" { can.append(.string("devices")); can.append(.string("slicer-prices")) }
         let answer: JSONValue = .object(["deviceId": .string(id), "role": .string(role),
                                          "scopes": .array(scopes.map(JSONValue.string)),
                                          "can": .array(can)])
