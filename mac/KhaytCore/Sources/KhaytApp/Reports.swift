@@ -19,6 +19,7 @@ struct Reports: View {
     @State private var best: KhaytEngine.TopLists?
     @State private var machinePL: KhaytEngine.MachineProfitReport?
     @State private var success: [KhaytEngine.SuccessRow] = []
+    @State private var successPercent: [String: Int] = [:]
     /// What the shop must bill this month to cover what it pays anyway.
     /// Beside the quarters rather than on a page of its own: a shop reading
     /// what it made is the shop that wants to know whether it was enough.
@@ -133,7 +134,7 @@ struct Reports: View {
                                   power: power,
                                   maintenance: maintenance,
                                   downtime: downtime, downtimeMonths: downtimeMonths,
-                                  sites: sites, success: success)
+                                  sites: sites, success: success, successPercent: successPercent)
             } else if shop.reportPage == .custom {
                 CustomReportPage(shop: shop)
             } else if rows.isEmpty {
@@ -903,6 +904,9 @@ struct Reports: View {
         let period = shop.period, clock = shop.now
         let sent = Shop.runsSent(shop.orderRows) { Shop.inPeriod($0, period: period, now: clock) }
         success = (try? await engine.successRates(orders: sent, machines: shop.machineRows)) ?? []
+        var percents: [String: Int] = [:]
+        for row in success { if let p = try? await engine.successPercent(row.rate) { percents[row.machineId] = p } }
+        successPercent = percents
         machinePL = try? await engine.machineProfit(
             machines: shop.machineRows,
             completed: done.orders,

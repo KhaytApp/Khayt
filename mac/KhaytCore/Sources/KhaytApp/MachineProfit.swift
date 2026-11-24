@@ -50,6 +50,9 @@ struct MachineProfitPage: View {
     /// Beside the profit because a printer that earns well and fails one
     /// print in five is two facts a shop weighs together.
     var success: [KhaytEngine.SuccessRow] = []
+    /// Each printer's rate as the whole per cent a person reads, by the
+    /// shared rule's own rounding (`KhaytEngine.successPercent`).
+    var successPercent: [String: Int] = [:]
 
     /// "14 · 3 failed · 1 cancelled", "3 · not marked yet", or "—" for a
     /// printer that printed nothing in the range.
@@ -69,10 +72,14 @@ struct MachineProfitPage: View {
     /// "79%", "Too few prints yet" under the rule's five decided prints, or
     /// "—" when none is decided. Never a percentage a shop could misread:
     /// one failure in two is not a 50% printer.
-    @MainActor static func cameOutRight(_ row: KhaytEngine.SuccessRow?, _ words: Words) -> String {
-        guard let row, row.decided > 0, let rate = row.rate else { return "—" }
+    ///
+    /// `percent` is the rule's own whole per cent for this row (99 for 199
+    /// of 200, never 100). It is not worked out here.
+    @MainActor static func cameOutRight(_ row: KhaytEngine.SuccessRow?, percent: Int?, _ words: Words) -> String {
+        guard let row, row.decided > 0, row.rate != nil else { return "—" }
         guard row.enough else { return words.callIt("mac.mpl_too_few") }
-        return Money.quantity((rate * 100).rounded(), decimals: 0) + "%"
+        guard let percent else { return "—" }
+        return words.numeral(percent) + "%"
     }
 
     var body: some View {
@@ -157,7 +164,8 @@ struct MachineProfitPage: View {
         let words = shop.words
         VStack(alignment: .leading, spacing: 10) {
             ForEach(report.rows) { row in
-                Row(shop: shop, row: row, success: success.first { $0.machineId == row.machineId })
+                Row(shop: shop, row: row, success: success.first { $0.machineId == row.machineId },
+                    percent: successPercent[row.machineId])
             }
             // The rows, added up — and they ARE the rows: the rule returns both
             // so a screen cannot show a sum that is not in the table above it.
@@ -224,6 +232,7 @@ struct MachineProfitPage: View {
         let shop: Shop
         let row: KhaytEngine.MachineProfit
         var success: KhaytEngine.SuccessRow?
+        var percent: Int?
 
         var body: some View {
             let words = shop.words
@@ -298,7 +307,7 @@ struct MachineProfitPage: View {
                     }
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(words.callIt("mac.mpl_right")).font(.caption).foregroundStyle(.secondary)
-                        Text(MachineProfitPage.cameOutRight(success, words))
+                        Text(MachineProfitPage.cameOutRight(success, percent: percent, words))
                             .font(.callout.monospacedDigit())
                             .foregroundStyle(success?.enough == true ? .primary : .secondary)
                     }
