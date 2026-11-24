@@ -167,6 +167,9 @@ struct AppLockGate: ViewModifier {
                 lock.start(enabled: enabled)
                 sync(scenePhase)
             }
+            // With the lock in force, Spotlight, Siri and Shortcuts keep the
+            // jobs but not their customers (Turki, Nov 24).
+            .task(id: enabled && lock.canLock) { await JobSearch.lockChanged(inForce: enabled && lock.canLock) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { lock.wentToBackground() }
                 if phase == .active { lock.cameBack(enabled: enabled) }

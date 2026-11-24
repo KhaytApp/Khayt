@@ -259,6 +259,40 @@ final class AppLockTests: XCTestCase {
         }
     }
 
+    // MARK: - Spotlight, Siri and Shortcuts while the lock is on (Turki, Nov 24)
+
+    /// A job stays findable by its number, title and stage; the customer is
+    /// neither shown nor searchable.
+    func testWithTheLockOnAFoundJobNamesNoCustomer() {
+        let open = JobSearchQuery.entity(id: "KH-1042", title: "Planter", client: "Sample Customer", stage: "Printing", hideCustomer: false)
+        XCTAssertEqual(open.attributeSet.keywords, ["KH-1042", "Sample Customer"])
+        let locked = JobSearchQuery.entity(id: "KH-1042", title: "Planter", client: "Sample Customer", stage: "Printing", hideCustomer: true)
+        XCTAssertEqual(locked.client, "")
+        XCTAssertEqual(locked.attributeSet.title, "Planter")
+        XCTAssertEqual(locked.attributeSet.keywords, ["KH-1042"], "not searchable by the customer's name")
+        XCTAssertEqual(locked.attributeSet.contentDescription, "Printing")
+        XCTAssertFalse("\(locked.displayRepresentation)".contains("Sample Customer"))
+    }
+
+    /// Turning the lock on replaces what Spotlight holds at once, and turning
+    /// it off does so again; no change, no work.
+    func testTheLockTurningOnOrOffReindexes() async {
+        let before = JobSearch.defaults
+        JobSearch.defaults = defaults
+        defer { JobSearch.defaults = before }
+        let spotlight = FakeIndex()
+        XCTAssertFalse(JobSearch.hidesCustomers)
+        await JobSearch.lockChanged(inForce: true, into: spotlight)
+        XCTAssertTrue(JobSearch.hidesCustomers)
+        XCTAssertEqual(spotlight.calls.first, "delete", "what was indexed with customers is removed")
+        let after = spotlight.calls.count
+        await JobSearch.lockChanged(inForce: true, into: spotlight)
+        XCTAssertEqual(spotlight.calls.count, after, "unchanged: nothing is redone")
+        await JobSearch.lockChanged(inForce: false, into: spotlight)
+        XCTAssertFalse(JobSearch.hidesCustomers)
+        XCTAssertGreaterThan(spotlight.calls.count, after, "off again: indexed afresh, with customers")
+    }
+
     // MARK: - Words and the Settings row
 
     func testTheLockWordsInEnglish() {
