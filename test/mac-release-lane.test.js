@@ -183,8 +183,13 @@ test('the publish half re-checks the archive, signs it, and publishes the releas
   const pub = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'mac-publish.yml'), 'utf8');
   for (const must of [/isDraft/, /SUFeedURL/, /SUPublicEDKey/, /stapler validate/, /--check-resources/,
     /codesign --verify/, /sign_update -f - -p/]) assert.match(pub, must);
-  assert.ok(pub.indexOf('--draft=false') < pub.indexOf('mac-appcast.js'),
+  // The feed is WRITTEN and signed first (so a bad one stops the release), and
+  // PUBLISHED after the release: the push to the site is what installs see.
+  assert.ok(pub.indexOf('gh release edit "$TAG" -R KhaytApp/khayt-mac --draft=false') < pub.indexOf('          git push'),
     'the release must be public before the feed names it');
+  assert.ok(pub.indexOf('$NODE scripts/mac-appcast.js \\') > 0
+    && pub.indexOf('$NODE scripts/mac-appcast.js \\') < pub.indexOf('gh release edit "$TAG" -R KhaytApp/khayt-mac --draft=false'),
+    'the feed must be written, signed and checked before the release is public');
   // Only through env: a tag typed into the form must never be pasted into a script.
   assert.doesNotMatch(pub, /run:[^\n]*\$\{\{ inputs\.tag \}\}/);
 });
