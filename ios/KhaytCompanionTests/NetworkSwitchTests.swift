@@ -218,7 +218,9 @@ final class NetworkSwitchTests: XCTestCase {
         XCTAssertEqual(once.lines[1].sub, "Blocked 1 time, last at 14:12")
         L10n.setLanguage(.ar)
         let twice = model(.object(["offline": .bool(true)]), blocked: [.lookups: .init(count: 2, last: Date())])
-        XCTAssertTrue(twice.lines[1].sub.hasPrefix("حُظر مرتين"), twice.lines[1].sub)
+        // Arabic formatting wraps each inserted piece in direction isolates, so the
+        // sentence is searched, not matched from its first character.
+        XCTAssertTrue(twice.lines[1].sub.contains("حُظر مرتين"), twice.lines[1].sub)
         L10n.setLanguage(.system)
     }
 
