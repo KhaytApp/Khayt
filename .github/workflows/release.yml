@@ -126,6 +126,12 @@ jobs:
               echo "::warning::no CHANGELOG section for ${TAG#v} — publishing with the fallback note."
               echo "See [README](https://github.com/${GITHUB_REPOSITORY}#readme) for full release notes." > "$NOTES_FILE"
             fi
+            # An entry still in changelog.d/ is not in these notes. The release
+            # PR's "Changelog entry" check refuses that, and cut-release.yml
+            # does; a tag pushed by hand gets this, said where it will be seen.
+            if ! node scripts/changelog-fold.js --check >/dev/null 2>&1; then
+              echo "::warning::changelog.d/ at ${TAG} still holds fragments — their entries are NOT in these release notes. Fold them (npm run changelog:fold) and add them to the release by hand."
+            fi
             gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --title "Khayt $TAG" \

@@ -29,7 +29,7 @@ Thank you for helping maintain Khayt. This document is the default workflow for 
 
    E2E covers boot, tab navigation, order lifecycle, store round-trip, and LAN PIN gate.
 
-2. If you changed user-visible behavior, add a line under `CHANGELOG.md` → `[Unreleased]`.
+2. If you changed user-visible behavior, write it in `changelog.d/<your-branch>.md`: one line starting `- `, as it would read under `[Unreleased]` (see [`changelog.d/README.md`](./changelog.d/README.md)). The release cut folds these into `CHANGELOG.md`; a file of your own never conflicts with anyone else's.
 
 3. Bump version only when preparing a **release** (see [VERSIONING.md](./VERSIONING.md)), not on every PR.
 

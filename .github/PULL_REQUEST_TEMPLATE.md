@@ -11,7 +11,7 @@
 ## Checklist
 
 - [ ] `npm run lint` and `npm test` pass
-- [ ] `CHANGELOG.md` updated under `[Unreleased]` (if user-visible)
+- [ ] `changelog.d/<branch>.md` written (if user-visible; see `changelog.d/README.md`)
 - [ ] Version bump only if this PR is a **release** (see VERSIONING.md)
 
 ## Testing

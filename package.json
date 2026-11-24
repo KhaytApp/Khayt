@@ -114,6 +114,7 @@
     "test:e2e:intakequote": "node scripts/e2e-intake-quote-smoke.mjs",
     "test:e2e:actuals": "node scripts/e2e-measured-actuals-smoke.mjs",
     "check:changelog": "node scripts/check-changelog.js",
+    "changelog:fold": "node scripts/changelog-fold.js",
     "check:release-claims": "node scripts/check-release-claims.js",
     "check:globals": "node scripts/check-globals-loaded.js renderer/index.html renderer/bedready.html",
     "test:e2e:pollcache": "node scripts/e2e-poll-cache.mjs",
