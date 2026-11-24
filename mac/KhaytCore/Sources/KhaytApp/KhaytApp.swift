@@ -974,6 +974,12 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // The machine sheet heads and "Link a spool", page 25 frames 1 and 2 (`SnapshotMachineHeads.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_HEADS"] == "1", let shop = subject {
+                await captureMachineHeads(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_APPS"] == "1", let shop = subject {
                 await captureConnectedApps(shop, into: dir, dark: dark)
                 NSApp.terminate(nil)

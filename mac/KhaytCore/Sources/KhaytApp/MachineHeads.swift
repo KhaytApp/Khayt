@@ -256,10 +256,21 @@ struct LinkHeadSheet: View {
     let adding: Bool
     let done: () async -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var chosen = ""
+    @State private var chosen: String
     @State private var saving = false
 
     static let new = "\u{0}new"
+
+    /// What starts chosen is decided here, not when the sheet appears: a
+    /// sheet that is photographed never "appears", and would show no choice.
+    init(shop: Shop, machineId: String, row: KhaytEngine.HeadRow, adding: Bool, done: @escaping () async -> Void) {
+        self.shop = shop
+        self.machineId = machineId
+        self.row = row
+        self.adding = adding
+        self.done = done
+        _chosen = State(initialValue: Self.first(row, adding: adding, mayAdd: shop.mayAddSpoolFromTag))
+    }
 
     /// What can be chosen, in order: the linked spool first when there is
     /// one, then the rule's candidates, then "Add as a new spool".
@@ -319,10 +330,7 @@ struct LinkHeadSheet: View {
                 .disabled(chosen.isEmpty || saving)
             }
         }
-        .onAppear {
-            shop.moveProblem = nil
-            chosen = Self.first(row, adding: adding, mayAdd: shop.mayAddSpoolFromTag)
-        }
+        .onAppear { shop.moveProblem = nil }
     }
 
     /// One choice: its name and what is left, and why it is offered.
