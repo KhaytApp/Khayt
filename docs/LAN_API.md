@@ -1315,6 +1315,87 @@ An **owner's phone** turning the shop's "Make no internet calls" on or off (iPho
 
 **How a phone knows the route is there.** `GET /api/devices/self` carries `"can": ["network-switch"]` for an owner's phone on a computer that serves this route (see below). No `can`, or a list without it: show the switch read-only.
 
+### `GET /api/printer/{machineId}/trays`
+
+> **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it.
+
+The spool tags a printer's heads read (a Snapmaker U1), each matched against the shop's spools. Only the Mac holds the printer, so the phone asks and the Mac reads: one read-only `GET` of the printer's `filament_detect`. Nothing else is sent to the printer.
+
+**Requires a signed, enrolled phone.** The owner PIN sent bare, or an API token, is `403 {"ok":false,"reason":"device-key-required"}`: the answer names the shop's spools.
+
+**Role:** `inventory:read` in `lib/device-roles.js`. `GET /api/devices/self` lists `"trays"` in `can` when this Mac serves the routes and the phone's role may read them.
+
+**Response 200:**
+
+```json
+{"ok":true,"trays":[
+  {"head":1,
+   "tag":{"vendor":"Snapmaker","manufacturer":"Polymaker","material":"PLA","sub":"SnapSpeed",
+          "colours":["#080A0D"],"weightG":500,"diameterMm":1.75,"official":true},
+   "key":"…",
+   "match":{"kind":"link","spoolId":"INV-1"},
+   "prefill":{"material":"PLA SnapSpeed","color":"#080A0D","brand":"Polymaker","weight":500},
+   "linked":null},
+  {"head":3,"tag":null,"key":"","match":{"kind":"none"},"prefill":null,"linked":null}
+]}
+```
+
+- `head` counts from one, in the printer's order. One row per head, tagged or not.
+- `tag` is `null` when the head reads no tag. A head with no tag may still hold filament.
+- `key` is everything the tag says. Send it back as `seen` when linking. Two identical spools have the same key: the printer reports no number of the tag's own.
+- `match.kind` is the shared rule's answer (`lib/rfid-tray.js spoolMatch`): `link` (exactly one spool matches strongly: `spoolId`), `ask` (several, or only near ones: `candidates`, spool ids, best first), `new` (nothing like it on the shelf), `none` (no tag).
+- `prefill` is what **Add spool from the tag** would add (`null` with no tag). No price: that is the shop's to set.
+- `linked` is the spool already recorded in this head, or `null`. A link to a spool no longer on the shelf is not reported.
+
+**A printer with no tags to read answers `200 {"ok":true}` with no `trays`** (not a Moonraker printer, not connected, or firmware with no `filament_detect`). The phone shows nothing for it.
+
+**Refusals:** `{"ok":false,"reason":…,"message"?:…}`
+
+| Status | `reason` |
+|---|---|
+| 404 | `not-found`: no machine with that id |
+| 502 | `printer-unreachable`: the printer was asked and did not answer; `message` says why |
+| 503 | `busy`: the app is starting |
+
+### `POST /api/printer/{machineId}/trays/{head}/spool`
+
+> **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it.
+
+Says which of the shop's spools is in a head. `head` counts from one, 1 to 16.
+
+**Body**, exactly one of:
+
+```json
+{"seen":"<the row's key>","spoolId":"INV-1"}
+{"seen":"<the row's key>","create":true}
+```
+
+`seen` is required: the `key` of the row the phone was showing. `create` adds one spool from the tag (its `prefill`) and links it. Any other field, both, or neither is `400 bad-body`.
+
+**What it writes, and nothing else:** `machines[].headSpools[head - 1]` = the spool's id (the record the Windows/Linux app writes, keyed from zero as it keys it), and with `create` one new spool with no price. **An existing spool is never changed.** The printer is told nothing: the Mac reads the tags again before writing, with the same read-only `GET`.
+
+**Requires a signed, enrolled phone**, as above.
+
+**Role:** `inventory:write` in `lib/device-roles.js`: an operator's, a manager's or the owner's phone. That is the computers' own rule for the same acts (adding a spool is inventory/create, linking is printers/edit, and an operator has both). A viewer's phone is refused with `403 {"reason":"role-scope","required":"inventory:write"}`.
+
+**Response 200** (linked) or **201** (a spool was added): `{"ok":true,"head":2,"spoolId":"INV-9","created":true,"spool":{"id":"INV-9","material":"PLA SnapSpeed","color":"#E2DEDB","brand":"Polymaker","weight":500}}`.
+
+**Refusals:** `{"ok":false,"reason":…,"message"?:…,"trays"?:[…]}`
+
+| Status | `reason` |
+|---|---|
+| 400 | `bad-body` |
+| 404 | `not-found` (the machine), `no-head` (the printer has no such head), `no-spool` (no such spool on the shelf) |
+| 409 | `changed`: the head's tag is not the one the phone was showing (taken out or swapped since); `trays` holds what is there now, and nothing was written |
+| 409 | `no-trays`: this printer has no tags to read |
+| 409 | `tag-unusable`: the tag names no material a spool could be made from |
+| 409 | `read-only`: this Mac is showing the sample book |
+| 500 | `not-saved`: the write failed (another computer holds the book, for one); `message` says why |
+| 502 | `printer-unreachable` |
+| 503 | `busy`: the app is starting |
+
+Sending the same link twice writes the same link. Sending `create` twice adds two spools: the phone must not retry a `create` whose answer it did not see without reading the trays again (the first one's spool is then `linked`).
+
 ### `POST /api/printer/{machineId}/bed-clear`
 
 > **Served by both apps** (Nov 2026, drafts): the native Mac app and
