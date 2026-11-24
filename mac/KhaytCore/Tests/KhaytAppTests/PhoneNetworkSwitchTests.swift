@@ -47,7 +47,9 @@ struct PhoneNetworkSwitchTests {
         #expect(bench.switchCalls.calls.isEmpty, Comment(rawValue: role))
         // And the route is not advertised to a phone that cannot use it.
         let me = try await PhoneRolesTests.status(bench, phone, "GET", "/api/devices/self")
-        #expect((me.1["can"] as? [String]) == [], Comment(rawValue: role))
+        // Not the owner: the switch is not among what this phone is told it can do
+        // (other abilities, with other rules, may be).
+        #expect((me.1["can"] as? [String])?.contains("network-switch") == false, Comment(rawValue: role))
     }
 
     @Test("the owner's phone reaches it, once per request, with its name, and the answer is signed")
@@ -70,7 +72,7 @@ struct PhoneNetworkSwitchTests {
             #expect(replay.status == 401 && bench.switchCalls.calls.count == before + 1)
             // Advertised to the owner, so the phone offers the control only where it works.
             let me = try await PhoneRolesTests.status(bench, phone, "GET", "/api/devices/self")
-            #expect((me.1["can"] as? [String]) == ["network-switch"])
+            #expect((me.1["can"] as? [String])?.contains("network-switch") == true)
         }
         #expect(bench.switchCalls.calls.first?.hasPrefix("Owner phone ") == true, "who changed it is the device's own name")
         // A paired slicer is not a phone.
