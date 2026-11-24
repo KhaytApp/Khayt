@@ -123,8 +123,10 @@ jobs:
           set -euo pipefail
           ARCHIVE="$(ls dist/*.zip | head -1)"
           FEED="$RUNNER_TEMP/appcast.xml"
-          node scripts/changelog-section.js "${TAG#v}" > "$RUNNER_TEMP/notes.md" 2>/dev/null || : > "$RUNNER_TEMP/notes.md"
-          node scripts/mac-appcast.js \
+          # The key is for sign_update alone: these never see it.
+          NODE="env -u SPARKLE_PRIVATE_KEY node"
+          $NODE scripts/changelog-section.js "${TAG#v}" > "$RUNNER_TEMP/notes.md" 2>/dev/null || : > "$RUNNER_TEMP/notes.md"
+          $NODE scripts/mac-appcast.js \
             --archive "$ARCHIVE" \
             --signature "$SIG" \
             --url "https://github.com/KhaytApp/khayt-mac/releases/download/$TAG/$(basename "$ARCHIVE")" \
@@ -132,10 +134,18 @@ jobs:
             --notes-url "https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG" \
             --out "$FEED"
           printf '%s' "$SPARKLE_PRIVATE_KEY" | sparkle/bin/sign_update -f - --disable-signing-warning "$FEED" >/dev/null
-          printf '%s' "$SPARKLE_PRIVATE_KEY" | sparkle/bin/sign_update -f - --verify "$FEED" \
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | sparkle/bin/sign_update -f - --verify "$FEED" >/dev/null \
             || { echo "::error::Sparkle does not verify the feed it just signed"; exit 1; }
-          node scripts/mac-appcast-verify.js --feed "$FEED" \
-            || { echo "::error::the signed feed does not verify with the key the app holds (SUPublicEDKey in mac/make-app.sh)"; exit 1; }
+          # Sparkle's verify proves only that the signing agrees with itself
+          # (it derives the public key from the private one). THIS is the
+          # check against the key inside the app that is about to ship, read
+          # from its own Info.plist.
+          $NODE scripts/mac-appcast-verify.js --feed "$FEED" \
+            --public-key "$(plutil -extract SUPublicEDKey raw "x/Khayt.app/Contents/Info.plist")" \
+            || { echo "::error::the signed feed does not verify with the key inside the app (SUPublicEDKey)"; exit 1; }
+          # And a feed that signs and verifies can still be one no Mac can
+          # parse: signing never reads it as XML.
+          xmllint --noout "$FEED" || { echo "::error::the feed is not well-formed XML"; exit 1; }
 
       # The release FIRST, the feed after: a feed naming an asset that is not
       # published yet sends every install that checks in between to a 404.

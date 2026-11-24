@@ -48,8 +48,13 @@ function extract(feed) {
   if (at < 0) return unsigned;
   const end = feed.indexOf(SUFFIX, at + PREFIX.length);
   if (end < 0) return unsigned;
+  // A block that is not UTF-8 is no block to Sparkle (it treats the whole
+  // file as unsigned), so it is none here.
+  let block;
+  try { block = new TextDecoder('utf-8', { fatal: true }).decode(feed.subarray(at + PREFIX.length, end)); }
+  catch (_) { return unsigned; }
   let signature = null, length = 0;
-  for (const line of feed.subarray(at + PREFIX.length, end).toString('utf8').split(/\r\n|\n|\r/)) {
+  for (const line of block.split(/\r\n|\n|\r/)) {
     if (line.startsWith('edSignature:')) signature = line.slice('edSignature:'.length).trim();
     else if (line.startsWith('length:')) length = Number.parseInt(line.slice('length:'.length).trim(), 10) || 0;
   }
@@ -67,9 +72,16 @@ function verify(feed, publicKey) {
   if (raw.length !== 32) return { ok: false, reason: 'the public key is not a 32-byte Ed25519 key' };
   const { content, signature, length } = extract(feed);
   if (!signature) return { ok: false, reason: 'the feed is not signed (no sparkle-signatures block)' };
-  // Sparkle refuses a feed whose stated length is not the content's.
+  // STRICTER THAN SPARKLE, on purpose: the app uses the stated length only to
+  // word its error. A block whose length is wrong was not written by
+  // sign_update, and that is worth stopping a release for.
   if (length !== content.length) {
     return { ok: false, reason: `the signature says ${length} bytes were signed, the feed has ${content.length} before it` };
+  }
+  // Strict base64, as the app decodes it (no stray characters): Node's own
+  // decoder skips what it does not know and would pass a signature a Mac refuses.
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(signature) || signature.length % 4 !== 0) {
+    return { ok: false, reason: 'the signature is not an Ed25519 signature' };
   }
   const sig = Buffer.from(signature, 'base64');
   if (sig.length !== 64) return { ok: false, reason: 'the signature is not an Ed25519 signature' };
@@ -79,9 +91,17 @@ function verify(feed, publicKey) {
     good = crypto.verify(null, content, key, sig);
   } catch (e) { return { ok: false, reason: `could not verify: ${e.message}` }; }
   if (!good) return { ok: false, reason: 'the signature does not match the feed and this key (edited after signing, or signed with another key)' };
-  // A signature over something that is not a feed proves nothing useful.
-  if (!/<rss[\s>]/.test(content.toString('utf8')) || !/<enclosure\s/.test(content.toString('utf8'))) {
+  // A signature over something that is not a feed proves nothing useful, and
+  // neither does one over a feed no Mac can parse: both sign and verify.
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(content); }
+  catch (_) { return { ok: false, reason: 'what was signed is not UTF-8' }; }
+  if (!/<rss[\s>]/.test(text) || !/<enclosure\s/.test(text) || !/<\/rss>\s*$/.test(text)) {
     return { ok: false, reason: 'what was signed is not an update feed' };
+  }
+  const bad = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/.exec(text);
+  if (bad) {
+    return { ok: false, reason: `the feed holds a character XML does not allow (U+${bad[0].charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}): no Mac could parse it` };
   }
   return { ok: true };
 }

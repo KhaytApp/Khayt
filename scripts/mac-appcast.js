@@ -51,14 +51,32 @@ function xml(s) {
  * 150,000 characters; the update window is not where that is read. */
 const NOTES_MAX = 40000;
 
-/** Markdown inside CDATA: the only sequence that could end it early is split. */
+/**
+ * Markdown inside CDATA. Two sequences are split across CDATA sections, which
+ * a parser joins back into the same text:
+ *   `]]>`  would end the section early.
+ *   `<!-- sparkle-signatures:`  is the marker of the signature block.
+ *     `sign_update` looks for the LAST one in the file before it signs
+ *     (SPUExtractAppcastContent), so notes that quote it would have the feed
+ *     cut off at that point and signed short. The cut is caught (the check
+ *     finds no enclosure) but it stops the release; splitting it means the
+ *     marker never appears in the file's bytes outside the real block.
+ */
 function cdata(s) {
-  return `<![CDATA[${String(s).replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
+  return `<![CDATA[${String(s)
+    .replace(/]]>/g, ']]]]><![CDATA[>')
+    .replace(/<!-- sparkle-signatures:/g, '<!-]]><![CDATA[- sparkle-signatures:')}]]>`;
 }
+
+/** Characters XML 1.0 does not allow anywhere, CDATA included: the C0 controls
+ * but tab, newline and return, and U+FFFE/U+FFFF. One of them (an ESC from
+ * pasted terminal colours, a form feed) in a CHANGELOG entry makes a feed
+ * that signs and verifies and that no Mac can parse. */
+const XML_ILLEGAL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
 
 /** The notes, whole or cut at a line with a pointer to the rest. */
 function fitNotes(notes, notesUrl) {
-  const text = String(notes == null ? '' : notes).replace(/\r\n?/g, '\n').replace(/\u0000/g, '').trim();
+  const text = String(notes == null ? '' : notes).replace(/\r\n?/g, '\n').replace(XML_ILLEGAL, '').trim();
   if (text.length <= NOTES_MAX) return text;
   const cut = text.slice(0, NOTES_MAX);
   const at = cut.lastIndexOf('\n');
@@ -91,7 +109,8 @@ function appcast({ version, build, archiveBytes, signature, url, minimumSystemVe
   }
   // Never `sparkle:releaseNotesLink`: see the header. The notes ride inside
   // the feed, as markdown (Sparkle shows it as plain text where it cannot
-  // render it), and the page is the "Version History" link.
+  // render it), and the page is the "Version History" link, which Sparkle
+  // offers on its "you're up to date" alert.
   const body = fitNotes(notes, notesUrl);
   const inline = body
     ? `      <description sparkle:format="markdown">${cdata(body)}</description>\n`
@@ -122,7 +141,7 @@ ${inline}${history}      <enclosure url="${xml(url)}"
 `;
 }
 
-module.exports = { appcast, xml, cdata, fitNotes, NOTES_MAX };
+module.exports = { appcast, xml, cdata, fitNotes, NOTES_MAX, XML_ILLEGAL };
 
 if (require.main === module) {
   const args = {};
