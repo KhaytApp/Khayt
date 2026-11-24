@@ -1583,7 +1583,7 @@
 "lock.floor.title" = "Aucun verrouillage nécessaire";
 "lock.floor.body" = "C’est un téléphone d’atelier : il ne garde aucune copie du livre de l’atelier, il n’y a donc rien à verrouiller. Il affiche la file et les imprimantes tant qu’il est sur le Wi-Fi de l’atelier.";
 "lock.hide_names" = "Masquer les noms des commandes sur l’écran verrouillé";
-"lock.hide_names.foot" = "Désactivé par défaut. Une fois activé, les alertes d’impression et l’Activité en direct indiquent « Une impression » au lieu du titre de la commande ou du nom de fichier de l’imprimante, afin que le nom d’un client dans un titre n’apparaisse jamais sur un téléphone verrouillé.";
+"lock.hide_names.foot" = "Désactivé par défaut. Une fois activé, les alertes d’impression et l’Activité en direct indiquent « Une impression » au lieu du titre de la commande ou du nom de fichier de l’imprimante, et le rappel d’une demande ne nomme pas le client.";
 "lock.locked" = "Verrouillé. Le livre de votre atelier est sur ce téléphone.";
 "lock.failed" = "%@ n’a pas reconnu. Réessayez ou utilisez le code de cet iPhone.";
 "lock.failed.passcode" = "Khayt n’a pas été déverrouillé. Réessayez.";
@@ -1593,3 +1593,4 @@
 "lock.use_passcode" = "Utiliser le code";
 "lock.reason" = "Déverrouillez Khayt pour voir votre atelier.";
 "alert.print.a_print" = "Une impression";
+"intake.remind.alert.hidden" = "Une demande client attend votre réponse.";

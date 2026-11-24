@@ -1583,7 +1583,7 @@
 "lock.floor.title" = "Keine Sperre nötig";
 "lock.floor.body" = "Dies ist ein Werkstatt-Telefon: Es hält keine Kopie des Shop-Buchs, also gibt es darauf nichts zu sperren. Es zeigt Warteschlange und Drucker, solange es im WLAN des Shops ist.";
 "lock.hide_names" = "Auftragsnamen auf dem Sperrbildschirm ausblenden";
-"lock.hide_names.foot" = "Standardmäßig aus. Wenn an, steht in Druckhinweisen und in der Live-Aktivität „Ein Druck“ statt des Auftragstitels oder des Dateinamens des Druckers, sodass ein Kundenname im Titel nie auf einem gesperrten Telefon erscheint.";
+"lock.hide_names.foot" = "Standardmäßig aus. Wenn an, steht in Druckhinweisen und in der Live-Aktivität „Ein Druck“ statt des Auftragstitels oder des Dateinamens des Druckers, und eine Anfrage-Erinnerung nennt den Kunden nicht.";
 "lock.locked" = "Gesperrt. Das Buch Ihres Shops ist auf diesem Telefon.";
 "lock.failed" = "%@ hat nicht gepasst. Versuchen Sie es erneut oder verwenden Sie den Code dieses iPhone.";
 "lock.failed.passcode" = "Khayt wurde nicht entsperrt. Versuchen Sie es erneut.";
@@ -1593,3 +1593,4 @@
 "lock.use_passcode" = "Code verwenden";
 "lock.reason" = "Entsperren Sie Khayt, um Ihren Shop zu sehen.";
 "alert.print.a_print" = "Ein Druck";
+"intake.remind.alert.hidden" = "Eine Kundenanfrage wartet auf Ihre Antwort.";

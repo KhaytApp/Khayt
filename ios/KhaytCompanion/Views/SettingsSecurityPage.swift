@@ -37,7 +37,8 @@ struct SettingsSecurityPage: View {
             } else {
                 VStack(spacing: 0) {
                     SettingsPieces.toggle(L10n.format("lock.toggle", biometry),
-                                          Binding(get: { enabled }, set: { lock.choice = $0 }), last: !enabled)
+                                          Binding(get: { enabled }, set: { on in if on { lock.choice = true } else { lock.turnedOffInSettings() } }),
+                                          last: !enabled)
                         .disabled(!lock.canLock)
                     if enabled {
                         SettingsPieces.row(L10n.tr("lock.after"), last: true) {

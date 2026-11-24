@@ -109,11 +109,11 @@ final class AppLockTests: XCTestCase {
         lock.start(enabled: true)
         await lock.unlock(biometricsOnly: true)
         let t = Date(timeIntervalSince1970: 1_795_000_000)
-        lock.wentAway(now: t)
-        lock.wentAway(now: t.addingTimeInterval(30))      // inactive, then background: the first one counts
+        lock.wentToBackground(now: t)
+        lock.wentToBackground(now: t.addingTimeInterval(30))  // told twice: the first one counts
         lock.cameBack(enabled: true, now: t.addingTimeInterval(45))
         XCTAssertFalse(lock.locked, "45 s away")
-        lock.wentAway(now: t.addingTimeInterval(100))
+        lock.wentToBackground(now: t.addingTimeInterval(100))
         lock.cameBack(enabled: true, now: t.addingTimeInterval(161))
         XCTAssertTrue(lock.locked, "61 s away")
     }
@@ -123,14 +123,56 @@ final class AppLockTests: XCTestCase {
         lock.start(enabled: false)
         XCTAssertFalse(lock.locked)
         let t = Date(timeIntervalSince1970: 1_795_000_000)
-        lock.wentAway(now: t)
+        lock.wentToBackground(now: t)
         lock.cameBack(enabled: false, now: t.addingTimeInterval(3600))
         XCTAssertFalse(lock.locked)
         let on = AppLock(defaults: defaults, checker: Checker())
         on.start(enabled: true)
         XCTAssertTrue(on.locked)
-        on.lockTurnedOff()
+        on.turnedOffInSettings()
         XCTAssertFalse(on.locked)
+        XCTAssertEqual(on.choice, false, "the person's own choice, kept")
+    }
+
+    /// The Face ID sheet, Control Centre and Notification Centre make the app
+    /// inactive, never background. With "Immediately" that must not lock
+    /// Khayt again the moment Face ID succeeds (review of #2691).
+    func testTheFaceIDSheetItselfNeverLocksItAgain() async {
+        let checker = Checker()
+        checker.answers = [true, true]
+        let lock = AppLock(defaults: defaults, checker: checker)
+        lock.after = .immediately
+        lock.start(enabled: true)
+        await lock.unlock(biometricsOnly: true)
+        // Back to active after the sheet: it never went to the background.
+        lock.cameBack(enabled: true)
+        XCTAssertFalse(lock.locked)
+        // A real trip to the background still locks at once.
+        let t = Date(timeIntervalSince1970: 1_795_000_000)
+        lock.wentToBackground(now: t)
+        lock.cameBack(enabled: true, now: t)
+        XCTAssertTrue(lock.locked)
+        // Unlocking forgets the trip: the return that follows does not lock again.
+        await lock.unlock(biometricsOnly: true)
+        lock.cameBack(enabled: true, now: t.addingTimeInterval(5))
+        XCTAssertFalse(lock.locked)
+    }
+
+    /// Only the switch in Settings (behind the lock) opens Khayt without a
+    /// check. The app has no other way to clear `locked`.
+    func testNothingButSettingsOrACheckOpensIt() async {
+        let checker = Checker()
+        let lock = AppLock(defaults: defaults, checker: checker)
+        lock.start(enabled: true)
+        lock.cameBack(enabled: false)            // the role dropped, or the sign-in went, while locked
+        XCTAssertTrue(lock.locked)
+        await lock.unlock(biometricsOnly: true)  // the check fails
+        XCTAssertTrue(lock.locked)
+        let source = try? String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "KhaytCompanion/Views/AppLockView.swift"), encoding: .utf8)
+        XCTAssertEqual(source?.contains("turnedOffInSettings"), false, "the gate never opens the lock by itself")
+        XCTAssertEqual(source?.contains("windowLevel = .alert + 1"), true, "the lock is a window above sheets and alerts")
+        XCTAssertEqual(source?.contains("accessibilityViewIsModal = true"), true)
     }
 
     /// An iPhone with no passcode has nothing to check with: Khayt does not
@@ -201,6 +243,11 @@ final class AppLockTests: XCTestCase {
         let views = try String(contentsOf: ios.appending(path: "KhaytWidget/PrintActivityViews.swift"), encoding: .utf8)
         XCTAssertTrue(views.contains(#""khayt.hideJobNames""#))
         XCTAssertTrue(views.contains(#"Text("A print", bundle: bundle)"#))
+        let island = try String(contentsOf: ios.appending(path: "KhaytWidget/PrintActivityWidget.swift"), encoding: .utf8)
+        XCTAssertTrue(island.contains(#"PrintActivityText.hidesJobNames() ? Text("A print")"#), "the Dynamic Island's expanded line too")
+        let intake = try String(contentsOf: ios.appending(path: "KhaytCompanion/Views/IntakeView.swift"), encoding: .utf8)
+        XCTAssertTrue(intake.contains("LockScreenPrivacy.hidesJobNames() ? L10n.tr(\"intake.remind.alert.hidden\")"),
+                      "a request reminder does not name the customer")
         XCTAssertEqual(LockScreenPrivacy.key, "khayt.hideJobNames")
         for lang in ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
             for table in ["KhaytWidget/\(lang).lproj/Localizable.strings", "KhaytAlerts/\(lang).lproj/Localizable.strings",

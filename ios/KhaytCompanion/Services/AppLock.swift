@@ -131,13 +131,19 @@ final class AppLock: ObservableObject {
         if enabled, canLock { locked = true }
     }
 
-    /// Khayt left the front (the app switcher, another app, the lock screen).
-    func wentAway(now: Date = Date()) {
+    /// Khayt went to the BACKGROUND (another app, the Home Screen, the
+    /// iPhone locked). Merely inactive does not count: the Face ID sheet
+    /// itself, Control Centre and Notification Centre make the app inactive,
+    /// and counting them re-locked Khayt the moment Face ID succeeded, in a
+    /// loop with "Immediately" (review of #2691).
+    func wentToBackground(now: Date = Date()) {
         if leftAt == nil { leftAt = now }
     }
 
     /// Khayt is in front again.
     func cameBack(enabled: Bool, now: Date = Date()) {
+        // The iPhone's own check is in front: not a return from anywhere.
+        guard !checking else { return }
         defer { leftAt = nil }
         if !locked, canLock, AppLockRule.locksOnReturn(enabled: enabled, after: after, leftAt: leftAt, now: now) {
             locked = true
@@ -145,8 +151,10 @@ final class AppLock: ObservableObject {
         }
     }
 
-    /// Turning the lock off opens Khayt; the switch itself is behind the lock.
-    func lockTurnedOff() { locked = false; failed = false }
+    /// The person turned the lock off in Settings, which is itself behind the
+    /// lock. Nothing else opens Khayt without a check: a role change or a
+    /// dropped sign-in while locked leaves it locked (review of #2691).
+    func turnedOffInSettings() { choice = false; locked = false; failed = false }
 
     /// Ask the iPhone. `biometricsOnly` is the first button; the second
     /// ("Use passcode") lets the iPhone's passcode open it.
@@ -157,6 +165,7 @@ final class AppLock: ObservableObject {
         if await checker.check(reason: L10n.tr("lock.reason"), biometricsOnly: biometricsOnly) {
             locked = false
             failed = false
+            leftAt = nil
         } else {
             failed = true
         }

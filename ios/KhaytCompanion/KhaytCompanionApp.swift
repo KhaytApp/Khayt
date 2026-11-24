@@ -160,8 +160,9 @@ struct KhaytCompanionApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                // Over everything, sheets included: locked, or on its way to
-                // the app switcher with the lock on.
+                // The lock: its own window above sheets and alerts
+                // (`AppLockCurtain`), locked or on its way to the app
+                // switcher with the lock on.
                 .modifier(AppLockGate(
                     enabled: AppLockRule.enabled(
                         choice: lock.choice,

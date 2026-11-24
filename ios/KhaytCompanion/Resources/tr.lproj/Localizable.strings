@@ -1583,7 +1583,7 @@
 "lock.floor.title" = "Kilide gerek yok";
 "lock.floor.body" = "Bu bir atölye telefonu: atölye defterinin kopyasını tutmaz, bu yüzden kilitlenecek bir şey yoktur. Atölyenin Wi-Fi’ındayken kuyruğu ve yazıcıları gösterir.";
 "lock.hide_names" = "Kilit ekranında iş adlarını gizle";
-"lock.hide_names.foot" = "Varsayılan olarak kapalıdır. Açıkken baskı uyarıları ve Canlı Etkinlik, işin başlığı veya yazıcının dosya adı yerine “Bir baskı” der; böylece başlıktaki müşteri adı kilitli telefonda hiç görünmez.";
+"lock.hide_names.foot" = "Varsayılan olarak kapalıdır. Açıkken baskı uyarıları ve Canlı Etkinlik, işin başlığı veya yazıcının dosya adı yerine “Bir baskı” der ve talep hatırlatıcısı müşterinin adını vermez.";
 "lock.locked" = "Kilitli. Atölyenizin defteri bu telefonda.";
 "lock.failed" = "%@ eşleşmedi. Yeniden deneyin veya bu iPhone’un parolasını kullanın.";
 "lock.failed.passcode" = "Khayt’ın kilidi açılmadı. Yeniden deneyin.";
@@ -1593,3 +1593,4 @@
 "lock.use_passcode" = "Parolayı kullan";
 "lock.reason" = "Atölyenizi görmek için Khayt’ın kilidini açın.";
 "alert.print.a_print" = "Bir baskı";
+"intake.remind.alert.hidden" = "Bir müşteri talebi yanıtınızı bekliyor.";

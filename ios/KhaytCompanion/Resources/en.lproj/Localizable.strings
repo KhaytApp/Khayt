@@ -1583,7 +1583,7 @@
 "lock.floor.title" = "No lock needed";
 "lock.floor.body" = "This is a floor phone: it keeps no copy of the shop's book, so there is nothing on it to lock. It shows the queue and printers while it is on the shop's Wi-Fi.";
 "lock.hide_names" = "Hide job names on the lock screen";
-"lock.hide_names.foot" = "Off by default. When on, print alerts and the Live Activity say \"A print\" instead of the job's title or the printer's file name, so a customer's name in a title never shows on a locked phone.";
+"lock.hide_names.foot" = "Off by default. When on, print alerts and the Live Activity say \"A print\" instead of the job's title or the printer's file name, and a request reminder does not name the customer.";
 "lock.locked" = "Locked. Your shop's book is on this phone.";
 "lock.failed" = "%@ did not match. Try again, or use this iPhone's passcode.";
 "lock.failed.passcode" = "That did not unlock Khayt. Try again.";
@@ -1593,3 +1593,4 @@
 "lock.use_passcode" = "Use passcode";
 "lock.reason" = "Unlock Khayt to see your shop.";
 "alert.print.a_print" = "A print";
+"intake.remind.alert.hidden" = "A customer request is waiting for your answer.";

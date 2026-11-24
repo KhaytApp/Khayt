@@ -1583,7 +1583,7 @@
 "lock.floor.title" = "无需锁定";
 "lock.floor.body" = "这是一部车间手机：它不保存店铺账本的副本，因此没有需要锁定的内容。连接店铺 Wi-Fi 时，它显示队列和打印机。";
 "lock.hide_names" = "在锁定屏幕上隐藏订单名称";
-"lock.hide_names.foot" = "默认关闭。开启后，打印提醒和实时活动会显示“一次打印”，而不是订单标题或打印机的文件名，这样标题中的客户姓名就不会出现在锁定的手机上。";
+"lock.hide_names.foot" = "默认关闭。开启后，打印提醒和实时活动会显示“一次打印”，而不是订单标题或打印机的文件名，请求提醒也不会显示客户姓名。";
 "lock.locked" = "已锁定。你店铺的账本在这部手机上。";
 "lock.failed" = "%@ 不匹配。请重试，或使用这部 iPhone 的密码。";
 "lock.failed.passcode" = "未能解锁 Khayt。请重试。";
@@ -1593,3 +1593,4 @@
 "lock.use_passcode" = "使用密码";
 "lock.reason" = "解锁 Khayt 以查看你的店铺。";
 "alert.print.a_print" = "一次打印";
+"intake.remind.alert.hidden" = "有一个客户请求在等待你的答复。";

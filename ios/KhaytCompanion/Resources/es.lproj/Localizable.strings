@@ -1583,7 +1583,7 @@
 "lock.floor.title" = "No hace falta bloqueo";
 "lock.floor.body" = "Este es un teléfono de taller: no guarda copia del libro de la tienda, así que no hay nada que bloquear. Muestra la cola y las impresoras mientras está en la Wi-Fi de la tienda.";
 "lock.hide_names" = "Ocultar los nombres de los trabajos en la pantalla de bloqueo";
-"lock.hide_names.foot" = "Desactivado por defecto. Cuando está activado, los avisos de impresión y la Actividad en directo dicen «Una impresión» en lugar del título del trabajo o del nombre de archivo de la impresora, para que el nombre de un cliente en un título nunca se vea en un teléfono bloqueado.";
+"lock.hide_names.foot" = "Desactivado por defecto. Cuando está activado, los avisos de impresión y la Actividad en directo dicen «Una impresión» en lugar del título del trabajo o del nombre de archivo de la impresora, y el recordatorio de una solicitud no nombra al cliente.";
 "lock.locked" = "Bloqueado. El libro de tu tienda está en este teléfono.";
 "lock.failed" = "%@ no coincidió. Inténtalo de nuevo o usa el código de este iPhone.";
 "lock.failed.passcode" = "Eso no desbloqueó Khayt. Inténtalo de nuevo.";
@@ -1593,3 +1593,4 @@
 "lock.use_passcode" = "Usar el código";
 "lock.reason" = "Desbloquea Khayt para ver tu tienda.";
 "alert.print.a_print" = "Una impresión";
+"intake.remind.alert.hidden" = "Una solicitud de cliente espera tu respuesta.";
