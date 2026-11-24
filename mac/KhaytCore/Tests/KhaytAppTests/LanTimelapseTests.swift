@@ -369,7 +369,8 @@ struct LanTimelapseTests {
 
         let (shop, wrote, dir) = Self.shop([Self.job()])
         defer { try? FileManager.default.removeItem(at: dir) }
-        #expect(await shop.phoneTimelapse("nobody").0 == 404 && await shop.phoneKeepTimelapse("nobody").0 == 404)
+        #expect(await shop.phoneTimelapse("nobody").0 == 404)
+        #expect(await shop.phoneKeepTimelapse("nobody").0 == 404)
         StubPrinter.set(.init(chunks: [Data(repeating: 5, count: 2048)]))
         let (status, body) = await shop.phoneKeepTimelapse("J 1/x")
         let said = Self.json(body)
