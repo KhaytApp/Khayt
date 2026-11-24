@@ -2619,6 +2619,13 @@ final class Shop {
     /// whether this Mac has a book (a test must not depend on the machine
     /// it runs on having one).
     var launchGateFileForTests: String?
+    /// An update Khayt found that has unread "Before you update" items: the
+    /// sheet in front of it (`UpdateGate.swift`). Nil when none is held.
+    var updateOffer: UpdateOffer?
+    /// TESTS ONLY: a release's gate file, instead of asking GitHub for it.
+    var updateGateFetchForTests: (@Sendable (String) async -> String?)?
+    /// TESTS ONLY: the version this Mac runs (a test build has none).
+    var updateGateRunningForTests: String?
     var launchGateHasBookForTests: Bool?
 
     /// What is low and has not already been ordered.
