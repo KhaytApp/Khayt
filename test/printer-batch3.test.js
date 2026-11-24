@@ -28,7 +28,36 @@ for (const c of vec('run-result').cases) test('P4 ' + c.why, () => {
   }
   assert.deepEqual(o.printRuns, c.want);
 });
-for (const c of vec('printer-success').cases) test('P6 ' + c.why, () => assert.deepEqual(PS.successRates(c.input), c.want));
+/** A vector's `calendar`: the day of `at` on a fixed-offset clock (what the Mac's book calendar does with a TimeZone). */
+const fixedOffsetDayOf = (minutes) => (at) => {
+  const s = String(at == null ? '' : at);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? new Date(t + minutes * 60000).toISOString().slice(0, 10) : '';
+};
+for (const c of vec('printer-success').cases) test('P6 ' + c.why, () => {
+  const input = c.calendar ? Object.assign({}, c.input, { dayOf: fixedOffsetDayOf(c.calendar.utcOffsetMinutes) }) : c.input;
+  assert.deepEqual(PS.successRates(input), c.want);
+});
+
+test('P6: localDayOf reads a UTC stamp on this computer\'s calendar, and leaves a bare day as written', () => {
+  const was = process.env.TZ;
+  try {
+    process.env.TZ = 'America/New_York';
+    assert.equal(PS.localDayOf('2026-12-01T01:00:00.000Z'), '2026-11-30', 'an evening print west of UTC');
+    assert.equal(PS.localDayOf('2026-11-01'), '2026-11-01', 'a bare day is not read as UTC midnight');
+    process.env.TZ = 'Asia/Riyadh';
+    assert.equal(PS.localDayOf('2026-10-31T21:30:00.000Z'), '2026-11-01', 'an early-morning print east of UTC');
+    assert.equal(PS.localDayOf('2026-11-30T21:00:00.000Z'), '2026-12-01', 'local midnight is the next day');
+    for (const junk of [null, undefined, '', 'yesterday', '2026', '2026-13-45T00:00:00Z', 1764000000000]) assert.equal(PS.localDayOf(junk), '', String(junk));
+    // The desktop's call, end to end: the west-of-UTC vector, on this computer's own calendar.
+    const ny = vec('printer-success').cases.find((c) => c.calendar && c.calendar.utcOffsetMinutes === -300 && c.input.orders && c.input.orders[0].printRuns && c.input.orders[0].printRuns.length);
+    process.env.TZ = 'America/New_York';
+    assert.deepEqual(PS.successRates(Object.assign({}, ny.input, { dayOf: PS.localDayOf })), ny.want);
+  } finally {
+    if (was === undefined) delete process.env.TZ; else process.env.TZ = was;
+  }
+});
 for (const c of vec('waiting-at-machine').cases) test('C4 ' + c.why, () => assert.deepEqual(W.waiting(c.machine, c.opts), c.want));
 
 test('P4: the poll cache keeps how a job ended, from the word it ended on', () => {

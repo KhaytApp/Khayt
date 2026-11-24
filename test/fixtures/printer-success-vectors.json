@@ -1,5 +1,5 @@
 {
- "about": "lib/printer-success.js successRates(input): per printer, finished / (finished + failed) from run results (P6). Synthetic book.",
+ "about": "lib/printer-success.js successRates(input): per printer, finished / (finished + failed) from run results (P6). Synthetic book. A case with `calendar: { utcOffsetMinutes }` passes `dayOf` = that fixed-offset calendar's day of the run's `at` (a full UTC stamp shifted by the offset; a bare YYYY-MM-DD returned as written). Without it, the lib's own fallback: the first ten characters.",
  "cases": [
   {
    "why": "worst first; cancelled and unknown counted but not in the rate; too few decided runs is not \"enough\"; a deleted job is left out",
@@ -256,6 +256,1454 @@
      "enough": false
     }
    ]
+  },
+  {
+   "why": "west of UTC (UTC-5): an evening print on the last day is in, a late print the evening before the first day is out, local midnight is the edge",
+   "calendar": {
+    "utcOffsetMinutes": -300
+   },
+   "input": {
+    "machines": [
+     {
+      "id": "A"
+     }
+    ],
+    "orders": [
+     {
+      "id": "1",
+      "printRuns": [
+       {
+        "machineId": "A",
+        "at": "2026-12-01T01:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T03:30:00.000Z",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T05:30:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-12-01T05:00:00.000Z",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-15",
+        "result": "finished",
+        "resultSource": "printer"
+       }
+      ]
+     }
+    ],
+    "from": "2026-11-01",
+    "to": "2026-11-30"
+   },
+   "want": [
+    {
+     "machineId": "A",
+     "finished": 3,
+     "failed": 0,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": 1,
+     "enough": false
+    }
+   ]
+  },
+  {
+   "why": "the same runs with no dayOf: the old first-ten-characters day, unchanged for a caller that passes none",
+   "input": {
+    "machines": [
+     {
+      "id": "A"
+     }
+    ],
+    "orders": [
+     {
+      "id": "1",
+      "printRuns": [
+       {
+        "machineId": "A",
+        "at": "2026-12-01T01:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T03:30:00.000Z",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T05:30:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-12-01T05:00:00.000Z",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-15",
+        "result": "finished",
+        "resultSource": "printer"
+       }
+      ]
+     }
+    ],
+    "from": "2026-11-01",
+    "to": "2026-11-30"
+   },
+   "want": [
+    {
+     "machineId": "A",
+     "finished": 2,
+     "failed": 1,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": 0.667,
+     "enough": false
+    }
+   ]
+  },
+  {
+   "why": "east of UTC (UTC+3): an early-morning print on the first day is in, one at local midnight after the last day is out",
+   "calendar": {
+    "utcOffsetMinutes": 180
+   },
+   "input": {
+    "machines": [
+     {
+      "id": "A"
+     }
+    ],
+    "orders": [
+     {
+      "id": "1",
+      "printRuns": [
+       {
+        "machineId": "A",
+        "at": "2026-10-31T21:30:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-30T20:59:59.000Z",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-30T21:00:00.000Z",
+        "result": "failed",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-10-31T20:59:59.000Z",
+        "result": "failed",
+        "resultSource": "printer"
+       }
+      ]
+     }
+    ],
+    "from": "2026-11-01",
+    "to": "2026-11-30"
+   },
+   "want": [
+    {
+     "machineId": "A",
+     "finished": 1,
+     "failed": 1,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": 0.5,
+     "enough": false
+    }
+   ]
+  },
+  {
+   "why": "199 of 200 is 0.995, not 1: the lib never rounds a failure away (a page showing a whole percent must not round it up to 100%)",
+   "input": {
+    "machines": [
+     {
+      "id": "A"
+     }
+    ],
+    "orders": [
+     {
+      "id": "1",
+      "printRuns": [
+       {
+        "machineId": "A",
+        "at": "2026-11-01T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-02T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-03T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-04T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-05T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-06T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-07T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-08T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-09T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-10T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-11T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-12T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-13T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-14T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-15T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-16T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-17T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-18T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-19T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-20T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-21T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-22T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-23T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-24T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-25T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-26T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-27T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-28T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-02T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-03T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-04T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-05T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-06T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-07T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-08T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-09T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-10T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-11T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-12T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-13T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-14T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-15T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-16T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-17T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-18T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-19T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-20T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-21T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-22T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-23T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-24T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-25T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-26T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-27T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-28T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-02T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-03T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-04T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-05T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-06T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-07T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-08T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-09T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-10T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-11T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-12T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-13T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-14T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-15T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-16T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-17T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-18T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-19T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-20T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-21T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-22T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-23T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-24T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-25T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-26T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-27T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-28T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-02T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-03T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-04T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-05T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-06T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-07T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-08T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-09T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-10T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-11T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-12T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-13T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-14T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-15T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-16T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-17T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-18T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-19T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-20T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-21T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-22T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-23T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-24T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-25T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-26T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-27T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-28T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-02T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-03T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-04T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-05T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-06T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-07T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-08T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-09T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-10T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-11T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-12T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-13T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-14T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-15T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-16T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-17T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-18T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-19T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-20T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-21T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-22T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-23T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-24T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-25T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-26T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-27T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-28T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-02T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-03T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-04T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-05T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-06T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-07T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-08T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-09T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-10T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-11T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-12T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-13T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-14T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-15T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-16T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-17T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-18T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-19T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-20T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-21T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-22T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-23T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-24T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-25T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-26T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-27T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-28T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-02T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-03T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-04T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-05T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-06T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-07T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-08T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-09T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-10T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-11T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-12T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-13T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-14T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-15T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-16T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-17T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-18T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-19T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-20T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-21T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-22T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-23T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-24T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-25T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-26T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-27T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-28T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-01T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-02T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-03T10:00:00.000Z",
+        "result": "finished",
+        "resultSource": "printer"
+       },
+       {
+        "machineId": "A",
+        "at": "2026-11-20T10:00:00.000Z",
+        "result": "failed",
+        "resultSource": "printer"
+       }
+      ]
+     }
+    ]
+   },
+   "want": [
+    {
+     "machineId": "A",
+     "finished": 199,
+     "failed": 1,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": 0.995,
+     "enough": true
+    }
+   ]
+  },
+  {
+   "why": "no runs: a printer with none has no rate and is not enough",
+   "calendar": {
+    "utcOffsetMinutes": -300
+   },
+   "input": {
+    "machines": [
+     {
+      "id": "A"
+     }
+    ],
+    "orders": [
+     {
+      "id": "1",
+      "printRuns": []
+     },
+     {
+      "id": "2"
+     }
+    ],
+    "from": "2026-11-01",
+    "to": "2026-11-30"
+   },
+   "want": [
+    {
+     "machineId": "A",
+     "finished": 0,
+     "failed": 0,
+     "cancelled": 0,
+     "unknown": 0,
+     "rate": null,
+     "enough": false
+    }
+   ]
+  },
+  {
+   "why": "nothing at all: no printers and no jobs is no rows",
+   "input": {},
+   "want": []
   }
  ]
 }

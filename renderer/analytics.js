@@ -2307,16 +2307,19 @@ function renderMachinePL() {
   // CAME OUT RIGHT (Figma 136:208, N2): one result per print run, in the
   // range, by lib/printer-success.js (the Mac's rule). Cancelled runs are
   // counted but left out of the rate; under five decided runs, no rate.
-  const runsInRange = printLog.filter((o) => o && !o.deleted).map((o) => ({
-    // The run's LOCAL day, as every other date in this table: `at` is UTC, so
-    // slicing it put an early-morning print in a UTC+3 shop on the day before.
-    printRuns: (Array.isArray(o.printRuns) ? o.printRuns : []).filter((r) => {
-      const d = r && new Date(r.at);
-      return !!d && Number.isFinite(d.getTime()) && inRange(localDateStr(d), analyticsRange, 'analytics');
-    }),
-  }));
+  // The run's LOCAL day, as every other date in this table: the lib reads each
+  // run's UTC `at` through localDayOf, over the range's own span
+  // (lib/date-range.js bounds, written from the same definitions as inRange).
+  const successSpan = (() => {
+    const DR = globalThis.KhaytDateRange;
+    if (!analyticsRange || analyticsRange === 'all' || !DR) return {};
+    if (analyticsRange === 'custom') return { from: customRangeFrom.analytics || '', to: customRangeTo.analytics || '' };
+    return DR.bounds(analyticsRange, { now: new Date() }) || {};
+  })();
   const success = (typeof KhaytPrinterSuccess !== 'undefined')
-    ? new Map(KhaytPrinterSuccess.successRates({ orders: runsInRange, machines }).map((x) => [x.machineId, x]))
+    ? new Map(KhaytPrinterSuccess.successRates({
+      orders: printLog, machines, from: successSpan.from, to: successSpan.to, dayOf: KhaytPrinterSuccess.localDayOf,
+    }).map((x) => [x.machineId, x]))
     : new Map();
   const printsCell = (s) => {
     if (!s) return '—';
