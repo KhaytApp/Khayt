@@ -1567,3 +1567,10 @@
 "outbound.purpose.webhooks" = "los webhooks";
 "photos.blocked.detail" = "Las fotos no se pueden ver ni añadir desde este teléfono. El propietario puede mantener Khayt Cloud en Uso de internet en el Mac.";
 "photos.blocked.nothing_sent" = "No se envió nada.";
+
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "Retirada";
+"waiting.do.bed_clear" = "La cama está libre";
+"printer.why.read_only" = "El Mac muestra la tienda de muestra, que no se puede cambiar.";
+"printer.why.not_saved" = "El Mac no pudo guardarlo ahora. Inténtalo de nuevo.";
+"printer.why.role" = "El rol de este teléfono no lo permite. Pregunta al propietario.";
