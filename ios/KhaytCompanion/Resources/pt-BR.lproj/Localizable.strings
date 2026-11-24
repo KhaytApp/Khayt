@@ -1567,3 +1567,47 @@
 "outbound.purpose.webhooks" = "os webhooks";
 "photos.blocked.detail" = "As fotos não podem ser vistas nem adicionadas neste telefone. O proprietário pode manter o Khayt Cloud em Uso da internet no Mac.";
 "photos.blocked.nothing_sent" = "Nada foi enviado.";
+
+/* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
+"internet.title" = "Uso da internet";
+"internet.switch" = "Não fazer conexões com a internet";
+"internet.state.allowed" = "Permitido";
+"internet.state.kept" = "Mantido";
+"internet.state.blocked" = "Bloqueado";
+"internet.result.failed" = "Não deu certo. Nada foi alterado.";
+"internet.switch.hint" = "O interruptor da loja. Todos os computadores e telefones o seguem.";
+"internet.foot.readonly" = "Definido no Mac pelo proprietário. As chamadas para o seu Mac no Wi-Fi da loja sempre funcionam.";
+"internet.foot.owner" = "Muda para a loja inteira: enviado assinado ao seu Mac. As chamadas para o seu Mac no Wi-Fi da loja sempre funcionam.";
+"internet.uses" = "O que este telefone usa";
+"internet.cloud.kept" = "Mantido no Mac: fotos e sincronização continuam funcionando.";
+"internet.cloud.allowed" = "Login, sincronização e fotos dos trabalhos.";
+"internet.cloud.blocked" = "Fotos e sincronização aguardam até a loja permitir chamadas à internet de novo.";
+"internet.lookups" = "Consultas";
+"internet.lookups.sub" = "Consulta do código de barras ao escanear um carretel.";
+"internet.lookups.blocked" = "As consultas de código de barras ficam desativadas enquanto o interruptor estiver ligado.";
+"internet.blocked_times" = "%1$@, a última às %2$@";
+"internet.install" = "Contagem de instalações";
+"internet.install.sub" = "Ajuste próprio deste telefone. Qualquer pessoa pode desativar; só o proprietário pode ativar.";
+"internet.state.on" = "Ativado";
+"internet.state.off" = "Desativado";
+"internet.confirm.eyebrow" = "Antes de mudar";
+"internet.confirm.off.title" = "Desligar o interruptor para a loja inteira?";
+"internet.confirm.off.body" = "Atualizações, Khayt Cloud e mensagens voltam ao normal em todos os computadores e telefones. Seu Mac assina a mudança.";
+"internet.confirm.on.title" = "Ligar o interruptor para a loja inteira?";
+"internet.confirm.on.body" = "O Khayt deixa de fazer chamadas à internet em todos os computadores e telefones, exceto o que a loja mantém. Seu Mac assina a mudança.";
+"internet.turn_off" = "Desligar";
+"internet.turn_on" = "Ligar";
+"internet.result.changed" = "Alguém mudou nesse meio-tempo, então nada foi alterado. Este é o ajuste agora.";
+"internet.result.not_saved" = "Seu Mac não conseguiu salvar agora. Nada foi alterado. Tente de novo.";
+"internet.result.read_only" = "A loja de exemplo não pode ser alterada.";
+"internet.result.busy" = "O Khayt está iniciando no seu Mac. Tente de novo em instantes.";
+"internet.result.not_owner" = "Só o telefone do proprietário pode mudar isto.";
+"internet.result.unconfirmed" = "O Khayt não conseguiu confirmar isso com o seu Mac. O interruptor acima mostra o que o seu Mac diz agora.";
+"internet.result.saved_not_read" = "Seu Mac salvou. Este telefone segue na próxima sincronização.";
+"internet.blocked_count" = "Bloqueado %d vezes";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "Retirada";
+"waiting.do.bed_clear" = "A mesa está livre";
+"printer.why.read_only" = "O Mac está mostrando a loja de exemplo, que não pode ser alterada.";
+"printer.why.not_saved" = "O Mac não conseguiu salvar agora. Tente de novo.";
+"printer.why.role" = "A função deste telefone não permite isso. Pergunte ao proprietário.";
