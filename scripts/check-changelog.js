@@ -43,22 +43,75 @@ const OVERRIDE = '[no changelog]';
 
 const CHANGELOG = 'CHANGELOG.md';
 
+/* ── FRAGMENTS: one file per pull request (changelog.d/) ─────────────────────
+ *
+ * Every PR used to add its line at the top of [Unreleased], so every merge put
+ * every other open PR in conflict on the same spot. With main strict and CI
+ * at 8–12 minutes, one busy day cost each PR a refresh and a full CI cycle per
+ * merge ahead of it (Nov 24). A PR now writes `changelog.d/<branch>.md`, a
+ * file nobody else touches, and the cut folds them in (scripts/changelog-fold.js).
+ * ~/Khayt-proposals/changelog-fragments.md. */
+const FRAGMENT_DIR = 'changelog.d';
+const FRAGMENT_NAME = /^changelog\.d\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.md$/;
+const isFragmentPath = (file) => {
+  const f = String(file || '').trim();
+  return f.startsWith(FRAGMENT_DIR + '/') && f !== FRAGMENT_DIR + '/README.md';
+};
+
+/**
+ * What a fragment may hold: exactly what would have gone under [Unreleased].
+ * Bullets (`- `), continuation lines indented two spaces, blank lines. No
+ * heading of any level: [Unreleased] has none, check-release-claims.js
+ * refuses a repeated `###` there, and "### Before you update" is parsed by the
+ * updater's gate, so it is written in CHANGELOG.md itself.
+ *
+ * @returns {{ok: boolean, problems: string[]}}
+ */
+function checkFragment(file, text) {
+  const problems = [];
+  const f = String(file || '').trim();
+  if (!FRAGMENT_NAME.test(f)) {
+    problems.push(`${f}: a fragment is changelog.d/<name>.md — letters, digits, ".", "_", "-", starting with a letter or digit (a branch's "/" becomes "-")`);
+  }
+  const lines = String(text == null ? '' : text).replace(/\r\n/g, '\n').split('\n');
+  if (!lines.some((l) => l.startsWith('- ') && l.trim().length > 2)) {
+    problems.push(`${f}: no entry — write at least one line starting "- "`);
+  }
+  let seenBullet = false;
+  lines.forEach((l, i) => {
+    const at = `${f}:${i + 1}`;
+    if (!l.trim()) return;
+    if (/^\s*#/.test(l)) { problems.push(`${at}: no headings in a fragment ("${l.slice(0, 40)}") — a "Before you update" item goes in ${CHANGELOG} itself`); return; }
+    if (l.startsWith('- ')) { seenBullet = true; return; }
+    if (/^ {2,}\S/.test(l) && seenBullet) return;
+    problems.push(`${at}: not an entry line ("${l.slice(0, 40)}") — start with "- ", or indent a continuation by two spaces`);
+  });
+  return { ok: problems.length === 0, problems };
+}
+
 const isWatched = (file) => WATCHED.some((m) => m(String(file || '').trim()));
 
 /**
- * @param {string[]} files     paths changed, relative to the repo root
- * @param {string}   messages  the PR's commit messages, joined
+ * @param {string[]} files      paths changed, relative to the repo root
+ * @param {string}   messages   the PR's commit messages, joined
+ * @param {string[]} [fragments] fragments the PR ADDED or CHANGED (a deleted
+ *                              one is the cut folding it, not an entry).
+ *                              Defaults to the fragment paths in `files`.
  * @returns {{ok: boolean, reason: string, watched: string[]}}
  */
-function verdict(files, messages = '') {
+function verdict(files, messages = '', fragments) {
   const list = (Array.isArray(files) ? files : []).map((f) => String(f || '').trim()).filter(Boolean);
   const watched = list.filter(isWatched);
+  const frags = (Array.isArray(fragments) ? fragments : list).map((f) => String(f || '').trim()).filter(isFragmentPath);
 
   if (!watched.length) {
     return { ok: true, reason: 'no shipped code changed', watched };
   }
   if (list.includes(CHANGELOG)) {
     return { ok: true, reason: `${CHANGELOG} was updated`, watched };
+  }
+  if (frags.length) {
+    return { ok: true, reason: `a changelog fragment was written (${frags.join(', ')})`, watched };
   }
   // Case-insensitive: the marker is for humans, and "[No Changelog]" is the
   // same intent typed differently.
@@ -149,7 +202,7 @@ function placement(diff, after) {
   return { ok: misplaced.length === 0, misplaced };
 }
 
-module.exports = { verdict, isWatched, WATCHED, OVERRIDE, CHANGELOG, placement };
+module.exports = { verdict, isWatched, WATCHED, OVERRIDE, CHANGELOG, placement, checkFragment, isFragmentPath, FRAGMENT_DIR };
 
 if (require.main === module) {
   const { execFileSync } = require('child_process');
@@ -158,9 +211,11 @@ if (require.main === module) {
 
   let files = [];
   let messages = '';
+  let fragments = [];
   try {
     files = sh(['diff', '--name-only', `${base}...HEAD`]).split('\n');
     messages = sh(['log', '--format=%B', `${base}..HEAD`]);
+    fragments = sh(['diff', '--name-only', '--diff-filter=AMR', `${base}...HEAD`, '--', FRAGMENT_DIR]).split('\n').filter(isFragmentPath);
   } catch (e) {
     // A missing base ref is a CI wiring fault, not a contributor's fault —
     // failing the PR for it would teach people to ignore this check.
@@ -168,7 +223,25 @@ if (require.main === module) {
     process.exit(0);
   }
 
-  const r = verdict(files, messages);
+  // Every fragment the PR wrote must be one the fold can take as it stands.
+  const bad = [];
+  for (const f of fragments) {
+    let text = '';
+    try { text = require('fs').readFileSync(f, 'utf8'); } catch (e) { bad.push(`${f}: unreadable — ${(e && e.message) || e}`); continue; }
+    bad.push(...checkFragment(f, text).problems);
+  }
+  if (bad.length) {
+    process.stderr.write(
+      `\nchangelog check failed — a fragment the release cut could not fold as written:\n\n` +
+      bad.map((p) => `  ${p}\n`).join('') +
+      `\nA fragment holds what you would have added under "## [Unreleased]": lines\n` +
+      `starting "- ", continuation lines indented two spaces, blank lines. See\n` +
+      `${FRAGMENT_DIR}/README.md.\n`
+    );
+    process.exit(1);
+  }
+
+  const r = verdict(files, messages, fragments);
 
   // WHERE it landed, whenever the file was touched at all — including by a PR
   // that changed no shipped code, since a misplaced entry is misplaced either
@@ -206,8 +279,10 @@ if (require.main === module) {
     `These shipped files changed:\n` +
     r.watched.slice(0, 20).map((f) => `  ${f}\n`).join('') +
     (r.watched.length > 20 ? `  …and ${r.watched.length - 20} more\n` : '') +
-    `\nAdd a line under "## [Unreleased]" in ${CHANGELOG} saying what a shop would\n` +
-    `notice. If a shop would notice nothing, put ${OVERRIDE} in the commit message.\n`
+    `\nWrite what a shop would notice in ${FRAGMENT_DIR}/<your-branch>.md, one line\n` +
+    `starting "- " (see ${FRAGMENT_DIR}/README.md). It is folded into ${CHANGELOG}\n` +
+    `at the release cut, and unlike a line in ${CHANGELOG} it never conflicts.\n` +
+    `If a shop would notice nothing, put ${OVERRIDE} in the commit message.\n`
   );
   process.exit(1);
 }
