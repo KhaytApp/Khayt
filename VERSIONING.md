@@ -91,7 +91,7 @@ the counter (`3.6.0-beta.11` → `3.6.0-beta.12`). See `scripts/bump-version.js`
 This is why a beta never sits on the *current* stable line: a `3.5.4-beta.1`
 would sort BELOW the shipped `v3.5.3` and would never be offered as an update.
 
-Each command updates `package.json` and `package-lock.json`. Edit `CHANGELOG.md` under `[Unreleased]` before tagging.
+Each command updates `package.json` and `package-lock.json`. Before tagging, fold the `changelog.d/` fragments (`npm run changelog:fold`) and write the version's section in `CHANGELOG.md` from `[Unreleased]`.
 
 ## Release checklist
 
@@ -114,6 +114,10 @@ Each command updates `package.json` and `package-lock.json`. Edit `CHANGELOG.md`
 > expect to redo step 1 against what `main` has become, and re-date the section
 > to the day it actually ships.
 
+0. Fold the pull requests' entries in: `npm run changelog:fold`. It moves every
+   `changelog.d/*.md` fragment to the top of `[Unreleased]`, newest first, and
+   deletes the files. `cut-release.yml` and `mac/release-local.sh` refuse to
+   tag or release while a fragment is still waiting.
 1. Move notes from `CHANGELOG.md` `[Unreleased]` into `## [X.Y.Z]`.
 2. Run the appropriate `npm run version:*` command.
 3. Commit: `chore: release vX.Y.Z`

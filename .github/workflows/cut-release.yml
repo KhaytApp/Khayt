@@ -208,6 +208,24 @@ jobs:
           fi
           echo "CHANGELOG.md has a section for $VERSION."
 
+      # A PR's entry waits in changelog.d/ until the cut folds it into
+      # CHANGELOG.md (scripts/changelog-fold.js). A tag over an unfolded
+      # fragment ships without that entry in its notes, and nothing else
+      # would say so.
+      - name: No changelog fragment left unfolded
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+          LEFT="$(git ls-tree --name-only "$SHA" changelog.d/ | grep -v '^changelog.d/README.md$' || true)"
+          if [ -n "$LEFT" ]; then
+            echo "::error::changelog.d/ at $SHA still holds fragments that are not in CHANGELOG.md:"
+            echo "$LEFT"
+            echo "Run 'npm run changelog:fold', move [Unreleased] into the version's section, and tag that commit."
+            exit 1
+          fi
+          echo "No changelog fragments waiting."
+
       # release.yml refuses to re-run against a PUBLISHED release, and is right
       # to. Catching it here turns that late, cryptic failure into an early one
       # that says which tag and why.
