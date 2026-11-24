@@ -101,11 +101,20 @@ extension Shop {
         // And a gate file that cannot be read is NOT "nothing to read": the
         // record stays where it is, so a later build with a good file still
         // shows what this one could not.
-        guard let pending = try? await engine.launchGatePending(current: current, lastRun: last, acceptedFor: accepted,
+        guard let everything = try? await engine.launchGatePending(current: current, lastRun: last, acceptedFor: accepted,
                                                                 hasBook: launchGateHasBookForTests ?? (aRealBookExists || source.isReal),
                                                                 floor: LaunchGate.floor,
                                                                 gates: launchGateFileForTests,
                                                                 language: words.language) else { return }
+        // An older build over a newer one: what was ticked before the
+        // download is forgotten too, so the next upgrade asks again on
+        // either sheet, as it does here.
+        if let last, (try? await engine.compareVersions(current, last)) ?? 0 < 0 {
+            launchGateDefaults.removeObject(forKey: UpdateGate.readItemsKey)
+        }
+        // Not the items already ticked on this Mac before the download
+        // ("An update is ready", `UpdateGate.swift`): they were read there.
+        let pending = UpdateGate.unread(everything, read: readGateItems)
         launchGateFrom = last
         launchGateCurrent = current
         launchGatePending = pending
@@ -154,27 +163,7 @@ struct LaunchGateSheet: View {
             Text(Self.summary(current: current, from: from, count: count, words: words))
                 .font(.system(size: 12)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(words.callIt("mac.gate_head")).font(.system(size: 12, weight: .semibold))
-                    ForEach(releases) { release in
-                        ForEach(Array(release.items.enumerated()), id: \.offset) { _, item in
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                Text(LaunchGate.bullet).accessibilityHidden(true)
-                                // Which release said it, when more than one did.
-                                Text(releases.count > 1 ? LaunchGate.short(release.version) + ": " + item : item)
-                                    .textSelection(.enabled)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .font(.system(size: 12))
-                        }
-                    }
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(maxHeight: 280)
-            .background(Khayt.attention.opacity(0.13), in: RoundedRectangle(cornerRadius: 8))
+            GateItemsPanel(head: words.callIt("mac.gate_head"), releases: releases)
             Toggle(words.callIt("mac.gate_read"), isOn: $read)
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12, weight: .medium))
