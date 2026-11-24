@@ -9,9 +9,12 @@ import Testing
 struct SuccessRatesTests {
 
     struct Case: Decodable {
-        struct Input: Decodable { let machines: [JSONValue]; let orders: [JSONValue]; let from: String?; let to: String? }
+        struct Input: Decodable { let machines: [JSONValue]?; let orders: [JSONValue]?; let from: String?; let to: String? }
+        /// The caller's calendar, on cases that have one (the Windows/Linux app's #2702).
+        struct CalendarOf: Decodable { let utcOffsetMinutes: Int }
         let why: String
         let input: Input
+        let calendar: CalendarOf?
         let want: [KhaytEngine.SuccessRow]
     }
     struct Vectors: Decodable { let cases: [Case] }
@@ -24,7 +27,8 @@ struct SuccessRatesTests {
         #expect(cases.count >= 2, "the fixture lost its cases")
         var sawWindow = false, sawNil = false, sawNotEnough = false
         for c in cases {
-            let got = try await engine.successRates(orders: c.input.orders, machines: c.input.machines, from: c.input.from, to: c.input.to)
+            let got = try await engine.successRates(orders: c.input.orders ?? [], machines: c.input.machines ?? [], from: c.input.from, to: c.input.to,
+                                                    utcOffsetMinutes: c.calendar?.utcOffsetMinutes)
             #expect(got == c.want, Comment(rawValue: c.why))
             sawWindow = sawWindow || c.input.from != nil
             sawNil = sawNil || c.want.contains { $0.rate == nil }

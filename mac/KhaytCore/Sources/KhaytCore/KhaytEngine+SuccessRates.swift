@@ -43,11 +43,38 @@ extension KhaytEngine {
     ///
     /// - `from`, `to`: `YYYY-MM-DD` on the day a run was sent, inclusive; nil
     ///   for no bound. A run with no date is left out of a bounded count.
+    /// - `utcOffsetMinutes`: whose day that is, as a fixed offset from UTC.
+    ///
+    /// WHOSE DAY. A real run's `at` is a full UTC timestamp, and with no
+    /// offset the rule takes its first ten characters: the UTC day, which in
+    /// Riyadh is yesterday until 03:00. Two ways to count by the shop's day:
+    ///   - pick the runs yourself by the book's calendar and pass NO dates.
+    ///     This is what the Mac's Machine profit and the phone do, and it is
+    ///     the right one for a calendar whose offset changes through the year.
+    ///   - pass `utcOffsetMinutes`, for a zone with one offset. The rule is
+    ///     then handed a `dayOf` (its own hook, from the Windows/Linux app's
+    ///     #2702); a bundled rule from before that hook ignores it and slices
+    ///     as it always did.
+    /// A bare `YYYY-MM-DD` is kept as written either way.
     public func successRates(orders: [JSONValue], machines: [JSONValue],
-                             from: String? = nil, to: String? = nil) throws -> [SuccessRow] {
-        try runtime.call2("globalThis.KhaytPrinterSuccess.successRates({ orders: ARG0, machines: ARG1, from: ARG2, to: ARG3 })",
-                          [.array(orders), .array(machines), from.map(JSONValue.string) ?? .null, to.map(JSONValue.string) ?? .null],
-                          as: [SuccessRow].self)
+                             from: String? = nil, to: String? = nil, utcOffsetMinutes: Int? = nil) throws -> [SuccessRow] {
+        try runtime.call2("""
+            (function (orders, machines, from, to, offset) {
+              var input = { orders: orders, machines: machines, from: from, to: to };
+              if (typeof offset === 'number' && isFinite(offset)) {
+                input.dayOf = function (at) {
+                  var s = at == null ? '' : String(at);
+                  if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) return s;
+                  var ms = typeof at === 'number' ? at : Date.parse(s);
+                  if (typeof ms !== 'number' || !isFinite(ms)) return '';
+                  return new Date(ms + offset * 60000).toISOString().slice(0, 10);
+                };
+              }
+              return globalThis.KhaytPrinterSuccess.successRates(input);
+            })(ARG0, ARG1, ARG2, ARG3, ARG4)
+            """, [.array(orders), .array(machines), from.map(JSONValue.string) ?? .null, to.map(JSONValue.string) ?? .null,
+                  utcOffsetMinutes.map { .number(Double($0)) } ?? .null],
+            as: [SuccessRow].self)
     }
 
     /// How many decided runs a printer needs before its rate is shown
