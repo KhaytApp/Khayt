@@ -98,6 +98,23 @@ struct LanTraysTests {
         #expect(bench.trayCalls.calls == before)
     }
 
+    @Test("both answers are signed for the phone that asked, and the PIN-only refusal is not")
+    func signed() async throws {
+        let bench = try await PhoneRolesTests.bench()
+        defer { bench.stop() }
+        let phone = try PhoneRolesTests.codePaired(bench.devices, role: "operator", name: "Op")
+        for (method, path, body) in [("GET", "/api/printer/M1/trays", Data()), ("POST", "/api/printer/M1/trays/2/spool", Self.link)] {
+            let headers = phone.headers(method, path, body: body)
+            let reply = try await bench.send(method, path, body: body.isEmpty ? nil : body, headers: headers, timeout: 30)
+            #expect(reply.status == 200, Comment(rawValue: path))
+            let mac = try #require(reply.headers["x-khayt-reply-mac"], Comment(rawValue: path))
+            #expect(mac == LanServer.replyMac(key: phone.key, nonce: headers["x-khayt-nonce"] ?? "", status: reply.status, body: reply.body),
+                    Comment(rawValue: path))
+        }
+        let pin = try await bench.get("/api/printer/M1/trays", headers: ["x-khayt-pin": LanDeviceKeysTests.pin])
+        #expect(pin.status == 403 && pin.headers["x-khayt-reply-mac"] == nil)
+    }
+
     @Test("the rule names the scopes, in the bundled copy the server asks; the wrong direction is the owner's")
     func rule() async throws {
         func ask(_ role: String, _ method: String, _ path: String) async throws -> (Bool, String?) {
