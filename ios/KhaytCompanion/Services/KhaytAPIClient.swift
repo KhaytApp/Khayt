@@ -26,6 +26,10 @@ final class KhaytAPIClient: ObservableObject {
     /// phone with nothing to send and a phone that cannot send are different
     /// things, but neither has anything waiting.
     @Published private(set) var pendingCount = 0
+    /// The phone writes the paired Mac serves for THIS phone beyond its role's
+    /// scopes (`can` on `/api/devices/self`): today `network-switch`. Empty
+    /// until the Mac says so, signed; never kept between launches.
+    @Published private(set) var macCan: Set<String> = []
 
     /// What this phone holds of the order history, when it holds only part.
     @Published private(set) var historyWindow: HeldWindow?
@@ -2833,6 +2837,17 @@ extension KhaytAPIClient {
     /// the Mac did not answer 200 (not enrolled, unreachable), `.some(nil)` for
     /// an answer with no role. A role that is not text reads as "viewer".
     private func deviceSelf(_ credential: DeviceKey.Credential) async -> String?? {
+        guard let answer = await deviceSelfAnswer(credential) else { return nil }
+        switch answer["role"] {
+        case .string(let r)?: return .some(r)
+        case nil, .null?: return .some(nil)
+        default: return .some("viewer")
+        }
+    }
+
+    /// The whole signed `/api/devices/self` answer, or nil when the Mac did
+    /// not answer 200 with a reply MAC that verifies.
+    private func deviceSelfAnswer(_ credential: DeviceKey.Credential) async -> [String: JSONValue]? {
         // The role is believed only when the Mac signed this very answer
         // (`x-khayt-reply-mac` over this request's nonce): a forged "owner"
         // from something else on the Wi-Fi would otherwise make this phone
@@ -2845,11 +2860,47 @@ extension KhaytAPIClient {
               DeviceKey.replyVerifies(credential, nonce: nonce, status: 200, body: data,
                                       header: http.value(forHTTPHeaderField: "x-khayt-reply-mac")),
               case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: data) else { return nil }
-        switch o["role"] {
-        case .string(let r)?: return .some(r)
-        case nil, .null?: return .some(nil)
-        default: return .some("viewer")
+        return o
+    }
+
+    // MARK: - The shop's "Make no internet calls", from the owner's phone (1B)
+
+    /// Ask the Mac what else it serves for this phone (`can`, signed). No
+    /// device key, no answer or an unsigned one: nothing, so the page stays
+    /// read-only. Asked when Settings › Internet use opens.
+    func refreshMacCan() async {
+        guard !settings.isSampleShop, let device = usableDevice,
+              let answer = await deviceSelfAnswer(device) else { macCan = []; return }
+        macCan = PhoneNetworkSwitch.can(.object(answer))
+    }
+
+    /// Flip the shop's switch through the Mac. Signed by this phone's key;
+    /// the answer is believed only with the Mac's reply MAC over this nonce.
+    /// On done the Mac's settings are read again, so the gate follows at once.
+    func setShopOffline(_ offline: Bool, showing: PhoneNetworkSwitch.Showing) async -> PhoneNetworkSwitch.Outcome {
+        guard !settings.isSampleShop else { return .readOnly }
+        guard let device = usableDevice, let url = try? makeURL(path: PhoneNetworkSwitch.path) else { return .unsupported }
+        let nonce = MacIdentity.nonce()
+        let body = PhoneNetworkSwitch.body(offline: offline, showing: showing)
+        var outcome = PhoneNetworkSwitch.Outcome.failed
+        if let (data, response) = try? await send(url, method: "POST", body: body, auth: .device(device), nonce: nonce),
+           let http = response as? HTTPURLResponse {
+            let verified = DeviceKey.replyVerifies(device, nonce: nonce, status: http.statusCode, body: data,
+                                                   header: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+            outcome = PhoneNetworkSwitch.outcome(status: http.statusCode, body: data, verified: verified)
         }
+        switch outcome {
+        case .unsupported, .notOwner:
+            await refreshMacCan()
+        case .readOnly, .busy:
+            break
+        default:
+            // Done, changed, not saved, and also no answer or an unsigned
+            // one: the Mac may have made the change even when the phone
+            // never heard so, so its settings are read again every time.
+            if let book { await refreshMacSettings(into: book) }
+        }
+        return outcome
     }
 
     /// Keep the screens in step with the role the Mac holds (a role change on

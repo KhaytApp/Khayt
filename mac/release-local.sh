@@ -98,6 +98,8 @@ DRAFT="$(gh release view "$TAG" -R KhaytApp/khayt-mac --json isDraft --jq .isDra
 [ "$DRAFT" = "false" ] && fail "$TAG is already published — cut the next version before releasing"
 node scripts/changelog-section.js "$V" >/dev/null 2>&1 \
   || fail "CHANGELOG.md has no section for $V — the release would ship without notes"
+node scripts/changelog-fold.js --check >/dev/null 2>&1 \
+  || fail "changelog.d/ still holds fragments — run npm run changelog:fold and land it, or those entries miss these notes"
 
 echo "  notary profile, version: ok"
 

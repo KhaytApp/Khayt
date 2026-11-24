@@ -1568,6 +1568,43 @@
 "photos.blocked.detail" = "لا يمكن عرض الصور أو إضافتها من هذا الهاتف. يمكن للمالك إبقاء سحابة خيط في «استخدام الإنترنت» على الماك.";
 "photos.blocked.nothing_sent" = "لم يُرسَل شيء.";
 
+/* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
+"internet.title" = "استخدام الإنترنت";
+"internet.switch" = "عدم الاتصال بالإنترنت";
+"internet.state.allowed" = "مسموح";
+"internet.state.kept" = "مُبقى";
+"internet.state.blocked" = "محظور";
+"internet.result.failed" = "لم يتم ذلك. لم يتغيّر شيء.";
+"internet.switch.hint" = "مفتاح المتجر. يتبعه كل حاسوب وكل هاتف.";
+"internet.foot.readonly" = "يضبطه المالك على الماك. الاتصال بالماك عبر واي فاي المتجر يعمل دائمًا.";
+"internet.foot.owner" = "يغيّره للمتجر كله: يُرسل إلى الماك موقّعًا. الاتصال بالماك عبر واي فاي المتجر يعمل دائمًا.";
+"internet.uses" = "ما يستخدمه هذا الهاتف";
+"internet.cloud.kept" = "مُبقى على الماك: الصور والمزامنة تستمر في العمل.";
+"internet.cloud.allowed" = "تسجيل الدخول والمزامنة وصور الطلبات.";
+"internet.cloud.blocked" = "الصور والمزامنة تنتظر حتى يسمح المتجر باتصالات الإنترنت مجددًا.";
+"internet.lookups" = "عمليات البحث";
+"internet.lookups.sub" = "البحث عن الباركود عند مسح بكرة.";
+"internet.lookups.blocked" = "البحث عن الباركود متوقف ما دام المفتاح مفعّلًا.";
+"internet.blocked_times" = "%1$@، آخرها الساعة %2$@";
+"internet.install" = "عدّ التثبيت";
+"internet.install.sub" = "إعداد خاص بهذا الهاتف. يمكن لأي شخص إيقافه، والمالك وحده يستطيع تشغيله.";
+"internet.state.on" = "مفعّل";
+"internet.state.off" = "متوقف";
+"internet.confirm.eyebrow" = "قبل أن يتغيّر";
+"internet.confirm.off.title" = "إيقاف المفتاح للمتجر كله؟";
+"internet.confirm.off.body" = "تعود التحديثات وسحابة خيط والرسائل إلى وضعها المعتاد على كل حاسوب وهاتف. يوقّع الماك هذا التغيير.";
+"internet.confirm.on.title" = "تشغيل المفتاح للمتجر كله؟";
+"internet.confirm.on.body" = "يتوقف خيط عن اتصالات الإنترنت على كل حاسوب وهاتف، عدا ما يُبقيه المتجر. يوقّع الماك هذا التغيير.";
+"internet.turn_off" = "إيقاف";
+"internet.turn_on" = "تشغيل";
+"internet.result.changed" = "غيّره شخص آخر في الأثناء، فلم يتغيّر شيء. هذا هو الإعداد الآن.";
+"internet.result.not_saved" = "تعذّر على الماك حفظه الآن. لم يتغيّر شيء. حاول مجددًا.";
+"internet.result.read_only" = "لا يمكن تغيير المتجر التجريبي.";
+"internet.result.busy" = "خيط على الماك قيد التشغيل. حاول بعد لحظة.";
+"internet.result.not_owner" = "هاتف المالك وحده يستطيع تغيير هذا.";
+"internet.result.unconfirmed" = "تعذّر على خيط تأكيد ذلك مع الماك. المفتاح أعلاه يعرض ما يقوله الماك الآن.";
+"internet.result.saved_not_read" = "حفظه الماك. يتبعه هذا الهاتف عند المزامنة التالية.";
+"internet.blocked_count" = "حُظر %d مرة";
 /* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
 "waiting.do.taken_off" = "أُزيلت";
 "waiting.do.bed_clear" = "اللوح فارغ";
