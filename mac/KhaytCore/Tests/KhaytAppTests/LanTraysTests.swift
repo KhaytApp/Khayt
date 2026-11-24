@@ -197,7 +197,8 @@ struct LanTraysTests {
         // One strong match (the tag's own maker) AND near ones: the strong one first, then the near ones,
         // best first; a used-up spool, a resin one and a deleted one are never offered.
         let (mixed, _) = Self.shop(Self.book(spools: [
-            Self.spool("near2", "PLA", "#101216"), Self.spool("strong", "PLA", "#080A0D", brand: "Polymaker"), Self.spool("near1", "PLA", "#080A0D", brand: "Other"),
+            // The tag's own maker: strong. Another maker's spool of the same colour: near, not strong.
+            Self.spool("strong", "PLA", "#080A0D", brand: "Polymaker"), Self.spool("near1", "PLA", "#080A0D", brand: "Other"),
             Self.spool("empty", "PLA", "#080A0D", weight: 0),
             .object(["id": .string("resin"), "material": .string("PLA"), "color": .string("#080A0D"), "weight": .number(500), "materialType": .string("resin")]),
             .object(["id": .string("gone"), "material": .string("PLA"), "color": .string("#080A0D"), "weight": .number(500), "deleted": .bool(true)]),
@@ -205,7 +206,7 @@ struct LanTraysTests {
         let link = try #require(Self.rows(await mixed.phoneTrays("U1").1).first?["match"] as? [String: Any])
         #expect(link["kind"] as? String == "link" && link["spoolId"] as? String == "strong")
         let offered = try #require(link["candidates"] as? [String])
-        #expect(offered.first == "strong" && Set(offered.dropFirst()).isSubset(of: ["near1", "near2"]) && offered.count >= 2, Comment(rawValue: "\(offered)"))
+        #expect(offered == ["strong", "near1"], Comment(rawValue: "\(offered)"))
         for never in ["empty", "resin", "gone"] { #expect(!offered.contains(never), Comment(rawValue: never)) }
     }
 
