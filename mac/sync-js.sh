@@ -60,6 +60,13 @@ done
 cp lib/hueforge-u1-template.json "$DEST/hueforge-u1-template.json"
 echo "  synced hueforge-u1-template.json"
 
+# Each release's "Before you update" items, generated from CHANGELOG.md at the
+# cut (`npm run release:gates`). The first-launch sheet reads the `mac` map
+# from this copy, because the CHANGELOG does not ship inside the app. Data,
+# not a module; `LaunchGateTests` holds it to lib/.
+cp lib/release-gates.json "$DEST/release-gates.json"
+echo "  synced release-gates.json"
+
 # The invoice's stylesheet. The html is a bundled module; this is what it looks
 # like, and two copies would be two documents that agree until one is edited.
 cp renderer/invoice.css "mac/KhaytCore/Sources/KhaytApp/Resources/invoice.css"

@@ -433,6 +433,10 @@ extension Shop {
                 }
                 if published { await sendToCloud() }
             }
+            // An "off" that was waiting for exactly this (frame H) goes now,
+            // not at the next quarter-hour check: the person has just done
+            // what the banner asked, and the other computers are still offline.
+            if networkSwitchUnsentOff != nil { Task { await self.checkNetworkSwitch() } }
             moveNotices = fromServer || published
                 ? [words.callIt("mac.cloud_signed_in")] + (published ? [words.callIt("mac.cloud_key_published")] : [])
                 : [words.callIt("mac.cloud_signed_in"), words.callIt("mac.cloud_key_local")]

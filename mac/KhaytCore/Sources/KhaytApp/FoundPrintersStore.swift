@@ -112,6 +112,25 @@ extension Shop {
                                               nowMs: (now.timeIntervalSince1970 * 1000).rounded())) ?? []
     }
 
+    /// The printers earlier scans found that THIS scan did not see, most
+    /// recently seen first (`lib/found-printers.js forScan`: the rows with
+    /// `seenNow: false`). What the Find printers sheet lists under "Seen
+    /// earlier, not in this scan". Empty on the sample book.
+    func earlierFinds(notIn scanned: [KhaytEngine.FoundPrinter], now: Date = Date()) async -> [EarlierFind] {
+        guard let engine, let build = source_build else { return [] }
+        let rows: [JSONValue] = scanned.compactMap { printer in
+            guard let data = try? JSONEncoder().encode(printer) else { return nil }
+            return try? JSONDecoder().decode(JSONValue.self, from: data)
+        }
+        let shown = (try? await engine.foundForScan(list: FoundPrintersStore.read(build), scanned: rows,
+                                                    nowMs: (now.timeIntervalSince1970 * 1000).rounded())) ?? []
+        // One row per printer: a list another app wrote, or somebody edited,
+        // can name the same address twice, and two rows with one id garble
+        // the list.
+        var seen = Set<String>()
+        return shown.compactMap(EarlierFind.init).filter { seen.insert($0.id).inserted }
+    }
+
     /// Forget every printer this computer's scans remembered.
     func forgetFoundPrinters() {
         // lock: system — clears this computer's own note of what its scans saw; nothing in the book is written.
@@ -122,3 +141,46 @@ extension Shop {
     /// The real book's build, nil on the sample.
     private var source_build: StoreReader.Build? { source.build }
 }
+
+/// One printer an earlier scan found and this one did not: what the shared
+/// rule kept about it, as the sheet needs it.
+struct EarlierFind: Identifiable, Equatable {
+    /// The printer, in the shape `Shop.addFound` takes: adding an earlier
+    /// find is adding a found printer, with the address it was last seen at.
+    let printer: KhaytEngine.FoundPrinter
+    let lastSeen: Date
+    /// Where it was before its address moved, when the rule saw it move.
+    let previousHost: String?
+    var id: String { printer.id }
+
+    init?(_ row: JSONValue) {
+        guard case .object(let o) = row, o["seenNow"] == .bool(false),
+              case .number(let seen)? = o["lastSeen"], seen > 0 else { return nil }
+        // Only what `FoundPrinter` declares; empty strings the rule keeps for
+        // "not said" are nil here, as a scan's own printers have them.
+        var fields: [String: JSONValue] = [:]
+        // These came from whatever answered on the network days ago. The rule
+        // bounds their length; here they lose anything that is not text to
+        // read (control characters, and the marks that reorder what follows:
+        // an address must read as the address it is).
+        func plain(_ s: String) -> String {
+            String(String.UnicodeScalarView(s.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        for key in ["name", "host", "vendor", "serial", "firmware", "connection", "catalogId"] {
+            if case .string(let raw)? = o[key] { let s = plain(raw); if !s.isEmpty { fields[key] = .string(s) } }
+        }
+        if case .number(let p)? = o["port"], p > 0 { fields["port"] = .number(p) }
+        guard fields["host"] != nil else { return nil }
+        if fields["name"] == nil { fields["name"] = fields["host"] }
+        guard let data = try? JSONEncoder().encode(JSONValue.object(fields)),
+              let printer = try? JSONDecoder().decode(KhaytEngine.FoundPrinter.self, from: data) else { return nil }
+        self.printer = printer
+        self.lastSeen = Date(timeIntervalSince1970: seen / 1000)
+        if case .string(let raw)? = o["previousHost"] {
+            let was = plain(raw)
+            previousHost = was.isEmpty || was == printer.host ? nil : was
+        } else { previousHost = nil }
+    }
+}
+
