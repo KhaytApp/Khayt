@@ -36,7 +36,8 @@ struct TimelapseProofCardTests {
         #expect(reason == "size-unknown")
         // No time-lapse, an unusable record, no such job: the card shows nothing.
         let none = await Self.shop(.object(["id": .string("J 1/x")]))
-        #expect(await none.timelapseProof("J 1/x") == nil && await none.timelapseProof("nobody") == nil)
+        #expect(await none.timelapseProof("J 1/x") == nil)
+        #expect(await none.timelapseProof("nobody") == nil)
         let unsafe = await Self.shop(LanTimelapseTests.job(video: "../x.mp4"))
         #expect(await unsafe.timelapseProof("J 1/x") == nil)
     }
