@@ -29,6 +29,9 @@ final class PushTokenDelegate: NSObject, UIApplicationDelegate {
 struct KhaytCompanionApp: App {
     @UIApplicationDelegateAdaptor(PushTokenDelegate.self) private var pushDelegate
     @StateObject private var settings: ConnectionSettings
+    /// The lock when Khayt opens, and "Hide job names on the lock screen".
+    @StateObject private var lock = AppLock()
+    @StateObject private var lockScreenNames = LockScreenNames()
     @StateObject private var api: KhaytAPIClient
     @StateObject private var health: ConnectionHealth
     @StateObject private var nfc = NFCReader()
@@ -157,6 +160,17 @@ struct KhaytCompanionApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                // The lock: its own window above sheets and alerts
+                // (`AppLockCurtain`), locked or on its way to the app
+                // switcher with the lock on.
+                .modifier(AppLockGate(
+                    enabled: AppLockRule.enabled(
+                        choice: lock.choice,
+                        hasShop: ContentView.hasAShop(settings: settings, signedInToCloud: api.cloud != nil),
+                        sampleShop: settings.isSampleShop, holdsBook: settings.mayHoldBook),
+                    shopName: settings.shopLabel))
+                .environmentObject(lock)
+                .environmentObject(lockScreenNames)
                 .environmentObject(settings)
                 .environmentObject(api)
                 .environmentObject(health)
