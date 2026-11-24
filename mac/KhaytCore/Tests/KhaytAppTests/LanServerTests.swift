@@ -43,6 +43,7 @@ struct LanServerTests {
         /// What `/api/printer/{id}/bed-clear` handed the stubbed hook, in order.
         let bedCalls = PrinterCalls()
         let lapseCalls = PrinterCalls()
+        let trayCalls = PrinterCalls()
         /// What `/api/network/switch` handed the stubbed hook: the device's name and the body, in order.
         let switchCalls = PrinterCalls()
         /// What reached the expense hook: the body's size, once per call.
@@ -196,6 +197,15 @@ struct LanServerTests {
             host.keepTimelapse = { id in
                 lapseCalls.calls.append("keep \(id)")
                 return (201, #"{"ok":true,"state":"kept","bytes":34000000,"filename":"J1-timelapse-x.mp4"}"#)
+            }
+            let trayCalls = self.trayCalls
+            host.trays = { id in
+                trayCalls.calls.append("read \(id)")
+                return (200, #"{"ok":true,"trays":[]}"#)
+            }
+            host.linkTray = { id, head, body in
+                trayCalls.calls.append("link \(id) \(head) " + String(decoding: body, as: UTF8.self))
+                return (200, #"{"ok":true,"head":1,"spoolId":"S1","created":false,"spool":{"id":"S1"}}"#)
             }
             let photoCalls = self.photoCalls
             host.addJobPhoto = { id, data in

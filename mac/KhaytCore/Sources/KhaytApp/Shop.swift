@@ -2635,6 +2635,12 @@ final class Shop {
     var timelapseFolderForTests: URL?
     var timelapseBaseForTests: URL?
     var timelapseWriteForTests: ((String, [String: JSONValue]) async throws -> Bool?)?
+    /// TESTS ONLY, for the spool-tag routes (`Shop+PhoneTrays.swift`): the
+    /// book to read and write instead of the one on disk, the printer's
+    /// address, and its answers.
+    var trayBookForTests: [String: JSONValue]?
+    var trayBaseForTests: URL?
+    var trayFetchForTests: ((URLRequest) async throws -> (Data, URLResponse))?
     var launchGateHasBookForTests: Bool?
 
     /// What is low and has not already been ordered.

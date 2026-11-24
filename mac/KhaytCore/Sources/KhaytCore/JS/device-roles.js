@@ -175,6 +175,14 @@ const ROUTES = Object.freeze([
   // "Bed is clear" / "Taken off": a person saying the plate is empty, so the
   // printer may be offered again. The floor's call, as pause and stop are.
   { path: ['printer', 'id', 'bed-clear'], write: 'machines:control' },
+  // The spool tags a printer's heads read (a Snapmaker U1), matched against
+  // the shelf, and saying which of the shop's spools is in a head. Reading
+  // names the shop's spools; the write notes the link on the machine and may
+  // add one spool from the tag. Stock's scopes: adding a spool is
+  // inventory/create and linking is printers/edit at the computer, and an
+  // operator has both (lib/rbac.js). Served by the native Mac.
+  { path: ['printer', 'id', 'trays'], read: 'inventory:read' },
+  { path: ['printer', 'id', 'trays', 'id', 'spool'], write: 'inventory:write' },
   // Jobs. A quote's customer link and approving a quote for the customer are
   // pricing, so they need quote:write (a manager), not orders:write.
   { path: ['orders'], read: 'orders:read', write: 'orders:write' },

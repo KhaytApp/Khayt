@@ -213,6 +213,11 @@ final class LanServer {
         /// routes are not here (404).
         var timelapse: (@MainActor (_ jobId: String) async -> (Int, String))? = nil
         var keepTimelapse: (@MainActor (_ jobId: String) async -> (Int, String))? = nil
+        /// The spool tags a printer's heads read, and saying which of the
+        /// shop's spools is in a head (`Shop.phoneTrays`, `Shop.phoneLinkTray`).
+        /// Unset, the routes are not here (404).
+        var trays: (@MainActor (_ machineId: String) async -> (Int, String))? = nil
+        var linkTray: (@MainActor (_ machineId: String, _ head: Int, _ body: Data) async -> (Int, String))? = nil
         /// An owner's phone turning the shop's "Make no internet calls" on or
         /// off (`Shop.phoneSetOutbound`). Unset, the route is not here (404)
         /// and `/api/devices/self` does not advertise it.
@@ -1538,6 +1543,11 @@ final class LanServer {
         // token's `orders:read` does not open it: the answer holds a
         // printer's address). The gate's role check asks `orders:read`.
         case (_, true) where request.method == "GET" && host.timelapse != nil && Self.timelapseReadPath(path) != nil:
+        // `GET /api/printer/{machineId}/trays`: the spool tags the heads
+        // read, each matched against the shelf. SIGNED PHONES ONLY (never an
+        // API token, never the PIN alone): the answer names the shop's
+        // spools. The gate's role check asks `inventory:read`.
+        case (_, true) where request.method == "GET" && host.trays != nil && Self.trayReadPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
             guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
@@ -1550,11 +1560,21 @@ final class LanServer {
         // 150 MB of disk, so: a signed phone, and `orders:write`
         // (`lib/device-roles.js`), the phone's orders/edit.
         case (_, false) where request.method == "POST" && host.keepTimelapse != nil && Self.timelapseKeepPath(path) != nil:
+            let (status, body) = await host.trays!(Self.trayReadPath(path)!)
+            return .json(status, body)
+
+        // `POST /api/printer/{machineId}/trays/{head}/spool`: which spool is
+        // in that head. It writes the machine's record and may add one spool,
+        // so: a signed phone, and `inventory:write` (`lib/device-roles.js`),
+        // which a viewer's phone does not hold.
+        case (_, false) where request.method == "POST" && host.linkTray != nil && Self.trayLinkPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
             guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.keepTimelapse!(Self.timelapseKeepPath(path)!)
+            let asked = Self.trayLinkPath(path)!
+            let (status, body) = await host.linkTray!(asked.id, asked.head, request.body)
             return .json(status, body)
 
         // ── A PHONE TELLS A PRINTER WHAT TO DO ───────────────────────────
@@ -2817,6 +2837,9 @@ final class LanServer {
         if host.networkSwitch != nil, role == "owner" { can.append(.string("network-switch")) }
         // "Keep as proof": said when this Mac serves it, to a phone whose role may ask.
         if host.keepTimelapse != nil, scopes.contains("orders:write") { can.append(.string("timelapse-keep")) }
+        // The spool-tag routes: said when this Mac serves them, to a phone
+        // whose role may at least read them.
+        if host.trays != nil, scopes.contains("inventory:read") { can.append(.string("trays")) }
         let answer: JSONValue = .object(["deviceId": .string(id), "role": .string(role),
                                          "scopes": .array(scopes.map(JSONValue.string)),
                                          "can": .array(can)])
@@ -3490,6 +3513,12 @@ extension Shop {
         }
         host.keepTimelapse = { [weak self] id in
             await self?.phoneKeepTimelapse(id) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        host.trays = { [weak self] id in
+            await self?.phoneTrays(id) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        host.linkTray = { [weak self] id, head, body in
+            await self?.phoneLinkTray(id, head: head, body: body) ?? (503, #"{"ok":false,"reason":"busy"}"#)
         }
         host.addJobPhoto = { [weak self] id, data in
             await self?.phoneAddJobPhoto(id, data) ?? (503, #"{"ok":false,"reason":"busy"}"#)
