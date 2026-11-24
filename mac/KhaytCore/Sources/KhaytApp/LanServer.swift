@@ -1543,11 +1543,6 @@ final class LanServer {
         // token's `orders:read` does not open it: the answer holds a
         // printer's address). The gate's role check asks `orders:read`.
         case (_, true) where request.method == "GET" && host.timelapse != nil && Self.timelapseReadPath(path) != nil:
-        // `GET /api/printer/{machineId}/trays`: the spool tags the heads
-        // read, each matched against the shelf. SIGNED PHONES ONLY (never an
-        // API token, never the PIN alone): the answer names the shop's
-        // spools. The gate's role check asks `inventory:read`.
-        case (_, true) where request.method == "GET" && host.trays != nil && Self.trayReadPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
             guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
@@ -1560,6 +1555,22 @@ final class LanServer {
         // 150 MB of disk, so: a signed phone, and `orders:write`
         // (`lib/device-roles.js`), the phone's orders/edit.
         case (_, false) where request.method == "POST" && host.keepTimelapse != nil && Self.timelapseKeepPath(path) != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let (status, body) = await host.keepTimelapse!(Self.timelapseKeepPath(path)!)
+            return .json(status, body)
+
+        // `GET /api/printer/{machineId}/trays`: the spool tags the heads
+        // read, each matched against the shelf. SIGNED PHONES ONLY (never an
+        // API token, never the PIN alone): the answer names the shop's
+        // spools. The gate's role check asks `inventory:read`.
+        case (_, true) where request.method == "GET" && host.trays != nil && Self.trayReadPath(path) != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
             let (status, body) = await host.trays!(Self.trayReadPath(path)!)
             return .json(status, body)
 
@@ -1572,7 +1583,6 @@ final class LanServer {
             guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
-            let (status, body) = await host.keepTimelapse!(Self.timelapseKeepPath(path)!)
             let asked = Self.trayLinkPath(path)!
             let (status, body) = await host.linkTray!(asked.id, asked.head, request.body)
             return .json(status, body)
