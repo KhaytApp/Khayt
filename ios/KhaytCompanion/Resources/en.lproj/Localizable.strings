@@ -1605,3 +1605,9 @@
 "internet.result.unconfirmed" = "Khayt could not confirm this with your Mac. The switch above shows what your Mac says now.";
 "internet.result.saved_not_read" = "Your Mac saved it. This phone follows at its next sync.";
 "internet.blocked_count" = "Blocked %d times";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "Taken off";
+"waiting.do.bed_clear" = "Bed is clear";
+"printer.why.read_only" = "The Mac is showing the sample shop, which cannot be changed.";
+"printer.why.not_saved" = "The Mac could not save it just now. Try again.";
+"printer.why.role" = "This phone's role cannot do that. Ask the owner.";

@@ -1605,3 +1605,9 @@
 "internet.result.unconfirmed" = "Khayt bunu Mac’inizle doğrulayamadı. Yukarıdaki anahtar Mac’inizin şu an söylediğini gösterir.";
 "internet.result.saved_not_read" = "Mac’iniz kaydetti. Bu telefon bir sonraki eşitlemede buna uyar.";
 "internet.blocked_count" = "%d kez engellendi";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "Alındı";
+"waiting.do.bed_clear" = "Tabla boş";
+"printer.why.read_only" = "Mac örnek atölyeyi gösteriyor; değiştirilemez.";
+"printer.why.not_saved" = "Mac şu anda kaydedemedi. Yeniden deneyin.";
+"printer.why.role" = "Bu telefonun rolü buna izin vermiyor. Sahibine sorun.";

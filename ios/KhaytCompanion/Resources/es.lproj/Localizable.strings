@@ -1605,3 +1605,9 @@
 "internet.result.unconfirmed" = "Khayt no pudo confirmarlo con tu Mac. El interruptor de arriba muestra lo que tu Mac dice ahora.";
 "internet.result.saved_not_read" = "Tu Mac lo guardó. Este teléfono lo seguirá en la próxima sincronización.";
 "internet.blocked_count" = "Bloqueado %d veces";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "Retirada";
+"waiting.do.bed_clear" = "La cama está libre";
+"printer.why.read_only" = "El Mac muestra la tienda de muestra, que no se puede cambiar.";
+"printer.why.not_saved" = "El Mac no pudo guardarlo ahora. Inténtalo de nuevo.";
+"printer.why.role" = "El rol de este teléfono no lo permite. Pregunta al propietario.";

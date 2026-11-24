@@ -1605,3 +1605,9 @@
 "internet.result.unconfirmed" = "Khayt は Mac でこれを確認できませんでした。上のスイッチは Mac の現在の状態を示しています。";
 "internet.result.saved_not_read" = "Mac が保存しました。この電話は次の同期で従います。";
 "internet.blocked_count" = "%d 回ブロック";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "取り外した";
+"waiting.do.bed_clear" = "ベッドは空";
+"printer.why.read_only" = "Mac はサンプルショップを表示中で、変更できません。";
+"printer.why.not_saved" = "Mac が今は保存できませんでした。もう一度お試しください。";
+"printer.why.role" = "この電話の役割ではできません。オーナーに確認してください。";

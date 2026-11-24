@@ -1605,3 +1605,9 @@
 "internet.result.unconfirmed" = "تعذّر على خيط تأكيد ذلك مع الماك. المفتاح أعلاه يعرض ما يقوله الماك الآن.";
 "internet.result.saved_not_read" = "حفظه الماك. يتبعه هذا الهاتف عند المزامنة التالية.";
 "internet.blocked_count" = "حُظر %d مرة";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "أُزيلت";
+"waiting.do.bed_clear" = "اللوح فارغ";
+"printer.why.read_only" = "الماك يعرض المتجر التجريبي، ولا يمكن تغييره.";
+"printer.why.not_saved" = "تعذّر على الماك حفظه الآن. حاول مجددًا.";
+"printer.why.role" = "دور هذا الهاتف لا يسمح بذلك. اسأل المالك.";

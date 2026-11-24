@@ -1605,3 +1605,9 @@
 "internet.result.unconfirmed" = "Khayt 无法与你的 Mac 确认此更改。上方的开关显示 Mac 当前的状态。";
 "internet.result.saved_not_read" = "你的 Mac 已保存。这部手机将在下次同步时遵循。";
 "internet.blocked_count" = "已拦截 %d 次";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "已取下";
+"waiting.do.bed_clear" = "热床已清空";
+"printer.why.read_only" = "Mac 正在显示示例店铺，无法更改。";
+"printer.why.not_saved" = "Mac 暂时无法保存。请重试。";
+"printer.why.role" = "这部手机的角色不能执行此操作。请询问店主。";
