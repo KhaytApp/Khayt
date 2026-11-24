@@ -43,38 +43,85 @@ extension KhaytEngine {
     ///
     /// - `from`, `to`: `YYYY-MM-DD` on the day a run was sent, inclusive; nil
     ///   for no bound. A run with no date is left out of a bounded count.
-    /// - `utcOffsetMinutes`: whose day that is, as a fixed offset from UTC.
+    /// - `calendar`: WHOSE day that is. Pass the book's calendar
+    ///   (`Calendar.book`), never the device's.
     ///
-    /// WHOSE DAY. A real run's `at` is a full UTC timestamp, and with no
-    /// offset the rule takes its first ten characters: the UTC day, which in
-    /// Riyadh is yesterday until 03:00. Two ways to count by the shop's day:
-    ///   - pick the runs yourself by the book's calendar and pass NO dates.
-    ///     This is what the Mac's Machine profit and the phone do, and it is
-    ///     the right one for a calendar whose offset changes through the year.
-    ///   - pass `utcOffsetMinutes`, for a zone with one offset. The rule is
-    ///     then handed a `dayOf` (its own hook, from the Windows/Linux app's
-    ///     #2702); a bundled rule from before that hook ignores it and slices
-    ///     as it always did.
-    /// A bare `YYYY-MM-DD` is kept as written either way.
+    /// WHOSE DAY. A real run's `at` is a full UTC timestamp, and left to
+    /// itself the rule takes its first ten characters: the UTC day, which in
+    /// Riyadh is yesterday until 03:00, and at a month's edge last month.
+    /// JavaScript cannot be handed a Swift function and JavaScriptCore has no
+    /// time zones to ask, so with a `calendar` the days are worked out HERE,
+    /// one per run, and the rule is given them ready-made: its `dayOf` hook
+    /// (the Windows/Linux app's #2702) becomes a lookup. That is exact for
+    /// any zone, through daylight-saving changes too. A bare `YYYY-MM-DD` is
+    /// kept as written; an `at` that cannot be read has no day. A bundled
+    /// rule from before the hook ignores it and slices as it always did.
     public func successRates(orders: [JSONValue], machines: [JSONValue],
-                             from: String? = nil, to: String? = nil, utcOffsetMinutes: Int? = nil) throws -> [SuccessRow] {
-        try runtime.call2("""
-            (function (orders, machines, from, to, offset) {
+                             from: String? = nil, to: String? = nil, calendar: Calendar? = nil) throws -> [SuccessRow] {
+        var days: JSONValue = .null
+        if let calendar, from != nil || to != nil { days = .object(Self.runDays(orders, calendar: calendar)) }
+        return try runtime.call2("""
+            (function (orders, machines, from, to, days) {
               var input = { orders: orders, machines: machines, from: from, to: to };
-              if (typeof offset === 'number' && isFinite(offset)) {
+              if (days && typeof days === 'object') {
+                var has = Object.prototype.hasOwnProperty;
                 input.dayOf = function (at) {
-                  var s = at == null ? '' : String(at);
-                  if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) return s;
-                  var ms = typeof at === 'number' ? at : Date.parse(s);
-                  if (typeof ms !== 'number' || !isFinite(ms)) return '';
-                  return new Date(ms + offset * 60000).toISOString().slice(0, 10);
+                  var key = typeof at === 'number' ? '#' + Math.round(at) : (at == null ? '' : String(at));
+                  if (has.call(days, key)) return days[key];
+                  return String(at == null ? '' : at).slice(0, 10);
                 };
               }
               return globalThis.KhaytPrinterSuccess.successRates(input);
             })(ARG0, ARG1, ARG2, ARG3, ARG4)
-            """, [.array(orders), .array(machines), from.map(JSONValue.string) ?? .null, to.map(JSONValue.string) ?? .null,
-                  utcOffsetMinutes.map { .number(Double($0)) } ?? .null],
+            """, [.array(orders), .array(machines), from.map(JSONValue.string) ?? .null, to.map(JSONValue.string) ?? .null, days],
             as: [SuccessRow].self)
+    }
+
+    /// The day each run was sent, in `calendar`, keyed by the run's `at` as
+    /// the rule will ask for it (a number as `#<milliseconds>`). "" for an
+    /// `at` that is neither a bare day, a timestamp, nor milliseconds.
+    static func runDays(_ orders: [JSONValue], calendar: Calendar) -> [String: JSONValue] {
+        var days: [String: JSONValue] = [:]
+        for order in orders {
+            guard case .object(let o) = order, case .array(let runs)? = o["printRuns"] else { continue }
+            for run in runs {
+                guard case .object(let r) = run else { continue }
+                switch r["at"] {
+                case .string(let text)?:
+                    guard days[text] == nil else { continue }
+                    if text.wholeMatch(of: /[0-9]{4}-[0-9]{2}-[0-9]{2}/) != nil { days[text] = .string(text) }
+                    else if let instant = Calendar.instant(text) { days[text] = .string(calendar.dayString(instant)) }
+                    else { days[text] = .string("") }
+                case .number(let ms)? where ms.isFinite:
+                    let key = "#" + String(Int64(ms.rounded()))
+                    days[key] = .string(ms > 0 ? calendar.dayString(Date(timeIntervalSince1970: ms / 1000)) : "")
+                default: continue
+                }
+            }
+        }
+        return days
+    }
+
+    /// A rate as the whole per cent a person reads ("95" for 0.95), by the
+    /// rule's own rounding when the bundled rule has it (`successPercent`,
+    /// the Windows/Linux app's helper) so 199 of 200 does not read as 100%;
+    /// nil for no rate.
+    public func successPercent(_ rate: Double?) throws -> Int? {
+        guard let rate, rate.isFinite else { return nil }
+        let said = try runtime.call2("""
+            (function (rate) {
+              var f = globalThis.KhaytPrinterSuccess.successPercent;
+              if (typeof f === 'function') return f(rate);
+              // Before the helper: never round a rate under one up to a hundred.
+              var p = Math.round(rate * 100);
+              return rate < 1 && p >= 100 ? 99 : p;
+            })(ARG0)
+            """, [.number(rate)], as: JSONValue.self)
+        switch said {
+        case .number(let n): return Int(n.rounded())
+        case .string(let text): return Int(text.prefix { $0.isNumber })
+        default: return nil
+        }
     }
 
     /// How many decided runs a printer needs before its rate is shown
