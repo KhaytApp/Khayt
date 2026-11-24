@@ -42,6 +42,7 @@ struct LanServerTests {
         let photoCalls = PrinterCalls()
         /// What `/api/printer/{id}/bed-clear` handed the stubbed hook, in order.
         let bedCalls = PrinterCalls()
+        let lapseCalls = PrinterCalls()
         /// What `/api/network/switch` handed the stubbed hook: the device's name and the body, in order.
         let switchCalls = PrinterCalls()
         /// What reached the expense hook: the body's size, once per call.
@@ -186,6 +187,15 @@ struct LanServerTests {
             host.bedClear = { id in
                 bedCalls.calls.append(id)
                 return (200, #"{"ok":true,"bedClearedAt":"2026-11-22T10:00:00.000Z"}"#)
+            }
+            let lapseCalls = self.lapseCalls
+            host.timelapse = { id in
+                lapseCalls.calls.append("read \(id)")
+                return (200, #"{"ok":true,"state":"available","bytes":34000000}"#)
+            }
+            host.keepTimelapse = { id in
+                lapseCalls.calls.append("keep \(id)")
+                return (201, #"{"ok":true,"state":"kept","bytes":34000000,"filename":"J1-timelapse-x.mp4"}"#)
             }
             let photoCalls = self.photoCalls
             host.addJobPhoto = { id, data in

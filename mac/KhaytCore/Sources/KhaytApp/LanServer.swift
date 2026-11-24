@@ -207,6 +207,12 @@ final class LanServer {
         /// Unset, the route is not here and the phone reads the 404 as "this
         /// Mac predates it".
         var bedClear: (@MainActor (_ machineId: String) async -> (Int, String))? = nil
+        /// Whether a job has a time-lapse, and "Keep as proof": the Mac
+        /// copies it from the printer into the job's files
+        /// (`Shop.phoneTimelapse`, `Shop.phoneKeepTimelapse`). Unset, the
+        /// routes are not here (404).
+        var timelapse: (@MainActor (_ jobId: String) async -> (Int, String))? = nil
+        var keepTimelapse: (@MainActor (_ jobId: String) async -> (Int, String))? = nil
         /// An owner's phone turning the shop's "Make no internet calls" on or
         /// off (`Shop.phoneSetOutbound`). Unset, the route is not here (404)
         /// and `/api/devices/self` does not advertise it.
@@ -1527,6 +1533,30 @@ final class LanServer {
             let (status, body) = await host.bedClear!(Self.bedClearPath(path)!)
             return .json(status, body)
 
+        // `GET /api/orders/{id}/timelapse`: whether the job has a
+        // time-lapse on its printer, kept or not. SIGNED PHONES ONLY (an API
+        // token's `orders:read` does not open it: the answer holds a
+        // printer's address). The gate's role check asks `orders:read`.
+        case (_, true) where request.method == "GET" && host.timelapse != nil && Self.timelapseReadPath(path) != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let (status, body) = await host.timelapse!(Self.timelapseReadPath(path)!)
+            return .json(status, body)
+
+        // `POST /api/orders/{id}/timelapse/keep`: the Mac copies the video
+        // from the printer into the job's files. It writes the job and up to
+        // 150 MB of disk, so: a signed phone, and `orders:write`
+        // (`lib/device-roles.js`), the phone's orders/edit.
+        case (_, false) where request.method == "POST" && host.keepTimelapse != nil && Self.timelapseKeepPath(path) != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let (status, body) = await host.keepTimelapse!(Self.timelapseKeepPath(path)!)
+            return .json(status, body)
+
         // ── A PHONE TELLS A PRINTER WHAT TO DO ───────────────────────────
         //
         // SIGNED PHONES ONLY. Every other phone route also opens to the owner
@@ -2785,6 +2815,8 @@ final class LanServer {
         // list, so later ones can be added; an older Mac sends none.
         var can: [JSONValue] = []
         if host.networkSwitch != nil, role == "owner" { can.append(.string("network-switch")) }
+        // "Keep as proof": said when this Mac serves it, to a phone whose role may ask.
+        if host.keepTimelapse != nil, scopes.contains("orders:write") { can.append(.string("timelapse-keep")) }
         let answer: JSONValue = .object(["deviceId": .string(id), "role": .string(role),
                                          "scopes": .array(scopes.map(JSONValue.string)),
                                          "can": .array(can)])
@@ -3452,6 +3484,12 @@ extension Shop {
         }
         host.bedClear = { [weak self] id in
             await self?.phoneBedClear(id) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        host.timelapse = { [weak self] id in
+            await self?.phoneTimelapse(id) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        host.keepTimelapse = { [weak self] id in
+            await self?.phoneKeepTimelapse(id) ?? (503, #"{"ok":false,"reason":"busy"}"#)
         }
         host.addJobPhoto = { [weak self] id, data in
             await self?.phoneAddJobPhoto(id, data) ?? (503, #"{"ok":false,"reason":"busy"}"#)
