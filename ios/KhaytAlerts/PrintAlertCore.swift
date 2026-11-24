@@ -152,9 +152,22 @@ enum NotificationKind {
     }
 }
 
+/// "Hide job names on the lock screen" (Turki, Nov 22), where every process
+/// reads it: the app writes it, the notification extension and the widget
+/// extension read it. Off unless the person turned it on.
+enum LockScreenPrivacy {
+    static let group = "group.com.khaytapp.companion"
+    static let key = "khayt.hideJobNames"
+    static func hidesJobNames(_ defaults: UserDefaults? = UserDefaults(suiteName: group)) -> Bool {
+        defaults?.bool(forKey: key) ?? false
+    }
+}
+
 /// The words of a print alert.
 enum PrintAlertText {
-    static func content(for event: PrintFinished, orderStatus: String?,
+    /// `hideJobNames`: say "A print" instead of the job's title or the
+    /// printer's file name, either of which can hold a customer's name.
+    static func content(for event: PrintFinished, orderStatus: String?, hideJobNames: Bool = false,
                         locale: Locale = AlertDigits.locale(), shopId: String? = nil,
                         now: Date = Date(), timeZone: TimeZone = .current,
                         tr: (String) -> String) -> UNMutableNotificationContent {
@@ -166,7 +179,7 @@ enum PrintAlertText {
         case .cancelled: c.title = tr("alert.print.cancelled")
         case .ended: c.title = tr("alert.print.ended")
         }
-        let what = event.project ?? event.filename ?? tr("alert.print.a_job")
+        let what = hideJobNames ? tr("alert.print.a_print") : (event.project ?? event.filename ?? tr("alert.print.a_job"))
         var parts = [what]
         if let machine = event.machineName, !machine.isEmpty { parts.append(machine) }
         if let s = event.durationS, s >= 60 {

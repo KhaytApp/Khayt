@@ -57,7 +57,7 @@ struct PrintActivityWidget: Widget {
                             }
                         }
                         if let job = state.job {
-                            Text(PrintActivityText.jobTitle(job))
+                            (PrintActivityText.hidesJobNames() ? Text("A print") : Text(PrintActivityText.jobTitle(job)))
                                 .font(PrintActivityLook.text(12))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)

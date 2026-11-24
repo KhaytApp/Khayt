@@ -187,7 +187,8 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
     /// The alert itself — the same builder the notification service
     /// extension uses for a push, so an ending reads the same however it came.
     nonisolated static func content(for event: PrintFinished, orderStatus: String?) -> UNMutableNotificationContent {
-        PrintAlertText.content(for: event, orderStatus: orderStatus, locale: L10n.locale, tr: L10n.tr)
+        PrintAlertText.content(for: event, orderStatus: orderStatus, hideJobNames: LockScreenPrivacy.hidesJobNames(),
+                                locale: L10n.locale, tr: L10n.tr)
     }
 
     // MARK: - UNUserNotificationCenterDelegate
