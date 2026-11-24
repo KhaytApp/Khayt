@@ -261,7 +261,10 @@ jobs:
             || printf 'Khayt for macOS %s — the native Mac app.\n' "$VERSION" > "$NOTES"
           FLAGS=""
           [ "${{ inputs.prerelease }}" = "true" ] && FLAGS="--prerelease"
-          gh release create "$TAG" dist/*.zip \
+          # lib/release-gates.json: this release's "Before you update" items,
+          # which a Mac on an older version reads before it downloads this
+          # one (UpdateGate.swift). mac/release-local.sh attaches it too.
+          gh release create "$TAG" dist/*.zip lib/release-gates.json \
             --repo KhaytApp/khayt-mac \
             --title "Khayt for macOS $VERSION" \
             --notes-file "$NOTES" \

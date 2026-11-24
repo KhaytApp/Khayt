@@ -766,6 +766,9 @@ struct WindowSheets: ViewModifier {
             // "Khayt was updated": over the window at the first start after
             // an update with "Before you update" items, until they are read.
             .shopSheet(isPresented: Binding(get: { shop.showsLaunchGate }, set: { _ in })) { LaunchGateSheet(shop: shop) }
+            // "An update is ready": in front of an update that has such
+            // items, until they are read or it is put off.
+            .shopSheet(isPresented: Binding(get: { shop.showsUpdateGate }, set: { _ in })) { UpdateGateSheet(shop: shop) }
             .shopSheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }
             .shopSheet(isPresented: $shop.settingUpShop) { ShopSetupSheet(shop: shop) }
             .shopSheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
