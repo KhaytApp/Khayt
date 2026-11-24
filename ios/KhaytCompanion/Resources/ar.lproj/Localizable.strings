@@ -1594,3 +1594,9 @@
 "lock.reason" = "افتح خيط لعرض متجرك.";
 "alert.print.a_print" = "طباعة";
 "intake.remind.alert.hidden" = "طلب عميل ينتظر ردّك.";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "أُزيلت";
+"waiting.do.bed_clear" = "اللوح فارغ";
+"printer.why.read_only" = "الماك يعرض المتجر التجريبي، ولا يمكن تغييره.";
+"printer.why.not_saved" = "تعذّر على الماك حفظه الآن. حاول مجددًا.";
+"printer.why.role" = "دور هذا الهاتف لا يسمح بذلك. اسأل المالك.";

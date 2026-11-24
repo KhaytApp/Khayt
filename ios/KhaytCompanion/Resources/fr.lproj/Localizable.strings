@@ -1594,3 +1594,9 @@
 "lock.reason" = "Déverrouillez Khayt pour voir votre atelier.";
 "alert.print.a_print" = "Une impression";
 "intake.remind.alert.hidden" = "Une demande client attend votre réponse.";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "Retirée";
+"waiting.do.bed_clear" = "Le plateau est libre";
+"printer.why.read_only" = "Le Mac affiche l’atelier d’exemple, qui ne peut pas être modifié.";
+"printer.why.not_saved" = "Le Mac n’a pas pu l’enregistrer pour le moment. Réessayez.";
+"printer.why.role" = "Le rôle de ce téléphone ne le permet pas. Demandez au propriétaire.";

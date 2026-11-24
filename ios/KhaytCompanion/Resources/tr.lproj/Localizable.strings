@@ -1594,3 +1594,9 @@
 "lock.reason" = "Atölyenizi görmek için Khayt’ın kilidini açın.";
 "alert.print.a_print" = "Bir baskı";
 "intake.remind.alert.hidden" = "Bir müşteri talebi yanıtınızı bekliyor.";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "Alındı";
+"waiting.do.bed_clear" = "Tabla boş";
+"printer.why.read_only" = "Mac örnek atölyeyi gösteriyor; değiştirilemez.";
+"printer.why.not_saved" = "Mac şu anda kaydedemedi. Yeniden deneyin.";
+"printer.why.role" = "Bu telefonun rolü buna izin vermiyor. Sahibine sorun.";

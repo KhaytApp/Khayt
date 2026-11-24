@@ -1594,3 +1594,9 @@
 "lock.reason" = "Entsperren Sie Khayt, um Ihren Shop zu sehen.";
 "alert.print.a_print" = "Ein Druck";
 "intake.remind.alert.hidden" = "Eine Kundenanfrage wartet auf Ihre Antwort.";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "Abgenommen";
+"waiting.do.bed_clear" = "Bett ist frei";
+"printer.why.read_only" = "Der Mac zeigt den Beispiel-Shop, der nicht geändert werden kann.";
+"printer.why.not_saved" = "Der Mac konnte es gerade nicht speichern. Versuchen Sie es erneut.";
+"printer.why.role" = "Die Rolle dieses Telefons erlaubt das nicht. Fragen Sie den Inhaber.";

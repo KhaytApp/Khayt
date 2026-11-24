@@ -1594,3 +1594,9 @@
 "lock.reason" = "Unlock Khayt to see your shop.";
 "alert.print.a_print" = "A print";
 "intake.remind.alert.hidden" = "A customer request is waiting for your answer.";
+/* "Taken off" / "Bed is clear" (POST /api/printer/{id}/bed-clear) */
+"waiting.do.taken_off" = "Taken off";
+"waiting.do.bed_clear" = "Bed is clear";
+"printer.why.read_only" = "The Mac is showing the sample shop, which cannot be changed.";
+"printer.why.not_saved" = "The Mac could not save it just now. Try again.";
+"printer.why.role" = "This phone's role cannot do that. Ask the owner.";
