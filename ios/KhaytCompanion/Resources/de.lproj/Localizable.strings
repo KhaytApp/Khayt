@@ -1568,6 +1568,32 @@
 "photos.blocked.detail" = "Fotos können auf diesem Telefon nicht angezeigt oder hinzugefügt werden. Der Inhaber kann Khayt Cloud auf dem Mac unter Internetnutzung beibehalten.";
 "photos.blocked.nothing_sent" = "Es wurde nichts gesendet.";
 
+/* The lock when Khayt opens (signed frames L1-L4, L3b) */
+"lock.title" = "Sicherheit";
+"lock.toggle" = "Khayt mit %@ sperren";
+"lock.toggle.search" = "Khayt mit Face ID sperren";
+"lock.passcode" = "dem Code";
+"lock.after" = "Sperren nach";
+"lock.after.immediately" = "Sofort";
+"lock.after.1" = "Nach 1 Minute";
+"lock.after.5" = "Nach 5 Minuten";
+"lock.after.15" = "Nach 15 Minuten";
+"lock.foot" = "Auf Telefonen von Inhaber und Manager standardmäßig an. Face ID oder der Code dieses iPhone öffnet Khayt beim Start und erneut, wenn es die oben genannte Zeit im Hintergrund war. Ihr Buch bleibt in jedem Fall auf dem Telefon.";
+"lock.no_passcode" = "Dieses iPhone hat keinen Code, daher kann Khayt nicht sperren. Legen Sie einen in den iPhone-Einstellungen fest.";
+"lock.floor.title" = "Keine Sperre nötig";
+"lock.floor.body" = "Dies ist ein Werkstatt-Telefon: Es hält keine Kopie des Shop-Buchs, also gibt es darauf nichts zu sperren. Es zeigt Warteschlange und Drucker, solange es im WLAN des Shops ist.";
+"lock.hide_names" = "Auftragsnamen auf dem Sperrbildschirm ausblenden";
+"lock.hide_names.foot" = "Standardmäßig aus. Wenn an, steht in Druckhinweisen und in der Live-Aktivität „Ein Druck“ statt des Auftragstitels oder des Dateinamens des Druckers, und eine Anfrage-Erinnerung nennt den Kunden nicht.";
+"lock.locked" = "Gesperrt. Das Buch Ihres Shops ist auf diesem Telefon.";
+"lock.failed" = "%@ hat nicht gepasst. Versuchen Sie es erneut oder verwenden Sie den Code dieses iPhone.";
+"lock.failed.passcode" = "Khayt wurde nicht entsperrt. Versuchen Sie es erneut.";
+"lock.unlock_with" = "Mit %@ entsperren";
+"lock.try_again" = "%@ erneut versuchen";
+"lock.unlock" = "Entsperren";
+"lock.use_passcode" = "Code verwenden";
+"lock.reason" = "Entsperren Sie Khayt, um Ihren Shop zu sehen.";
+"alert.print.a_print" = "Ein Druck";
+"intake.remind.alert.hidden" = "Eine Kundenanfrage wartet auf Ihre Antwort.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
 "internet.title" = "Internetnutzung";
 "internet.switch" = "Keine Internetverbindungen herstellen";

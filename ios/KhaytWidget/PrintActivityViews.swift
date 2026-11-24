@@ -145,7 +145,9 @@ struct PrintActivityLockScreen: View {
                         .foregroundStyle(PrintActivityLook.ink)
                         .lineLimit(1)
                     if let job = state.job {
-                        Text(PrintActivityText.jobTitle(job))
+                        // "Hide job names on the lock screen": a file name can
+                        // hold a customer's name (Turki, Nov 22).
+                        (PrintActivityText.hidesJobNames() ? Text("A print", bundle: bundle) : Text(PrintActivityText.jobTitle(job)))
                             .font(PrintActivityLook.text(12.5))
                             .foregroundStyle(PrintActivityLook.note)
                             .lineLimit(1)
@@ -354,6 +356,11 @@ enum PrintActivityText {
 
     /// A printer's file name, made readable: the extension and the slicer's
     /// underscores go, so `Dragon_0.2mm_PLA.gcode` reads `Dragon 0.2mm PLA`.
+    /// The app's "Hide job names on the lock screen", from the App Group.
+    static func hidesJobNames(_ defaults: UserDefaults? = UserDefaults(suiteName: "group.com.khaytapp.companion")) -> Bool {
+        defaults?.bool(forKey: "khayt.hideJobNames") ?? false
+    }
+
     static func jobTitle(_ file: String) -> String {
         var name = file
         for ext in [".gcode.3mf", ".gcode", ".bgcode", ".3mf"] where name.lowercased().hasSuffix(ext) {
