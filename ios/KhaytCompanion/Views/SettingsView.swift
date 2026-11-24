@@ -142,6 +142,7 @@ struct SettingsView: View {
             return on.isEmpty ? L10n.tr("state.off") : ListFormatter.localizedString(byJoining: on)
         case .privacy:
             return ActiveCountSender.ready ? nil : L10n.tr("settings.privacy_policy")
+        case .security: return nil
         case .shop:
             return [settings.shopLabel, L10n.tr("settings.shop.readonly")].filter { !$0.isEmpty }.joined(separator: " · ")
         case .mac:
@@ -194,6 +195,7 @@ struct SettingsView: View {
         case .appearance: SettingsAppearancePage()
         case .notifications: SettingsNotificationsPage()
         case .privacy: SettingsPrivacyPage()
+        case .security: SettingsSecurityPage()
         case .shop: SettingsShopPage()
         case .internet: SettingsInternetUsePage()
         case .mac: SettingsMacPage()
