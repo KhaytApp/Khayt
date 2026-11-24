@@ -266,5 +266,29 @@
 			<string>لا مصروفات</string>
 		</dict>
 	</dict>
+	<key>internet.blocked_count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>حُظر %d مرات</string>
+			<key>many</key>
+			<string>حُظر %d مرة</string>
+			<key>one</key>
+			<string>حُظر مرة واحدة</string>
+			<key>other</key>
+			<string>حُظر %d مرة</string>
+			<key>two</key>
+			<string>حُظر مرتين</string>
+			<key>zero</key>
+			<string>لم يُحظر</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

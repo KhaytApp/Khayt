@@ -74,7 +74,7 @@ final class SettingsIndexTests: XCTestCase {
 
     func testTheDesignsOrder() {
         XCTAssertEqual(SettingsRoute.rows(in: .thisPhone, showsConnectors: true), [.appearance, .notifications, .privacy, .security])
-        XCTAssertEqual(SettingsRoute.rows(in: .shop, showsConnectors: true), [.shop])
+        XCTAssertEqual(SettingsRoute.rows(in: .shop, showsConnectors: true), [.shop, .internet])
         XCTAssertEqual(SettingsRoute.rows(in: .connected, showsConnectors: true), [.mac, .cloud, .connectors])
         XCTAssertEqual(SettingsRoute.rows(in: .about, showsConnectors: true), [.help, .diagnostics])
     }
