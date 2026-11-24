@@ -15,7 +15,11 @@ Write exactly what you would have added under `[Unreleased]`:
   Blank lines are fine.
 - Do not use headings. A `### Before you update` item still goes in `CHANGELOG.md` itself,
   because the updater reads it there.
-- The "Changelog entry" check accepts a fragment and refuses one it could not fold.
+- The "Changelog entry" check accepts a fragment your pull request **added**. Editing or
+  renaming someone else's fragment doesn't count as your entry. Removing one is refused,
+  because only the cut removes fragments. A fragment the cut could not fold is refused too.
+- A release pull request (a new `## [X.Y.Z]` section, or a version bump) is refused while
+  any fragment is still here, so a late entry can't miss the release it shipped in.
 - At the release cut, `npm run changelog:fold` moves every fragment to the top of
   `[Unreleased]`, newest first, and deletes the files (VERSIONING.md, step 0). The cut refuses
   to tag while a fragment is still waiting.

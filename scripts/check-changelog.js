@@ -118,7 +118,7 @@ function verdict(files, messages = '', fragments) {
   if (String(messages || '').toLowerCase().includes(OVERRIDE)) {
     return { ok: true, reason: `${OVERRIDE} was given`, watched };
   }
-  return { ok: false, reason: `shipped code changed and ${CHANGELOG} did not`, watched };
+  return { ok: false, reason: `shipped code changed and there is no changelog entry (no ${FRAGMENT_DIR}/ fragment, no ${CHANGELOG} line)`, watched };
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -202,20 +202,68 @@ function placement(diff, after) {
   return { ok: misplaced.length === 0, misplaced };
 }
 
-module.exports = { verdict, isWatched, WATCHED, OVERRIDE, CHANGELOG, placement, checkFragment, isFragmentPath, FRAGMENT_DIR };
+/**
+ * Is this PR a release? Any of: it ADDS a version section to CHANGELOG.md, or
+ * it changes the version in package.json or mac/version.json.
+ *
+ * @param {{changelogDiff: string, versionBefore: (f)=>string|null, versionAfter: (f)=>string|null}} d
+ * @returns {string[]} what makes it one, in words; empty when it is not
+ */
+function releaseSignals(d) {
+  const out = [];
+  for (const raw of String((d && d.changelogDiff) || '').split('\n')) {
+    if (!raw.startsWith('+') || raw.startsWith('+++')) continue;
+    const name = headingOf(raw.slice(1));
+    if (name && name !== 'Unreleased') out.push(`it adds "## [${name}]" to ${CHANGELOG}`);
+  }
+  for (const f of ['package.json', 'mac/version.json']) {
+    const a = d && d.versionBefore ? d.versionBefore(f) : null;
+    const b = d && d.versionAfter ? d.versionAfter(f) : null;
+    if (a && b && a !== b) out.push(`${f} goes from ${a} to ${b}`);
+  }
+  return out;
+}
+
+/** Everything in changelog.d/ but its README: the one rule for "waiting" (the fold's --check and cut-release.yml say the same). */
+function waitingFragments(names) {
+  return (Array.isArray(names) ? names : []).map(String).filter((n) => n && n !== 'README.md').sort();
+}
+
+module.exports = { verdict, isWatched, WATCHED, OVERRIDE, CHANGELOG, placement, checkFragment, isFragmentPath, FRAGMENT_DIR, releaseSignals, waitingFragments };
 
 if (require.main === module) {
   const { execFileSync } = require('child_process');
+  const fs = require('fs');
+  const path = require('path');
   const base = process.env.BASE_REF || process.argv[2] || 'main';
-  const sh = (args) => execFileSync('git', args, { encoding: 'utf8' });
+  // From the repo root whatever the cwd, and paths exactly as written (no
+  // octal quoting of a non-ASCII name, which would hide it from the rules).
+  const sh = (args) => execFileSync('git', ['-c', 'core.quotePath=false', ...args], { encoding: 'utf8', cwd: TOP });
+  const TOP = (() => { try { return execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim(); } catch (_) { return process.cwd(); } })();
+  const nul = (s) => String(s || '').split('\0').filter(Boolean);
 
   let files = [];
   let messages = '';
   let fragments = [];
+  let releasing = [];
+  let leftover = [];
+  let deleted = [];
   try {
-    files = sh(['diff', '--name-only', `${base}...HEAD`]).split('\n');
+    files = nul(sh(['diff', '-z', '--name-only', `${base}...HEAD`]));
     messages = sh(['log', '--format=%B', `${base}..HEAD`]);
-    fragments = sh(['diff', '--name-only', '--diff-filter=AMR', `${base}...HEAD`, '--', FRAGMENT_DIR]).split('\n').filter(isFragmentPath);
+    // ADDED only. A fragment that was already on the base is another PR's
+    // entry: editing or renaming it is not this PR writing its own (review of #2706).
+    // --no-renames: a rename is the old name deleted and a new one added, and
+    // the deletion is judged below.
+    const inDir = (f) => f.startsWith(FRAGMENT_DIR + '/') && f !== FRAGMENT_DIR + '/README.md';
+    fragments = nul(sh(['diff', '-z', '--no-renames', '--name-only', '--diff-filter=A', `${base}...HEAD`, '--', FRAGMENT_DIR])).filter(inDir);
+    deleted = nul(sh(['diff', '-z', '--no-renames', '--name-only', '--diff-filter=D', `${base}...HEAD`, '--', FRAGMENT_DIR])).filter(inDir);
+    releasing = releaseSignals({
+      changelogDiff: files.includes(CHANGELOG) ? sh(['diff', '--unified=0', `${base}...HEAD`, '--', CHANGELOG]) : '',
+      versionBefore: (f) => { try { return JSON.parse(sh(['show', `${base}:${f}`])).version || null; } catch (_) { return null; } },
+      versionAfter: (f) => { try { return JSON.parse(fs.readFileSync(path.join(TOP, f), 'utf8')).version || null; } catch (_) { return null; } },
+    });
+    leftover = waitingFragments(fs.existsSync(path.join(TOP, FRAGMENT_DIR)) ? fs.readdirSync(path.join(TOP, FRAGMENT_DIR)) : []);
   } catch (e) {
     // A missing base ref is a CI wiring fault, not a contributor's fault —
     // failing the PR for it would teach people to ignore this check.
@@ -223,11 +271,39 @@ if (require.main === module) {
     process.exit(0);
   }
 
+  // A RELEASE PR must carry every entry its tag will carry. A fragment that
+  // lands while the release PR's CI runs comes in with the rebase, with no
+  // conflict; caught only at tag time, it could be filed nowhere but
+  // [Unreleased] (the placement rule) and missed its release. Here, under the
+  // strict rule, the checked tree IS the merged tree (review of #2706).
+  if (releasing.length && leftover.length) {
+    process.stderr.write(
+      `\nchangelog check failed — this is a release (${releasing.join('; ')}), and ${FRAGMENT_DIR}/ still ` +
+      `holds entries that are not in ${CHANGELOG}:\n\n` + leftover.map((f) => `  ${FRAGMENT_DIR}/${f}\n`).join('') +
+      `\nRun "npm run changelog:fold" again and file them in this release's section.\n`
+    );
+    process.exit(1);
+  }
+
+  // Only the fold removes a fragment that is already on main, and the fold
+  // writes its lines into CHANGELOG.md in the same PR. Anything else that
+  // removes one (or renames, or rewrites-and-renames it) drops another PR's
+  // entry before any release could carry it.
+  if (deleted.length && !files.includes(CHANGELOG)) {
+    process.stderr.write(
+      `\nchangelog check failed — this removes ${deleted.length === 1 ? 'an entry' : 'entries'} another pull request wrote, ` +
+      `and puts ${deleted.length === 1 ? 'it' : 'them'} nowhere:\n\n` + deleted.map((f) => `  ${f}\n`).join('') +
+      `\nWrite your own entry in a new file of yours, and leave these as they are. Only the\n` +
+      `release cut removes them, by folding them into ${CHANGELOG} (npm run changelog:fold).\n`
+    );
+    process.exit(1);
+  }
+
   // Every fragment the PR wrote must be one the fold can take as it stands.
   const bad = [];
   for (const f of fragments) {
     let text = '';
-    try { text = require('fs').readFileSync(f, 'utf8'); } catch (e) { bad.push(`${f}: unreadable — ${(e && e.message) || e}`); continue; }
+    try { text = fs.readFileSync(path.join(TOP, f), 'utf8'); } catch (e) { bad.push(`${f}: unreadable — ${(e && e.message) || e}`); continue; }
     bad.push(...checkFragment(f, text).problems);
   }
   if (bad.length) {
@@ -250,7 +326,7 @@ if (require.main === module) {
     let where = { ok: true, misplaced: [] };
     try {
       const diff = sh(['diff', '--unified=3', `${base}...HEAD`, '--', CHANGELOG]);
-      where = placement(diff, require('fs').readFileSync(CHANGELOG, 'utf8'));
+      where = placement(diff, fs.readFileSync(path.join(TOP, CHANGELOG), 'utf8'));
     } catch (e) {
       process.stdout.write(`changelog placement not checked — ${(e && e.message) || e}\n`);
     }

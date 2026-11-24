@@ -10,9 +10,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const { fold, order, entryLines } = require('../scripts/changelog-fold.js');
-const { verdict, checkFragment, isFragmentPath, placement } = require('../scripts/check-changelog.js');
+const { verdict, checkFragment, isFragmentPath, placement, releaseSignals, waitingFragments } = require('../scripts/check-changelog.js');
 
 const ROOT = path.join(__dirname, '..');
 const REAL = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8');
@@ -35,19 +37,32 @@ test('fold: the lines land at the top of [Unreleased], newest first, exactly as 
   assert.equal(out.slice(out.search(/\n## \[\d/)), REAL.slice(firstRelease));
 });
 
-test('fold: the result passes the guards that read CHANGELOG.md', () => {
-  const out = fold(REAL, [{ name: 'changelog.d/a.md', text: `${A}\n` }]);
-  // check-changelog.js placement: every added bullet is in [Unreleased].
-  const diff = ['@@ -5,2 +5,3 @@', ' ## [Unreleased]', ' ', `+${A}`].join('\n');
-  assert.deepEqual(placement(diff, out), { ok: true, misplaced: [] });
-  // check-release-claims.js rule 5: no heading repeated in [Unreleased] (a fragment cannot add one).
-  const unrel = out.slice(out.indexOf('## [Unreleased]'));
-  const body = unrel.slice(0, unrel.indexOf('\n## [', 1));
-  const heads = [...body.matchAll(/^### (.+)$/gm)].map((m) => m[1]);
-  assert.equal(new Set(heads).size, heads.length);
-  // One [Unreleased], still first.
+test('fold: the real diff of the folded file passes placement(), and [Unreleased] is still the one first section', () => {
+  const out = fold(REAL, [{ name: 'changelog.d/a.md', text: `${A}\n${B}\n` }]);
+  // git's own diff of before → after, as check-changelog.js reads a PR.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-fold-'));
+  try {
+    fs.writeFileSync(path.join(tmp, 'before.md'), REAL);
+    fs.writeFileSync(path.join(tmp, 'after.md'), out);
+    const r = spawnSync('git', ['diff', '--no-index', '--unified=3', 'before.md', 'after.md'], { cwd: tmp, encoding: 'utf8' });
+    assert.equal(r.status, 1, 'the files differ');
+    const added = r.stdout.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++'));
+    assert.deepEqual(added, [`+${A}`, `+${B}`], 'only the fragment lines are added');
+    assert.deepEqual(placement(r.stdout, out), { ok: true, misplaced: [] });
+    // The same lines added at the top of a RELEASED section would be refused: the check can fail.
+    const wrong = out.replace(`${A}\n${B}\n`, '').replace(/(\n## \[\d[^\n]*\n\n(?:### [^\n]*\n\n)?)/, `$1${A}\n`);
+    fs.writeFileSync(path.join(tmp, 'wrong.md'), wrong);
+    const w = spawnSync('git', ['diff', '--no-index', '--unified=3', 'before.md', 'wrong.md'], { cwd: tmp, encoding: 'utf8' });
+    assert.equal(placement(w.stdout, wrong).ok, false);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
   assert.equal(out.match(/^## \[Unreleased\]$/gm).length, 1);
   assert.ok(out.indexOf('## [Unreleased]') < out.search(/\n## \[\d/));
+});
+
+test('fold: a heading at the top of [Unreleased] ("### Before you update") keeps its blank line', () => {
+  const s = '## [Unreleased]\n\n### Before you update\n\n- gate item\n\n## [1.0.0]\n- old\n';
+  assert.equal(fold(s, [{ name: 'changelog.d/a.md', text: A }]),
+    `## [Unreleased]\n\n${A}\n\n### Before you update\n\n- gate item\n\n## [1.0.0]\n- old\n`);
 });
 
 test('fold: no fragments is no change; blank and CRLF fragments add nothing stray', () => {
@@ -109,4 +124,109 @@ test('the repo: changelog.d holds a README and only well-formed fragments', () =
     if (!isFragmentPath(f)) continue;
     assert.deepEqual(checkFragment(f, fs.readFileSync(path.join(dir, n), 'utf8')).problems, [], f);
   }
+});
+
+test('releaseSignals: a version section added, or a version changed, is a release; [Unreleased] is not', () => {
+  const v = (before, after) => ({ versionBefore: (f) => before[f] ?? null, versionAfter: (f) => after[f] ?? null });
+  assert.deepEqual(releaseSignals({ changelogDiff: '+++ b/CHANGELOG.md\n+## [Unreleased]\n+- x', ...v({}, {}) }), []);
+  assert.equal(releaseSignals({ changelogDiff: '+## [4.12.0] - 2026-11-25\n+- x', ...v({}, {}) }).length, 1);
+  assert.equal(releaseSignals({ changelogDiff: '-## [4.12.0] - 2026-11-25', ...v({}, {}) }).length, 0, 'removed is not added');
+  assert.match(releaseSignals({ changelogDiff: '', ...v({ 'package.json': '4.11.0' }, { 'package.json': '4.12.0' }) })[0], /4\.11\.0 to 4\.12\.0/);
+  assert.match(releaseSignals({ changelogDiff: '', ...v({ 'mac/version.json': '4.0.0-beta.50' }, { 'mac/version.json': '4.0.0-beta.51' }) })[0], /mac\/version\.json/);
+  assert.deepEqual(releaseSignals({ changelogDiff: '', ...v({ 'package.json': '4.11.0' }, { 'package.json': '4.11.0' }) }), []);
+});
+
+test('waitingFragments: anything in changelog.d/ but the README waits, the same rule everywhere', () => {
+  assert.deepEqual(waitingFragments(['README.md', 'b.md', 'a.md', '.gitkeep', 'x.txt', 'sub']), ['.gitkeep', 'a.md', 'b.md', 'sub', 'x.txt']);
+  assert.deepEqual(waitingFragments(['README.md']), []);
+  assert.deepEqual(waitingFragments(undefined), []);
+});
+
+test('the message when nothing was written names the fragment first', () => {
+  assert.match(verdict(['lib/x.js'], 'fix').reason, /changelog\.d\/ fragment/);
+});
+
+/* ── The command line, in a throwaway repo: what only git can show ───────── */
+function sandbox() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-cli-'));
+  const git = (...a) => {
+    const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@e.x', '-c', 'commit.gpgsign=false', ...a], { cwd: dir, encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`git ${a.join(' ')}: ${r.stderr}`);
+    return r.stdout;
+  };
+  const write = (f, s) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), s); };
+  fs.mkdirSync(path.join(dir, 'scripts'));
+  for (const f of ['check-changelog.js', 'changelog-fold.js']) fs.copyFileSync(path.join(ROOT, 'scripts', f), path.join(dir, 'scripts', f));
+  git('init', '-q', '-b', 'main');
+  write('CHANGELOG.md', '# Changelog\n\n## [Unreleased]\n\n- old entry\n\n## [1.0.0] - 2026-01-01\n\n- shipped\n');
+  write('package.json', '{"version":"1.0.0"}\n');
+  write('lib/a.js', '1\n');
+  write('changelog.d/README.md', 'readme\n');
+  write('changelog.d/someone-else.md', '- **Theirs.**\n');
+  git('add', '-A'); git('commit', '-q', '-m', 'base');
+  git('checkout', '-q', '-b', 'pr');
+  const check = (cwd = dir) => spawnSync(process.execPath, [path.join(dir, 'scripts/check-changelog.js')], { cwd, encoding: 'utf8', env: { ...process.env, BASE_REF: 'main' } });
+  return { dir, git, write, check, done: () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
+test('CLI: a fragment the PR added passes; editing or renaming someone else\'s does not count', () => {
+  const s = sandbox();
+  try {
+    s.write('lib/a.js', '2\n'); s.git('commit', '-qam', 'code');
+    assert.equal(s.check().status, 1, 'code and no entry');
+    s.write('changelog.d/someone-else.md', '- **Theirs, rewritten by me.**\n'); s.git('commit', '-qam', 'edit theirs');
+    assert.equal(s.check().status, 1, 'an edit to an existing fragment is not this PR\'s entry');
+    s.git('mv', 'changelog.d/someone-else.md', 'changelog.d/mine.md'); s.git('commit', '-qm', 'rename theirs');
+    const renamed = s.check();
+    assert.equal(renamed.status, 1, 'nor is a rename (or rewrite-and-rename) of one');
+    assert.match(renamed.stderr, /removes an entry another pull request wrote[\s\S]*changelog\.d\/someone-else\.md/);
+    s.git('mv', 'changelog.d/mine.md', 'changelog.d/someone-else.md'); s.git('checkout', '-q', 'main', '--', 'changelog.d/someone-else.md');
+    s.write('changelog.d/pr.md', '- **Mine.** Added by this PR.\n'); s.git('add', '-A'); s.git('commit', '-qm', 'entry');
+    const r = s.check();
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /fragment was written \(changelog\.d\/pr\.md\)/);
+    assert.equal(s.check(path.join(s.dir, 'lib')).status, 0, 'run from lib/');
+  } finally { s.done(); }
+});
+
+test('CLI: a malformed fragment is refused, a non-ASCII name included', () => {
+  const s = sandbox();
+  try {
+    s.write('lib/a.js', '2\n'); s.write('changelog.d/café.md', '- **Accented name.**\n'); s.git('add', '-A'); s.git('commit', '-qm', 'x');
+    const r = s.check();
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /changelog\.d\/café\.md: a fragment is changelog\.d\/<name>\.md/);
+    s.git('rm', '-q', 'changelog.d/café.md'); s.write('changelog.d/pr.md', '### Before you update\n- x\n'); s.git('add', '-A'); s.git('commit', '-qm', 'y');
+    assert.match(s.check().stderr, /no headings in a fragment/);
+  } finally { s.done(); }
+});
+
+test('CLI: a release PR is refused while a fragment waits, and passes once folded', () => {
+  const s = sandbox();
+  try {
+    s.write('package.json', '{"version":"1.1.0"}\n');
+    s.write('CHANGELOG.md', '# Changelog\n\n## [Unreleased]\n\n## [1.1.0] - 2026-11-25\n\n- old entry\n\n## [1.0.0] - 2026-01-01\n\n- shipped\n');
+    s.git('commit', '-qam', 'release 1.1.0');
+    const r = s.check();
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /this is a release \(.*package\.json goes from 1\.0\.0 to 1\.1\.0/);
+    assert.match(r.stderr, /changelog\.d\/someone-else\.md/);
+    s.git('rm', '-q', 'changelog.d/someone-else.md');
+    s.write('CHANGELOG.md', '# Changelog\n\n## [Unreleased]\n\n## [1.1.0] - 2026-11-25\n\n- **Theirs.**\n- old entry\n\n## [1.0.0] - 2026-01-01\n\n- shipped\n');
+    s.git('commit', '-qam', 'fold');
+    const ok = s.check();
+    assert.equal(ok.status, 0, ok.stderr);
+  } finally { s.done(); }
+});
+
+test('CLI: the fold\'s --check and the fold itself treat a stray file the same way', () => {
+  const s = sandbox();
+  try {
+    s.git('rm', '-q', 'changelog.d/someone-else.md'); s.write('changelog.d/notes.txt', 'x\n'); s.git('add', '-A'); s.git('commit', '-qm', 'x');
+    const fold = (...a) => spawnSync(process.execPath, [path.join(s.dir, 'scripts/changelog-fold.js'), ...a], { cwd: s.dir, encoding: 'utf8' });
+    assert.equal(fold('--check').status, 1, '--check sees it');
+    const r = fold();
+    assert.equal(r.status, 1, 'the fold refuses it rather than skipping it');
+    assert.match(r.stderr, /notes\.txt/);
+  } finally { s.done(); }
 });

@@ -53,9 +53,10 @@ function fold(changelog, fragments) {
   if (insert < lines.length && lines[insert].trim() === '') insert += 1;
   const added = [];
   for (const l of list) added.push(...l);
-  // If [Unreleased] was empty (the next line a heading or the end), keep a blank line before what follows.
+  // A blank line before whatever heading follows: the next version, or a
+  // "### Before you update" at the top of [Unreleased] (review of #2706).
   const next = lines[insert];
-  if (next === undefined || /^## \[/.test(next)) added.push('');
+  if (next === undefined || /^#/.test(next)) added.push('');
   if (insert === at + 1) added.unshift('');
   lines.splice(insert, 0, ...added);
   return lines.join('\n');
@@ -80,12 +81,13 @@ if (require.main === module) {
   const fs = require('fs');
   const path = require('path');
   const { execFileSync } = require('child_process');
-  const { checkFragment, isFragmentPath, FRAGMENT_DIR, CHANGELOG } = require('./check-changelog.js');
+  const { checkFragment, waitingFragments, FRAGMENT_DIR, CHANGELOG } = require('./check-changelog.js');
   const ROOT = path.join(__dirname, '..');
   const dir = path.join(ROOT, FRAGMENT_DIR);
-  const names = (fs.existsSync(dir) ? fs.readdirSync(dir) : [])
-    .map((n) => `${FRAGMENT_DIR}/${n}`)
-    .filter((f) => isFragmentPath(f) && f.endsWith('.md'));
+  // Anything but the README is waiting, the same rule as cut-release.yml and
+  // the release PR's check: a stray .txt or folder is refused below, never
+  // silently skipped while the tag step refuses it forever (review of #2706).
+  const names = waitingFragments(fs.existsSync(dir) ? fs.readdirSync(dir) : []).map((n) => `${FRAGMENT_DIR}/${n}`);
 
   if (process.argv.includes('--check')) {
     if (names.length) {
@@ -101,6 +103,7 @@ if (require.main === module) {
   const problems = [];
   const texts = {};
   for (const n of names) {
+    if (!fs.statSync(path.join(ROOT, n)).isFile()) { problems.push(`${n}: not a file — ${FRAGMENT_DIR}/ holds only <name>.md fragments and README.md`); continue; }
     texts[n] = fs.readFileSync(path.join(ROOT, n), 'utf8');
     problems.push(...checkFragment(n, texts[n]).problems);
   }
