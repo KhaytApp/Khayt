@@ -33,6 +33,12 @@ defaults:
   run:
     shell: bash
 
+
+# Least privilege: merge-queue runs execute queued PR code with this token
+# (security review of Nov 26, LOW-8).
+permissions:
+  contents: read
+
 jobs:
   ios-relevant:
     name: Does this touch the iPhone app?
