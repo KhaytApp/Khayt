@@ -19,6 +19,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The merge queue on main (Nov 26 2026) tests each queued PR on top of the
+  # latest main before it lands, instead of `strict` making every PR re-run
+  # after each merge. A queue run is a `merge_group` event; the relevance
+  # jobs below diff it against the queue's base, as a PR is diffed against its.
+  merge_group:
 
 # Every `run:` is `bash -eo pipefail` (GitHub's default without `shell:` is
 # `bash -e`, with NO pipefail): a step that pipes a test into tail, tee or grep
@@ -41,9 +46,9 @@ jobs:
       - id: decide
         env:
           EVENT: ${{ github.event_name }}
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
-          if [ "$EVENT" != "pull_request" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$EVENT" != "pull_request" ] && [ "$EVENT" != "merge_group" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           files=$(git diff --name-only "$BASE"...HEAD)
           echo "$files"
           # IPHONE-RELEVANT PATHS (the old workflow path filter):
