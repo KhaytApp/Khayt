@@ -14,7 +14,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { fold, order, entryLines } = require('../scripts/changelog-fold.js');
-const { verdict, checkFragment, isFragmentPath, placement, releaseSignals, waitingFragments } = require('../scripts/check-changelog.js');
+const { verdict, checkFragment, isFragmentPath, placement, releaseSignals, waitingFragments, lostFragments } = require('../scripts/check-changelog.js');
 
 const ROOT = path.join(__dirname, '..');
 const REAL = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8');
@@ -136,6 +136,17 @@ test('releaseSignals: a version section added, or a version changed, is a releas
   assert.deepEqual(releaseSignals({ changelogDiff: '', ...v({ 'package.json': '4.11.0' }, { 'package.json': '4.11.0' }) }), []);
 });
 
+test('lostFragments: a removed fragment is lost unless its entries are in the CHANGELOG.md the PR leaves (review of 4.12.0, L3)', () => {
+  const cl = `## [Unreleased]\n\n${A}\n- plain bullet with no title\n\n## [1.0.0]\n- old\n`;
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/a.md', text: `${A}\n` }], cl), [], 'folded verbatim');
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/a.md', text: '- **Bed Ready: a download asks the switch first.** A typo the cut fixed.\n' }], cl), [], 'found by its title, the body may be edited');
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/p.md', text: '- plain bullet with no title\n' }], cl), []);
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/b.md', text: `${B}\n` }], cl), ['changelog.d/b.md'], 'not in the file');
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/ab.md', text: `${A}\n${B}\n` }], cl), ['changelog.d/ab.md'], 'every entry must be there');
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/x.md', text: '' }], cl), [], 'nothing to lose');
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/p.md', text: '- plain bullet\n' }], cl), ['changelog.d/p.md'], 'a bare bullet must match a whole line');
+});
+
 test('waitingFragments: anything in changelog.d/ but the README waits, the same rule everywhere', () => {
   assert.deepEqual(waitingFragments(['README.md', 'b.md', 'a.md', '.gitkeep', 'x.txt', 'sub']), ['.gitkeep', 'a.md', 'b.md', 'sub', 'x.txt']);
   assert.deepEqual(waitingFragments(['README.md']), []);
@@ -186,6 +197,24 @@ test('CLI: a fragment the PR added passes; editing or renaming someone else\'s d
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stdout, /fragment was written \(changelog\.d\/pr\.md\)/);
     assert.equal(s.check(path.join(s.dir, 'lib')).status, 0, 'run from lib/');
+  } finally { s.done(); }
+});
+
+test('CLI: touching CHANGELOG.md does not excuse deleting someone\'s fragment; a real fold does (L3)', () => {
+  const s = sandbox();
+  try {
+    // A "Before you update" item belongs in CHANGELOG.md itself, and a bad rebase dropped someone's fragment.
+    s.write('CHANGELOG.md', '# Changelog\n\n## [Unreleased]\n\n### Before you update\n\n- **Update every computer first.** Body.\n\n- old entry\n\n## [1.0.0] - 2026-01-01\n\n- shipped\n');
+    s.git('rm', '-q', 'changelog.d/someone-else.md');
+    s.git('add', '-A'); s.git('commit', '-qm', 'gate item, and a fragment lost');
+    const r = s.check();
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /puts it nowhere in CHANGELOG\.md:[\s\S]*changelog\.d\/someone-else\.md/);
+    // The same PR, folding it properly instead: passes.
+    s.write('CHANGELOG.md', '# Changelog\n\n## [Unreleased]\n\n### Before you update\n\n- **Update every computer first.** Body.\n\n- **Theirs.**\n- old entry\n\n## [1.0.0] - 2026-01-01\n\n- shipped\n');
+    s.git('commit', '-qam', 'fold it');
+    const ok = s.check();
+    assert.equal(ok.status, 0, ok.stderr);
   } finally { s.done(); }
 });
 

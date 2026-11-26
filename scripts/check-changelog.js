@@ -224,12 +224,36 @@ function releaseSignals(d) {
   return out;
 }
 
+/**
+ * Fragments removed by a PR whose entries are not in the CHANGELOG.md it
+ * leaves. An entry is found by its bold title (`- **Title.**`), so a cut that
+ * fixes a typo in an entry's body still passes; a bullet with no bold title
+ * must be there as written. A fragment with no entry lines is not lost.
+ *
+ * @param {Array<{name: string, text: string}>} removed  each fragment as it was on the base
+ * @param {string} changelog  CHANGELOG.md as the PR leaves it
+ * @returns {string[]} names of the fragments whose entries went nowhere
+ */
+function lostFragments(removed, changelog) {
+  const file = String(changelog || '');
+  const out = [];
+  for (const f of Array.isArray(removed) ? removed : []) {
+    const bullets = String((f && f.text) || '').replace(/\r\n/g, '\n').split('\n').filter((l) => l.startsWith('- ') && l.trim().length > 2);
+    const found = bullets.every((l) => {
+      const title = /^- (\*\*.+?\*\*)/.exec(l);
+      return title ? file.includes(`- ${title[1]}`) : file.split('\n').includes(l);
+    });
+    if (!found) out.push(f.name);
+  }
+  return out;
+}
+
 /** Everything in changelog.d/ but its README: the one rule for "waiting" (the fold's --check and cut-release.yml say the same). */
 function waitingFragments(names) {
   return (Array.isArray(names) ? names : []).map(String).filter((n) => n && n !== 'README.md').sort();
 }
 
-module.exports = { verdict, isWatched, WATCHED, OVERRIDE, CHANGELOG, placement, checkFragment, isFragmentPath, FRAGMENT_DIR, releaseSignals, waitingFragments };
+module.exports = { verdict, isWatched, WATCHED, OVERRIDE, CHANGELOG, placement, checkFragment, isFragmentPath, FRAGMENT_DIR, releaseSignals, waitingFragments, lostFragments };
 
 if (require.main === module) {
   const { execFileSync } = require('child_process');
@@ -300,11 +324,17 @@ if (require.main === module) {
   // Only the fold removes a fragment that is already on main, and the fold
   // writes its lines into CHANGELOG.md in the same PR. Anything else that
   // removes one (or renames, or rewrites-and-renames it) drops another PR's
-  // entry before any release could carry it.
-  if (deleted.length && !files.includes(CHANGELOG)) {
+  // entry before any release could carry it. Touching CHANGELOG.md is not
+  // proof of a fold (a "Before you update" item goes there too): each removed
+  // fragment's entries must be IN the file this PR leaves (review of 4.12.0, L3).
+  const lost = deleted.length ? lostFragments(
+    deleted.map((f) => { let text = ''; try { text = sh(['show', `${base}:${f}`]); } catch (_) { /* unreadable: counts as lost */ } return { name: f, text }; }),
+    (() => { try { return fs.readFileSync(path.join(TOP, CHANGELOG), 'utf8'); } catch (_) { return ''; } })(),
+  ) : [];
+  if (lost.length) {
     process.stderr.write(
-      `\nchangelog check failed — this removes ${deleted.length === 1 ? 'an entry' : 'entries'} another pull request wrote, ` +
-      `and puts ${deleted.length === 1 ? 'it' : 'them'} nowhere:\n\n` + deleted.map((f) => `  ${f}\n`).join('') +
+      `\nchangelog check failed — this removes ${lost.length === 1 ? 'an entry' : 'entries'} another pull request wrote, ` +
+      `and puts ${lost.length === 1 ? 'it' : 'them'} nowhere in ${CHANGELOG}:\n\n` + lost.map((f) => `  ${f}\n`).join('') +
       `\nWrite your own entry in a new file of yours, and leave these as they are. Only the\n` +
       `release cut removes them, by folding them into ${CHANGELOG} (npm run changelog:fold).\n`
     );
