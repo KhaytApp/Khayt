@@ -1063,6 +1063,7 @@ final class KhaytAPIClient: ObservableObject {
         refreshHoldsBook()
         // Spotlight, the feed, the widgets, delivered alerts, shared papers.
         ShopTraces.forget()
+        floorTracesForgotten = false
         pendingCount = 0
         historyWindow = nil
         lastSync = nil
@@ -2855,6 +2856,8 @@ extension KhaytAPIClient {
         // The approved screen says which role first; its Continue marks the
         // phone paired (frame "Pair 2 · Approved").
         if markPaired { settings.isPaired = true }
+        // A new pairing is a new demotion, if it is one: forget anything held.
+        floorTracesForgotten = false
         followRole()
         return usableDevice == credential
     }

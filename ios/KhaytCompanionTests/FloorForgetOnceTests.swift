@@ -79,6 +79,19 @@ final class FloorForgetOnceTests: XCTestCase {
         api.followRole()
         XCTAssertEqual(forgets, 2)
     }
+
+    /// Unpairing and pairing again start over: a phone paired as floor to
+    /// another shop gets its first forget (#2718 review). Source guard, as
+    /// pairing needs a real Mac's offer.
+    func testUnpairAndPairingClearTheFlag() throws {
+        let src = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "KhaytCompanion/Services/KhaytAPIClient.swift")
+        let text = try String(contentsOf: src, encoding: .utf8)
+        for head in ["    func unpair() {", "    func finishCodePairing("] {
+            let start = try XCTUnwrap(text.range(of: head), head)
+            XCTAssertTrue(text[start.lowerBound...].prefix(1600).contains("floorTracesForgotten = false"), head)
+        }
+    }
 }
 
 /// A Mac that answers 403 to everything: a floor phone's send is refused.
