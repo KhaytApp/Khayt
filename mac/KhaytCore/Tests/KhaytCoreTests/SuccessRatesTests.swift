@@ -20,7 +20,8 @@ struct SuccessRatesTests {
     }
     /// `percent.cases`, on a fixture new enough to have them.
     struct Percent: Decodable {
-        struct One: Decodable { let why: String; let rate: Double?; let want: Int? }
+        /// `rate` as the fixture has it: a number, null, or something that is not a number at all.
+        struct One: Decodable { let why: String; let rate: JSONValue; let want: Int? }
         let cases: [One]
     }
     struct Vectors: Decodable { let cases: [Case]; let percent: Percent? }
@@ -84,8 +85,11 @@ struct SuccessRatesTests {
         #expect(try await count(try zone("Asia/Riyadh")) == 5)      // all four instants and the bare day
         #expect(try await count(try zone("America/New_York")) == 2)  // the one after midnight there, and the bare day
         #expect(try await count(try zone("UTC")) == 3)
-        // With no dates, no days are worked out and every run counts.
-        let all = try await engine.successRates(orders: orders, machines: [], calendar: try zone("Asia/Riyadh"))
+        // No dates asked. With a calendar, the two runs it cannot date ("soon", no date) count nowhere;
+        // without one, every run counts, as before.
+        let dated = try await engine.successRates(orders: orders, machines: [], calendar: try zone("Asia/Riyadh"))
+        #expect(dated.first.map { $0.unknown } == 5)
+        let all = try await engine.successRates(orders: orders, machines: [])
         #expect(all.first.map { $0.unknown } == 7)
     }
 
@@ -105,7 +109,13 @@ struct SuccessRatesTests {
         let percents = try #require(try JSONDecoder().decode(Vectors.self, from: file).percent?.cases)
         #expect(percents.count >= 5, "the fixture lost its percent cases")
         for c in percents {
-            #expect(try await engine.successPercent(c.rate) == c.want, Comment(rawValue: c.why))
+            switch c.rate {
+            case .number(let n): #expect(try await engine.successPercent(n) == c.want, Comment(rawValue: c.why))
+            case .null: #expect(try await engine.successPercent(nil) == c.want, Comment(rawValue: c.why))
+            // A string ("0.5") cannot be handed to the Swift call at all: its type is Double?. The fixture
+            // says the rule gives no figure for one, which is what a Swift caller gets for no rate.
+            default: #expect(c.want == nil, Comment(rawValue: c.why))
+            }
         }
     }
 

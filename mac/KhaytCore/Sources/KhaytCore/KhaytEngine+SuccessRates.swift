@@ -54,11 +54,16 @@ extension KhaytEngine {
     /// one per run, and the rule is given them ready-made: its `dayOf` hook
     /// becomes a lookup. That is exact for any zone, through daylight-saving
     /// changes too. A bare `YYYY-MM-DD` is kept as written; an `at` that
-    /// cannot be read has no day.
+    /// cannot be read has no day, and with a calendar such a run is counted
+    /// in no period, with or without `from`/`to`. Without a calendar every
+    /// run counts when no dates are asked, as before.
     public func successRates(orders: [JSONValue], machines: [JSONValue],
                              from: String? = nil, to: String? = nil, calendar: Calendar? = nil) throws -> [SuccessRow] {
         var days: JSONValue = .null
-        if let calendar, from != nil || to != nil { days = .object(Self.runDays(orders, calendar: calendar)) }
+        // Whenever a calendar is given, range or not: the rule then counts a
+        // run that calendar cannot date in no period at all, "All time"
+        // included (#2702's contract).
+        if let calendar { days = .object(Self.runDays(orders, calendar: calendar)) }
         return try runtime.call2("""
             (function (orders, machines, from, to, days) {
               var input = { orders: orders, machines: machines, from: from, to: to };
