@@ -1,3 +1,4 @@
 "NSCameraUsageDescription" = "Khaytはカメラを使って、スプールのラベルやバーコードを読み取り、レシートを撮影し、完成したプリントの写真を撮ります。";
 "NFCReaderUsageDescription" = "KhaytはフィラメントスプールのNFCタグを読み書きします。";
 "NSLocalNetworkUsageDescription" = "Khaytは同じWi‑Fi上のMacまたはPCのKhaytに接続し、キュー、在庫、プリンタの状態を表示します。";
+"NSFaceIDUsageDescription" = "Khayt は Face ID を使ってアプリのロックを解除し、ショップの帳簿を非公開に保ちます。";

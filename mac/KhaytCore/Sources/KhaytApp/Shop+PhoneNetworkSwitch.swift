@@ -92,7 +92,14 @@ extension Shop {
         if let seenKeep {
             let current: Set<String> = { if case .object(let n) = networkForPhone(), case .array(let a)? = n["keep"] {
                 return Set(a.compactMap { if case .string(let s) = $0 { s } else { nil } }) }; return [] }()
-            if current != seenKeep { return stale }
+            // Only the purposes this Mac itself shows a phone. An id the phone
+            // knows and this Mac does not (a newer desktop ticked it, a newer
+            // phone read it there) is never in `current`, so comparing it
+            // would answer "changed" to every request, for good. What this
+            // Mac does not show, it has nothing to say about; the write
+            // leaves such a tick in the book as it is (`network(_:keepAll:)`).
+            let shown = Set(Self.phoneKeepable.map(\.rawValue))
+            if current != seenKeep.intersection(shown) { return stale }
         }
         // A name is chosen on the phone at pairing and is now written where
         // other computers show it: no control or direction-changing

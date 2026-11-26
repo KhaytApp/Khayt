@@ -59,5 +59,8 @@ test('the pattern runs on what it must and skips docs-only changes', () => {
 test('the Mac job is skipped by its own if:, never by a workflow path filter', () => {
   assert.doesNotMatch(ci.split('\njobs:')[0], /paths:/, 'a workflow path filter would leave the required check unreported');
   assert.match(ci, /\n  mac:\n    name: Mac app tests\n    needs: mac-relevant\n    if: needs\.mac-relevant\.outputs\.run == 'true'/);
-  assert.match(ci, /if \[ "\$EVENT" != "pull_request" \]; then echo "run=true"/, 'a push to main must always run it');
+  assert.match(ci, /if \[ "\$EVENT" != "pull_request" \] && \[ "\$EVENT" != "merge_group" \]; then echo "run=true"/, 'a push to main must always run it');
+  // A merge-queue run is diffed against the queue's base, as a PR is against its own.
+  assert.match(ci, /\n  merge_group:\n/, 'the merge queue on main needs CI to run on merge_group');
+  assert.match(ci, /BASE: \$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.merge_group\.base_sha \}\}/);
 });
