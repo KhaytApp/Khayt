@@ -80,17 +80,10 @@ struct SuccessRatesTests {
             let rows = try await engine.successRates(orders: orders, machines: [], from: "2026-11-01", to: "2026-11-01", calendar: calendar)
             return rows.first.map { $0.finished + $0.failed + $0.cancelled + $0.unknown } ?? 0
         }
-        // Whether the bundled rule has the hook yet decides what is checked.
-        let inRiyadh = try await count(try zone("Asia/Riyadh")), sliced = try await count(nil)
-        let hooked = inRiyadh != sliced
-        if hooked {
-            #expect(try await count(try zone("Asia/Riyadh")) == 5)      // all four instants and the bare day
-            #expect(try await count(try zone("America/New_York")) == 2)  // the one after midnight there, and the bare day
-            #expect(try await count(try zone("UTC")) == 3)
-        } else {
-            // The rule from before the hook: the UTC slice, whatever calendar is passed. Nothing breaks.
-            #expect(try await count(try zone("Asia/Riyadh")) == 3)
-        }
+        #expect(try await count(nil) == 3, "with no calendar the rule slices the UTC day, as it always did")
+        #expect(try await count(try zone("Asia/Riyadh")) == 5)      // all four instants and the bare day
+        #expect(try await count(try zone("America/New_York")) == 2)  // the one after midnight there, and the bare day
+        #expect(try await count(try zone("UTC")) == 3)
         // With no dates, no days are worked out and every run counts.
         let all = try await engine.successRates(orders: orders, machines: [], calendar: try zone("Asia/Riyadh"))
         #expect(all.first.map { $0.unknown } == 7)
@@ -107,9 +100,11 @@ struct SuccessRatesTests {
         #expect(try await engine.successPercent(nil) == nil)
         #expect(try await engine.successPercent(1.5) == nil)
         #expect(try await engine.successPercent(-0.1) == nil)
-        // The desktop's own vectors, when the fixture carries them.
+        // The desktop's own vectors.
         let file = try Data(contentsOf: CrossAppFixtureTests.fixture("printer-success-vectors.json"))
-        for c in try JSONDecoder().decode(Vectors.self, from: file).percent?.cases ?? [] {
+        let percents = try #require(try JSONDecoder().decode(Vectors.self, from: file).percent?.cases)
+        #expect(percents.count >= 5, "the fixture lost its percent cases")
+        for c in percents {
             #expect(try await engine.successPercent(c.rate) == c.want, Comment(rawValue: c.why))
         }
     }
