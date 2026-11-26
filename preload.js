@@ -248,7 +248,8 @@ const hubAPI = {
   // Quit handshake: main asks the renderer to flush its debounced save before exiting.
   launchGate:           (lang) => ipcRenderer.invoke('hub:launch-gate', String(lang || '')),
   launchGateAccept:     () => ipcRenderer.invoke('hub:launch-gate-accept'),
-  launchGateAcceptedInUpdate: (version) => ipcRenderer.invoke('hub:launch-gate-accepted-in-update', String(version || '')),
+  launchGateAcceptedInUpdate: (version, items) => ipcRenderer.invoke('hub:launch-gate-accepted-in-update',
+    { version: String(version || ''), items: Array.isArray(items) ? items.map((x) => String(x)) : [] }),
   onFlushSaveRequest:   (cb) => { ipcRenderer.on('hub:flush-save-request', () => { try { cb(); } catch { /* noop */ } }); },
   onRestoreRefused:     (cb) => { ipcRenderer.on('hub:restore-refused', (_e, refused) => { try { cb(Array.isArray(refused) ? refused.map(String) : []); } catch { /* noop */ } }); },
   flushSaveDone:        ()   => ipcRenderer.send('hub:flush-save-done'),
