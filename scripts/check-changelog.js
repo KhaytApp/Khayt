@@ -155,9 +155,11 @@ function headingOf(line) {
  *
  * @param {string} diff   `git diff <base>...HEAD -- CHANGELOG.md`, unified.
  * @param {string} after  the file as the PR leaves it.
+ * @param {string} [before]  the file on the base. With it, an entry reworded
+ *                  in place in a shipped section is not an addition.
  * @returns {{ok: boolean, misplaced: Array<{section: string, text: string}>}}
  */
-function placement(diff, after) {
+function placement(diff, after, before) {
   const lines = String(after || '').split('\n');
 
   // Which section each line of the new file belongs to.
@@ -169,34 +171,59 @@ function placement(diff, after) {
     sectionAt.push(current);
   }
 
-  // Walk the diff's hunks, tracking the line number in the NEW file.
-  const addedBullets = [];   // {lineNo, text}
+  // The OLD file's sections too, when the caller has it: a reworded entry is
+  // a removed line and an added one, and only the old file says where the
+  // removed one was (review of the 4.12.0 notes, Nov 26).
+  const oldSectionAt = [];
+  if (typeof before === 'string') {
+    let cur = null;
+    for (const line of before.split('\n')) { const n = headingOf(line); if (n) cur = n; oldSectionAt.push(cur); }
+  }
+
+  // Walk the diff's hunks, tracking the line number in the NEW file (and the OLD one).
+  const addedBullets = [];   // {lineNo, text, hunk}
+  const removedBullets = []; // {section, hunk, used}
   const addedSections = new Set();
   let lineNo = 0;
+  let oldNo = 0;
+  let hunkNo = -1;
   for (const raw of String(diff || '').split('\n')) {
-    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
-    if (hunk) { lineNo = Number(hunk[1]) - 1; continue; }
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
+    if (hunk) { oldNo = Number(hunk[1]) - 1; lineNo = Number(hunk[2]) - 1; hunkNo += 1; continue; }
     if (raw.startsWith('+++') || raw.startsWith('---')) continue;
     if (raw.startsWith('+')) {
       lineNo += 1;
       const text = raw.slice(1);
       const name = headingOf(text);
       if (name) { addedSections.add(name); continue; }
-      if (text.startsWith('- ')) addedBullets.push({ lineNo, text });
+      if (text.startsWith('- ')) addedBullets.push({ lineNo, text, hunk: hunkNo });
       continue;
     }
-    if (raw.startsWith('-')) continue;       // gone from the new file
-    if (raw.startsWith(' ')) { lineNo += 1; continue; }
+    if (raw.startsWith('-')) {               // gone from the new file
+      oldNo += 1;
+      if (raw.slice(1).startsWith('- ') && oldSectionAt.length) {
+        removedBullets.push({ section: oldSectionAt[oldNo - 1], hunk: hunkNo, used: false });
+      }
+      continue;
+    }
+    if (raw.startsWith(' ')) { lineNo += 1; oldNo += 1; continue; }
   }
 
   const misplaced = [];
-  for (const { lineNo: n, text } of addedBullets) {
+  for (const { lineNo: n, text, hunk } of addedBullets) {
     const section = sectionAt[n - 1];
     // Above the first heading, or in a file with none: not this rule's business.
     if (!section) continue;
     if (section === 'Unreleased') continue;
     // A release cut writes the section and its entries together.
     if (addedSections.has(section)) continue;
+    // A shipped entry REWORDED in place: the hunk also removes a bullet that
+    // was in this same section in the old file. One added line per removed
+    // one, so a new entry slipped in beside a rewording still counts. An
+    // entry MOVED from [Unreleased] pairs with nothing (its removed line was
+    // in another section), which is the case this rule exists for.
+    const pair = removedBullets.find((r) => !r.used && r.hunk === hunk && r.section === section);
+    if (pair) { pair.used = true; continue; }
     misplaced.push({ section, text: text.slice(0, 90) });
   }
   return { ok: misplaced.length === 0, misplaced };
@@ -262,7 +289,9 @@ if (require.main === module) {
   const base = process.env.BASE_REF || process.argv[2] || 'main';
   // From the repo root whatever the cwd, and paths exactly as written (no
   // octal quoting of a non-ASCII name, which would hide it from the rules).
-  const sh = (args) => execFileSync('git', ['-c', 'core.quotePath=false', ...args], { encoding: 'utf8', cwd: TOP });
+  // maxBuffer: CHANGELOG.md is over 2 MB, past execFileSync's 1 MB default, and
+  // a read that overflowed was caught below as "not checked" (Nov 26).
+  const sh = (args) => execFileSync('git', ['-c', 'core.quotePath=false', ...args], { encoding: 'utf8', cwd: TOP, maxBuffer: 256 * 1024 * 1024 });
   const TOP = (() => { try { return execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim(); } catch (_) { return process.cwd(); } })();
   const nul = (s) => String(s || '').split('\0').filter(Boolean);
 
@@ -368,7 +397,10 @@ if (require.main === module) {
     let where = { ok: true, misplaced: [] };
     try {
       const diff = sh(['diff', '--unified=3', `${base}...HEAD`, '--', CHANGELOG]);
-      where = placement(diff, fs.readFileSync(path.join(TOP, CHANGELOG), 'utf8'));
+      // The old side of `base...HEAD` is the merge base's file.
+      let before;
+      try { before = sh(['show', `${sh(['merge-base', base, 'HEAD']).trim()}:${CHANGELOG}`]); } catch (_) { before = undefined; }
+      where = placement(diff, fs.readFileSync(path.join(TOP, CHANGELOG), 'utf8'), before);
     } catch (e) {
       process.stdout.write(`changelog placement not checked — ${(e && e.message) || e}\n`);
     }
