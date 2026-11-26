@@ -157,8 +157,8 @@ extension Shop {
     }
 
     /// `settings.network` with one purpose kept, or no longer kept, while
-    /// offline. Only a purpose the rule knows, never `lan` (always allowed)
-    /// and never `tunnel` (the Mac has none). The stamp is not touched.
+    /// offline. Never `lan` (always allowed) or the switch-sync call; a
+    /// purpose only a newer app knows stays as it was. The stamp is not touched.
     nonisolated static func network(_ network: JSONValue?, keep purpose: OutboundPurpose, _ kept: Bool) -> JSONValue {
         var n: [String: JSONValue] = { if case .object(let o)? = network { return o }; return [:] }()
         // The switch-sync call is not in `keep`: unticking its row writes
@@ -170,8 +170,12 @@ extension Shop {
         var list: [String] = { if case .array(let a)? = n["keep"] { return a.compactMap { if case .string(let s) = $0 { s } else { nil } } }; return [] }()
         list.removeAll { $0 == purpose.rawValue }
         if kept { list.append(purpose.rawValue) }
-        let known = Set(OutboundPurpose.allCases.map(\.rawValue))
-        n["keep"] = .array(list.filter { known.contains($0) && !NetworkSwitch.neverKept.contains($0) }.map(JSONValue.string))
+        // A purpose this Mac does not know stays, as `keepAll` leaves it: a
+        // newer app ticked it, and a tick on another row here is not an
+        // untick of that one (review Nov 26, L4). Never `lan` or the
+        // switch-sync call, and each once.
+        var seen = Set<String>()
+        n["keep"] = .array(list.filter { !NetworkSwitch.neverKept.contains($0) && seen.insert($0).inserted }.map(JSONValue.string))
         return .object(n)
     }
 

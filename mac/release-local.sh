@@ -112,6 +112,16 @@ node scripts/write-release-gates.js --check \
 bash mac/sync-js.sh >/dev/null
 git diff --quiet -- mac/KhaytCore/Sources/KhaytCore/JS/release-gates.json \
   || fail "the bundled release-gates.json on origin/main is not lib's — run mac/sync-js.sh, land what it writes, and start again"
+# And everything else sync-js.sh writes: the bundled modules, the locales and
+# the Resources copies. The build below compiles THIS tree, so a module that
+# drifted from lib/ on main would otherwise ship lib's version silently, with
+# no commit that says so (review Nov 26, L1). Untracked counts too: a module
+# newly on the list but never copied in.
+DRIFT="$(git status --porcelain -- mac/KhaytCore/Sources/KhaytCore/JS/ \
+  mac/KhaytCore/Sources/KhaytApp/Resources/invoice.css \
+  mac/KhaytCore/Sources/KhaytApp/Resources/filament-catalog.json)"
+[ -z "$DRIFT" ] || fail "the bundled JS on origin/main is not lib's — run mac/sync-js.sh, land what it writes, and start again:
+$DRIFT"
 
 V="$(node -p "require('./mac/version.json').version")"
 B="$(node -p "require('./mac/version.json').build")"
@@ -133,7 +143,10 @@ publish() {
   say "signing and publishing on GitHub (a few minutes)"
   PRE=true; [ "$PRERELEASE" = 1 ] || PRE=false
   BEFORE="$(gh run list -R KhaytApp/Khayt --workflow mac-publish.yml --limit 1 --json databaseId --jq '.[0].databaseId // 0')"
-  gh workflow run mac-publish.yml -R KhaytApp/Khayt --ref main -f tag="$TAG" -f prerelease="$PRE" -f publish_appcast=true
+  # sha: the commit this build is from, so the publish checks and scripts
+  # against IT and not against main's tip, which may have moved on (L2).
+  gh workflow run mac-publish.yml -R KhaytApp/Khayt --ref main -f tag="$TAG" -f prerelease="$PRE" -f publish_appcast=true \
+    -f sha="$(git rev-parse HEAD)"
   RUN=""
   for _ in $(seq 1 30); do
     sleep 5
