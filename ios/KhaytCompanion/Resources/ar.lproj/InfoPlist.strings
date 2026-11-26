@@ -2,3 +2,4 @@
 "NFCReaderUsageDescription" = "يقرأ تطبيق خيط وسوم NFC على بكرات الخيط ويكتب عليها.";
 "NSLocalNetworkUsageDescription" = "يتصل هذا التطبيق بتطبيق خيط على جهاز Mac أو الحاسوب على شبكة Wi‑Fi نفسها لعرض الطابور والمخزون وحالة الطابعات.";
 "CFBundleDisplayName" = "خيط";
+"NSFaceIDUsageDescription" = "يستخدم خيط Face ID لفتح التطبيق، ليبقى دفتر متجرك خاصًا.";

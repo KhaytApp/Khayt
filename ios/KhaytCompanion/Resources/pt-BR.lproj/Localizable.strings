@@ -1568,6 +1568,32 @@
 "photos.blocked.detail" = "As fotos não podem ser vistas nem adicionadas neste telefone. O proprietário pode manter o Khayt Cloud em Uso da internet no Mac.";
 "photos.blocked.nothing_sent" = "Nada foi enviado.";
 
+/* The lock when Khayt opens (signed frames L1-L4, L3b) */
+"lock.title" = "Segurança";
+"lock.toggle" = "Bloquear o Khayt com %@";
+"lock.toggle.search" = "Bloquear o Khayt com Face ID";
+"lock.passcode" = "o código";
+"lock.after" = "Bloquear após";
+"lock.after.immediately" = "Imediatamente";
+"lock.after.1" = "Após 1 minuto";
+"lock.after.5" = "Após 5 minutos";
+"lock.after.15" = "Após 15 minutos";
+"lock.foot" = "Ativado por padrão nos telefones do proprietário e do gerente. O Face ID ou o código deste iPhone abre o Khayt ao iniciar, e de novo depois de ficar em segundo plano pelo tempo acima. Seu livro fica no telefone de qualquer forma.";
+"lock.no_passcode" = "Este iPhone não tem código, então o Khayt não pode bloquear. Defina um nos Ajustes do iPhone.";
+"lock.floor.title" = "Não é preciso bloquear";
+"lock.floor.body" = "Este é um telefone de oficina: não guarda cópia do livro da loja, então não há nada nele para bloquear. Mostra a fila e as impressoras enquanto está no Wi-Fi da loja.";
+"lock.hide_names" = "Ocultar os nomes dos trabalhos na tela bloqueada";
+"lock.hide_names.foot" = "Desativado por padrão. Quando ativado, os alertas de impressão e a Atividade ao Vivo dizem “Uma impressão” em vez do título do trabalho ou do nome do arquivo da impressora, e o lembrete de um pedido não cita o cliente.";
+"lock.locked" = "Bloqueado. O livro da sua loja está neste telefone.";
+"lock.failed" = "O %@ não reconheceu. Tente de novo ou use o código deste iPhone.";
+"lock.failed.passcode" = "Isso não desbloqueou o Khayt. Tente de novo.";
+"lock.unlock_with" = "Desbloquear com %@";
+"lock.try_again" = "Tentar o %@ de novo";
+"lock.unlock" = "Desbloquear";
+"lock.use_passcode" = "Usar o código";
+"lock.reason" = "Desbloqueie o Khayt para ver sua loja.";
+"alert.print.a_print" = "Uma impressão";
+"intake.remind.alert.hidden" = "Um pedido de cliente aguarda sua resposta.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
 "internet.title" = "Uso da internet";
 "internet.switch" = "Não fazer conexões com a internet";

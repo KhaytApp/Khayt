@@ -66,6 +66,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Khayt uses the camera to read spool labels and barcodes, photograph receipts, and take photos of finished prints.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Khayt uses Face ID to unlock the app, so your shop's book stays private.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Khayt connects to Khayt on your Mac or PC on the same Wi‑Fi to show the queue, inventory and printer status.</string>
 	<key>NSSupportsLiveActivities</key>

@@ -52,14 +52,18 @@ extension KhaytEngine {
     /// JavaScript cannot be handed a Swift function and JavaScriptCore has no
     /// time zones to ask, so with a `calendar` the days are worked out HERE,
     /// one per run, and the rule is given them ready-made: its `dayOf` hook
-    /// (the Windows/Linux app's #2702) becomes a lookup. That is exact for
-    /// any zone, through daylight-saving changes too. A bare `YYYY-MM-DD` is
-    /// kept as written; an `at` that cannot be read has no day. A bundled
-    /// rule from before the hook ignores it and slices as it always did.
+    /// becomes a lookup. That is exact for any zone, through daylight-saving
+    /// changes too. A bare `YYYY-MM-DD` is kept as written; an `at` that
+    /// cannot be read has no day, and with a calendar such a run is counted
+    /// in no period, with or without `from`/`to`. Without a calendar every
+    /// run counts when no dates are asked, as before.
     public func successRates(orders: [JSONValue], machines: [JSONValue],
                              from: String? = nil, to: String? = nil, calendar: Calendar? = nil) throws -> [SuccessRow] {
         var days: JSONValue = .null
-        if let calendar, from != nil || to != nil { days = .object(Self.runDays(orders, calendar: calendar)) }
+        // Whenever a calendar is given, range or not: the rule then counts a
+        // run that calendar cannot date in no period at all, "All time"
+        // included (#2702's contract).
+        if let calendar { days = .object(Self.runDays(orders, calendar: calendar)) }
         return try runtime.call2("""
             (function (orders, machines, from, to, days) {
               var input = { orders: orders, machines: machines, from: from, to: to };
@@ -109,18 +113,10 @@ extension KhaytEngine {
     /// no rate, or for anything that is not a number from 0 to 1: shown "—".
     public func successPercent(_ rate: Double?) throws -> Int? {
         guard let rate, rate.isFinite else { return nil }
-        let said = try runtime.call2("""
-            (function (rate) {
-              var f = globalThis.KhaytPrinterSuccess.successPercent;
-              if (typeof f === 'function') return f(rate);
-              // The same rule, for a bundled copy from before the helper.
-              if (typeof rate !== 'number' || !(rate >= 0 && rate <= 1)) return null;
-              var p = Math.round(rate * 100);
-              if (p >= 100 && rate < 1) return 99;
-              if (p <= 0 && rate > 0) return 1;
-              return p;
-            })(ARG0)
-            """, [.number(rate)], as: JSONValue.self)
+        // The rule's own figure. There is no second copy of the rounding here:
+        // a stand-in lived in this place until the helper was bundled, and two
+        // copies of one rule drift (Windows/Linux lane, #2702).
+        let said = try runtime.call2("globalThis.KhaytPrinterSuccess.successPercent(ARG0)", [.number(rate)], as: JSONValue.self)
         switch said {
         case .number(let n): return Int(n.rounded())
         case .string(let text): return Int(text.prefix { $0.isNumber })

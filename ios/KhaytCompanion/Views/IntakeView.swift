@@ -269,7 +269,10 @@ enum IntakeReminder {
         let c = UNMutableNotificationContent()
         c.title = L10n.tr("PUSH_TITLE")
         let who = item.clientName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        c.body = L10n.format("intake.remind.alert", who.isEmpty ? item.displayTitle : who)
+        // "Hide job names on the lock screen": this alert would otherwise put
+        // the customer's own name there (review of #2691).
+        c.body = LockScreenPrivacy.hidesJobNames() ? L10n.tr("intake.remind.alert.hidden")
+            : L10n.format("intake.remind.alert", who.isEmpty ? item.displayTitle : who)
         c.sound = .default
         c.threadIdentifier = "khayt.intake"
         c.filterCriteria = NotificationKind.intake

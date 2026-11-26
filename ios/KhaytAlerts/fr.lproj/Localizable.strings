@@ -20,3 +20,4 @@
 "PUSH_MESSAGE" = "Un client a envoyé un message";
 "PUSH_PAYMENT" = "Un paiement est arrivé";
 "PUSH_GENERIC" = "Quelque chose dans votre atelier demande un coup d’œil";
+"alert.print.a_print" = "Une impression";
