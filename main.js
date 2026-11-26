@@ -2468,6 +2468,11 @@ require('./lib/main/launch-gate.js').registerLaunchGate({
   // Asked once, as the app starts: the window writes a fresh install's first
   // book before it asks for the gate, and that is not an upgrade.
   hasBook: (() => { let had = false; try { had = fs.existsSync(dataFilePath()); } catch (_) { had = false; } return () => had; })(),
+  // The app version that last opened the book, read as the app starts, before
+  // this launch's app-version backup overwrites the marker (writeAppVersionBackup).
+  // Every build since 3.11.6 writes it, so a 4.11.x book counts from 4.11.x and
+  // is not asked about 4.11.0 again (review of 4.12.0, L1).
+  lastKnownVersion: (() => { let v = null; try { v = fs.readFileSync(path.join(app.getPath('userData'), LAST_APP_VERSION_FILE), 'utf8').trim() || null; } catch (_) { v = null; } return () => v; })(),
   isNewer: (a, b) => isVersionNewer(String(a), String(b)),
   offeredVersion: () => require('./lib/updater').offeredUpdateVersion(),
 });

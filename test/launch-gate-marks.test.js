@@ -42,6 +42,36 @@ test('marks cover only versions up to acceptedFor', () => {
   assert.deepEqual(items, ['Update every computer first.', 'Sign in to send a file.'], 'a mark for 4.11.0 does not read 4.12.0\'s items');
 });
 
+test('L1: with no record of its own, the gate counts from the version that last opened the book, when the host knows it', () => {
+  const run = (lastKnown) => G.pending({ current: '4.12.0', seen: null, gates, hasBook: true, isNewer: G.isNewer, lastKnown }).items;
+  assert.deepEqual(run('4.11.0'), ['Update every computer first.', 'Sign in to send a file.'], 'a 4.11.0 book is not asked about 4.11.0 again');
+  assert.deepEqual(run('4.11.2'), ['Update every computer first.', 'Sign in to send a file.']);
+  assert.deepEqual(run('4.10.3'), ['Old item.', 'Update every computer first.', 'Sign in to send a file.'], 'a book from before 4.11.0 still reads it');
+  assert.deepEqual(run('4.12.0'), [], 'the same version: nothing');
+  // Unknown or not a version: the floor, as before (the safe way to be wrong).
+  for (const bad of [null, undefined, '', 'garbage', '4.11', 7]) {
+    assert.deepEqual(run(bad), ['Old item.', 'Update every computer first.', 'Sign in to send a file.'], String(bad));
+  }
+  // The file's own record still wins.
+  assert.deepEqual(G.pending({ current: '4.12.0', seen: { lastRun: '4.10.0' }, gates, hasBook: true, isNewer: G.isNewer, lastKnown: '4.11.0' }).items,
+    ['Old item.', 'Update every computer first.', 'Sign in to send a file.']);
+  // A fresh install is never asked, whatever the marker says.
+  assert.deepEqual(G.pending({ current: '4.12.0', seen: null, gates, hasBook: false, isNewer: G.isNewer, lastKnown: '4.10.0' }).items, []);
+});
+
+test('L1: main hands the rule the version read at start (lastKnownVersion)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lg-'));
+  const handlers = new Map();
+  try {
+    registerLaunchGate({ ipcMain: { handle: (n, f) => handlers.set(n, f) }, userDataDir: () => dir, current: '4.12.0', gates, hasBook: () => true,
+      isNewer: G.isNewer, lastKnownVersion: () => '4.11.0' });
+    assert.deepEqual(handlers.get('hub:launch-gate')(null, 'en').items, ['Update every computer first.', 'Sign in to send a file.']);
+    const src = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+    assert.match(src, /lastKnownVersion: \(\(\) => \{ let v = null; try \{ v = fs\.readFileSync\(path\.join\(app\.getPath\('userData'\), LAST_APP_VERSION_FILE\)/,
+      'read once as the app starts, before writeAppVersionBackup overwrites it');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('main: the dialog\'s accept records the shown items, bounded; the first-launch accept clears them', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lg-'));
   const handlers = new Map();
