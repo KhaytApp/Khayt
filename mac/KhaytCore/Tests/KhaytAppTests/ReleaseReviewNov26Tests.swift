@@ -151,37 +151,60 @@ struct ReleaseReviewNov26Tests {
     /// The house rule: anything a device can send, timed at 8 MB. A phone's
     /// expense with its receipt may be several megabytes of JSON, and this
     /// check runs on the LAN server's thread before any rule does.
-    @Test("the repeated-key check is linear: 8 MB of keys in one object, escaped or not, and deep nesting")
-    func repeatedKeyTiming() {
-        func timed(_ data: Data) -> (Bool, Double) {
-            let start = Date()
-            let found = JSONRepeatedKeys.found(in: data)
-            return (found, Date().timeIntervalSince(start))
+    /// Three bodies of one kind, at about 1 MB and 8 MB.
+    static func body(_ kind: Int, keys: Int) -> Data {
+        let bs = "\u{5C}"
+        var text = kind == 2 ? "" : "{"
+        text.reserveCapacity(keys * 48)
+        for k in 0..<keys {
+            switch kind {
+            case 0: text += "\"key_\(k)_padding_padding_padding_pad\":\(k),"
+            case 1: text += "\"\(bs)u006b\(k)_pad_pad_pad_pad_pad_\(bs)t_\(bs)u00e9\":0,"
+            default: text += "[{\"a\":"
+            }
         }
-        // ~200,000 distinct keys in ONE object (the case that was quadratic), ~8 MB.
-        var plain = "{"
-        plain.reserveCapacity(9_000_000)
-        for k in 0..<200_000 { plain += "\"key_\(k)_padding_padding_padding_pad\":\(k),"; }
-        plain += "\"last\":0}"
-        let (p1, t1) = timed(Data(plain.utf8))
-        #expect(Data(plain.utf8).count >= 8_000_000, Comment(rawValue: "\(Data(plain.utf8).count) bytes"))
-        #expect(!p1 && t1 < 2, Comment(rawValue: "plain keys: \(t1) s"))
-        // The same, with one repeat at the very end: found.
-        let (p2, _) = timed(Data((plain.dropLast() + ",\"key_0_padding_padding_padding_pad\":1}").utf8))
-        #expect(p2)
-        // Every key escaped (each read by hand, not by JSONDecoder), ~8 MB.
-        var escaped = "{"
-        escaped.reserveCapacity(9_000_000)
-        for k in 0..<200_000 { escaped += "\"BSu006b\(k)_pad_pad_pad_pad_pad_BSt_BSu00e9\":0,".replacingOccurrences(of: "BS", with: "BACKSLASH") }
-        escaped = escaped.replacingOccurrences(of: "BACKSLASH", with: "\u{5C}") + "\"z\":0}"
-        #expect(Data(escaped.utf8).count >= 8_000_000, Comment(rawValue: "\(Data(escaped.utf8).count) bytes"))
-        let (p3, t3) = timed(Data(escaped.utf8))
-        #expect(!p3 && t3 < 2, Comment(rawValue: "escaped keys: \(t3) s"))
-        // 8 MB of nesting.
-        let deep = String(repeating: "[{\"a\":", count: 1_400_000)
-        let (p4, t4) = timed(Data(deep.utf8))
-        #expect(!p4 && t4 < 2, Comment(rawValue: "nesting: \(t4) s"))
-        print("repeated-key timing at 8 MB: plain \(t1) s, escaped \(t3) s, nested \(t4) s")
+        if kind != 2 { text += "\"z\":0}" }
+        return Data(text.utf8)
+    }
+
+    /// The house rule: anything a device can send, measured at 8 MB. A phone's
+    /// expense with its receipt may be several megabytes of JSON, and this
+    /// check runs on the LAN server's thread before any rule does.
+    ///
+    /// SCALING, NOT THE CLOCK. On a runner busy with the whole suite the same
+    /// work took four times as long as here (2.2 s against 0.5 s for the
+    /// escaped keys, merge-queue run 45784438496), so a fixed bound in seconds
+    /// fails on load and passes a slow regression on a quiet machine. Eight
+    /// times the bytes must cost about eight times the time: the quadratic
+    /// version Dev Hub caught would cost about sixty-four. Each size is the
+    /// best of three, which takes the noise out of the ratio.
+    @Test("the repeated-key check is linear: eight times the bytes, about eight times the time, at 8 MB")
+    func repeatedKeyScaling() {
+        func best(_ data: Data) -> Double {
+            var fastest = Double.infinity
+            for _ in 0..<3 {
+                let start = DispatchTime.now().uptimeNanoseconds
+                _ = JSONRepeatedKeys.found(in: data)
+                fastest = min(fastest, Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9)
+            }
+            return fastest
+        }
+        var said: [String] = []
+        for (kind, name, keys) in [(0, "plain keys in one object", 200_000), (1, "escaped keys in one object", 200_000), (2, "nesting", 1_400_000)] {
+            let large = Self.body(kind, keys: keys), small = Self.body(kind, keys: keys / 8)
+            #expect(large.count >= 8_000_000, Comment(rawValue: "\(name): \(large.count) bytes"))
+            #expect(!JSONRepeatedKeys.found(in: large), Comment(rawValue: name))
+            let (t1, t8) = (best(small), best(large))
+            let ratio = t8 / max(t1, 1e-6)
+            said.append("\(name) \(String(format: "%.3f", t1)) s at 1 MB, \(String(format: "%.3f", t8)) s at 8 MB, x\(String(format: "%.1f", ratio))")
+            #expect(ratio < 16, Comment(rawValue: "\(name): \(t1) s at 1 MB, \(t8) s at 8 MB, ratio \(ratio)"))
+        }
+        // And still found when the repeat is the very last key of 8 MB.
+        var last = Self.body(0, keys: 200_000)
+        last.removeLast()
+        last.append(Data(",\"key_0_padding_padding_padding_pad\":1}".utf8))
+        #expect(JSONRepeatedKeys.found(in: last))
+        print("repeated-key scaling: " + said.joined(separator: "; "))
     }
 
     @Test("a body that does not start like JSON is not looked at: a photo's bytes are never a repeated key")
