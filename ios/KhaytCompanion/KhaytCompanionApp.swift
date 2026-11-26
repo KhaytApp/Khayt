@@ -76,8 +76,11 @@ struct KhaytCompanionApp: App {
         }
         JobSearch.open = { id in nav.openOrder(id: id) }
         JobSearch.floorPhone = { ConnectionSettings.storedIsFloorPhone }
+        Task { await JobSearch.reindexIfUpdated() }
         alerts = center
-        activities = PrintActivities(printers: printers, settings: s, api: apiClient)
+        let printActivities = PrintActivities(printers: printers, settings: s, api: apiClient)
+        activities = printActivities
+        LockScreenNames.changed = { Task { await printActivities.redraw() } }
         activeCount = ActiveCountSender(settings: s)
         channel.onEvent = { kind, at, ciphertext, session, ref in
             if kind == "cmd-result" {

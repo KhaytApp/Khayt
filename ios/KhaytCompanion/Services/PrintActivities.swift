@@ -162,6 +162,16 @@ final class PrintActivities {
         holdWatch()
     }
 
+    /// "Hide job names on the lock screen" changed: every running card is
+    /// drawn again now, with what it already says. The views read the setting
+    /// as they draw, and a paused or waiting print can go a long time without
+    /// a new reading (release review L2, Nov 26).
+    func redraw() async {
+        for a in Activity<PrintActivityAttributes>.activities where Self.isRunning(a.activityState) {
+            await a.update(ActivityContent(state: a.content.state, staleDate: a.content.staleDate))
+        }
+    }
+
     /// Switched off in Settings: every running one goes at once.
     func endAll() async {
         for a in Activity<PrintActivityAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }

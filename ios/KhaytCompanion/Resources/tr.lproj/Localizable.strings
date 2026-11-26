@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Kilidi aç";
 "lock.use_passcode" = "Parolayı kullan";
 "lock.reason" = "Atölyenizi görmek için Khayt’ın kilidini açın.";
+"lock.reason.change" = "Khayt kilidini değiştirmek için kimliğinizi doğrulayın.";
 "alert.print.a_print" = "Bir baskı";
 "intake.remind.alert.hidden" = "Bir müşteri talebi yanıtınızı bekliyor.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */

@@ -551,7 +551,7 @@ final class StubPairMac: URLProtocol, @unchecked Sendable {
         let data = try! JSONSerialization.data(withJSONObject: answer.1)
         var fields = ["Content-Type": "application/json"]
         // The reply MAC as docs/LAN_API.md writes it, worked out here on its
-        // own rather than with the phone's DeviceKey.replyMac.
+        // own rather than with the phone's DeviceKey code.
         if let (key, nonce) = replyMacFor, Self.replySigning != .unsigned {
             let signedBody = Self.replySigning == .forged ? Data(#"{"role":"owner"}"#.utf8) : data
             let hex = SHA256.hash(data: signedBody).map { String(format: "%02x", $0) }.joined()

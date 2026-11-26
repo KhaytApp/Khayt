@@ -1592,6 +1592,7 @@
 "lock.unlock" = "解锁";
 "lock.use_passcode" = "使用密码";
 "lock.reason" = "解锁 Khayt 以查看你的店铺。";
+"lock.reason.change" = "请验证身份以更改 Khayt 锁定。";
 "alert.print.a_print" = "一次打印";
 "intake.remind.alert.hidden" = "有一个客户请求在等待你的答复。";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */

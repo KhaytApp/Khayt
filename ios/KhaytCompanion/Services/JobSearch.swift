@@ -102,7 +102,30 @@ enum JobSearch {
     /// (which run without the app's screens) can read it.
     static let lockKey = "khayt.lock.inForce"
     nonisolated(unsafe) static var defaults: UserDefaults = .standard
-    nonisolated static var hidesCustomers: Bool { defaults.bool(forKey: lockKey) }
+    /// Before this build's gate has said (Siri or a Shortcut running before
+    /// the first launch after the update), the person's own choice, else
+    /// hidden: never a customer named on a guess (release review L3).
+    nonisolated static var hidesCustomers: Bool {
+        if let inForce = defaults.object(forKey: lockKey) as? Bool { return inForce }
+        return defaults.object(forKey: lockChoiceKey) as? Bool ?? true
+    }
+    /// `AppLock`'s own key for the person's choice.
+    nonisolated static let lockChoiceKey = "khayt.lock.choice"
+
+    /// The build whose index Spotlight holds.
+    static let indexedBuildKey = "khayt.spotlight.indexedBuild"
+
+    /// The first launch of a new build (also one Siri starts in the
+    /// background) replaces what the older build put in Spotlight at once:
+    /// it may name customers this build hides while the lock is on (release
+    /// review L3). Later launches do nothing here.
+    static func reindexIfUpdated(build: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
+                                 into spotlight: any JobIndex = CSSearchableIndex.default()) async {
+        guard defaults.string(forKey: indexedBuildKey) != build else { return }
+        defaults.set(build, forKey: indexedBuildKey)
+        indexedAt = nil
+        await index(into: spotlight)
+    }
 
     /// The lock turned on or off: what Spotlight holds is replaced at once,
     /// without customers while it is on and with them again when it is off.

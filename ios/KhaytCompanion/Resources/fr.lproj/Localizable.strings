@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Déverrouiller";
 "lock.use_passcode" = "Utiliser le code";
 "lock.reason" = "Déverrouillez Khayt pour voir votre atelier.";
+"lock.reason.change" = "Confirmez votre identité pour modifier le verrouillage de Khayt.";
 "alert.print.a_print" = "Une impression";
 "intake.remind.alert.hidden" = "Une demande client attend votre réponse.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
