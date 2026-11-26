@@ -1,2 +1,1 @@
-### Fixed
-- iPhone: a phone moved to the floor with edits still unsent no longer deletes its print alerts, reminders, feed and widget on every refresh. The shop's traces are cleared once when it is moved, and again only after it is raised and moved back.
+- **iPhone: a phone moved to the floor keeps its print alerts.** A phone moved to the floor with edits still unsent no longer deletes its print alerts, reminders, feed and widget on every refresh. The shop's traces are cleared once when it is moved, and again only after it is raised and moved back, unpaired or paired again.
