@@ -274,8 +274,10 @@ if (require.main === module) {
   // A RELEASE PR must carry every entry its tag will carry. A fragment that
   // lands while the release PR's CI runs comes in with the rebase, with no
   // conflict; caught only at tag time, it could be filed nowhere but
-  // [Unreleased] (the placement rule) and missed its release. Here, under the
-  // strict rule, the checked tree IS the merged tree (review of #2706).
+  // [Unreleased] (the placement rule) and missed its release. The tree that
+  // will merge is checked here: the PR's own under `strict`, and since the
+  // merge queue (Nov 26) the queue's run as well, which sees every PR ahead of
+  // this one (review of #2706; ci.yml runs this on merge_group).
   if (releasing.length && leftover.length) {
     process.stderr.write(
       `\nchangelog check failed — this is a release (${releasing.join('; ')}), and ${FRAGMENT_DIR}/ still ` +
@@ -283,6 +285,16 @@ if (require.main === module) {
       `\nRun "npm run changelog:fold" again and file them in this release's section.\n`
     );
     process.exit(1);
+  }
+
+  // In the merge queue only the release rule above can change between the
+  // PR's own run and the merge (another PR's fragment landing ahead). The rest
+  // was decided on the PR, and the queue's commits do not carry the PR's own
+  // messages, so a "[no changelog]" there would read as missing and stall the
+  // queue for a PR that was right.
+  if (process.env.CHANGELOG_CHECK_SCOPE === 'release') {
+    process.stdout.write(`changelog check ok — merge queue: ${releasing.length ? 'a release with no fragments waiting' : 'not a release'}\n`);
+    process.exit(0);
   }
 
   // Only the fold removes a fragment that is already on main, and the fold

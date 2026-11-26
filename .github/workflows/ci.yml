@@ -37,9 +37,17 @@ jobs:
   # between v3.6.0-beta.8 and this job with [Unreleased] empty for all of them,
   # so those release notes were written at cut time by someone who had not made
   # the changes. PRs only — a push to main is a squash of something already checked.
+  #
+  # AND THE MERGE QUEUE. The release-PR rule (no changelog.d/ fragment left
+  # when a version section is written) was race-free only while `strict`
+  # made the checked tree the merged tree. With the queue, a fragment can land
+  # ahead of a release PR after its PR run; the queue's run is the one that
+  # sees the tree that will merge, so it must run this too. Diffed against the
+  # queue's base (main's tip), so PRs ahead in the same group count as in the
+  # tree, which is exactly what the release rule needs.
   changelog:
     name: Changelog entry
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -49,7 +57,9 @@ jobs:
 
       - name: Changelog entry for shipped changes
         env:
-          BASE_REF: origin/${{ github.base_ref }}
+          BASE_REF: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || format('origin/{0}', github.base_ref) }}
+          # The queue re-checks only the release rule (scripts/check-changelog.js).
+          CHANGELOG_CHECK_SCOPE: ${{ github.event_name == 'merge_group' && 'release' || 'all' }}
         run: node scripts/check-changelog.js
 
   # CONTRIBUTING.md says a PR without a DCO sign-off can't be merged. Until this

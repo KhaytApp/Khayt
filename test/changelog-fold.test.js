@@ -165,7 +165,7 @@ function sandbox() {
   write('changelog.d/someone-else.md', '- **Theirs.**\n');
   git('add', '-A'); git('commit', '-q', '-m', 'base');
   git('checkout', '-q', '-b', 'pr');
-  const check = (cwd = dir) => spawnSync(process.execPath, [path.join(dir, 'scripts/check-changelog.js')], { cwd, encoding: 'utf8', env: { ...process.env, BASE_REF: 'main' } });
+  const check = (cwd = dir, env = {}) => spawnSync(process.execPath, [path.join(dir, 'scripts/check-changelog.js')], { cwd, encoding: 'utf8', env: { ...process.env, BASE_REF: 'main', CHANGELOG_CHECK_SCOPE: '', ...env } });
   return { dir, git, write, check, done: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
@@ -217,6 +217,34 @@ test('CLI: a release PR is refused while a fragment waits, and passes once folde
     const ok = s.check();
     assert.equal(ok.status, 0, ok.stderr);
   } finally { s.done(); }
+});
+
+test('CLI, merge queue (CHANGELOG_CHECK_SCOPE=release): only the release rule, which a PR ahead in the queue can break', () => {
+  const s = sandbox();
+  const queue = { CHANGELOG_CHECK_SCOPE: 'release' };
+  try {
+    // A PR whose own run passed on "[no changelog]": the queue's commits do not carry that message.
+    s.write('lib/a.js', '2\n'); s.git('commit', '-qam', 'internal refactor');
+    assert.equal(s.check(s.dir).status, 1, 'its own run would ask for an entry');
+    const q = s.check(s.dir, queue);
+    assert.equal(q.status, 0, q.stderr);
+    assert.match(q.stdout, /merge queue: not a release/);
+    // The release PR, with a fragment that landed ahead of it in the queue still waiting: refused.
+    s.write('package.json', '{"version":"1.1.0"}\n'); s.git('commit', '-qam', 'release');
+    const r = s.check(s.dir, queue);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /this is a release[\s\S]*changelog\.d\/someone-else\.md/);
+  } finally { s.done(); }
+});
+
+test('ci.yml: the "Changelog entry" job runs in the merge queue too, on the release rule only', () => {
+  const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+  const job = ci.slice(ci.indexOf('\n  changelog:\n'), ci.indexOf('\n  dco:\n'));
+  assert.ok(job.length > 0, 'the changelog job is where it was');
+  assert.match(job, /if: github\.event_name == 'pull_request' \|\| github\.event_name == 'merge_group'/);
+  assert.match(job, /BASE_REF: \$\{\{ github\.event_name == 'merge_group' && github\.event\.merge_group\.base_sha \|\| format\('origin\/\{0\}', github\.base_ref\) \}\}/);
+  assert.match(job, /CHANGELOG_CHECK_SCOPE: \$\{\{ github\.event_name == 'merge_group' && 'release' \|\| 'all' \}\}/);
+  assert.match(job, /fetch-depth: 0/, 'the base must be in the clone');
 });
 
 test('CLI: the fold\'s --check and the fold itself treat a stray file the same way', () => {
