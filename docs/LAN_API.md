@@ -1510,6 +1510,7 @@ Whether a finished job has a time-lapse on its printer, and whether it has been 
 | 409 | `no-timelapse`: the job has none a copy could be made of |
 | 409 | `no-machine`: its printer is no longer one of the shop's Moonraker printers |
 | 409 | `copying`: a copy for this job is already running |
+| 409 | `cancelled`: somebody at the Mac stopped that copy; nothing was kept |
 | 409 | `read-only`: this Mac is showing the sample book, or another computer holds the book |
 | 500 | `not-saved`: the copy was made and the job could not be written (the copy is removed); `message` says why |
 | 502 | `printer-unreachable`: the printer did not hand the file over |

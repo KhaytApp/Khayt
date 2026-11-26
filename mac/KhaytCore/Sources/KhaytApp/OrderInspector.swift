@@ -119,6 +119,9 @@ struct JobDetail: View {
             if let timelapse {
                 TimelapseLine(shop: shop, link: timelapse)
             }
+            // "Keep as proof": the video copied into this job's own files
+            // (Mac file page 25, frame 3). Shows nothing for a job with no time-lapse.
+            TimelapseProofCard(shop: shop, jobId: job.id)
             Divider()
             money
             if Shop.finishedStatuses.contains(job.status), job.shippingStatus != nil || shop.canMoveJobs {

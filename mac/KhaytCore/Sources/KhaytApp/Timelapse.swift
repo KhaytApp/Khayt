@@ -187,7 +187,8 @@ struct TimelapseLine: View {
 /// the player is handed a private scheme, and every byte it asks for is
 /// fetched by `PinnedVideoLoader` from the address that was checked, with
 /// redirects refused and no cache, exactly as a still is.
-private struct TimelapsePlayer: View {
+/// Not private: the "Keep as proof" card plays a video too large to keep the same way.
+struct TimelapsePlayer: View {
     let url: URL
     /// What the printer said the video weighed when the job was noted.
     let bytes: Double?

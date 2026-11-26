@@ -48,6 +48,8 @@ extension Shop {
         case noMachine
         /// A copy for this job is running.
         case busy
+        /// The person stopped it. Nothing was kept.
+        case cancelled
         /// The printer did not hand the file over.
         case unreachable
         /// The sample book, or a book another computer holds.
@@ -152,14 +154,24 @@ extension Shop {
         let got: Int
         do {
             try files.createDirectory(at: folder, withIntermediateDirectories: true)
-            got = try await CappedDownload.run(request, to: part, cap: Int(most))
+            let total = plan.bytes
+            timelapseProgress[jobId] = TimelapseProgress(got: 0, total: total)
+            got = try await CappedDownload.run(request, to: part, cap: Int(most)) { [weak self] bytes in
+                Task { @MainActor in
+                    guard let self, self.timelapseCopying.contains(jobId) else { return }
+                    self.timelapseProgress[jobId] = TimelapseProgress(got: bytes, total: total)
+                }
+            }
         } catch CappedDownload.Failure.overBudget(let seen) {
             discard()
+            timelapseProgress[jobId] = nil
             return .link(reason: "over-budget", bytes: Double(seen), maxBytes: most)
         } catch {
             discard()
-            return .unreachable
+            timelapseProgress[jobId] = nil
+            return Task.isCancelled ? .cancelled : .unreachable
         }
+        timelapseProgress[jobId] = nil
         guard got > 0 else { discard(); return .unreachable }
         do {
             try? files.removeItem(at: dest)
@@ -237,6 +249,7 @@ extension Shop {
         case .none: return refuse(409, "no-timelapse")
         case .noMachine: return refuse(409, "no-machine")
         case .busy: return refuse(409, "copying")
+        case .cancelled: return refuse(409, "cancelled")
         case .unreachable: return refuse(502, "printer-unreachable")
         case .readOnly: return refuse(409, "read-only")
         case .notPermitted: return refuse(403, "not-permitted")

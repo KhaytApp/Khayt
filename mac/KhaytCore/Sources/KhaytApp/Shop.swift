@@ -2629,6 +2629,13 @@ final class Shop {
     /// The jobs whose time-lapse is being copied from a printer now
     /// (`Shop+TimelapseKeep.swift`): one copy per job at a time.
     var timelapseCopying: Set<String> = []
+    /// How far each running copy has got, for the job page's card.
+    var timelapseProgress: [String: TimelapseProgress] = [:]
+    /// What the last "Keep as proof" on a job came to when it kept nothing,
+    /// said on the card until the next try (`TimelapseProofCard`).
+    var timelapseProblem: [String: String] = [:]
+    /// The copies started from this Mac's own card, so Cancel can stop one.
+    var timelapseTasks: [String: Task<Void, Never>] = [:]
     /// TESTS ONLY, for the time-lapse keep: where the files go, the
     /// printer's address, and the write of the job's row in place of the
     /// book on disk (nil from it: the job is gone; false: already kept).

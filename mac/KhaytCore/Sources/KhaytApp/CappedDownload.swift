@@ -32,6 +32,9 @@ final class CappedDownload: NSObject, URLSessionDataDelegate, @unchecked Sendabl
     private let cap: Int
     private var got = 0
     private var failure: Failure?
+    /// Told how much has been written, about every quarter megabyte.
+    private var progress: (@Sendable (Int) -> Void)?
+    private var told = 0
     private var done: CheckedContinuation<Int, Error>?
     private let lock = NSLock()
 
@@ -40,13 +43,14 @@ final class CappedDownload: NSObject, URLSessionDataDelegate, @unchecked Sendabl
     /// The bytes written to `file`. Throws `Failure`, or the transport's own
     /// error; in every failing case `file` may hold a partial copy, which is
     /// the caller's to remove.
-    static func run(_ request: URLRequest, to file: URL, cap: Int) async throws -> Int {
+    static func run(_ request: URLRequest, to file: URL, cap: Int, progress: (@Sendable (Int) -> Void)? = nil) async throws -> Int {
         guard let url = request.url, cap > 0 else { throw Failure.status(0) }
         // The switch never blocks the shop's own network, and says so itself.
         try OutboundGate.shared.require(.lan, url: url)
         guard FileManager.default.createFile(atPath: file.path, contents: nil),
               let handle = try? FileHandle(forWritingTo: file) else { throw Failure.write }
         let job = CappedDownload(handle: handle, cap: cap)
+        job.progress = progress
         let setup = URLSessionConfiguration.ephemeral
         setup.timeoutIntervalForRequest = idle
         setup.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -99,7 +103,8 @@ final class CappedDownload: NSObject, URLSessionDataDelegate, @unchecked Sendabl
         if stopped { return }
         // What is READ is the limit, whatever was said: nothing past it is written.
         if now > cap { return fail(.overBudget(now), dataTask) }
-        do { try handle.write(contentsOf: data) } catch { fail(.write, dataTask) }
+        do { try handle.write(contentsOf: data) } catch { return fail(.write, dataTask) }
+        if now - told >= 256 * 1024 { told = now; progress?(now) }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {

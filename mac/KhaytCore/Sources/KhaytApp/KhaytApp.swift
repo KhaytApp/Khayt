@@ -987,6 +987,12 @@ final class Activator: NSObject, NSApplicationDelegate {
             // Only the vault over its plan (khayt-cloud #143): the plan pane,
             // the library banner and the vault sheets, not over / read-only /
             // deleting, on the sample, in memory (`SnapshotVaultLapse.swift`).
+            // The "Keep as proof" card, page 25 frame 3 (`SnapshotProofCard.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_PROOF"] == "1", let shop = subject {
+                await captureProofCard(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_VAULTLAPSE"] == "1", let shop = subject {
                 await captureVaultLapse(shop, into: dir, dark: dark)
                 NSApp.terminate(nil)
