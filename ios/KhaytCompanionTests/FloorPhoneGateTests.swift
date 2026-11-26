@@ -83,7 +83,10 @@ final class FloorPhoneGateTests: XCTestCase {
         let start = try XCTUnwrap(text.range(of: "PhoneOutbound.start("))
         let call = String(text[start.lowerBound...].prefix(600))
         XCTAssertTrue(call.contains("floor:"), "PhoneOutbound.start is given floor:")
-        XCTAssertTrue(call.contains("isFloorPhone"), "…from the phone's role")
+        XCTAssertTrue(call.contains("storedIsFloorPhone"), "…from the phone's role, read from storage")
+        // Never through the main actor: the gate may ask from any thread (#2717).
+        XCTAssertFalse(text.contains("assumeIsolated { s.isFloorPhone }"))
+        XCTAssertFalse(text.contains("assumeIsolated { s.isPaired"))
     }
 
     // MARK: (c) forgetting the book on the way to the floor leaves the gate held
@@ -102,6 +105,40 @@ final class FloorPhoneGateTests: XCTestCase {
             PhoneOutbound.forgotten()
             XCTAssertEqual(gate.currentBook, OutboundGate.Book.none)
         }
+    }
+
+    // MARK: the closures are safe from any thread (#2717 review)
+
+    /// What the app hands the gate and Spotlight, called from a background
+    /// queue: answers, never traps, and agrees with the main-actor property.
+    func testTheRoleAndPairingAreReadableFromABackgroundQueue() async {
+        let s = ConnectionSettings()
+        let saved = (s.deviceRole, s.pairedByCode)
+        defer { s.deviceRole = saved.0; s.pairedByCode = saved.1 }
+        s.pairedByCode = true
+        s.deviceRole = "operator"
+        let onMain = s.isFloorPhone
+        // The closures exactly as the app installs them.
+        PhoneOutbound.floor = { ConnectionSettings.storedIsFloorPhone }
+        PhoneOutbound.paired = { ConnectionSettings.storedIsPaired }
+        JobSearch.floorPhone = { ConnectionSettings.storedIsFloorPhone }
+        let gateFloor = PhoneOutbound.floor, gatePaired = PhoneOutbound.paired, spotlightFloor = JobSearch.floorPhone
+        let off: (Bool, Bool) = await withCheckedContinuation { done in
+            DispatchQueue.global(qos: .background).async {
+                XCTAssertFalse(Thread.isMainThread)
+                _ = gatePaired()
+                XCTAssertEqual(gateFloor(), spotlightFloor())
+                done.resume(returning: (gateFloor(), gatePaired()))
+            }
+        }
+        XCTAssertTrue(onMain)
+        XCTAssertEqual(off.0, onMain, "the same answer off the main thread")
+        s.deviceRole = "manager"
+        let manager: Bool = await withCheckedContinuation { done in
+            DispatchQueue.global().async { done.resume(returning: ConnectionSettings.storedIsFloorPhone) }
+        }
+        XCTAssertFalse(manager)
+        _ = off.1
     }
 
     // MARK: M2: no customer names back into Spotlight on a floor phone
