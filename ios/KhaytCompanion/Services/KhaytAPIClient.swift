@@ -278,8 +278,29 @@ final class KhaytAPIClient: ObservableObject {
 
     func fetchStatus() async throws -> ShopStatus {
         if let local = await fromBook({ try await $0.status() }) { return local }
-        return try await get("/api/status?format=json", requiresPin: false, as: ShopStatus.self)
+        // A phone with no book (a floor phone) learns the shop's internet
+        // switch from this answer (#2640, H1). The Mac includes `network` only
+        // for a request whose device signature verified, and signs its answer
+        // with `x-khayt-reply-mac` over this nonce; the phone believes the
+        // block only when that verifies (`PhoneOutbound.StatusNetwork.read`).
+        if let device = usableDevice, let url = try? makeURL(path: Self.statusPath) {
+            let nonce = MacIdentity.nonce()
+            if let (data, response) = try? await send(url, method: "GET", body: nil, auth: .device(device), nonce: nonce),
+               let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+               let status = try? JSONDecoder().decode(ShopStatus.self, from: data) {
+                PhoneOutbound.statusAnswer(.read(device, nonce: nonce, status: http.statusCode, body: data,
+                                                 replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac")))
+                await CompanionCache.shared.store(status, for: Self.statusPath)
+                servingCachedSince = nil
+                return status
+            }
+            // Refused or unreadable: the plain read below, as before. Nothing
+            // it says touches the gate.
+        }
+        return try await get(Self.statusPath, requiresPin: false, as: ShopStatus.self)
     }
+
+    static let statusPath = "/api/status?format=json"
 
     func fetchQueue() async throws -> [QueueOrder] {
         if let local = await fromBook({ try await $0.queue() }) { return local }
@@ -622,6 +643,9 @@ final class KhaytAPIClient: ObservableObject {
         if settings.isConfigured, (try? await sendPendingChanges()) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
         }
+        // A phone moved to the floor kept its book only for unsent edits: once
+        // they are sent, it goes now rather than at the next round (M2).
+        if !settings.mayHoldBook { forgetBookForFloorMode() }
         var cloudDone = false
         if cloud != nil {
             // A refused round adopted nothing: the Mac's book still comes down.
@@ -2927,12 +2951,18 @@ extension KhaytAPIClient {
         // Only on the way down (a book is held): a floor phone's own cached
         // answers are what it is allowed to see, and clearing them each round
         // would leave its screens blank offline.
-        guard settings.pairedByCode, !settings.mayHoldBook, !settings.isSampleShop, pendingCount == 0,
+        guard settings.pairedByCode, !settings.mayHoldBook, !settings.isSampleShop,
               holdsBookOnDisk || holdsBook else { return }
+        // What the book left behind outside it goes at once, edits waiting or
+        // not (M2): Spotlight, the feed and the widgets name customers, and a
+        // floor phone shows none of them.
+        ShopTraces.forget()
+        // The book itself waits for its edits to be sent, and goes the moment
+        // they are (`refreshEverywhere` asks again right after a send).
+        guard pendingCount == 0 else { return }
         book?.forget()
         Task { await CompanionCache.shared.clear() }
         Task { await LibraryThumbs.shared.clear() }
-        ShopTraces.forget()
         refreshHoldsBook()
     }
 

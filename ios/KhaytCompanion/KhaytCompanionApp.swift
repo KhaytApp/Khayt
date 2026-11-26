@@ -53,7 +53,11 @@ struct KhaytCompanionApp: App {
         // Before anything can call out: the shop's internet switch, from the
         // book on disk (P8).
         PhoneOutbound.start(book: apiClient.book, countInstall: s.countInstall,
-                            paired: { MainActor.assumeIsolated { s.isPaired || s.device != nil } })
+                            paired: { MainActor.assumeIsolated { s.isPaired || s.device != nil } },
+                            // H1: an operator or viewer phone keeps no book, so
+                            // until its Mac's signed status says, it holds
+                            // everything but `lan` (`.unread`), never "online".
+                            floor: { MainActor.assumeIsolated { s.isFloorPhone } })
         let healthMonitor = ConnectionHealth(api: apiClient, settings: s)
         _settings = StateObject(wrappedValue: s)
         _api = StateObject(wrappedValue: apiClient)
@@ -70,6 +74,7 @@ struct KhaytCompanionApp: App {
             await center.perform(move: move, machineId: machineId)
         }
         JobSearch.open = { id in nav.openOrder(id: id) }
+        JobSearch.floorPhone = { MainActor.assumeIsolated { s.isFloorPhone } }
         alerts = center
         activities = PrintActivities(printers: printers, settings: s, api: apiClient)
         activeCount = ActiveCountSender(settings: s)
