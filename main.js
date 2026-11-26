@@ -5552,6 +5552,22 @@ registerLanServer({
   // until the phone ships it, as on the Mac: on only for a developer who
   // starts Khayt with KHAYT_PHONE_PAIRING_BY_CODE=1. Read here, in main, so
   // nothing the window sends can switch it on.
+  // POST /api/network/switch: an owner's phone flipping "Make no internet
+  // calls" (the Mac's route; lib/main/phone-network-switch.js). The same write,
+  // stamp and "tell my other computers" as the window's own change. The
+  // functions read networkSwitchSync when called (it is declared further down).
+  phoneNetworkSwitch: require('./lib/main/phone-network-switch').createPhoneNetworkSwitch({
+    getSettings: () => (lanServerStore && lanServerStore.settings) || null,
+    updateNetwork: (fn) => updateStoreOnDiskAllowingLock((cur) => {
+      const before = (cur.settings && cur.settings.network && typeof cur.settings.network === 'object') ? cur.settings.network : {};
+      const next = fn(before);
+      if (next === before) return cur;
+      return Object.assign({}, cur, { settings: Object.assign({}, cur.settings, { network: next }) });
+    }, ['settings.network']),
+    publish: (args) => networkSwitchSync.publish(args),
+    highestSeen: () => { try { return networkSwitchSync.state().highestSeen || null; } catch (_) { return null; } },
+    notify: (network) => BrowserWindow.getAllWindows().forEach((w) => { try { w.webContents.send('hub:network-applied', network); } catch (_) { /* gone */ } }),
+  }),
   phonePairing: require('./lib/main/phone-pairing').createPhonePairing({
     enabled: () => process.env.KHAYT_PHONE_PAIRING_BY_CODE === '1',
   }),
