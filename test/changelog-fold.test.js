@@ -327,3 +327,12 @@ test('CLI: the fold\'s --check and the fold itself treat a stray file the same w
     assert.match(r.stderr, /notes\.txt/);
   } finally { s.done(); }
 });
+
+test('a CHANGELOG.md checked out with CRLF folds and keeps its line endings (review of 4.12.0, L4)', () => {
+  const { fold } = require('../scripts/changelog-fold.js');
+  const lf = '# Changelog\n\n## [Unreleased]\n\n- **Old.** x\n\n## [1.0.0]\n';
+  const frag = [{ name: 'a.md', text: '- **New.** y\n' }];
+  const out = fold(lf.replace(/\n/g, '\r\n'), frag);
+  assert.strictEqual(out, fold(lf, frag).replace(/\n/g, '\r\n'));
+  assert.ok(out.includes('- **New.** y\r\n'));
+});

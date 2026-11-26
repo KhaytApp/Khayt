@@ -286,7 +286,13 @@ if (require.main === module) {
   const { execFileSync } = require('child_process');
   const fs = require('fs');
   const path = require('path');
-  const base = process.env.BASE_REF || process.argv[2] || 'main';
+  // In the merge queue each queued PR is one squash commit on top of those
+  // ahead of it, and each gets its own group run. The release rule is about THIS
+  // PR, so it is judged against its own parent: a fragment PR queued behind a
+  // release PR otherwise saw the release ahead of it, counted its own fragment as
+  // left over and was ejected (review of 4.12.0, L2). The release PR's own group
+  // run still sees every fragment in the tree it will merge.
+  const base = process.env.CHANGELOG_CHECK_SCOPE === 'release' ? 'HEAD^1' : (process.env.BASE_REF || process.argv[2] || 'main');
   // From the repo root whatever the cwd, and paths exactly as written (no
   // octal quoting of a non-ASCII name, which would hide it from the rules).
   // maxBuffer: CHANGELOG.md is over 2 MB, past execFileSync's 1 MB default, and
