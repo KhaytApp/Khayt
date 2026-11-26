@@ -148,6 +148,56 @@ struct ReleaseReviewNov26Tests {
         }
     }
 
+    /// The house rule: anything a device can send, timed at 8 MB. A phone's
+    /// expense with its receipt may be several megabytes of JSON, and this
+    /// check runs on the LAN server's thread before any rule does.
+    @Test("the repeated-key check is linear: 8 MB of keys in one object, escaped or not, and deep nesting")
+    func repeatedKeyTiming() {
+        func timed(_ data: Data) -> (Bool, Double) {
+            let start = Date()
+            let found = JSONRepeatedKeys.found(in: data)
+            return (found, Date().timeIntervalSince(start))
+        }
+        // ~200,000 distinct keys in ONE object (the case that was quadratic), ~8 MB.
+        var plain = "{"
+        plain.reserveCapacity(9_000_000)
+        for k in 0..<200_000 { plain += "\"key_\(k)_padding_padding_padding_pad\":\(k),"; }
+        plain += "\"last\":0}"
+        let (p1, t1) = timed(Data(plain.utf8))
+        #expect(Data(plain.utf8).count >= 8_000_000, Comment(rawValue: "\(Data(plain.utf8).count) bytes"))
+        #expect(!p1 && t1 < 2, Comment(rawValue: "plain keys: \(t1) s"))
+        // The same, with one repeat at the very end: found.
+        let (p2, _) = timed(Data((plain.dropLast() + ",\"key_0_padding_padding_padding_pad\":1}").utf8))
+        #expect(p2)
+        // Every key escaped (each read by hand, not by JSONDecoder), ~8 MB.
+        var escaped = "{"
+        escaped.reserveCapacity(9_000_000)
+        for k in 0..<200_000 { escaped += "\"BSu006b\(k)_pad_pad_pad_pad_pad_BSt_BSu00e9\":0,".replacingOccurrences(of: "BS", with: "BACKSLASH") }
+        escaped = escaped.replacingOccurrences(of: "BACKSLASH", with: "\u{5C}") + "\"z\":0}"
+        #expect(Data(escaped.utf8).count >= 8_000_000, Comment(rawValue: "\(Data(escaped.utf8).count) bytes"))
+        let (p3, t3) = timed(Data(escaped.utf8))
+        #expect(!p3 && t3 < 2, Comment(rawValue: "escaped keys: \(t3) s"))
+        // 8 MB of nesting.
+        let deep = String(repeating: "[{\"a\":", count: 1_400_000)
+        let (p4, t4) = timed(Data(deep.utf8))
+        #expect(!p4 && t4 < 2, Comment(rawValue: "nesting: \(t4) s"))
+        print("repeated-key timing at 8 MB: plain \(t1) s, escaped \(t3) s, nested \(t4) s")
+    }
+
+    @Test("a body that does not start like JSON is not looked at: a photo's bytes are never a repeated key")
+    func notJson() {
+        var jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0])
+        jpeg.append(Data(#"{"a":1,"a":2}"#.utf8))
+        #expect(!JSONRepeatedKeys.found(in: jpeg))
+        #expect(JSONRepeatedKeys.found(in: Data(" \n\t{\"a\":1,\"a\":2}".utf8)), "spaces before the brace are still JSON")
+        #expect(!JSONRepeatedKeys.found(in: Data(#"x{"a":1,"a":2}"#.utf8)))
+        // Escapes read as JSON reads them, and none that JSON does not have.
+        let bs = "\u{5C}"
+        #expect(JSONRepeatedKeys.found(in: Data("{\"\(bs)/a\":1,\"/a\":2}".utf8)))
+        #expect(JSONRepeatedKeys.found(in: Data("{\"\(bs)u00e9\":1,\"é\":2}".utf8)))
+        #expect(!JSONRepeatedKeys.found(in: Data("{\"\(bs)q\":1,\"\(bs)q\":2}".utf8)), "not JSON: the reader's question")
+    }
+
     // MARK: - L3 and L5
 
     @Test("failed accounting pushes wait while the shop makes no internet calls, as webhook retries do")
