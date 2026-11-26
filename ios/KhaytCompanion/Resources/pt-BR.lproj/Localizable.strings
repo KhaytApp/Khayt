@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Desbloquear";
 "lock.use_passcode" = "Usar o código";
 "lock.reason" = "Desbloqueie o Khayt para ver sua loja.";
+"lock.reason.change" = "Confirme que é você para alterar o bloqueio do Khayt.";
 "alert.print.a_print" = "Uma impressão";
 "intake.remind.alert.hidden" = "Um pedido de cliente aguarda sua resposta.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */

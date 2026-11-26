@@ -1592,6 +1592,7 @@
 "lock.unlock" = "ロック解除";
 "lock.use_passcode" = "パスコードを使う";
 "lock.reason" = "ショップを表示するには Khayt のロックを解除してください。";
+"lock.reason.change" = "Khayt のロックを変更するには本人確認をしてください。";
 "alert.print.a_print" = "印刷";
 "intake.remind.alert.hidden" = "顧客からの依頼が返答を待っています。";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */

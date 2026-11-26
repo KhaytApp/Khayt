@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Entsperren";
 "lock.use_passcode" = "Code verwenden";
 "lock.reason" = "Entsperren Sie Khayt, um Ihren Shop zu sehen.";
+"lock.reason.change" = "Bestätigen Sie, dass Sie es sind, um die Khayt-Sperre zu ändern.";
 "alert.print.a_print" = "Ein Druck";
 "intake.remind.alert.hidden" = "Eine Kundenanfrage wartet auf Ihre Antwort.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */

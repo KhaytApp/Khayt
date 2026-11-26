@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Unlock";
 "lock.use_passcode" = "Use passcode";
 "lock.reason" = "Unlock Khayt to see your shop.";
+"lock.reason.change" = "Confirm it’s you to change the Khayt lock.";
 "alert.print.a_print" = "A print";
 "intake.remind.alert.hidden" = "A customer request is waiting for your answer.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */

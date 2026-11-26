@@ -2886,8 +2886,8 @@ extension KhaytAPIClient {
               let (data, response) = try? await send(url, method: "GET", body: nil, auth: .device(credential),
                                                      nonce: nonce),
               let http = response as? HTTPURLResponse, http.statusCode == 200,
-              DeviceKey.replyVerifies(credential, nonce: nonce, status: 200, body: data,
-                                      header: http.value(forHTTPHeaderField: "x-khayt-reply-mac")),
+              DeviceKey.verifiesReply(credential, nonce: nonce, status: 200, body: data,
+                                      replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac")),
               case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: data) else { return nil }
         return o
     }
@@ -2914,8 +2914,8 @@ extension KhaytAPIClient {
         var outcome = PhoneNetworkSwitch.Outcome.failed
         if let (data, response) = try? await send(url, method: "POST", body: body, auth: .device(device), nonce: nonce),
            let http = response as? HTTPURLResponse {
-            let verified = DeviceKey.replyVerifies(device, nonce: nonce, status: http.statusCode, body: data,
-                                                   header: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+            let verified = DeviceKey.verifiesReply(device, nonce: nonce, status: http.statusCode, body: data,
+                                                   replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
             outcome = PhoneNetworkSwitch.outcome(status: http.statusCode, body: data, verified: verified)
         }
         switch outcome {

@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 import KhaytCore
 @testable import KhaytCompanion
 
@@ -112,12 +113,14 @@ final class NetworkSwitchTests: XCTestCase {
         let key = Data(repeating: 7, count: 32).base64EncodedString()
         let device = DeviceKey.Credential(deviceId: "dev_sample", key: key, identityKey: "sample-identity")
         let body = Data(#"{"ok":true,"network":{"offline":true,"keep":[]}}"#.utf8)
-        let mac = try XCTUnwrap(DeviceKey.replyMac(key: key, nonce: "n-1", status: 200, body: body))
-        XCTAssertTrue(DeviceKey.replyVerifies(device, nonce: "n-1", status: 200, body: body, header: mac))
-        XCTAssertFalse(DeviceKey.replyVerifies(device, nonce: "n-2", status: 200, body: body, header: mac), "another request's answer")
-        XCTAssertFalse(DeviceKey.replyVerifies(device, nonce: "n-1", status: 409, body: body, header: mac))
-        XCTAssertFalse(DeviceKey.replyVerifies(device, nonce: "n-1", status: 200, body: Data("{}".utf8), header: mac))
-        XCTAssertFalse(DeviceKey.replyVerifies(device, nonce: "n-1", status: 200, body: body, header: nil))
+        // Signed as the Mac signs it (LanServer.replyMac), not by the phone's own code.
+        let mac = Data(HMAC<SHA256>.authenticationCode(for: DeviceKey.replyText(nonce: "n-1", status: 200, body: body),
+                                                       using: SymmetricKey(data: Data(repeating: 7, count: 32)))).base64EncodedString()
+        XCTAssertTrue(DeviceKey.verifiesReply(device, nonce: "n-1", status: 200, body: body, replyMac: mac))
+        XCTAssertFalse(DeviceKey.verifiesReply(device, nonce: "n-2", status: 200, body: body, replyMac: mac), "another request's answer")
+        XCTAssertFalse(DeviceKey.verifiesReply(device, nonce: "n-1", status: 409, body: body, replyMac: mac))
+        XCTAssertFalse(DeviceKey.verifiesReply(device, nonce: "n-1", status: 200, body: Data("{}".utf8), replyMac: mac))
+        XCTAssertFalse(DeviceKey.verifiesReply(device, nonce: "n-1", status: 200, body: body, replyMac: nil))
     }
 
     func testEveryOutcomeButDoneHasWords() {

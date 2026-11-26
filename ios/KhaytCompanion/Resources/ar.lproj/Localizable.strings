@@ -1592,6 +1592,7 @@
 "lock.unlock" = "فتح";
 "lock.use_passcode" = "استخدام رمز الدخول";
 "lock.reason" = "افتح خيط لعرض متجرك.";
+"lock.reason.change" = "أكّد هويتك لتغيير قفل خيط.";
 "alert.print.a_print" = "طباعة";
 "intake.remind.alert.hidden" = "طلب عميل ينتظر ردّك.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
