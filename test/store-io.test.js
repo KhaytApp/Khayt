@@ -1102,3 +1102,30 @@ test('a window save that missed the per-head push never erases what main wrote (
   const own = io.mergeStoreSecretsFromDisk({ settings: {}, printLog: [{ id: 'J1', actualHeadsJobId: 'MAC', actualHeads: [], actualHeadsBasis: 'proportional' }] });
   assert.equal(own.printLog[0].actualHeadsJobId, 'MAC');
 });
+
+test('a window save that missed the time-lapse push never erases printerTimelapse (review of 4.12.0, M1); its own record, and a deletion, stand', async () => {
+  const io = makeStoreIo({ encryption: false });
+  // What lib/main/timelapse-keep.js write() puts on the job, through updateStoreOnDisk.
+  const rec = { machineId: 'M1', video: 'timelapse/a.mp4', cover: 'timelapse/a.jpg', bytes: 4200000, at: '2026-11-26T10:00:00.000Z' };
+  await fs.promises.writeFile(io.dataFilePath(), JSON.stringify(io.encryptForDisk({
+    settings: {}, printLog: [{ id: 'J1', status: 'post', printerTimelapse: rec }, { id: 'J2', status: 'post', printerTimelapse: { ...rec, video: 'timelapse/b.mp4' } }, { id: 'J3', status: 'post' }],
+  })), 'utf8');
+  // The window was reloading when main wrote it: its next save has J1 without the field
+  // (or as null), J2 deleted, J3 untouched.
+  const merged = io.mergeStoreSecretsFromDisk({ settings: {}, printLog: [{ id: 'J1', status: 'qc', notes: 'from the window' }, { id: 'J3', status: 'qc', printerTimelapse: null }] });
+  const j1 = merged.printLog.find((j) => j.id === 'J1');
+  assert.deepEqual(j1.printerTimelapse, rec, 'main\'s record survives the save');
+  assert.notEqual(j1.printerTimelapse, rec, 'a copy, not the disk object');
+  assert.deepEqual([j1.status, j1.notes], ['qc', 'from the window'], 'the window\'s own edits stand');
+  assert.equal(merged.printLog.some((j) => j.id === 'J2'), false, 'a job the window deleted stays deleted');
+  assert.equal(merged.printLog.find((j) => j.id === 'J3').printerTimelapse, null, 'nothing invented');
+  // A window job that already holds a record keeps its own (it only ever copies main's).
+  const own = io.mergeStoreSecretsFromDisk({ settings: {}, printLog: [{ id: 'J1', printerTimelapse: { ...rec, video: 'timelapse/other.mp4' } }] });
+  assert.equal(own.printLog[0].printerTimelapse.video, 'timelapse/other.mp4');
+  // And the two main-written groups are independent: a job with a split but no record gets the record.
+  await fs.promises.writeFile(io.dataFilePath(), JSON.stringify(io.encryptForDisk({
+    settings: {}, printLog: [{ id: 'J1', printerTimelapse: rec, actualHeadsJobId: 'A7', actualHeads: [], actualHeadsBasis: 'proportional' }],
+  })), 'utf8');
+  const both = io.mergeStoreSecretsFromDisk({ settings: {}, printLog: [{ id: 'J1', actualHeadsJobId: 'A7', actualHeads: [], actualHeadsBasis: 'proportional' }] });
+  assert.deepEqual(both.printLog[0].printerTimelapse, rec);
+});

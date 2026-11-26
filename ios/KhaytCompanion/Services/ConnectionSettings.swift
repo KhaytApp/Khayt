@@ -428,6 +428,24 @@ final class ConnectionSettings: ObservableObject {
     }
 }
 
+/// The two facts the internet gate and Spotlight ask from ANY thread (#2717
+/// review): read straight from what the published properties write
+/// (UserDefaults, the Keychain), never through the main-actor object, so a
+/// caller off the main thread can never trap on `MainActor.assumeIsolated`.
+extension ConnectionSettings {
+    /// `isFloorPhone`, from storage.
+    nonisolated static var storedIsFloorPhone: Bool {
+        let d = UserDefaults.standard
+        return DeviceRole.isFloor(DeviceRole.effective(role: d.string(forKey: Keys.deviceRole),
+                                                       pairedByCode: d.bool(forKey: Keys.pairedByCode)))
+    }
+
+    /// `isPaired || device != nil`, from storage.
+    nonisolated static var storedIsPaired: Bool {
+        UserDefaults.standard.bool(forKey: Keys.paired) || KeychainHelper.get(Keys.deviceKeychain) != nil
+    }
+}
+
 enum KeychainHelper {
     private static let service = Bundle.main.bundleIdentifier ?? "com.khaytapp.companion"
 

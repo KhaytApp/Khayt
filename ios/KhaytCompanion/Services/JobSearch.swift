@@ -93,6 +93,9 @@ struct OpenJobIntent: OpenIntent {
 enum JobSearch {
     /// Set by the app: open a job by id.
     static var open: ((String) -> Void)?
+    /// Whether this phone is a floor phone, asked at each index (the app
+    /// passes `ConnectionSettings.isFloorPhone`; a test sets its own).
+    nonisolated(unsafe) static var floorPhone: () -> Bool = { false }
     private static var indexedAt: Date?
 
     /// Whether the app lock is in force on this phone, where the intents
@@ -118,6 +121,15 @@ enum JobSearch {
     /// from the book, deleted on the Mac, or from the sample shop the phone
     /// opened before its real one, stayed findable for good.
     static func index(now: Date = Date(), into spotlight: any JobIndex = CSSearchableIndex.default()) async {
+        // A floor phone (operator or viewer) keeps none of the shop's jobs in
+        // Spotlight, even while a book it may no longer hold is still on disk
+        // waiting for its edits to be sent (M2): customer names must not come
+        // back through a re-index (the lock's, or the next one).
+        if floorPhone() {
+            indexedAt = nil
+            try? await spotlight.deleteJobs()
+            return
+        }
         if let last = indexedAt, now.timeIntervalSince(last) < 600 { return }
         indexedAt = now
         // An index that was under way when the lock changed is stale: it may

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import KhaytCore
 
@@ -176,10 +177,54 @@ extension Shop {
     }
 
     /// Stand the sheet over the window for this version.
+    ///
+    /// ── EVERY HOLD IS SHOWN (Nov 26 review, M1) ─────────────────────────
+    /// SwiftUI shows one sheet at a time on a window, and a sheet whose
+    /// condition turns true while another is up (a job sheet, New job) is
+    /// dropped, not queued. The update then stayed held with nothing on
+    /// screen: every check was refused, and a check by hand set the same
+    /// value again, which is no change, so nothing was shown, until a restart.
+    /// So a hold is always a change: cleared now, and set again once the
+    /// window has no sheet up. The one exception is this sheet already on
+    /// screen with these same items, which the hourly check must not flicker.
     func holdUpdate(_ version: String, _ releases: [KhaytEngine.GatedRelease]) {
         // lock: system — shows what a found update says; nothing is written.
         guard !releases.isEmpty else { return }
-        updateOffer = UpdateOffer(version: version, releases: releases)
+        let offer = UpdateOffer(version: version, releases: releases)
+        if updateGateOnScreen, updateOffer == offer { return }
+        updateOfferWaiting?.cancel()
+        updateOfferWaiting = nil
+        // Nothing held and nothing in the way: shown now, as it always was.
+        if updateOffer == nil, !updateWindowBusy { updateOffer = offer; return }
+        updateOffer = nil
+        updateOfferWaiting = Task { @MainActor [weak self] in
+            // At least one turn, so the cleared value is seen before the new one.
+            await Task.yield()
+            while let shop = self, shop.updateWindowBusy {
+                try? await Task.sleep(for: .milliseconds(400))
+                if Task.isCancelled { return }
+            }
+            guard !Task.isCancelled, let shop = self else { return }
+            shop.updateOffer = offer
+            shop.updateOfferWaiting = nil
+        }
+    }
+
+    /// Does a window of this app have a sheet up? Then a new one would be
+    /// dropped, so the held update waits for it to close.
+    var updateWindowBusy: Bool {
+        if let stand = updateGateWindowBusyForTests { return stand() }
+        guard let app = NSApp as NSApplication? else { return false }
+        return app.windows.contains { $0.isVisible && $0.attachedSheet != nil }
+    }
+
+    /// A held update is set again from scratch: after "Khayt was updated" is
+    /// read, the update sheet would otherwise turn true in the same moment
+    /// that one closes, and be dropped.
+    func showHeldUpdateAgain() {
+        // lock: system — shows a held update again; nothing is written.
+        guard let offer = updateOffer else { return }
+        holdUpdate(offer.version, offer.releases)
     }
 
     /// "I have read these changes", then "Continue to the update": the items
@@ -188,6 +233,7 @@ extension Shop {
         // lock: system — anyone signed in may read and go on (decision 3); this Mac's own record, nothing in the book.
         guard let offer = updateOffer else { return }
         noteGateItemsRead(offer.releases)
+        updateOfferWaiting?.cancel()
         updateOffer = nil
         Updates.shared.wasRead(offer.version)
     }
@@ -195,6 +241,7 @@ extension Shop {
     /// "Later": nothing is recorded, so the sheet comes back at the next check.
     func putOffUpdate() {
         // lock: system — closes the sheet and records nothing.
+        updateOfferWaiting?.cancel()
         updateOffer = nil
     }
 
@@ -276,5 +323,8 @@ struct UpdateGateSheet: View {
         .padding(20)
         .frame(width: 520)
         .interactiveDismissDisabled(true)
+        // Whether it is really up: a hold of the same update then changes nothing.
+        .onAppear { if pretend == nil { shop.updateGateOnScreen = true } }
+        .onDisappear { if pretend == nil { shop.updateGateOnScreen = false } }
     }
 }

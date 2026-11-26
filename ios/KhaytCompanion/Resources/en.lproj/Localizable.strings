@@ -1578,7 +1578,7 @@
 "lock.after.1" = "After 1 minute";
 "lock.after.5" = "After 5 minutes";
 "lock.after.15" = "After 15 minutes";
-"lock.foot" = "On by default on owner and manager phones. Face ID or this iPhone's passcode opens Khayt when it starts, and again after it has been in the background for the time above. Your book stays on the phone either way.";
+"lock.foot" = "On by default on owner and manager phones. Face ID or this iPhone's passcode opens Khayt when it starts, and again after it has been in the background for the time above. Your book stays on the phone either way. Siri, Shortcuts and the buttons on print alerts and the Live Activity still work while Khayt is locked: this iPhone's own lock guards them.";
 "lock.no_passcode" = "This iPhone has no passcode, so Khayt cannot lock. Set one in the iPhone's Settings.";
 "lock.floor.title" = "No lock needed";
 "lock.floor.body" = "This is a floor phone: it keeps no copy of the shop's book, so there is nothing on it to lock. It shows the queue and printers while it is on the shop's Wi-Fi.";

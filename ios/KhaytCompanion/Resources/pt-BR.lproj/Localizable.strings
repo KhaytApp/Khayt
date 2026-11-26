@@ -1578,7 +1578,7 @@
 "lock.after.1" = "Após 1 minuto";
 "lock.after.5" = "Após 5 minutos";
 "lock.after.15" = "Após 15 minutos";
-"lock.foot" = "Ativado por padrão nos telefones do proprietário e do gerente. O Face ID ou o código deste iPhone abre o Khayt ao iniciar, e de novo depois de ficar em segundo plano pelo tempo acima. Seu livro fica no telefone de qualquer forma.";
+"lock.foot" = "Ativado por padrão nos telefones do proprietário e do gerente. O Face ID ou o código deste iPhone abre o Khayt ao iniciar, e de novo depois de ficar em segundo plano pelo tempo acima. Seu livro fica no telefone de qualquer forma. A Siri, os Atalhos e os botões dos alertas de impressão e da Atividade ao Vivo continuam funcionando com o Khayt bloqueado: o bloqueio do próprio iPhone os protege.";
 "lock.no_passcode" = "Este iPhone não tem código, então o Khayt não pode bloquear. Defina um nos Ajustes do iPhone.";
 "lock.floor.title" = "Não é preciso bloquear";
 "lock.floor.body" = "Este é um telefone de oficina: não guarda cópia do livro da loja, então não há nada nele para bloquear. Mostra a fila e as impressoras enquanto está no Wi-Fi da loja.";

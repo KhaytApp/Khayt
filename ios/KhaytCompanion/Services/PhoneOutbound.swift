@@ -157,12 +157,12 @@ enum PhoneOutbound {
 
     /// Asked at each read, not captured once: a phone paired later in the
     /// same session counts as paired.
-    nonisolated(unsafe) private static var paired: () -> Bool = { false }
+    nonisolated(unsafe) static var paired: () -> Bool = { false }
     /// Whether this phone's role is below manager (operator, viewer), asked
     /// at each read like `paired`. The app passes the pairing's role once the
     /// role lives on this phone (#2630); on a build without roles no phone is
     /// a floor phone, which is what `false` says.
-    nonisolated(unsafe) private static var floor: () -> Bool = { false }
+    nonisolated(unsafe) static var floor: () -> Bool = { false }
 
     private static func read(_ book: CompanionBook?) {
         let exists = book?.exists == true
@@ -178,12 +178,16 @@ enum PhoneOutbound {
         tell(.settings(effective(store["settings"] ?? .object([:]))))
     }
 
-    /// The book went away (unpairing): no settings to follow, nothing remembered.
+    /// The book went away: nothing remembered. Unpaired, there is nobody to
+    /// ask and no settings to follow (`.none`). Still paired as a FLOOR phone
+    /// (the book forgotten because the phone was moved to operator or viewer,
+    /// D-P6 a), the phone waits for its Mac's signed status: `.unread`, never
+    /// `.none`, which would read as "online" (H1).
     static func forgotten() {
         defaults.removeObject(forKey: rememberedKey)
         defaults.removeObject(forKey: statusKey)
         bookHeld = false
-        tell(.none)
+        tell(paired() && floor() ? .unread : .none)
     }
 
     /// The phone has no switch of its own to go offline; it can only stop
