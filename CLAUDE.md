@@ -66,8 +66,9 @@ if a principal is explicitly listed, and none is.
 - **Direct pushes to `main` are effectively blocked** — required checks cannot have run on a
   commit that has not been pushed. Everything lands by PR. Release *tags* are unaffected, so
   the `vX.Y.Z` tagging flow in [VERSIONING.md](./VERSIONING.md) still works.
-- **Since Nov 26 2026 `main` has a merge queue.** `gh pr merge <n>` (no `--squash`, no
-  `--match-head-commit`) adds a green PR to the queue; the queue runs CI on it on top of the
+- **Since Nov 26 2026 `main` has a merge queue.** `gh pr merge` does **not** queue a PR here: with
+  auto-merge off it fails (`enablePullRequestAutoMerge`). Queue a green PR with GraphQL
+  `enqueuePullRequest(input:{pullRequestId, expectedHeadOid})`; the queue runs CI on it on top of the
   latest `main` (a `merge_group` event) and squash-merges it. A PR no longer has to be up to
   date to merge, so no rebase-and-wait just for BEHIND. Stacked children: the queue does
   not delete the parent's branch, so a child PR stays open; retarget it to `main` once the
