@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The merge queue on main (Nov 26 2026) tests each queued PR on top of the
+  # latest main before it lands, instead of `strict` making every PR re-run
+  # after each merge. A queue run is a `merge_group` event; the relevance
+  # jobs below diff it against the queue's base, as a PR is diffed against its.
+  merge_group:
 
 # Cancel a PR's previous run when a new commit arrives. Without this, every
 # force-push (a rebase to clear BEHIND, which `main` being strict makes routine)
@@ -565,9 +570,9 @@ jobs:
       - id: decide
         env:
           EVENT: ${{ github.event_name }}
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
-          if [ "$EVENT" != "pull_request" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$EVENT" != "pull_request" ] && [ "$EVENT" != "merge_group" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           files=$(git diff --name-only "$BASE"...HEAD)
           echo "$files"
           # MAC-RELEVANT PATHS: everything the Mac app builds from or its tests

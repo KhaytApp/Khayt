@@ -90,7 +90,8 @@ final class NotificationService: UNNotificationServiceExtension {
               let plain = try? SyncCrypto.openStore(blob, dek: shared.dek),
               let event = try? JSONDecoder().decode(PrintFinished.self, from: plain) else { return nil }
         let status = event.orderId.flatMap(BookPeek.status(of:))
-        return PrintAlertText.content(for: event, orderStatus: status, shopId: shopId) {
+        return PrintAlertText.content(for: event, orderStatus: status, hideJobNames: LockScreenPrivacy.hidesJobNames(),
+                                       shopId: shopId) {
             NSLocalizedString($0, comment: "")
         }
     }

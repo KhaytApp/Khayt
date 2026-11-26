@@ -1299,7 +1299,7 @@ An **owner's phone** turning the shop's "Make no internet calls" on or off (iPho
 - `offline` (boolean, required): the switch.
 - `keep` (array, optional): the purposes kept while it is on, replacing the list. Omitted or `null`: left as it is. Each entry must be a purpose the rule lets a shop keep: any of `lib/outbound.js` `PURPOSES` but `lan` and `switch-sync` (`tunnel` included, which the Windows/Linux app can tick). **An entry this computer does not know is refused (`bad-keep`), not dropped**, so a phone with a newer list learns it is talking to an older computer. A purpose already in the book that this computer does not know is left there: it was never this request's to untick, and the phone is not shown it.
 - `seen` (string, optional): the `changedAt` the phone was showing when the person tapped. If the book's is a different moment, nothing is changed and the answer is `409` with the current value, so two people flipping it at once never overwrite each other blind. Compared as instants, so the same moment written without its milliseconds is the same. A phone that has seen no `changedAt` sends none.
-- `seenKeep` (array of strings, optional): the `keep` list the phone was showing. `changedAt` moves only when the switch itself is flipped, so a Keep ticked at the computer meanwhile is invisible to `seen`; with `seenKeep`, a list that is no longer what the computer holds is a `409` too, and that tick is not wiped. **A phone that sends `keep` should send `seenKeep`.**
+- `seenKeep` (array of strings, optional): the `keep` list the phone was showing. `changedAt` moves only when the switch itself is flipped, so a Keep ticked at the computer meanwhile is invisible to `seen`; with `seenKeep`, a list that is no longer what the computer holds is a `409` too, and that tick is not wiped. **A phone that sends `keep` should send `seenKeep`.** Only purposes the computer itself shows a phone are compared: an id in `seenKeep` that this computer does not know is ignored, not a `409`.
 
 **Answers.** Every answer to a request whose signature verified carries `x-khayt-reply-mac`, as `/api/devices/self` does (the `200`, the `400`s, the `409`s, the `503` and the role `403`): a phone shows "Done" only when the MAC verifies. Before that, the usual gate answers apply and are not signed, except `device-revoked`: `401` (no PIN or a wrong one, `device-auth`, `device-clock`, `device-replay`, `device-revoked`), `421` (a `Host` that is not local), `429`. An API token is not a phone: `403 device-key-required`, whatever headers come with it.
 
@@ -1397,6 +1397,42 @@ Says which of the shop's spools is in a head. `head` counts from one, 1 to 16.
 | 503 | `busy`: the app is starting |
 
 Sending the same link twice writes the same link. Sending `create` twice adds two spools: the phone must not retry a `create` whose answer it did not see without reading the trays again (the first one's spool is then `linked`).
+
+### `GET /api/devices`
+
+> **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it. (`POST /api/devices` is enrolment, as before.)
+
+The shop's paired phones, for the owner's phone. Read only.
+
+**Requires a signed, enrolled phone whose role is `owner`.** The owner PIN sent bare, or an API token, is `403 {"ok":false,"reason":"device-key-required"}`; any other role is `403 {"reason":"role-scope","required":"owner"}`. The path is not in `lib/device-roles.js`, on purpose: a route the table does not name is the owner's. `GET /api/devices/self` lists `"devices"` in `can` for an owner.
+
+**Response 200** (signed, `x-khayt-reply-mac`):
+
+```json
+{"ok":true,"devices":[
+  {"deviceId":"dev_…","name":"Sara's iPhone","role":"owner","pairedBy":"pin","lastSeenAt":"2026-11-24T09:12:00.000Z","self":true},
+  {"deviceId":"dev_…","name":"Floor phone","role":"operator","pairedBy":"code","lastSeenAt":"2026-11-23T16:40:00.000Z"}
+]}
+```
+
+Phones only (paired slicers are below), most recently seen first. `role` is the role the phone HOLDS, as the shared rule reads it (a phone paired with the PIN before roles is `owner`). `pairedBy` is `pin` or `code`. `self` is present, and true, on the phone that asked. `lastSeenAt` is coarse: it is written at most every few minutes.
+
+**Never in the answer:** a device's key, its PIN tag, or anything that could enrol or impersonate a phone.
+
+### `GET /api/devices/connectors`
+
+> **Native Mac only** (Nov 2026).
+
+The paired slicers and whether prices show in them, for the owner's phone. Read only. (Under `/api/devices/`, not `/api/connectors/`: that prefix belongs to the slicers' own routes.)
+
+**Requires a signed, enrolled phone whose role is `owner`**, as above. `can` lists `"slicer-prices"` for an owner.
+
+**Response 200** (signed): `{"ok":true,"slicerPrices":true,"connectors":[{"deviceId":"dev_…","name":"OrcaSlicer on the PC","priceGrant":true,"grant":"price","lastSeenAt":"…"}]}`
+
+- `slicerPrices`: the shop's switch, "Show prices in the slicer", on this Mac.
+- `priceGrant`: whether this slicer may see prices when the switch is on ("May see prices" / "Prices hidden"). `grant` says how much: `"price"`, `"cost"` (price, cost and margin), or `null`.
+
+With `slicerPrices` false, no slicer is shown a price whatever its grant.
 
 ### `POST /api/printer/{machineId}/bed-clear`
 

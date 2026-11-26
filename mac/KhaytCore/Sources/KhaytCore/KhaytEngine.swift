@@ -378,6 +378,10 @@ public actor KhaytEngine {
         // top of what its protocol can send (C5). printer-capabilities reads
         // printer-commands at call time.
         "run-result",
+        // How often each printer's prints come out right, counted from the
+        // results above (reads run-result at call time). The phone works it
+        // out from this too.
+        "printer-success",
         "printer-capabilities",
         // A printer that changed address is not a printer that went away. Reads
         // the cache above to decide which machines have actually gone quiet.

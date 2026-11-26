@@ -39,14 +39,23 @@ struct JobSearchEntity: IndexedEntity {
 struct JobSearchQuery: EntityStringQuery {
     @MainActor
     static func all() async -> [JobSearchEntity] {
+        // Read BEFORE the book is: an index begun with the lock off must not
+        // decide after a wait that customers may be named.
+        let hide = JobSearch.hidesCustomers
         guard let book = try? CompanionBook.inSharedContainer(), book.exists,
               let rows = try? await BookReader(book: book).recentOrders(limit: 400) else { return [] }
         return rows.map { o in
-            JobSearchEntity(id: o.id,
-                            title: o.displayTitle,
-                            client: o.client ?? "",
-                            stage: OrderStatus(rawValue: o.status)?.localizedLabel ?? o.status)
+            entity(id: o.id, title: o.displayTitle, client: o.client,
+                   stage: OrderStatus(rawValue: o.status)?.localizedLabel ?? o.status, hideCustomer: hide)
         }
+    }
+
+    /// One job for Spotlight, Siri and Shortcuts. While the app lock is on
+    /// (`hideCustomer`), the job is still found by its number, title and
+    /// stage, but carries no customer: not shown, and not searchable by
+    /// their name (Turki, Nov 24).
+    static func entity(id: String, title: String, client: String?, stage: String, hideCustomer: Bool) -> JobSearchEntity {
+        JobSearchEntity(id: id, title: title, client: hideCustomer ? "" : (client ?? ""), stage: stage)
     }
 
     func entities(for identifiers: [String]) async throws -> [JobSearchEntity] {
@@ -86,6 +95,23 @@ enum JobSearch {
     static var open: ((String) -> Void)?
     private static var indexedAt: Date?
 
+    /// Whether the app lock is in force on this phone, where the intents
+    /// (which run without the app's screens) can read it.
+    static let lockKey = "khayt.lock.inForce"
+    nonisolated(unsafe) static var defaults: UserDefaults = .standard
+    nonisolated static var hidesCustomers: Bool { defaults.bool(forKey: lockKey) }
+
+    /// The lock turned on or off: what Spotlight holds is replaced at once,
+    /// without customers while it is on and with them again when it is off.
+    /// Nothing happens when it has not changed.
+    static func lockChanged(inForce: Bool, into spotlight: any JobIndex = CSSearchableIndex.default()) async {
+        guard defaults.object(forKey: lockKey) as? Bool != inForce else { return }
+        defaults.set(inForce, forKey: lockKey)
+        generation += 1
+        indexedAt = nil
+        await index(into: spotlight)
+    }
+
     /// Hand Spotlight the jobs the phone holds, at most every ten minutes.
     ///
     /// The jobs indexed last time go first. Indexing only ADDS: a job cut
@@ -94,8 +120,17 @@ enum JobSearch {
     static func index(now: Date = Date(), into spotlight: any JobIndex = CSSearchableIndex.default()) async {
         if let last = indexedAt, now.timeIntervalSince(last) < 600 { return }
         indexedAt = now
-        await reindex(await JobSearchQuery.all(), into: spotlight)
+        // An index that was under way when the lock changed is stale: it may
+        // hold customers the lock now hides (or lack ones it now shows). It
+        // drops its write; the lock's own index replaces what is there.
+        let mine = generation
+        let jobs = await JobSearchQuery.all()
+        guard mine == generation else { return }
+        await reindex(jobs, into: spotlight)
     }
+
+    /// Counts the lock's changes, so a stale index can tell it is one.
+    private static var generation = 0
 
     static func reindex(_ jobs: [JobSearchEntity], into spotlight: any JobIndex) async {
         try? await spotlight.deleteJobs()
