@@ -1578,7 +1578,7 @@
 "lock.after.1" = "Après 1 minute";
 "lock.after.5" = "Après 5 minutes";
 "lock.after.15" = "Après 15 minutes";
-"lock.foot" = "Activé par défaut sur les téléphones du propriétaire et du responsable. Face ID ou le code de cet iPhone ouvre Khayt au démarrage, puis de nouveau après être resté en arrière-plan pendant la durée ci-dessus. Votre livre reste sur le téléphone dans tous les cas.";
+"lock.foot" = "Activé par défaut sur les téléphones du propriétaire et du responsable. Face ID ou le code de cet iPhone ouvre Khayt au démarrage, puis de nouveau après être resté en arrière-plan pendant la durée ci-dessus. Votre livre reste sur le téléphone dans tous les cas. Siri, Raccourcis et les boutons des alertes d'impression et de l'Activité en direct fonctionnent même quand Khayt est verrouillé : c'est le verrouillage de cet iPhone qui les protège.";
 "lock.no_passcode" = "Cet iPhone n’a pas de code, Khayt ne peut donc pas se verrouiller. Définissez-en un dans les Réglages de l’iPhone.";
 "lock.floor.title" = "Aucun verrouillage nécessaire";
 "lock.floor.body" = "C’est un téléphone d’atelier : il ne garde aucune copie du livre de l’atelier, il n’y a donc rien à verrouiller. Il affiche la file et les imprimantes tant qu’il est sur le Wi-Fi de l’atelier.";

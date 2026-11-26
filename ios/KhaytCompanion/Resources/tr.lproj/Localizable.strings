@@ -1578,7 +1578,7 @@
 "lock.after.1" = "1 dakika sonra";
 "lock.after.5" = "5 dakika sonra";
 "lock.after.15" = "15 dakika sonra";
-"lock.foot" = "Sahip ve yönetici telefonlarında varsayılan olarak açıktır. Face ID veya bu iPhone’un parolası Khayt’ı açılışta ve yukarıdaki süre kadar arka planda kaldıktan sonra yeniden açar. Defteriniz her durumda telefonda kalır.";
+"lock.foot" = "Sahip ve yönetici telefonlarında varsayılan olarak açıktır. Face ID veya bu iPhone’un parolası Khayt’ı açılışta ve yukarıdaki süre kadar arka planda kaldıktan sonra yeniden açar. Defteriniz her durumda telefonda kalır. Khayt kilitliyken Siri, Kestirmeler ve baskı uyarıları ile Canlı Etkinlik düğmeleri çalışmaya devam eder: onları bu iPhone’un kendi kilidi korur.";
 "lock.no_passcode" = "Bu iPhone’da parola yok, bu yüzden Khayt kilitlenemez. iPhone Ayarları’ndan bir parola belirleyin.";
 "lock.floor.title" = "Kilide gerek yok";
 "lock.floor.body" = "Bu bir atölye telefonu: atölye defterinin kopyasını tutmaz, bu yüzden kilitlenecek bir şey yoktur. Atölyenin Wi-Fi’ındayken kuyruğu ve yazıcıları gösterir.";
