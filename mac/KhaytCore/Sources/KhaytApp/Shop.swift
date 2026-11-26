@@ -2626,6 +2626,15 @@ final class Shop {
     var updateGateFetchForTests: (@Sendable (String) async -> String?)?
     /// TESTS ONLY: the version this Mac runs (a test build has none).
     var updateGateRunningForTests: String?
+    /// The jobs whose time-lapse is being copied from a printer now
+    /// (`Shop+TimelapseKeep.swift`): one copy per job at a time.
+    var timelapseCopying: Set<String> = []
+    /// TESTS ONLY, for the time-lapse keep: where the files go, the
+    /// printer's address, and the write of the job's row in place of the
+    /// book on disk (nil from it: the job is gone; false: already kept).
+    var timelapseFolderForTests: URL?
+    var timelapseBaseForTests: URL?
+    var timelapseWriteForTests: ((String, [String: JSONValue]) async throws -> Bool?)?
     /// TESTS ONLY, for the spool-tag routes (`Shop+PhoneTrays.swift`): the
     /// book to read and write instead of the one on disk, the printer's
     /// address, and its answers.

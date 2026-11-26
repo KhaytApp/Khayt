@@ -1460,6 +1460,61 @@ A paired phone saying a machine's plate is empty: the phone's **"Bed is clear"**
 
 It is not refused while the printer is printing: a stamp made before a print ends is simply older than that print's end, and the rules ignore it. Sending it twice writes a newer stamp and changes nothing else.
 
+### `GET /api/orders/{id}/timelapse`
+
+> **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it.
+
+Whether a finished job has a time-lapse on its printer, and whether it has been kept with the job.
+
+**Requires a signed, enrolled phone.** The owner PIN sent bare, or an API token, is `403 {"ok":false,"reason":"device-key-required"}`.
+
+**Role:** `orders:read` in `lib/device-roles.js`.
+
+**Response 200:** `{"ok":true,"state":…,"bytes"?:…,"maxBytes"?:…,"reason"?:…,"url"?:…,"copying"?:true}`
+
+| `state` | Meaning |
+|---|---|
+| `none` | The job has no time-lapse (or its printer is no longer one of the shop's) |
+| `available` | On the printer, and small enough to keep. `bytes` is the printer's own figure |
+| `kept` | Copied into the job's files. `bytes` is the size of the copy |
+| `link` | On the printer, and it will not be copied: `reason` is `over-budget` (over `maxBytes`, 150 MB) or `size-unknown` (the printer did not say) |
+
+**The answer is signed** (`x-khayt-reply-mac`), and so are the keep route's answers. **A phone must open `url` only from an answer whose signature it has checked**: unsigned, anything on the network answering in the Mac's place could hand over any address.
+
+`url` (with `available` and `link`) is where the printer serves the video, on the shop's network: for **Open on the printer**. It works only on the shop's Wi-Fi, and stops working when the printer clears its camera folder. `copying` is present while the Mac is copying it.
+
+**Refusals:** `404 not-found` (no such job), `503 busy` (the app is starting).
+
+### `POST /api/orders/{id}/timelapse/keep`
+
+> **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it.
+
+**Keep as proof**: the Mac copies the job's time-lapse from the printer into the job's files (`order-files/`, the folder the Windows/Linux app keeps a job's files in) and adds it to the job's `attachedFiles`, as the other app's own button does. No body. **The answer comes when the copy is done**, which over the shop's network can take a minute for a large video: use a long timeout.
+
+**What it does, and nothing else:** one `GET` to the printer for that one file; one file written; one row added to the job. The printer is told nothing.
+
+**Limits:** a video the printer says is over 150 MB, or whose size it does not state, is not fetched at all (`state":"link"`). The limit is on what is **read**: a printer that under-states its size is cut off at 150 MB and nothing is left on disk. The file is fetched only from the job's own printer, at its address on the shop's network, with no redirect followed.
+
+**Requires a signed, enrolled phone**, as above.
+
+**Role:** `orders:write` in `lib/device-roles.js`: an operator's, a manager's or the owner's phone, the phone's form of the computers' own rule (whoever may edit jobs). A viewer's phone is refused with `403 {"reason":"role-scope","required":"orders:write"}`. `GET /api/devices/self` lists `"timelapse-keep"` in `can` when this Mac serves it and the role may ask.
+
+**Response 201:** `{"ok":true,"state":"kept","bytes":35651584,"filename":"J-12-timelapse-mb3k2a1.mp4"}`. `bytes` is what was written.
+**Response 200:** `{"ok":true,"state":"kept"}` (it was kept already), or `{"ok":true,"state":"link","reason":"over-budget"|"size-unknown","bytes"?:…,"maxBytes":157286400}` (not copied; it stays on the printer).
+
+**Refusals:** `{"ok":false,"reason":…,"message"?:…}`
+
+| Status | `reason` |
+|---|---|
+| 404 | `not-found`: no such job |
+| 409 | `no-timelapse`: the job has none a copy could be made of |
+| 409 | `no-machine`: its printer is no longer one of the shop's Moonraker printers |
+| 409 | `copying`: a copy for this job is already running |
+| 409 | `read-only`: this Mac is showing the sample book, or another computer holds the book |
+| 500 | `not-saved`: the copy was made and the job could not be written (the copy is removed); `message` says why |
+| 502 | `printer-unreachable`: the printer did not hand the file over |
+| 503 | `busy`: the app is starting |
+
 ### `POST /api/orders/{id}/photos`
 
 > **Served by both apps** (Nov 2026): the native Mac app and `lib/lan-server.js` (Windows/Linux).

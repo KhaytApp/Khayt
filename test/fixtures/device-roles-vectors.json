@@ -676,6 +676,61 @@
     "required": "owner",
     "role": "operator"
    }
+  },
+  {
+   "why": "a viewer sees whether a job has a time-lapse",
+   "role": "viewer",
+   "path": "/api/orders/a1b2/timelapse",
+   "method": "GET",
+   "want": {
+    "ok": true,
+    "required": "orders:read",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "a viewer cannot have the time-lapse kept",
+   "role": "viewer",
+   "path": "/api/orders/a1b2/timelapse/keep",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "orders:write",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "an operator has the time-lapse kept as proof",
+   "role": "operator",
+   "path": "/api/orders/a1b2/timelapse/keep",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "orders:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "whether a job has a time-lapse is read, not written",
+   "role": "manager",
+   "path": "/api/orders/a1b2/timelapse",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "keeping is asked for, not read",
+   "role": "manager",
+   "path": "/api/orders/a1b2/timelapse/keep",
+   "method": "GET",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "manager"
+   }
   }
  ],
  "phonePaths": [
@@ -843,6 +898,16 @@
    "POST",
    "/api/printer/m1/trays/1/spool",
    "inventory:write"
+  ],
+  [
+   "GET",
+   "/api/orders/o_123/timelapse",
+   "orders:read"
+  ],
+  [
+   "POST",
+   "/api/orders/o_123/timelapse/keep",
+   "orders:write"
   ]
  ],
  "requests": [
