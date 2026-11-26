@@ -263,6 +263,20 @@ test('review of #2629: an unreadable book holds back only the automatic calls ho
   for (const p of ['updates', 'install-count', 'crash-reports', 'usage-stats']) assert.equal(g.check(p).reason, 'settings-unknown', p);
 });
 
+test('review of 4.12.0, MED-2: an unreadable book never overrides THIS computer\'s own offline switch', async () => {
+  const g = createOutboundGate({ getSettings: () => null, readLocal: () => ({ offline: true }), bookUnreadable: () => true });
+  // The integrations a person starts, the non-fetch transports among them (webhook-send's
+  // https.request, custom SMTP, the tunnel), and Khayt Cloud: none goes out.
+  for (const p of ['cloud', 'messaging', 'storage', 'ai', 'payments', 'webhooks', 'tunnel', 'storefront']) {
+    const r = g.check(p);
+    assert.deepEqual([r.allowed, r.reason], [false, 'offline-here'], p);
+    await assert.rejects(g.gateFor(p, 'https://example.com/x'), (e) => e.code === 'outbound.blocked' && e.reason === 'offline-here', p);
+  }
+  // And the same computer with its own switch off still lets the shop restore through Khayt Cloud.
+  const g2 = createOutboundGate({ getSettings: () => null, readLocal: () => ({}), bookUnreadable: () => true });
+  assert.equal(g2.check('cloud').allowed, true);
+});
+
 test('round 2 (Nov 22): only the owner changes the switch under the staff lock, the book\'s and this computer\'s', () => {
   const PP = require('../lib/main/printer-permission.js');
   const ops = [{ id: 'own', roleKey: 'owner' }, { id: 'mgr', roleKey: 'manager' }, { id: 'op', roleKey: 'operator' }];

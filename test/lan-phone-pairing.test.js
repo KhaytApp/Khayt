@@ -542,3 +542,24 @@ test('POST /api/printer/{id}/bed-clear (the Mac\'s shape): a signed phone of ope
   const pinPhone = await enrolWithPin();   // a PIN-paired phone is the owner
   assert.equal((await signed(pinPhone, 'POST', '/api/printer/m1/bed-clear')).status, 200);
 });
+
+test('review of 4.12.0, MED-5: a phone meets the shop\'s per-printer limits (Roles ▸ Printers "control"), as the desktop\'s buttons do', async () => {
+  store.machines = [{ id: 'm1', name: 'U1' }];
+  const prevSettings = store.settings;
+  store.settings = Object.assign({}, prevSettings, { roleLimits: { operator: { printers: { control: false } } } });
+  try {
+    const operator = await pairPhone('operator');
+    const manager = await pairPhone('manager');
+    const r = await signed(operator, 'POST', '/api/printer/m1/bed-clear');
+    assert.deepEqual([r.status, r.json], [403, { reason: 'role-scope', required: 'machines:control', limit: 'printers.control' }]);
+    assert.ok(macOk(operator, r), 'the refusal is signed back');
+    assert.equal(store.machines[0].bedClearedAt, undefined, 'nothing written');
+    assert.equal((await signed(manager, 'POST', '/api/printer/m1/bed-clear')).status, 200, 'a role the shop did not limit still may');
+    // The owner is never limited, whatever a limit row says.
+    store.settings = Object.assign({}, prevSettings, { roleLimits: { operator: { printers: { control: false } }, owner: { printers: { control: false } } } });
+    const owner = await enrolWithPin();
+    assert.equal((await signed(owner, 'POST', '/api/printer/m1/bed-clear')).status, 200);
+    // And reading is untouched: the limit is on control, not on seeing the printers.
+    assert.equal((await signed(operator, 'GET', '/api/machines')).status, 200);
+  } finally { store.settings = prevSettings; }
+});
