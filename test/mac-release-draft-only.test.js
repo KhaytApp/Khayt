@@ -20,7 +20,7 @@ const skip = process.platform === 'win32' ? 'needs bash' : false;
 
 function sh(file, body) { fs.writeFileSync(file, '#!/bin/bash\n' + body); fs.chmodSync(file, 0o755); }
 
-function rig({ draft } = {}) {
+function rig({ draft, drift } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-release-test-'));
   const repo = path.join(root, 'repo'), bin = path.join(root, 'bin'), log = path.join(root, 'gh.log');
   fs.mkdirSync(path.join(repo, 'mac'), { recursive: true });
@@ -32,7 +32,10 @@ function rig({ draft } = {}) {
   fs.writeFileSync(path.join(repo, 'mac/version.json'), JSON.stringify({ version: '4.0.0-beta.99', build: 999 }));
   fs.writeFileSync(path.join(repo, 'lib/release-gates.json'), '{}\n');
   fs.writeFileSync(path.join(repo, 'mac/KhaytCore/Sources/KhaytCore/JS/release-gates.json'), '{}\n');
-  sh(path.join(repo, 'mac/sync-js.sh'), 'exit 0\n');
+  // sync-js.sh copies lib/ into the bundle; `drift` makes one copy differ from what main holds.
+  sh(path.join(repo, 'mac/sync-js.sh'), drift
+    ? 'cd "$(dirname "$0")/.."; echo changed > mac/KhaytCore/Sources/KhaytCore/JS/some-module.js\n'
+    : 'exit 0\n');
   // Builds nothing: a bundle with the right shape, and a mark that it ran.
   sh(path.join(repo, 'mac/make-app.sh'), [
     `echo "make-app $*" >> "${log}"`,
@@ -101,7 +104,8 @@ test('--publish builds nothing, needs the draft, and is what dispatches', { skip
   try {
     const { code, out, calls } = r.run('--publish');
     assert.equal(code, 0, out);
-    assert.match(calls, /gh workflow run mac-publish\.yml -R KhaytApp\/Khayt --ref main -f tag=v4\.0\.0-beta\.99 -f prerelease=true -f publish_appcast=true/);
+    assert.match(calls, /gh workflow run mac-publish\.yml -R KhaytApp\/Khayt --ref main -f tag=v4\.0\.0-beta\.99 -f prerelease=true -f publish_appcast=true -f sha=[0-9a-f]{40}\b/,
+      'the publish is told which commit the build is from (review Nov 26, L2)');
     assert.doesNotMatch(calls, /make-app|release create|release upload|notarytool/, 'publishing built or uploaded something');
   } finally { r.cleanup(); }
 });
@@ -128,4 +132,22 @@ test('the script dispatches in one place only', () => {
   const s = fs.readFileSync(SCRIPT, 'utf8');
   assert.equal((s.match(/gh workflow run/g) || []).length, 1);
   assert.match(s, /publish\(\) \{[\s\S]*gh workflow run mac-publish\.yml/);
+});
+
+test('a bundled module that differs from lib/ after sync-js stops the release before the build (review Nov 26, L1)', { skip }, () => {
+  const r = rig({ drift: true });
+  try {
+    const { code, out, calls } = r.run('--draft-only');
+    assert.notEqual(code, 0);
+    assert.match(out, /the bundled JS on origin\/main is not lib's/);
+    assert.match(out, /some-module\.js/, 'it says which file');
+    assert.doesNotMatch(calls, /make-app|release create|workflow run/);
+  } finally { r.cleanup(); }
+});
+
+test('mac-publish.yml checks out the commit it is given, and refuses one that is not on main (review Nov 26, L2)', () => {
+  const w = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'mac-publish.yml'), 'utf8');
+  assert.match(w, /\n      sha:\n/);
+  assert.match(w, /ref: \$\{\{ inputs\.sha \|\| github\.sha \}\}/);
+  assert.match(w, /merge-base --is-ancestor "\$SHA" origin\/main/);
 });

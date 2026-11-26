@@ -241,4 +241,22 @@ struct ReleaseReviewNov26Tests {
         #expect(route.contains("guard !request.tokenScoped, LanDevices.isSigned(request.headers)"),
                 "a token-scoped request skips the signature check in pinGate; the route must refuse it itself")
     }
+
+    // ── L4: a Keep tick on the Mac leaves a newer app's purpose alone ─────
+
+    /// A newer desktop knows a purpose this Mac does not, and ticked it. A
+    /// tick or untick of another row here must leave it in the book, as the
+    /// phone path already does (`keepAll`, #2692). Before: the Mac kept only
+    /// purposes it knew, and the newer tick was silently lost.
+    @Test("a Keep tick on the Mac keeps a purpose only a newer app knows; still never lan or switch-sync, each once")
+    func keepTickKeepsNewerPurposes() {
+        func keep(_ v: JSONValue) -> JSONValue? { if case .object(let o) = v { return o["keep"] }; return nil }
+        let book: JSONValue = .object(["keep": .array([.string("future-purpose"), .string("updates")])])
+        let ticked = Shop.network(book, keep: .webhooks, true)
+        #expect(keep(ticked) == .array([.string("future-purpose"), .string("updates"), .string("webhooks")]))
+        let unticked = Shop.network(book, keep: .updates, false)
+        #expect(keep(unticked) == .array([.string("future-purpose")]))
+        let messy: JSONValue = .object(["keep": .array([.string("lan"), .string("switch-sync"), .string("future-purpose"), .string("future-purpose")])])
+        #expect(keep(Shop.network(messy, keep: .updates, true)) == .array([.string("future-purpose"), .string("updates")]))
+    }
 }
