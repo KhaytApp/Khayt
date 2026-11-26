@@ -136,6 +136,30 @@ test('releaseSignals: a version section added, or a version changed, is a releas
   assert.deepEqual(releaseSignals({ changelogDiff: '', ...v({ 'package.json': '4.11.0' }, { 'package.json': '4.11.0' }) }), []);
 });
 
+test('placement with the old file: a shipped entry reworded in place is not an addition; a moved or extra one still is', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-reword-'));
+  const diffOf = (a, b) => {
+    fs.writeFileSync(path.join(tmp, 'a.md'), a); fs.writeFileSync(path.join(tmp, 'b.md'), b);
+    return spawnSync('git', ['diff', '--no-index', '--unified=3', 'a.md', 'b.md'], { cwd: tmp, encoding: 'utf8' }).stdout;
+  };
+  try {
+    const base = '# C\n\n## [Unreleased]\n\n- **New thing.** Body.\n\n## [2.0.0] - 2026-11-26\n\n### Added\n\n- **Shipped one.** Drawn from frames signed off on Nov 22.\n- **Shipped two.** Fine.\n\n## [1.0.0]\n\n- old\n';
+    // Reworded in place.
+    const reworded = base.replace('- **Shipped one.** Drawn from frames signed off on Nov 22.', '- **Shipped one.** Clean.');
+    let d = diffOf(base, reworded);
+    assert.equal(placement(d, reworded).ok, false, 'without the old file: as before, refused');
+    assert.deepEqual(placement(d, reworded, base), { ok: true, misplaced: [] });
+    // Moved from [Unreleased] into the shipped section: the removed line was in another section, so no pair.
+    const moved = base.replace('- **New thing.** Body.\n', '').replace('- **Shipped two.** Fine.\n', '- **Shipped two.** Fine.\n- **New thing.** Body.\n');
+    d = diffOf(base, moved);
+    assert.deepEqual(placement(d, moved, base).misplaced.map((m) => m.text), ['- **New thing.** Body.']);
+    // A reword plus a new entry slipped in beside it: one pairs, the other is refused.
+    const both = base.replace('- **Shipped one.** Drawn from frames signed off on Nov 22.', '- **Shipped one.** Clean.\n- **Sneaked in.** New.');
+    d = diffOf(base, both);
+    assert.deepEqual(placement(d, both, base).misplaced.map((m) => m.text), ['- **Sneaked in.** New.']);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
 test('lostFragments: a removed fragment is lost unless its entries are in the CHANGELOG.md the PR leaves (review of 4.12.0, L3)', () => {
   const cl = `## [Unreleased]\n\n${A}\n- plain bullet with no title\n\n## [1.0.0]\n- old\n`;
   assert.deepEqual(lostFragments([{ name: 'changelog.d/a.md', text: `${A}\n` }], cl), [], 'folded verbatim');
@@ -215,6 +239,22 @@ test('CLI: touching CHANGELOG.md does not excuse deleting someone\'s fragment; a
     s.git('commit', '-qam', 'fold it');
     const ok = s.check();
     assert.equal(ok.status, 0, ok.stderr);
+  } finally { s.done(); }
+});
+
+test('CLI: a CHANGELOG over 1 MB is still read (an overflow used to read as "not checked" and pass)', () => {
+  const s = sandbox();
+  try {
+    const filler = Array.from({ length: 12000 }, (_, i) => `- **Old entry ${i}.** ${'x'.repeat(100)}`).join('\n');
+    s.write('CHANGELOG.md', `# Changelog\n\n## [Unreleased]\n\n- old entry\n\n## [1.0.0] - 2026-01-01\n\n- shipped\n${filler}\n`);
+    s.git('commit', '-qam', 'a big history'); s.git('checkout', '-q', 'main'); s.git('merge', '-q', '--ff-only', 'pr'); s.git('checkout', '-q', 'pr');
+    assert.ok(fs.statSync(path.join(s.dir, 'CHANGELOG.md')).size > 1024 * 1024);
+    // An entry added into the shipped [1.0.0]: must be refused, not waved through.
+    s.write('CHANGELOG.md', fs.readFileSync(path.join(s.dir, 'CHANGELOG.md'), 'utf8').replace('- shipped\n', '- shipped\n- **Misfiled.** In a released section.\n'));
+    s.git('commit', '-qam', 'misfiled');
+    const r = s.check();
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /\[1\.0\.0\]\s+- \*\*Misfiled\.\*\*/);
   } finally { s.done(); }
 });
 
