@@ -26,6 +26,8 @@ final class KhaytAPIClient: ObservableObject {
     /// phone with nothing to send and a phone that cannot send are different
     /// things, but neither has anything waiting.
     @Published private(set) var pendingCount = 0
+    /// What forgetting the shop's traces does (`forgetBookForFloorMode`); a test counts it.
+    var forgetTraces: () -> Void = { ShopTraces.forget() }
     /// The phone writes the paired Mac serves for THIS phone beyond its role's
     /// scopes (`can` on `/api/devices/self`): today `network-switch`. Empty
     /// until the Mac says so, signed; never kept between launches.
@@ -645,7 +647,7 @@ final class KhaytAPIClient: ObservableObject {
         }
         // A phone moved to the floor kept its book only for unsent edits: once
         // they are sent, it goes now rather than at the next round (M2).
-        if !settings.mayHoldBook { forgetBookForFloorMode() }
+        followRole()
         var cloudDone = false
         if cloud != nil {
             // A refused round adopted nothing: the Mac's book still comes down.
@@ -2853,7 +2855,7 @@ extension KhaytAPIClient {
         // The approved screen says which role first; its Continue marks the
         // phone paired (frame "Pair 2 · Approved").
         if markPaired { settings.isPaired = true }
-        if !settings.mayHoldBook { forgetBookForFloorMode() }
+        followRole()
         return usableDevice == credential
     }
 
@@ -2939,9 +2941,23 @@ extension KhaytAPIClient {
         guard settings.pairedByCode, let device = usableDevice,
               case .some(let role) = await deviceSelf(device) else { return }
         settings.deviceRole = role
-        if !settings.mayHoldBook { forgetBookForFloorMode() }
+        followRole()
     }
 
+    /// After the role may have changed: a floor phone forgets its book, and a
+    /// phone raised back to manager or owner may be demoted (and forget its
+    /// traces) again later.
+    func followRole() {
+        if settings.mayHoldBook { floorTracesForgotten = false } else { forgetBookForFloorMode() }
+    }
+
+    /// Whether the shop's traces were forgotten for the current demotion. Kept
+    /// on disk, so a relaunch while edits still wait does not wipe again.
+    nonisolated static let floorTracesForgottenKey = "khayt.floorTracesForgotten"
+    var floorTracesForgotten: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.floorTracesForgottenKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.floorTracesForgottenKey) }
+    }
     /// D-P6 a: an operator or viewer phone keeps no book, nor anything taken
     /// from one: the book with its rollback copy, the cached answers (clients,
     /// orders, stock), the library pictures and the shop's traces (Spotlight,
@@ -2955,8 +2971,14 @@ extension KhaytAPIClient {
               holdsBookOnDisk || holdsBook else { return }
         // What the book left behind outside it goes at once, edits waiting or
         // not (M2): Spotlight, the feed and the widgets name customers, and a
-        // floor phone shows none of them.
-        ShopTraces.forget()
+        // floor phone shows none of them. ONCE per demotion: while edits wait
+        // (a floor phone cannot send them: /api/store/deltas needs
+        // `book:write`), this runs every round, and each run would also
+        // delete the print alerts and reminders the phone has posted since.
+        if !floorTracesForgotten {
+            floorTracesForgotten = true
+            forgetTraces()
+        }
         // The book itself waits for its edits to be sent, and goes the moment
         // they are (`refreshEverywhere` asks again right after a send).
         guard pendingCount == 0 else { return }
