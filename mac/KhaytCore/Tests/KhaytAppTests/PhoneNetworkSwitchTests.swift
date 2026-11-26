@@ -204,6 +204,25 @@ struct PhoneNetworkSwitchTests {
         #expect(await shop.phoneSetOutbound(body: Self.body(#"{"offline":true,"seenKeep":"cloud"}"#), deviceName: "Phone").0 == 400)
     }
 
+    @Test("a purpose the phone knows and this Mac does not is not a reason to refuse every request")
+    func seenKeepWithAnIdThisMacDoesNotShow() async throws {
+        // A newer desktop ticked a purpose this Mac has never heard of; a newer phone was shown it there.
+        let (shop, _, book) = await NetworkSwitchWiringTests.shop(option: false, network: .object([
+            "offline": .bool(true), "keep": .array([.string("cloud"), .string("from-the-future")]),
+            "changedAt": .string("2026-11-22T14:12:00.000Z")]))
+        let ok = await shop.phoneSetOutbound(
+            body: Self.body(#"{"offline":false,"seen":"2026-11-22T14:12:00.000Z","seenKeep":["cloud","from-the-future"]}"#), deviceName: "Phone")
+        #expect(ok.0 == 200, Comment(rawValue: ok.1))
+        // The tick this Mac does not know is still in the book.
+        guard case .object(let n)? = book.network, case .array(let keep)? = n["keep"] else { Issue.record("shape"); return }
+        #expect(Set(keep) == [.string("cloud"), .string("from-the-future")], "another app's tick was wiped: \(keep)")
+        // What this Mac DOES show is still compared: a list that is not what it holds is refused.
+        let changedAt: String = { if case .string(let s)? = shop.networkSettings["changedAt"] { return s }; return "" }()
+        let wrong = #"{"offline":true,"seen":"STAMP","seenKeep":["updates","from-the-future"]}"#.replacingOccurrences(of: "STAMP", with: changedAt)
+        let stale = await shop.phoneSetOutbound(body: Self.body(wrong), deviceName: "Phone")
+        #expect(stale.0 == 409 && stale.1.contains(#""reason":"changed""#), Comment(rawValue: stale.1))
+    }
+
     @Test("`seen` is the same moment however it is written, and a failure is the phone's to hear, not the Mac's screen")
     func seenIsAnInstant() async throws {
         let (shop, _, _) = await NetworkSwitchWiringTests.shop(option: false, network: .object([

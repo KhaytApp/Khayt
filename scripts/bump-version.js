@@ -71,4 +71,4 @@ if (fs.existsSync(lockPath)) {
 }
 
 console.log(`Version bumped (${kind}): ${prev} → ${next}`);
-console.log('Next: update CHANGELOG.md, commit, tag v' + next);
+console.log('Next: npm run changelog:fold, move [Unreleased] into ## [' + next + '] in CHANGELOG.md, commit, tag v' + next);

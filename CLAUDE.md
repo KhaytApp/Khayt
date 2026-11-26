@@ -22,6 +22,7 @@ Rules in force:
 | `deletion` | `main` cannot be deleted |
 | `non_fast_forward` | no force-push to `main` |
 | `required_status_checks` (**strict**) | the required checks must pass **and** the branch must be up to date |
+| `merge_queue` (since Nov 26 2026) | a PR lands through the queue, which re-tests it on top of the latest `main`; `strict` is off |
 
 Required checks — all come from [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 
@@ -65,6 +66,13 @@ if a principal is explicitly listed, and none is.
 - **Direct pushes to `main` are effectively blocked** — required checks cannot have run on a
   commit that has not been pushed. Everything lands by PR. Release *tags* are unaffected, so
   the `vX.Y.Z` tagging flow in [VERSIONING.md](./VERSIONING.md) still works.
+- **Since Nov 26 2026 `main` has a merge queue.** `gh pr merge` does **not** queue a PR here: with
+  auto-merge off it fails (`enablePullRequestAutoMerge`). Queue a green PR with GraphQL
+  `enqueuePullRequest(input:{pullRequestId, expectedHeadOid})`; the queue runs CI on it on top of the
+  latest `main` (a `merge_group` event) and squash-merges it. A PR no longer has to be up to
+  date to merge, so no rebase-and-wait just for BEHIND. Stacked children: the queue does
+  not delete the parent's branch, so a child PR stays open; retarget it to `main` once the
+  parent lands, then delete the parent's branch. The notes below about BEHIND describe the pre-queue rules.
 - **`gh pr merge --auto` does not work here.** Auto-merge is switched off at the repository
   level, so the flag fails outright:
 
@@ -168,11 +176,13 @@ with different rules; nothing in this file applies to them.
 
 **What this means in practice:**
 
-- **`CHANGELOG.md` conflicts on nearly every rebase**, because everyone appends
-  to `[Unreleased]`. It is not a real conflict — keep both sides, in either
-  order — but expect it, and prefer one larger PR over several small ones: `main`
-  is strict, checks take 8–12 minutes, and a busy day moves `main` faster than
-  that, so every extra PR costs another rebase cycle.
+- **Write your changelog entry in `changelog.d/<branch>.md`, not `CHANGELOG.md`.**
+  Everyone appending to `[Unreleased]` conflicted on every merge; a file of your
+  own never does. The cut folds them in (`npm run changelog:fold`, VERSIONING
+  step 0), and a release PR is refused while any wait. `CHANGELOG.md` itself is
+  still edited directly for a `### Before you update` item, and at the cut.
+  Checks still take 8–12 minutes and a busy day moves `main` faster than that,
+  so prefer one larger PR over several small ones.
 - **`lib/` is shared by four of the five.** A change there reaches the desktop,
   Bed Ready, the LAN API and — through `/api/store` — the phone. `lib/store-secret-paths.js`
   is the sharpest example: it decides what is masked before a book is handed to
