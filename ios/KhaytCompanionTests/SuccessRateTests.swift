@@ -27,8 +27,11 @@ final class SuccessRateTests: XCTestCase {
     func testTheSharedVectorsThroughThePhonesEngine() async throws {
         struct Want: Decodable { let machineId: String; let finished: Int; let failed: Int; let cancelled: Int; let unknown: Int
                                  let rate: Double?; let enough: Bool }
-        struct Input: Decodable { let machines: [JSONValue]; let orders: [JSONValue]; let from: String?; let to: String? }
-        struct Case: Decodable { let why: String; let input: Input; let want: [Want] }
+        // As the Mac's SuccessRatesTests reads them: a case may leave both
+        // lists out, and may name the caller's calendar (#2702).
+        struct Input: Decodable { let machines: [JSONValue]?; let orders: [JSONValue]?; let from: String?; let to: String? }
+        struct CalendarOf: Decodable { let utcOffsetMinutes: Int?; let timeZone: String? }
+        struct Case: Decodable { let why: String; let input: Input; let calendar: CalendarOf?; let want: [Want] }
         struct Vectors: Decodable { let cases: [Case] }
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "test/fixtures/printer-success-vectors.json")
@@ -36,7 +39,16 @@ final class SuccessRateTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(v.cases.count, 2)
         let engine = try await BookReader(book: try book(SampleShop.book())).sharedEngine()
         for c in v.cases {
-            let rows = try await engine.successRates(orders: c.input.orders, machines: c.input.machines, from: c.input.from, to: c.input.to)
+            var zone: Calendar?
+            if let named = c.calendar?.timeZone {
+                zone = Calendar(identifier: .gregorian)
+                zone?.timeZone = try XCTUnwrap(TimeZone(identifier: named), named)
+            } else if let minutes = c.calendar?.utcOffsetMinutes {
+                zone = Calendar(identifier: .gregorian)
+                zone?.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: minutes * 60))
+            }
+            let rows = try await engine.successRates(orders: c.input.orders ?? [], machines: c.input.machines ?? [],
+                                                     from: c.input.from, to: c.input.to, calendar: zone)
             XCTAssertEqual(rows.map(\.machineId), c.want.map(\.machineId), "\(c.why): worst first")
             for (got, want) in zip(rows, c.want) {
                 XCTAssertEqual([got.finished, got.failed, got.cancelled, got.unknown],
