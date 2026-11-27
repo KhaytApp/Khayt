@@ -155,12 +155,12 @@ struct SlicerPresetsTests {
         // A 3MF that carries its own settings needs nothing; a bare mesh does.
         #expect(try await engine.needsPresets(model: "a.stl", entries: nil))
         #expect(!(try await engine.needsPresets(model: "a.3mf", entries: ["Metadata/project_settings.config"])))
-        // PrusaSlicer is never handed them.
-        let glue = await SlicerRun.bareModelPresets(
+        // PrusaSlicer is never handed them: it slices the model as it is.
+        let glue = await SlicerRun.sliceInput(
             engine: engine,
             slicer: try SlicerRunTests.slicer("/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer"),
             template: "", model: URL(fileURLWithPath: "/tmp/m.stl"), outDir: t.root)
-        #expect(glue.presets == .null)
+        #expect(glue == SlicerProject.Prepared(model: URL(fileURLWithPath: "/tmp/m.stl"), problem: nil))
     }
 
     @Test("a slicer killed by a signal is said to have crashed")

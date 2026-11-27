@@ -97,6 +97,29 @@ test('the CLI files say "system": Bambu Studio refuses a flattened User process 
   assert.ok(!('inherits' in j));
 });
 
+// ── One project config instead of preset flags (Snapmaker Orca segfaults on the flags) ──
+
+test('projectSettingsJson merges printer, then print, then filament, and names what it used', () => {
+  const j = JSON.parse(P.projectSettingsJson(
+    { name: 'Snapmaker U1 (0.4 nozzle)', type: 'machine', from: 'system', inherits: 'base', printable_area: ['0x0', '270x0', '270x270', '0x270'], nozzle_diameter: ['0.4'], shared: 'machine' },
+    { name: '0.20mm High Quality @Snapmaker U1 (0.4 nozzle)', type: 'process', from: 'system', layer_height: '0.2', shared: 'process' },
+    { name: 'Generic PLA', type: 'filament', from: 'system', filament_type: ['PLA'], shared: 'filament' }));
+  assert.deepEqual(j.printable_area, ['0x0', '270x0', '270x270', '0x270']);
+  assert.equal(j.layer_height, '0.2');
+  assert.deepEqual(j.filament_type, ['PLA']);
+  assert.equal(j.shared, 'filament', 'a later preset wins a key, as the slicer reads them');
+  assert.equal(j.printer_settings_id, 'Snapmaker U1 (0.4 nozzle)');
+  assert.equal(j.print_settings_id, '0.20mm High Quality @Snapmaker U1 (0.4 nozzle)');
+  assert.deepEqual(j.filament_settings_id, ['Generic PLA']);
+  assert.equal(j.from, 'project');
+  for (const k of ['type', 'inherits', 'name']) assert.ok(!(k in j), k + ' belongs to a preset file, not a project');
+});
+
+test('projectSettingsJson refuses a missing preset rather than writing half a project', () => {
+  assert.throws(() => P.projectSettingsJson({ name: 'm' }, null, { name: 'f' }), /process preset is required/);
+  assert.throws(() => P.projectSettingsJson([], {}, {}), /machine preset is required/);
+});
+
 test('where each platform keeps a fork\'s presets', () => {
   const mac = P.presetRoots('/Applications/Snapmaker Orca.app/Contents/MacOS/Snapmaker_Orca', { platform: 'darwin', home: '/Users/s' })[0];
   assert.equal(mac.dir, '/Users/s/Library/Application Support/Snapmaker_Orca');
