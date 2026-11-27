@@ -1517,13 +1517,30 @@ function bareModelPresetsUnsafe(slicerPath, args, modelPath, outDir) {
   try { conf = fs.readFileSync(roots.confFile, 'utf8'); } catch (_) { /* no config yet */ }
   const r = slicerPresets.choosePresets(io, { conf, user: roots.user, system: roots.system, bundled: roots.bundled });
   if (!r.ok) return { error: r.error };
-  const file = (kind) => {
-    const f = path.join(outDir, `khayt-${kind}.json`);
-    fs.writeFileSync(f, slicerPresets.presetFileJson(kind, r[kind]), 'utf8');
-    return f;
-  };
-  return { presets: { settings: [file('machine'), file('process')], filaments: [file('filament')] },
+  // The flattened presets, for the PROJECT the model becomes (runSlice). They
+  // are never handed to the slicer by flag: Snapmaker Orca 2.4.1 segfaults on
+  // --load-settings / --load-filaments (#2731, lib/slicer-project.js).
+  return { flat: { machine: r.machine, process: r.process, filament: r.filament }, entries,
            names: { machine: r.machine.name, process: r.process.name, filament: r.filament.name } };
+}
+
+/**
+ * What the slicer is given for a model that needed presets: a project 3MF
+ * with them inside (lib/main/orca-project.js), never preset flags. A model
+ * that needed none is sliced as it is.
+ */
+function sliceTarget(bare, modelPath, outDir) {
+  if (!bare || !bare.flat) return { ok: true, path: modelPath };
+  const SlicerProject = require('./lib/slicer-project.js');
+  const OrcaProject = require('./lib/main/orca-project.js');
+  const kind = SlicerProject.plan(modelPath, bare.entries);
+  if (kind === 'as-is') return { ok: true, path: modelPath };
+  if (kind === 'unsupported') return { ok: false, error: 'Khayt can slice an STL or a 3MF with this slicer. Open this file in the slicer itself.' };
+  const settingsJson = slicerPresets.projectSettingsJson(bare.flat.machine, bare.flat.process, bare.flat.filament);
+  const outPath = path.join(outDir, 'khayt-project.3mf');
+  return kind === 'stl'
+    ? OrcaProject.buildStlProject({ stlPath: modelPath, outPath, settingsJson, machine: bare.flat.machine })
+    : OrcaProject.addProjectConfig({ modelPath, outPath, settingsJson });
 }
 
 async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
@@ -1539,7 +1556,16 @@ async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   // The slicer path picks the default template: an Orca/Bambu fork has no --export-gcode.
   // A model with no settings of its own also needs the fork's presets (#1778).
   const bare = bareModelPresets(slicerPath, args, modelPath, outDir);
-  const argv = sliceArgv(args, { model: modelPath, output: outPath, outdir: outDir, slicer: slicerPath, presets: bare.presets });
+  // Made into a project with the presets inside, and sliced with NO preset
+  // flags (Snapmaker Orca 2.4.1 segfaults on them; #2731).
+  let target;
+  try { target = sliceTarget(bare, modelPath, outDir); }
+  catch (e) { target = { ok: false, error: `Khayt could not prepare this model for the slicer (${String((e && e.message) || e).slice(0, 80)}).` }; }
+  if (!target.ok) {
+    try { fs.rmSync(outDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    return { ok: false, error: target.error };
+  }
+  const argv = sliceArgv(args, { model: target.path, output: outPath, outdir: outDir, slicer: slicerPath });
   const result = await new Promise((resolve) => {
     // Both streams: the Orca forks log their real reason ("File Version 2.3.0.4 not
     // supported…") to STDOUT and leave stderr with a usage dump or nothing.
