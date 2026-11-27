@@ -103,7 +103,8 @@ final class AppLockCurtain {
     /// out of the front. Only then does the curtain take the keyboard and
     /// key status: a cover for Control Centre or a permission alert must not
     /// cost an unlocked person the field they were typing in (review of #2691).
-    func show(lock: AppLock, settings: ConnectionSettings, shopName: String, interactive: Bool, locked: Bool) {
+    func show(lock: AppLock, settings: ConnectionSettings, shopName: String, interactive: Bool, locked: Bool,
+              in ownScene: UIWindowScene? = nil) {
         let view = AnyView(AppLockView(shopName: shopName, interactive: interactive)
             .environmentObject(lock)
             // The app's language and direction: this window is outside the
@@ -115,8 +116,12 @@ final class AppLockCurtain {
             if locked, !made.isKeyWindow { takeTheKeyboard(made) }
             return
         }
+        // The gate's own scene (security LOW-4): with more than one window
+        // (iPad), "the active one" may be another window's. Before the gate
+        // has found its window (the first frame), the active scene.
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
+        guard let scene = ownScene ?? scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+        else { return }
         keyBefore = scene.keyWindow
         let made = UIWindow(windowScene: scene)
         made.windowLevel = .alert + 1
@@ -139,7 +144,11 @@ final class AppLockCurtain {
         guard let shown = window else { return }
         shown.isHidden = true
         window = nil
-        keyBefore?.makeKey()
+        // At a locked cold launch the app's window may not be key yet when
+        // the curtain is made, so nothing was kept (L5): give the key back to
+        // the scene's own window, so a field takes typing right after Face ID.
+        let back = keyBefore ?? shown.windowScene?.windows.first { $0 !== shown && !$0.isHidden }
+        back?.makeKey()
     }
 
     var isShown: Bool { window != nil }
@@ -156,6 +165,8 @@ struct AppLockGate: ViewModifier {
     @EnvironmentObject private var settings: ConnectionSettings
     @Environment(\.scenePhase) private var scenePhase
     @State private var curtain = AppLockCurtain()
+    /// The scene this gate's view is shown in, once it has a window.
+    @State private var scene: UIWindowScene?
 
     private func covers(_ phase: ScenePhase) -> Bool {
         lock.locked || (enabled && lock.canLock && phase != .active)
@@ -164,7 +175,7 @@ struct AppLockGate: ViewModifier {
     private func sync(_ phase: ScenePhase) {
         if covers(phase) {
             curtain.show(lock: lock, settings: settings, shopName: shopName, interactive: lock.locked && phase == .active,
-                         locked: lock.locked)
+                         locked: lock.locked, in: scene)
         } else {
             curtain.hide()
         }
@@ -174,6 +185,7 @@ struct AppLockGate: ViewModifier {
         content
             // Nothing under the lock is read out or reachable by VoiceOver.
             .accessibilityHidden(lock.locked)
+            .background(SceneFinder { scene = $0 })
             .overlay {
                 if covers(scenePhase) {
                     AppLockView(shopName: shopName, interactive: false, asksByItself: false)
@@ -193,5 +205,29 @@ struct AppLockGate: ViewModifier {
             }
             .onChange(of: lock.locked) { _, _ in sync(scenePhase) }
             .onChange(of: enabled) { _, _ in sync(scenePhase) }
+    }
+}
+
+/// Tells its owner the window scene it is shown in (the curtain's own scene,
+/// LOW-4). Draws nothing.
+private struct SceneFinder: UIViewRepresentable {
+    let found: (UIWindowScene?) -> Void
+
+    func makeUIView(context: Context) -> Finder {
+        let view = Finder()
+        view.found = found
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: Finder, context: Context) { view.found = found }
+
+    final class Finder: UIView {
+        var found: ((UIWindowScene?) -> Void)?
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard let scene = window?.windowScene else { return }
+            DispatchQueue.main.async { [weak self] in self?.found?(scene) }
+        }
     }
 }

@@ -1529,7 +1529,10 @@ final class LanServer {
         case (_, false) where request.method == "POST" && host.bedClear != nil
                 && Self.bedClearPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
-            guard LanDevices.isSigned(request.headers) else {
+            // `!tokenScoped`: an API token skips the signature check in
+            // `pinGate`, so a route for signed phones refuses one itself
+            // (Nov 26 review, L5).
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.bedClear!(Self.bedClearPath(path)!)
@@ -2758,6 +2761,16 @@ final class LanServer {
         }
         let device = KhaytEngine.deviceRecord(kind: stored["kind"], role: stored["role"],
                                               rolesVersion: stored["rolesVersion"].flatMap(Int.init))
+        // ── A KEY SENT TWICE IS NOT READ (Nov 26 review, MED-1) ──────────
+        // The rule below reads the body with JavaScript, where the LAST of a
+        // repeated key wins; the routes read it in Swift, where the FIRST
+        // does. `{"status":"pending","status":null}` was no status to the
+        // rule (orders:write) and "pending" to the route: an operator's phone
+        // moved quotes on and priced jobs. No real client repeats a key, so
+        // the whole body is refused before either reads it.
+        if !request.body.isEmpty, JSONRepeatedKeys.found(in: request.body) {
+            return signedForPhone(.json(400, #"{"ok":false,"reason":"repeated-key"}"#), request)
+        }
         // The rule is asked about the REQUEST, not only the route: on a job
         // write the body decides too (a price, a new quote, or moving a quote
         // on is pricing, `quote:write`, whatever route carries it).
@@ -2767,7 +2780,21 @@ final class LanServer {
             bodyText: write.map { _ in String(decoding: request.body, as: UTF8.self) }, job: write?.job) else {
             return signedForPhone(.json(403, #"{"reason":"role-scope","required":"owner"}"#), request)
         }
-        if answer.ok { return nil }
+        if answer.ok {
+            // ── AND THE SHOP'S OWN PER-PRINTER LIMITS (Nov 26 review, MED-5) ──
+            // The role table gives every operator `machines:control`. A shop
+            // that took printer control away from operators (Roles ▸
+            // Printers, `settings.roleLimits`) is obeyed here as at the Mac
+            // (`printerRoleHas`): the same rule, `KhaytRbac.canPrinter`.
+            guard answer.required == "machines:control" else { return nil }
+            var limits: JSONValue?
+            if case .object(let settings)? = host.store()["settings"] { limits = settings["roleLimits"] }
+            guard let role = try? await host.engine.deviceRole(device),
+                  (try? await host.engine.rbacCanPrinter(role: role, verb: "control", lockEnabled: true, limits: limits)) == true else {
+                return signedForPhone(.json(403, #"{"reason":"role-scope","required":"machines:control"}"#), request)
+            }
+            return nil
+        }
         let body = (try? JSONEncoder().encode(["reason": "role-scope", "required": answer.required ?? "owner"])) ?? Data()
         // Signed back: a phone acts on this answer (it steps down to its floor
         // mode), so a device on the Wi-Fi must not be able to forge it.

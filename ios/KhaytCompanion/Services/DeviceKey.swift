@@ -99,27 +99,6 @@ enum DeviceKey {
         return Data(code).base64EncodedString()
     }
 
-    /// `x-khayt-reply-mac`: the Mac signs its answer to a signed request with
-    /// the same key, `HMAC(K, "khayt-reply-v1\n" + requestNonce + "\n" +
-    /// status + "\n" + hex(sha256(body)))`, base64 (docs/LAN_API.md, the
-    /// connector's formula). Something else on the Wi-Fi cannot forge it.
-    static func replyMac(key: String, nonce: String, status: Int, body: Data) -> String? {
-        guard let raw = Data(base64Encoded: key), raw.count == 32 else { return nil }
-        let digest = SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
-        let text = ["khayt-reply-v1", nonce, String(status), digest].joined(separator: "\n")
-        return Data(HMAC<SHA256>.authenticationCode(for: Data(text.utf8), using: SymmetricKey(data: raw)))
-            .base64EncodedString()
-    }
-
-    /// Whether an answer carries a reply MAC that verifies, compared in
-    /// constant time.
-    static func replyVerifies(_ credential: Credential, nonce: String, status: Int, body: Data,
-                              header: String?) -> Bool {
-        guard let header, let want = replyMac(key: credential.key, nonce: nonce, status: status, body: body),
-              let a = Data(base64Encoded: header), let b = Data(base64Encoded: want), a.count == b.count else { return false }
-        return zip(a, b).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0
-    }
-
     static func headers(_ credential: Credential, method: String, url: URL, body: Data?,
                         now: Date, nonce: String = MacIdentity.nonce()) -> Headers? {
         let time = Int(now.timeIntervalSince1970.rounded(.down))

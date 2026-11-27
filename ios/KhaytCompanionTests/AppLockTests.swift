@@ -281,7 +281,7 @@ final class AppLockTests: XCTestCase {
         JobSearch.defaults = defaults
         defer { JobSearch.defaults = before }
         let spotlight = FakeIndex()
-        XCTAssertFalse(JobSearch.hidesCustomers)
+        XCTAssertTrue(JobSearch.hidesCustomers, "not told yet and no choice: hidden")
         await JobSearch.lockChanged(inForce: true, into: spotlight)
         XCTAssertTrue(JobSearch.hidesCustomers)
         XCTAssertEqual(spotlight.calls.first, "delete", "what was indexed with customers is removed")

@@ -1,0 +1,1 @@
+- **Mac: updates are only taken from Khayt's own signed list.** Khayt checks a signature on the list of updates before it offers you one, and from this version refuses a list without it. An update offered by anyone other than Khayt, or a list changed after Khayt signed it, is never shown. Nothing changes in how you update.

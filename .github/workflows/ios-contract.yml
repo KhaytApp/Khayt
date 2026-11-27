@@ -33,6 +33,12 @@ defaults:
   run:
     shell: bash
 
+
+# Least privilege: merge-queue runs execute queued PR code with this token
+# (security review of Nov 26, LOW-8).
+permissions:
+  contents: read
+
 jobs:
   ios-relevant:
     name: Does this touch the iPhone app?
@@ -69,7 +75,7 @@ jobs:
           # - renderer/invoice.css (the phone's copy must not drift) and
           #   docs/lan-device-keys.vectors.json (shared signing vectors).
           #   RepoPathsInTheFilterTests fails if a test reads a path this misses.
-          pattern='^(ios/|mac/KhaytCore/|lib/|plugins/|renderer/analytics\.js$|renderer/invoice\.css$|renderer/locales/|docs/lan-device-keys\.vectors\.json$|test/fixtures/quote-draft-vectors\.json$|test/fixtures/parts-edit-vectors\.json$|test/fixtures/business-flag-vectors\.json$|test/fixtures/part-colour-vectors\.json$|test/fixtures/actual-times-vectors\.json$|test/fixtures/payment-plan-apply-vectors\.json$|test/fixtures/line-labour-vectors\.json$|test/fixtures/printer-activity-vectors\.json$|scripts/ios-contract-|\.github/workflows/ios-contract\.yml$|test/fixtures/printer-problems-vectors\.json$|test/fixtures/waiting-at-machine-vectors\.json$|docs/connector-pair\.vectors\.json$|docs/phone-pair\.vectors\.json$|test/fixtures/device-roles-vectors\.json$|test/fixtures/outbound-vectors\.json$)'
+          pattern='^(ios/|mac/KhaytCore/|lib/|plugins/|renderer/analytics\.js$|renderer/invoice\.css$|renderer/locales/|docs/lan-device-keys\.vectors\.json$|test/fixtures/quote-draft-vectors\.json$|test/fixtures/parts-edit-vectors\.json$|test/fixtures/business-flag-vectors\.json$|test/fixtures/part-colour-vectors\.json$|test/fixtures/actual-times-vectors\.json$|test/fixtures/payment-plan-apply-vectors\.json$|test/fixtures/line-labour-vectors\.json$|test/fixtures/printer-activity-vectors\.json$|scripts/ios-contract-|\.github/workflows/ios-contract\.yml$|test/fixtures/printer-problems-vectors\.json$|test/fixtures/waiting-at-machine-vectors\.json$|test/fixtures/printer-success-vectors\.json$|docs/connector-pair\.vectors\.json$|docs/phone-pair\.vectors\.json$|test/fixtures/device-roles-vectors\.json$|test/fixtures/outbound-vectors\.json$)'
           # A here-string, not `printf | grep -q`: under pipefail grep's early
           # exit can SIGPIPE printf on a long list and flip the answer.
           if grep -qE "$pattern" <<< "$files"; then run=true; else run=false; fi

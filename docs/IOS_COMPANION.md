@@ -204,3 +204,29 @@ docs/LAN_API.md
 - Owner PIN in iOS Keychain  
 - HTTP on trusted LAN only  
 - App Group `group.com.khaytapp.companion` for widget snapshot
+
+### The app lock: what it does and does not protect against
+
+The lock when Khayt opens (Settings › Security) uses the iPhone's own Face ID
+or passcode (`LocalAuthentication`). It protects the shop's book from someone
+holding the phone **while it is unlocked**, who does not know its passcode.
+By design (security review LOW-1, Nov 26 2026), it does **not** protect
+against:
+
+- **Someone who knows the iPhone's passcode.** "Use passcode" accepts it
+  (`.deviceOwnerAuthentication`), as the iPhone's own apps do.
+- **An iPhone with no passcode.** Nothing can be checked, so Khayt does not
+  lock (it fails open rather than lock with no way in), and Settings says so.
+- **A face added to Face ID later.** The enrolled set is not pinned
+  (`evaluatedPolicyDomainState`): adding a face needs the passcode anyway.
+
+Turning the lock off, or giving it longer in the background, asks Face ID or
+the passcode first. A shorter time asks nothing.
+
+**Open (security LOW-3).** The book's `network` block (`/api/store`,
+`/api/store/settings`) arrives over the shop's http without a reply MAC, and
+`PhoneOutbound.effective` believes it. Someone able to tamper with the shop
+Wi-Fi could make a book-holding phone read the switch as off; the phone then
+talks only to the shop's own cloud. The fix needs the Mac and the desktop to
+sign those answers (`x-khayt-reply-mac`, as `/api/devices/self`), so it is
+not an iPhone-only change.

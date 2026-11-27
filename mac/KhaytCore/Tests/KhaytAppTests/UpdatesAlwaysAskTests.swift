@@ -24,15 +24,15 @@ struct UpdatesAlwaysAskTests {
     }
 }
 
-/// An update is verified before it is unpacked. The feed is not signed yet, so
-/// demanding a signed one would strand every installed copy.
+/// An update is verified before it is unpacked, and the feed that offers it
+/// must carry a valid signature. Both lanes sign the feed since beta.43.
 struct UpdatesVerifiedFirstTests {
-    @Test("the built app verifies the archive's signature before extracting it, and does not yet demand a signed feed")
+    @Test("the built app verifies the archive's signature before extracting it, and demands a signed feed")
     func verifiedBeforeExtraction() throws {
         let script = try String(contentsOf: UpdatesAlwaysAskTests.root.deletingLastPathComponent()
             .appending(path: "make-app.sh"), encoding: .utf8)
         #expect(script.contains("<key>SUVerifyUpdateBeforeExtraction</key><true/>"))
-        #expect(!script.contains("<key>SURequireSignedFeed</key>"),
-                "a signed feed is required before the appcast is signed: no copy could update")
+        #expect(script.contains("<key>SURequireSignedFeed</key><true/>"),
+                "an unsigned or edited feed could offer an update")
     }
 }

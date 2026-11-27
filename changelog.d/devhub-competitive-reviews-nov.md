@@ -1,0 +1,1 @@
+- **Docs:** weekly competitive reviews of 2026-11-08, 2026-11-15 and 2026-11-22, landed together.

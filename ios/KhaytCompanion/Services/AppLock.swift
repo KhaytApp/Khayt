@@ -109,7 +109,7 @@ final class AppLock: ObservableObject {
     private var started = false
 
     private enum Keys {
-        static let choice = "khayt.lock.choice"
+        static let choice = JobSearch.lockChoiceKey
         static let after = "khayt.lock.after"
     }
 
@@ -156,6 +156,35 @@ final class AppLock: ObservableObject {
     /// dropped sign-in while locked leaves it locked (review of #2691).
     func turnedOffInSettings() { choice = false; locked = false; failed = false }
 
+    /// Settings › Security: turn the lock off. The iPhone is asked first
+    /// (security review LOW-2, Nov 26): someone who picks up an unlocked
+    /// phone inside "Lock after" must not be able to switch it off for good.
+    /// False when the check failed and nothing changed.
+    @discardableResult
+    func turnOff() async -> Bool {
+        guard await confirmsLoosening() else { return false }
+        turnedOffInSettings()
+        return true
+    }
+
+    /// Settings › Security: "Lock after". A LONGER time is asked for like
+    /// turning the lock off; a shorter one is stricter and asks nothing.
+    func setAfter(_ new: AppLockRule.After) async {
+        if new.rawValue > after.rawValue, await !confirmsLoosening() { return }
+        after = new
+    }
+
+    /// The iPhone's check before the lock is loosened, its passcode allowed.
+    /// An iPhone with no passcode has no lock in force, so nothing to ask.
+    /// While `checking`, coming back from the Face ID sheet does not re-lock.
+    private func confirmsLoosening() async -> Bool {
+        guard canLock else { return true }
+        guard !checking else { return false }
+        checking = true
+        defer { checking = false }
+        return await checker.check(reason: L10n.tr("lock.reason.change"), biometricsOnly: false)
+    }
+
     /// Ask the iPhone. `biometricsOnly` is the first button; the second
     /// ("Use passcode") lets the iPhone's passcode open it.
     func unlock(biometricsOnly: Bool) async {
@@ -179,8 +208,14 @@ final class AppLock: ObservableObject {
 @MainActor
 final class LockScreenNames: ObservableObject {
     @Published var hidden: Bool {
-        didSet { defaults?.set(hidden, forKey: LockScreenPrivacy.key) }
+        didSet {
+            defaults?.set(hidden, forKey: LockScreenPrivacy.key)
+            if hidden != oldValue { Self.changed() }
+        }
     }
+    /// Set by the app: redraw what is already on the Lock Screen (the running
+    /// Live Activities), which would otherwise keep the old words (L2).
+    static var changed: () -> Void = {}
     private let defaults: UserDefaults?
 
     init(defaults: UserDefaults? = UserDefaults(suiteName: LockScreenPrivacy.group)) {

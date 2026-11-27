@@ -1578,7 +1578,7 @@
 "lock.after.1" = "Nach 1 Minute";
 "lock.after.5" = "Nach 5 Minuten";
 "lock.after.15" = "Nach 15 Minuten";
-"lock.foot" = "Auf Telefonen von Inhaber und Manager standardmäßig an. Face ID oder der Code dieses iPhone öffnet Khayt beim Start und erneut, wenn es die oben genannte Zeit im Hintergrund war. Ihr Buch bleibt in jedem Fall auf dem Telefon.";
+"lock.foot" = "Auf Telefonen von Inhaber und Manager standardmäßig an. Face ID oder der Code dieses iPhone öffnet Khayt beim Start und erneut, wenn es die oben genannte Zeit im Hintergrund war. Ihr Buch bleibt in jedem Fall auf dem Telefon. Siri, Kurzbefehle und die Tasten in Druckmeldungen und der Live-Aktivität funktionieren auch, wenn Khayt gesperrt ist: Sie schützt die Sperre dieses iPhone selbst.";
 "lock.no_passcode" = "Dieses iPhone hat keinen Code, daher kann Khayt nicht sperren. Legen Sie einen in den iPhone-Einstellungen fest.";
 "lock.floor.title" = "Keine Sperre nötig";
 "lock.floor.body" = "Dies ist ein Werkstatt-Telefon: Es hält keine Kopie des Shop-Buchs, also gibt es darauf nichts zu sperren. Es zeigt Warteschlange und Drucker, solange es im WLAN des Shops ist.";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Entsperren";
 "lock.use_passcode" = "Code verwenden";
 "lock.reason" = "Entsperren Sie Khayt, um Ihren Shop zu sehen.";
+"lock.reason.change" = "Bestätigen Sie, dass Sie es sind, um die Khayt-Sperre zu ändern.";
 "alert.print.a_print" = "Ein Druck";
 "intake.remind.alert.hidden" = "Eine Kundenanfrage wartet auf Ihre Antwort.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
@@ -1637,3 +1638,33 @@
 "printer.why.read_only" = "Der Mac zeigt den Beispiel-Shop, der nicht geändert werden kann.";
 "printer.why.not_saved" = "Der Mac konnte es gerade nicht speichern. Versuchen Sie es erneut.";
 "printer.why.role" = "Die Rolle dieses Telefons erlaubt das nicht. Fragen Sie den Inhaber.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "Gekoppelte Telefone";
+"owner.phones.this" = "%@ (dieses Telefon)";
+"owner.phones.unnamed" = "Ein Telefon";
+"owner.phones.by_pin" = "Mit der PIN gekoppelt";
+"owner.phones.by_code" = "Per Nummer gekoppelt";
+"owner.phones.seen" = "zuletzt gesehen %@";
+"owner.phones.now" = "jetzt";
+"owner.phones.yesterday" = "gestern";
+"owner.phones.foot" = "Rollen und das Entfernen eines Telefons werden auf Ihrem Mac festgelegt (Einstellungen › Telefone & WLAN). Nur für den Inhaber sichtbar, im WLAN des Shops.";
+"owner.role.owner" = "Inhaber";
+"owner.role.manager" = "Manager";
+"owner.role.operator" = "Bediener";
+"owner.role.viewer" = "Betrachter";
+"owner.prices.title" = "Preise im Slicer";
+"owner.prices.switch" = "Preise im Slicer anzeigen";
+"owner.prices.switch.sub" = "Auf Ihrem Mac festgelegt";
+"owner.prices.may" = "Darf Preise sehen";
+"owner.prices.hidden" = "Preise ausgeblendet";
+"owner.prices.allowed" = "Erlaubt";
+"owner.prices.not_allowed" = "Nicht erlaubt";
+"owner.prices.unnamed" = "Ein Slicer";
+"owner.prices.foot" = "Welcher Slicer die Preise des Shops sehen darf, entscheidet der Inhaber am Mac. Das Telefon zeigt es nur an.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "Erfolgsquote";
+"success.window" = "%@ · letzte 30 Tage";
+"success.counts" = "%1$d fertig, %2$d fehlgeschlagen";
+"success.cancelled" = "%d abgebrochen, nicht gezählt";
+"success.not_enough" = "Noch nicht genug Drucke: %1$d von %2$d nötig";

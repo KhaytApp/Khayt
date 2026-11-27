@@ -1524,6 +1524,76 @@
      "via": "cloud"
     }
    }
+  },
+  {
+   "why": "the book unread and this computer offline: this computer's switch decides (webhooks; review of 4.12.0, MED-2)",
+   "settings": null,
+   "purpose": "webhooks",
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   },
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   }
+  },
+  {
+   "why": "the book unread and this computer offline: this computer's switch decides (messaging; review of 4.12.0, MED-2)",
+   "settings": null,
+   "purpose": "messaging",
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   },
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   }
+  },
+  {
+   "why": "the book unread and this computer offline: this computer's switch decides (tunnel; review of 4.12.0, MED-2)",
+   "settings": null,
+   "purpose": "tunnel",
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   },
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   }
+  },
+  {
+   "why": "the book unread and this computer offline: this computer's switch decides (cloud; review of 4.12.0, MED-2)",
+   "settings": null,
+   "purpose": "cloud",
+   "ctx": {
+    "local": {
+     "offline": true
+    }
+   },
+   "want": {
+    "allowed": false,
+    "reason": "offline-here"
+   }
+  },
+  {
+   "why": "the book unread and this computer NOT offline: still settings-unknown (MED-2 changes only the order)",
+   "settings": null,
+   "purpose": "webhooks",
+   "ctx": {
+    "local": {
+     "offline": false
+    }
+   },
+   "want": {
+    "allowed": false,
+    "reason": "settings-unknown"
+   }
   }
  ]
 }

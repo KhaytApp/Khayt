@@ -24,7 +24,9 @@ struct SuccessRatesTests {
         struct One: Decodable { let why: String; let rate: JSONValue; let want: Int? }
         let cases: [One]
     }
-    struct Vectors: Decodable { let cases: [Case]; let percent: Percent? }
+    struct Vectors: Decodable { let cases: [Case]; let percent: Percent?; let tone: Tone? }
+    struct Tone: Decodable { let cases: [ToneCase] }
+    struct ToneCase: Decodable { let why: String; let rate: Double?; let enough: Bool?; let want: String? }
 
     @Test("the desktop's vectors: worst first, cancelled and unknown outside the rate, too few is not enough, the date window")
     func vectors() async throws {
@@ -150,5 +152,20 @@ struct SuccessRatesTests {
             orders: [.object(["id": .string("1"), "deleted": .bool(true), "printRuns": .array([run("failed")])])],
             machines: [.object(["id": .string("U1")])])
         #expect(gone == [.init(machineId: "U1", finished: 0, failed: 0, cancelled: 0, unknown: 0, rate: nil, enough: false)])
+    }
+
+    /// The colour every app gives a shown rate (Turki, Nov 27), from the
+    /// desktop's own vectors: by the rule, never by a threshold written here.
+    @Test("a rate's colour: red under 80, none from 80 to 94, green from 95, none with too few prints")
+    func tone() async throws {
+        let engine = try KhaytEngine()
+        let file = try Data(contentsOf: CrossAppFixtureTests.fixture("printer-success-vectors.json"))
+        let tones = try #require(try JSONDecoder().decode(Vectors.self, from: file).tone?.cases)
+        #expect(tones.count >= 10, "the fixture lost its tone cases")
+        for c in tones {
+            // "enough missing" reaches Swift as false: the caller always has a row's `enough`.
+            let got = try await engine.successTone(c.rate, enough: c.enough ?? false)
+            #expect(got?.rawValue == c.want, Comment(rawValue: c.why))
+        }
     }
 }
