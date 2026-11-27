@@ -129,6 +129,9 @@ extension Shop {
         launchGateDefaults.set(current, forKey: LaunchGate.acceptedForKey)
         launchGateDefaults.set(current, forKey: LaunchGate.lastRunKey)
         launchGatePending = []
+        // An update held while this sheet was up is shown now, from scratch
+        // (`holdUpdate`): otherwise it turned true as this one closed, and was dropped.
+        showHeldUpdateAgain()
     }
 
     /// Whether the sheet stands over the window now. After sign-in when the

@@ -28,8 +28,8 @@
  *   2. 'lan'                          → online: allowed; offline: allowed only to a
  *                                       private address or a LAN name, else
  *                                       'lan-host-public' ('lan-host-missing' for none)
- *   3. no settings (the book not read yet) → blocked, 'settings-unknown'
- *   4. this computer is offline       → blocked, 'offline-here'
+ *   3. this computer is offline       → blocked, 'offline-here' (it needs no book)
+ *   4. no settings (the book not read yet) → blocked, 'settings-unknown'
  *   5. the shop is offline, not kept  → blocked, 'offline'
  *        'switch-sync' is kept by its own rule, never by `keep`: only when
  *        settings.network.via is 'cloud' and dropSwitchSync is not true
@@ -46,9 +46,9 @@
  * 'kept', `once: true`; the host must then keep `spend(token)` in its place,
  * so it is used once. It never opens anything else:
  *   - only 'switch-sync' (any other purpose ignores it);
- *   - only against the SHOP's switch: step 4 ('offline-here', this
+ *   - only against the SHOP's switch: step 3 ('offline-here', this
  *     computer's own switch) comes first, so a computer offline by its own
- *     switch makes no call; nor 'settings-unknown';
+ *     switch makes no call; nor 'settings-unknown' (step 4);
  *   - live for ANSWER_MS from `at`, by the clock the host hands in: a token
  *     from the future, one stretched past ANSWER_MS, or one already spent is
  *     dead.
@@ -272,8 +272,11 @@ function allowed(settings, purpose, ctx) {
     if (c.host === undefined || c.host === null || String(c.host).trim() === '') return out(false, 'lan-host-missing');
     return isLanHost(c.host) ? out(true, 'lan') : out(false, 'lan-host-public');
   }
-  if (!isPlain(settings)) return out(false, 'settings-unknown');
+  // This computer's own switch first: it needs no book, and a host that lets
+  // an unreadable book through for some purposes (the desktop's outbound
+  // gate, review of #2628/#2629) must still meet it (review of 4.12.0, MED-2).
   if (offlineHere) return out(false, 'offline-here');
+  if (!isPlain(settings)) return out(false, 'settings-unknown');
   const offline = shopOffline(settings);
   if (offline && keptOf(settings).indexOf(purpose) === -1) {
     if (purpose === 'switch-sync' && answerLive(c.answer, c.now)) return Object.assign(out(true, 'kept'), { once: true });

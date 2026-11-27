@@ -1578,7 +1578,7 @@
 "lock.after.1" = "Nach 1 Minute";
 "lock.after.5" = "Nach 5 Minuten";
 "lock.after.15" = "Nach 15 Minuten";
-"lock.foot" = "Auf Telefonen von Inhaber und Manager standardmäßig an. Face ID oder der Code dieses iPhone öffnet Khayt beim Start und erneut, wenn es die oben genannte Zeit im Hintergrund war. Ihr Buch bleibt in jedem Fall auf dem Telefon.";
+"lock.foot" = "Auf Telefonen von Inhaber und Manager standardmäßig an. Face ID oder der Code dieses iPhone öffnet Khayt beim Start und erneut, wenn es die oben genannte Zeit im Hintergrund war. Ihr Buch bleibt in jedem Fall auf dem Telefon. Siri, Kurzbefehle und die Tasten in Druckmeldungen und der Live-Aktivität funktionieren auch, wenn Khayt gesperrt ist: Sie schützt die Sperre dieses iPhone selbst.";
 "lock.no_passcode" = "Dieses iPhone hat keinen Code, daher kann Khayt nicht sperren. Legen Sie einen in den iPhone-Einstellungen fest.";
 "lock.floor.title" = "Keine Sperre nötig";
 "lock.floor.body" = "Dies ist ein Werkstatt-Telefon: Es hält keine Kopie des Shop-Buchs, also gibt es darauf nichts zu sperren. Es zeigt Warteschlange und Drucker, solange es im WLAN des Shops ist.";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Entsperren";
 "lock.use_passcode" = "Code verwenden";
 "lock.reason" = "Entsperren Sie Khayt, um Ihren Shop zu sehen.";
+"lock.reason.change" = "Bestätigen Sie, dass Sie es sind, um die Khayt-Sperre zu ändern.";
 "alert.print.a_print" = "Ein Druck";
 "intake.remind.alert.hidden" = "Eine Kundenanfrage wartet auf Ihre Antwort.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */

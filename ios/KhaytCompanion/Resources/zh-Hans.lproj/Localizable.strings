@@ -1578,7 +1578,7 @@
 "lock.after.1" = "1 分钟后";
 "lock.after.5" = "5 分钟后";
 "lock.after.15" = "15 分钟后";
-"lock.foot" = "店主和经理的手机默认开启。Khayt 启动时，以及在后台停留超过上述时间后，需用 Face ID 或这部 iPhone 的密码打开。无论哪种情况，账本都保留在手机上。";
+"lock.foot" = "店主和经理的手机默认开启。Khayt 启动时，以及在后台停留超过上述时间后，需用 Face ID 或这部 iPhone 的密码打开。无论哪种情况，账本都保留在手机上。Khayt 锁定时，Siri、快捷指令以及打印提醒和实时活动上的按钮仍可使用：由这部 iPhone 自身的锁保护。";
 "lock.no_passcode" = "这部 iPhone 没有设置密码，因此 Khayt 无法锁定。请在 iPhone 的设置中设置密码。";
 "lock.floor.title" = "无需锁定";
 "lock.floor.body" = "这是一部车间手机：它不保存店铺账本的副本，因此没有需要锁定的内容。连接店铺 Wi-Fi 时，它显示队列和打印机。";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "解锁";
 "lock.use_passcode" = "使用密码";
 "lock.reason" = "解锁 Khayt 以查看你的店铺。";
+"lock.reason.change" = "请验证身份以更改 Khayt 锁定。";
 "alert.print.a_print" = "一次打印";
 "intake.remind.alert.hidden" = "有一个客户请求在等待你的答复。";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */

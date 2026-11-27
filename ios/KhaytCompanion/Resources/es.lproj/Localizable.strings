@@ -1578,7 +1578,7 @@
 "lock.after.1" = "Tras 1 minuto";
 "lock.after.5" = "Tras 5 minutos";
 "lock.after.15" = "Tras 15 minutos";
-"lock.foot" = "Activado por defecto en los teléfonos del propietario y del gerente. Face ID o el código de este iPhone abre Khayt al iniciarse, y de nuevo tras estar en segundo plano el tiempo indicado arriba. Tu libro permanece en el teléfono en cualquier caso.";
+"lock.foot" = "Activado por defecto en los teléfonos del propietario y del gerente. Face ID o el código de este iPhone abre Khayt al iniciarse, y de nuevo tras estar en segundo plano el tiempo indicado arriba. Tu libro permanece en el teléfono en cualquier caso. Siri, Atajos y los botones de los avisos de impresión y de la Actividad en vivo siguen funcionando con Khayt bloqueado: los protege el bloqueo de este iPhone.";
 "lock.no_passcode" = "Este iPhone no tiene código, así que Khayt no puede bloquearse. Configura uno en los Ajustes del iPhone.";
 "lock.floor.title" = "No hace falta bloqueo";
 "lock.floor.body" = "Este es un teléfono de taller: no guarda copia del libro de la tienda, así que no hay nada que bloquear. Muestra la cola y las impresoras mientras está en la Wi-Fi de la tienda.";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Desbloquear";
 "lock.use_passcode" = "Usar el código";
 "lock.reason" = "Desbloquea Khayt para ver tu tienda.";
+"lock.reason.change" = "Confirma que eres tú para cambiar el bloqueo de Khayt.";
 "alert.print.a_print" = "Una impresión";
 "intake.remind.alert.hidden" = "Una solicitud de cliente espera tu respuesta.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */

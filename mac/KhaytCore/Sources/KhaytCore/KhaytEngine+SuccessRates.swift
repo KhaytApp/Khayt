@@ -11,6 +11,13 @@ import Foundation
 /// In KhaytCore, not KhaytApp, because the iPhone works the rate out for
 /// itself from the book an owner's or manager's phone holds (iPhone frame 6,
 /// "Success rate"): there is no second copy of this rule in Swift.
+///
+/// NO CALLER ON MAIN YET, on purpose (review Nov 26, L6). Its two callers are
+/// screens, and each waits for its own PR rather than being wired here
+/// without a frame: the Mac's Machine profit column (#2704, Mac Figma page 25,
+/// frame 5) and the iPhone's machine card (frame 6). Until one lands, nothing
+/// on either screen shows a rate, and the release notes say only that it
+/// "can be worked out".
 extension KhaytEngine {
 
     /// One printer's count.
