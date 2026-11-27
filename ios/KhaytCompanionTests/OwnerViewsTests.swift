@@ -68,6 +68,11 @@ final class OwnerViewsTests: XCTestCase {
         let older = try XCTUnwrap(OwnerViews.lastSeen("2026-11-10T06:12:00.000Z", now: now, calendar: utc))
         XCTAssertTrue(older.contains("10"), older)
         XCTAssertNil(OwnerViews.lastSeen(nil, now: now))
+        // The book's calendar, whatever the phone's region uses: a Saudi
+        // phone (Umm al-Qura) still reads Nov 10, never 1448 AH.
+        XCTAssertEqual(OwnerViews.bookCalendar.identifier, .gregorian)
+        XCTAssertFalse(older.contains("AH") || older.contains("1448"), older)
+        XCTAssertTrue(older.contains("Nov"), older)
         XCTAssertNil(OwnerViews.lastSeen("", now: now))
         XCTAssertNil(OwnerViews.lastSeen("last Tuesday", now: now))
     }
