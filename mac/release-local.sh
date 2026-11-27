@@ -8,6 +8,18 @@
 #   RELEASE_SHA=<sha> ./mac/release-local.sh   the same, built from that commit
 #                                     on main (the cut's merge), not main's tip
 #
+# IN TWO STEPS, so a person can install the build before anyone else can:
+#   RELEASE_SHA=<sha> ./mac/release-local.sh --draft-only
+#                         build, notarise, check and upload the DRAFT, then
+#                         STOP: nothing is signed, nothing is public, no
+#                         install is told. The draft can be downloaded by
+#                         whoever may see drafts, and installed by hand.
+#   RELEASE_SHA=<sha> ./mac/release-local.sh --publish
+#                         later, once it has been seen to work: no build;
+#                         the draft for this version must exist, and the
+#                         rest happens as below (sign, the feed, public).
+# Both take --final as well.
+#
 # It builds whatever `main` on GitHub holds, in its own worktree
 # (~/Khayt-release), so the checkout you work in is never switched, and never
 # edited under a ten-minute build. Cut the version first (bump-mac-version.js +
@@ -22,15 +34,25 @@
 #   xcrun notarytool store-credentials khayt     (Apple ID, team, app password)
 set -euo pipefail
 
+say()  { printf '\n== %s\n' "$*"; }
+fail() { printf '\nSTOPPED: %s\n' "$*" >&2; exit 1; }
+
 PRERELEASE=1
-[ "${1:-}" = "--final" ] && PRERELEASE=0
+DRAFT_ONLY=0
+PUBLISH_ONLY=0
+for arg in "$@"; do
+  case "$arg" in
+    --final) PRERELEASE=0 ;;
+    --draft-only) DRAFT_ONLY=1 ;;
+    --publish) PUBLISH_ONLY=1 ;;
+    *) fail "unknown option '$arg' (--final, --draft-only, --publish)" ;;
+  esac
+done
+[ "$DRAFT_ONLY" = 1 ] && [ "$PUBLISH_ONLY" = 1 ] && fail "--draft-only and --publish are the two halves: run one, then the other"
 PROFILE="${NOTARY_PROFILE:-khayt}"
 FEED_URL="https://khaytapp.com/mac/appcast.xml"
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 WT="${KHAYT_RELEASE_DIR:-$HOME/Khayt-release}"
-
-say()  { printf '\n== %s\n' "$*"; }
-fail() { printf '\nSTOPPED: %s\n' "$*" >&2; exit 1; }
 
 # ── BEFORE TEN MINUTES OF BUILDING, EVERYTHING THAT CAN REFUSE ──────────
 say "checking what this needs"
@@ -42,7 +64,8 @@ command -v node >/dev/null || fail "needs node"
 # the same profile had worked hours earlier with somebody at the machine.
 # Say what Apple said: a 403 for an unsigned or expired developer agreement
 # came out here as "unlock the screen" while somebody sat at the Mac (Nov 13).
-notary_err=$(xcrun notarytool history --keychain-profile "$PROFILE" 2>&1 >/dev/null) \
+# Not asked by --publish, which builds and notarises nothing.
+[ "$PUBLISH_ONLY" = 1 ] || notary_err=$(xcrun notarytool history --keychain-profile "$PROFILE" 2>&1 >/dev/null) \
   || fail "cannot use the notarytool profile '$PROFILE'. Apple said:
   $(printf '%s' "$notary_err" | head -3)
   403 'required agreement': sign it at developer.apple.com/account (Agreements), then run this again.
@@ -89,6 +112,16 @@ node scripts/write-release-gates.js --check \
 bash mac/sync-js.sh >/dev/null
 git diff --quiet -- mac/KhaytCore/Sources/KhaytCore/JS/release-gates.json \
   || fail "the bundled release-gates.json on origin/main is not lib's — run mac/sync-js.sh, land what it writes, and start again"
+# And everything else sync-js.sh writes: the bundled modules, the locales and
+# the Resources copies. The build below compiles THIS tree, so a module that
+# drifted from lib/ on main would otherwise ship lib's version silently, with
+# no commit that says so (review Nov 26, L1). Untracked counts too: a module
+# newly on the list but never copied in.
+DRIFT="$(git status --porcelain -- mac/KhaytCore/Sources/KhaytCore/JS/ \
+  mac/KhaytCore/Sources/KhaytApp/Resources/invoice.css \
+  mac/KhaytCore/Sources/KhaytApp/Resources/filament-catalog.json)"
+[ -z "$DRIFT" ] || fail "the bundled JS on origin/main is not lib's — run mac/sync-js.sh, land what it writes, and start again:
+$DRIFT"
 
 V="$(node -p "require('./mac/version.json').version")"
 B="$(node -p "require('./mac/version.json').build")"
@@ -102,6 +135,39 @@ node scripts/changelog-fold.js --check >/dev/null 2>&1 \
   || fail "changelog.d/ still holds fragments — run npm run changelog:fold and land it, or those entries miss these notes"
 
 echo "  notary profile, version: ok"
+
+# ── SIGN, MAKE PUBLIC, TELL EVERY INSTALL: mac-publish.yml ──────────────
+# The ONLY place this script dispatches anything. --draft-only never reaches
+# it (test/mac-release-draft-only.test.js runs the script and proves it).
+publish() {
+  say "signing and publishing on GitHub (a few minutes)"
+  PRE=true; [ "$PRERELEASE" = 1 ] || PRE=false
+  BEFORE="$(gh run list -R KhaytApp/Khayt --workflow mac-publish.yml --limit 1 --json databaseId --jq '.[0].databaseId // 0')"
+  # sha: the commit this build is from, so the publish checks and scripts
+  # against IT and not against main's tip, which may have moved on (L2).
+  gh workflow run mac-publish.yml -R KhaytApp/Khayt --ref main -f tag="$TAG" -f prerelease="$PRE" -f publish_appcast=true \
+    -f sha="$(git rev-parse HEAD)"
+  RUN=""
+  for _ in $(seq 1 30); do
+    sleep 5
+    RUN="$(gh run list -R KhaytApp/Khayt --workflow mac-publish.yml --limit 1 --json databaseId --jq '.[0].databaseId // 0')"
+    [ "$RUN" != "$BEFORE" ] && break
+  done
+  [ -n "$RUN" ] && [ "$RUN" != "$BEFORE" ] || fail "the publish run did not start — the draft is uploaded; start mac-publish.yml with tag=$TAG"
+  gh run watch "$RUN" -R KhaytApp/Khayt --exit-status >/dev/null \
+    || fail "the publish run failed: https://github.com/KhaytApp/Khayt/actions/runs/$RUN (the draft is still there; re-run it)"
+  say "done"
+  echo "  Release: https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG"
+  echo "  Feed:    $FEED_URL  (GitHub Pages + the CDN take a few minutes to serve it)"
+  echo "  Build $B is what Sparkle compares."
+}
+
+# The second half: the draft must be there, and nothing is built.
+if [ "$PUBLISH_ONLY" = 1 ]; then
+  [ "$DRAFT" = "true" ] || fail "there is no draft of $TAG to publish — run --draft-only first"
+  publish
+  exit 0
+fi
 
 # ── BUILD, NOTARISE, STAPLE ─────────────────────────────────────────────
 say "building (about ten minutes, silent for most of it)"
@@ -147,21 +213,13 @@ fi
 gh release upload "$TAG" lib/release-gates.json -R KhaytApp/khayt-mac --clobber
 rm -f "$NOTES"
 
-say "signing and publishing on GitHub (a few minutes)"
-PRE=true; [ "$PRERELEASE" = 1 ] || PRE=false
-BEFORE="$(gh run list -R KhaytApp/Khayt --workflow mac-publish.yml --limit 1 --json databaseId --jq '.[0].databaseId // 0')"
-gh workflow run mac-publish.yml -R KhaytApp/Khayt --ref main -f tag="$TAG" -f prerelease="$PRE" -f publish_appcast=true
-RUN=""
-for _ in $(seq 1 30); do
-  sleep 5
-  RUN="$(gh run list -R KhaytApp/Khayt --workflow mac-publish.yml --limit 1 --json databaseId --jq '.[0].databaseId // 0')"
-  [ "$RUN" != "$BEFORE" ] && break
-done
-[ -n "$RUN" ] && [ "$RUN" != "$BEFORE" ] || fail "the publish run did not start — the draft is uploaded; start mac-publish.yml with tag=$TAG"
-gh run watch "$RUN" -R KhaytApp/Khayt --exit-status >/dev/null \
-  || fail "the publish run failed: https://github.com/KhaytApp/Khayt/actions/runs/$RUN (the draft is still there; re-run it)"
+if [ "$DRAFT_ONLY" = 1 ]; then
+  say "stopped at the draft: nothing is signed, public or offered to any install"
+  echo "  Draft:   https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG  (visible to whoever may see drafts)"
+  echo "  Archive: $ARCHIVE (build $B), here, to install by hand and try"
+  echo "  When it has been seen to work, publish it (no build):"
+  echo "    RELEASE_SHA=$(git rev-parse HEAD) ./mac/release-local.sh --publish$([ "$PRERELEASE" = 1 ] || printf ' --final')"
+  exit 0
+fi
 
-say "done"
-echo "  Release: https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG"
-echo "  Feed:    $FEED_URL  (GitHub Pages + the CDN take a few minutes to serve it)"
-echo "  Build $B is what Sparkle compares."
+publish

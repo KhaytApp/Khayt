@@ -37,7 +37,7 @@ struct SettingsSecurityPage: View {
             } else {
                 VStack(spacing: 0) {
                     SettingsPieces.toggle(L10n.format("lock.toggle", biometry),
-                                          Binding(get: { enabled }, set: { on in if on { lock.choice = true } else { lock.turnedOffInSettings() } }),
+                                          Binding(get: { enabled }, set: { on in if on { lock.choice = true } else { Task { await lock.turnOff() } } }),
                                           last: !enabled)
                         .disabled(!lock.canLock)
                     if enabled {
@@ -53,7 +53,7 @@ struct SettingsSecurityPage: View {
                     SettingsPieces.eyebrow(L10n.tr("lock.after"))
                     VStack(spacing: 0) {
                         ForEach(AppLockRule.After.allCases) { choice in
-                            Button { lock.after = choice } label: {
+                            Button { Task { await lock.setAfter(choice) } } label: {
                                 SettingsPieces.row(L10n.tr(choice.labelKey), last: choice == AppLockRule.After.allCases.last) {
                                     if lock.after == choice {
                                         Image(systemName: "checkmark").font(.footnote.weight(.semibold))

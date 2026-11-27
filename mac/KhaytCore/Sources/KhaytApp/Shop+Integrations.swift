@@ -392,6 +392,10 @@ extension Shop {
     /// sync on does not push the shop's whole history.
     func retryFailedAccountingPushes() async {
         guard let engine, let build = source.build, StoreLock.weOwnIt(build) else { return }
+        // "Make no internet calls": what failed WAITS, as webhook retries do
+        // (`retryDueWebhooks`). A push goes out as a webhook; made now, each
+        // would only be refused and recorded as failed again (Nov 26 review, L3).
+        guard outboundGate.verdict(.webhooks).allowed else { return }
         guard let ids = try? await engine.accountingRetryable(orders: orderRows, settings: settingsDict) else { return }
         for id in ids { _ = await pushAccounting(id) }
     }

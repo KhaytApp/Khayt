@@ -23,6 +23,10 @@ on:
         description: 'Publish the Sparkle feed so existing installs see this build'
         type: boolean
         default: true
+      sha:
+        description: 'The commit the build was made from (release-local.sh sends it). Empty means main''s tip, as before'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -37,7 +41,23 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
+      # The commit the build was made from, not main's tip: main may have
+      # moved on since (another cut, a new changelog section, a new Sparkle),
+      # and the version check, the notes and the feed must be the build's
+      # (review Nov 26, L2). It must still be on main.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          fetch-depth: 0
+      - name: The commit is on main
+        env:
+          SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          [ -z "$SHA" ] && exit 0
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::sha must be a full 40-character commit"; exit 1; }
+          git fetch -q origin main
+          git merge-base --is-ancestor "$SHA" origin/main || { echo "::error::$SHA is not on main — publish only what main holds"; exit 1; }
       - uses: actions/setup-node@v7
         with: { node-version: 22 }
 
@@ -63,7 +83,7 @@ jobs:
         run: |
           set -euo pipefail
           V="$(node -p "require('./mac/version.json').version")"
-          [ "v$V" = "$TAG" ] || { echo "::error::main is at v$V, the draft is $TAG — publish from the commit that cut it"; exit 1; }
+          [ "v$V" = "$TAG" ] || { echo "::error::the commit is at v$V, the draft is $TAG — publish from the commit that cut it"; exit 1; }
           ARCHIVE="$(ls dist/*.zip | head -1)"
           [ "$(basename "$ARCHIVE")" = "Khayt-$V.zip" ] || { echo "::error::unexpected archive $ARCHIVE"; exit 1; }
           mkdir x && ditto -x -k "$ARCHIVE" x

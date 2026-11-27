@@ -14,7 +14,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { fold, order, entryLines } = require('../scripts/changelog-fold.js');
-const { verdict, checkFragment, isFragmentPath, placement, releaseSignals, waitingFragments } = require('../scripts/check-changelog.js');
+const { verdict, checkFragment, isFragmentPath, placement, releaseSignals, waitingFragments, lostFragments } = require('../scripts/check-changelog.js');
 
 const ROOT = path.join(__dirname, '..');
 const REAL = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8');
@@ -136,6 +136,41 @@ test('releaseSignals: a version section added, or a version changed, is a releas
   assert.deepEqual(releaseSignals({ changelogDiff: '', ...v({ 'package.json': '4.11.0' }, { 'package.json': '4.11.0' }) }), []);
 });
 
+test('placement with the old file: a shipped entry reworded in place is not an addition; a moved or extra one still is', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-reword-'));
+  const diffOf = (a, b) => {
+    fs.writeFileSync(path.join(tmp, 'a.md'), a); fs.writeFileSync(path.join(tmp, 'b.md'), b);
+    return spawnSync('git', ['diff', '--no-index', '--unified=3', 'a.md', 'b.md'], { cwd: tmp, encoding: 'utf8' }).stdout;
+  };
+  try {
+    const base = '# C\n\n## [Unreleased]\n\n- **New thing.** Body.\n\n## [2.0.0] - 2026-11-26\n\n### Added\n\n- **Shipped one.** Drawn from frames signed off on Nov 22.\n- **Shipped two.** Fine.\n\n## [1.0.0]\n\n- old\n';
+    // Reworded in place.
+    const reworded = base.replace('- **Shipped one.** Drawn from frames signed off on Nov 22.', '- **Shipped one.** Clean.');
+    let d = diffOf(base, reworded);
+    assert.equal(placement(d, reworded).ok, false, 'without the old file: as before, refused');
+    assert.deepEqual(placement(d, reworded, base), { ok: true, misplaced: [] });
+    // Moved from [Unreleased] into the shipped section: the removed line was in another section, so no pair.
+    const moved = base.replace('- **New thing.** Body.\n', '').replace('- **Shipped two.** Fine.\n', '- **Shipped two.** Fine.\n- **New thing.** Body.\n');
+    d = diffOf(base, moved);
+    assert.deepEqual(placement(d, moved, base).misplaced.map((m) => m.text), ['- **New thing.** Body.']);
+    // A reword plus a new entry slipped in beside it: one pairs, the other is refused.
+    const both = base.replace('- **Shipped one.** Drawn from frames signed off on Nov 22.', '- **Shipped one.** Clean.\n- **Sneaked in.** New.');
+    d = diffOf(base, both);
+    assert.deepEqual(placement(d, both, base).misplaced.map((m) => m.text), ['- **Sneaked in.** New.']);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('lostFragments: a removed fragment is lost unless its entries are in the CHANGELOG.md the PR leaves (review of 4.12.0, L3)', () => {
+  const cl = `## [Unreleased]\n\n${A}\n- plain bullet with no title\n\n## [1.0.0]\n- old\n`;
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/a.md', text: `${A}\n` }], cl), [], 'folded verbatim');
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/a.md', text: '- **Bed Ready: a download asks the switch first.** A typo the cut fixed.\n' }], cl), [], 'found by its title, the body may be edited');
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/p.md', text: '- plain bullet with no title\n' }], cl), []);
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/b.md', text: `${B}\n` }], cl), ['changelog.d/b.md'], 'not in the file');
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/ab.md', text: `${A}\n${B}\n` }], cl), ['changelog.d/ab.md'], 'every entry must be there');
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/x.md', text: '' }], cl), [], 'nothing to lose');
+  assert.deepEqual(lostFragments([{ name: 'changelog.d/p.md', text: '- plain bullet\n' }], cl), ['changelog.d/p.md'], 'a bare bullet must match a whole line');
+});
+
 test('waitingFragments: anything in changelog.d/ but the README waits, the same rule everywhere', () => {
   assert.deepEqual(waitingFragments(['README.md', 'b.md', 'a.md', '.gitkeep', 'x.txt', 'sub']), ['.gitkeep', 'a.md', 'b.md', 'sub', 'x.txt']);
   assert.deepEqual(waitingFragments(['README.md']), []);
@@ -165,7 +200,7 @@ function sandbox() {
   write('changelog.d/someone-else.md', '- **Theirs.**\n');
   git('add', '-A'); git('commit', '-q', '-m', 'base');
   git('checkout', '-q', '-b', 'pr');
-  const check = (cwd = dir) => spawnSync(process.execPath, [path.join(dir, 'scripts/check-changelog.js')], { cwd, encoding: 'utf8', env: { ...process.env, BASE_REF: 'main' } });
+  const check = (cwd = dir, env = {}) => spawnSync(process.execPath, [path.join(dir, 'scripts/check-changelog.js')], { cwd, encoding: 'utf8', env: { ...process.env, BASE_REF: 'main', CHANGELOG_CHECK_SCOPE: '', ...env } });
   return { dir, git, write, check, done: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
@@ -186,6 +221,40 @@ test('CLI: a fragment the PR added passes; editing or renaming someone else\'s d
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stdout, /fragment was written \(changelog\.d\/pr\.md\)/);
     assert.equal(s.check(path.join(s.dir, 'lib')).status, 0, 'run from lib/');
+  } finally { s.done(); }
+});
+
+test('CLI: touching CHANGELOG.md does not excuse deleting someone\'s fragment; a real fold does (L3)', () => {
+  const s = sandbox();
+  try {
+    // A "Before you update" item belongs in CHANGELOG.md itself, and a bad rebase dropped someone's fragment.
+    s.write('CHANGELOG.md', '# Changelog\n\n## [Unreleased]\n\n### Before you update\n\n- **Update every computer first.** Body.\n\n- old entry\n\n## [1.0.0] - 2026-01-01\n\n- shipped\n');
+    s.git('rm', '-q', 'changelog.d/someone-else.md');
+    s.git('add', '-A'); s.git('commit', '-qm', 'gate item, and a fragment lost');
+    const r = s.check();
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /puts it nowhere in CHANGELOG\.md:[\s\S]*changelog\.d\/someone-else\.md/);
+    // The same PR, folding it properly instead: passes.
+    s.write('CHANGELOG.md', '# Changelog\n\n## [Unreleased]\n\n### Before you update\n\n- **Update every computer first.** Body.\n\n- **Theirs.**\n- old entry\n\n## [1.0.0] - 2026-01-01\n\n- shipped\n');
+    s.git('commit', '-qam', 'fold it');
+    const ok = s.check();
+    assert.equal(ok.status, 0, ok.stderr);
+  } finally { s.done(); }
+});
+
+test('CLI: a CHANGELOG over 1 MB is still read (an overflow used to read as "not checked" and pass)', () => {
+  const s = sandbox();
+  try {
+    const filler = Array.from({ length: 12000 }, (_, i) => `- **Old entry ${i}.** ${'x'.repeat(100)}`).join('\n');
+    s.write('CHANGELOG.md', `# Changelog\n\n## [Unreleased]\n\n- old entry\n\n## [1.0.0] - 2026-01-01\n\n- shipped\n${filler}\n`);
+    s.git('commit', '-qam', 'a big history'); s.git('checkout', '-q', 'main'); s.git('merge', '-q', '--ff-only', 'pr'); s.git('checkout', '-q', 'pr');
+    assert.ok(fs.statSync(path.join(s.dir, 'CHANGELOG.md')).size > 1024 * 1024);
+    // An entry added into the shipped [1.0.0]: must be refused, not waved through.
+    s.write('CHANGELOG.md', fs.readFileSync(path.join(s.dir, 'CHANGELOG.md'), 'utf8').replace('- shipped\n', '- shipped\n- **Misfiled.** In a released section.\n'));
+    s.git('commit', '-qam', 'misfiled');
+    const r = s.check();
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /\[1\.0\.0\]\s+- \*\*Misfiled\.\*\*/);
   } finally { s.done(); }
 });
 
@@ -219,6 +288,34 @@ test('CLI: a release PR is refused while a fragment waits, and passes once folde
   } finally { s.done(); }
 });
 
+test('CLI, merge queue (CHANGELOG_CHECK_SCOPE=release): only the release rule, which a PR ahead in the queue can break', () => {
+  const s = sandbox();
+  const queue = { CHANGELOG_CHECK_SCOPE: 'release' };
+  try {
+    // A PR whose own run passed on "[no changelog]": the queue's commits do not carry that message.
+    s.write('lib/a.js', '2\n'); s.git('commit', '-qam', 'internal refactor');
+    assert.equal(s.check(s.dir).status, 1, 'its own run would ask for an entry');
+    const q = s.check(s.dir, queue);
+    assert.equal(q.status, 0, q.stderr);
+    assert.match(q.stdout, /merge queue: not a release/);
+    // The release PR, with a fragment that landed ahead of it in the queue still waiting: refused.
+    s.write('package.json', '{"version":"1.1.0"}\n'); s.git('commit', '-qam', 'release');
+    const r = s.check(s.dir, queue);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /this is a release[\s\S]*changelog\.d\/someone-else\.md/);
+  } finally { s.done(); }
+});
+
+test('ci.yml: the "Changelog entry" job runs in the merge queue too, on the release rule only', () => {
+  const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+  const job = ci.slice(ci.indexOf('\n  changelog:\n'), ci.indexOf('\n  dco:\n'));
+  assert.ok(job.length > 0, 'the changelog job is where it was');
+  assert.match(job, /if: github\.event_name == 'pull_request' \|\| github\.event_name == 'merge_group'/);
+  assert.match(job, /BASE_REF: \$\{\{ github\.event_name == 'merge_group' && github\.event\.merge_group\.base_sha \|\| format\('origin\/\{0\}', github\.base_ref\) \}\}/);
+  assert.match(job, /CHANGELOG_CHECK_SCOPE: \$\{\{ github\.event_name == 'merge_group' && 'release' \|\| 'all' \}\}/);
+  assert.match(job, /fetch-depth: 0/, 'the base must be in the clone');
+});
+
 test('CLI: the fold\'s --check and the fold itself treat a stray file the same way', () => {
   const s = sandbox();
   try {
@@ -229,4 +326,13 @@ test('CLI: the fold\'s --check and the fold itself treat a stray file the same w
     assert.equal(r.status, 1, 'the fold refuses it rather than skipping it');
     assert.match(r.stderr, /notes\.txt/);
   } finally { s.done(); }
+});
+
+test('a CHANGELOG.md checked out with CRLF folds and keeps its line endings (review of 4.12.0, L4)', () => {
+  const { fold } = require('../scripts/changelog-fold.js');
+  const lf = '# Changelog\n\n## [Unreleased]\n\n- **Old.** x\n\n## [1.0.0]\n';
+  const frag = [{ name: 'a.md', text: '- **New.** y\n' }];
+  const out = fold(lf.replace(/\n/g, '\r\n'), frag);
+  assert.strictEqual(out, fold(lf, frag).replace(/\n/g, '\r\n'));
+  assert.ok(out.includes('- **New.** y\r\n'));
 });

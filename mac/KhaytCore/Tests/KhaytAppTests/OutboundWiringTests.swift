@@ -140,9 +140,11 @@ struct OutboundWiringTests {
         // A value an older client stored reads as ON, so turning it "on" is no change.
         let odd: JSONValue = .object(["offline": .string("true"), "changedAt": .string("x")])
         #expect(obj(Shop.network(odd, offline: true, by: "A", at: t1))["changedAt"] == .string("x"))
-        // Junk in keep is dropped; lan is never kept.
+        // What is not a name is dropped, and lan is never kept. A name this Mac
+        // does not know stays: it may be a purpose a newer app ticked, and a
+        // tick on another row is not an untick of it (review Nov 26, L4).
         let junk: JSONValue = .object(["keep": .array([.string("nope"), .string("lan"), .number(3), .string("ai")])])
-        #expect(obj(Shop.network(junk, keep: .cloud, true))["keep"] == .array([.string("ai"), .string("cloud")]))
+        #expect(obj(Shop.network(junk, keep: .cloud, true))["keep"] == .array([.string("nope"), .string("ai"), .string("cloud")]))
         #expect(!Shop.keepable.contains(.lan) && !Shop.keepable.contains(.tunnel) && Shop.keepable.contains(.storefront))
         #expect(Shop.keepable.count == OutboundPurpose.allCases.count - 2, "tunnel is the only purpose left out besides lan")
     }

@@ -1282,11 +1282,12 @@ unset or short PIN is `401`.
 
 ### `POST /api/network/switch`
 
-> **Native Mac only** (Nov 2026, draft). `lib/lan-server.js` does not serve it
-> yet; the desktop is to match this shape. A phone treats a `404` as "this
-> computer cannot do it" and shows the switch read-only.
+> **Both computers** (Nov 2026): the native Mac (`Shop+PhoneNetworkSwitch.swift`) and
+> Windows/Linux (`lib/lan-server.js` with `lib/main/phone-network-switch.js`), one
+> shape. An older computer that does not serve it answers `404`; a phone treats that
+> as "this computer cannot do it" and shows the switch read-only.
 
-An **owner's phone** turning the shop's "Make no internet calls" on or off (iPhone frame 1B). It is the same change the owner makes at the Mac, by the same path: the same forward-only stamp (`lib/network-switch.js stampAfter`), the same "tell my other computers" call when that option is on, one write of `settings.network`, and the Mac's own gate told at once.
+An **owner's phone** turning the shop's "Make no internet calls" on or off (iPhone frame 1B). It is the same change the owner makes at the computer, by the same path: the same forward-only stamp (`lib/network-switch.js stampAfter`), the same "tell my other computers" call when that option is on (turning it **on**: told first, while still online; turning it **off**: told after the write), one write of `settings.network`, and the computer's own gate told at once (on Windows/Linux, the open window gets the written value as well).
 
 **Who.** A **signed**, enrolled phone whose role is **owner** (a phone paired with the owner PIN before roles is the owner). The PIN alone is `403 {"ok":false,"reason":"device-key-required"}`. A signed phone in any other role gets the usual `403 {"reason":"role-scope","required":"owner"}`: the route is deliberately not in the role table (`lib/device-roles.js`), and a route the table does not name is the owner's. A paired slicer cannot reach it.
 
@@ -1308,7 +1309,7 @@ An **owner's phone** turning the shop's "Make no internet calls" on or off (iPho
 | 200 | `{"ok":true,"network":{"offline":true,"keep":["cloud"],"changedAt":"…","changedBy":"Turki's iPhone"}}` |
 | 400 | `{"ok":false,"reason":"bad-body"}` or `"bad-keep"` |
 | 403 | `device-key-required` (unsigned) or `role-scope` (signed, not the owner) |
-| 409 | `{"ok":false,"reason":"changed","network":{…}}`: `seen` is stale. `"not-saved"` with `network`: another change is in flight or this computer cannot save the book now. `"read-only"`: the sample book |
+| 409 | `{"ok":false,"reason":"changed","network":{…}}`: `seen` (or `seenKeep`) is stale, or the switch changed at the computer between reading and writing. `"not-saved"` with `network`: another change is in flight or this computer cannot save the book now. `"read-only"`: the sample book (Mac only; Windows/Linux has none) |
 | 503 | `{"ok":false,"reason":"busy"}`: the app is starting |
 
 `changedBy` is the phone's name as the shop sees it in Paired phones, without control or direction-changing characters, cut at 80 characters. `changedAt` is never earlier than the newest stamp this computer has seen, unless that stamp is more than ten minutes ahead of its clock (a mistake already in the book), which is not followed.

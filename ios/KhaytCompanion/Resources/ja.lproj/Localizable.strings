@@ -1578,7 +1578,7 @@
 "lock.after.1" = "1 分後";
 "lock.after.5" = "5 分後";
 "lock.after.15" = "15 分後";
-"lock.foot" = "オーナーとマネージャーの電話では初期設定でオンです。Khayt の起動時と、上の時間だけバックグラウンドにあった後に、Face ID またはこの iPhone のパスコードで開きます。どちらの場合も帳簿は電話に残ります。";
+"lock.foot" = "オーナーとマネージャーの電話では初期設定でオンです。Khayt の起動時と、上の時間だけバックグラウンドにあった後に、Face ID またはこの iPhone のパスコードで開きます。どちらの場合も帳簿は電話に残ります。Khayt のロック中も、Siri、ショートカット、印刷通知とライブアクティビティのボタンは使えます。これらはこの iPhone 自体のロックで守られます。";
 "lock.no_passcode" = "この iPhone にはパスコードがないため、Khayt をロックできません。iPhone の設定でパスコードを設定してください。";
 "lock.floor.title" = "ロックは不要です";
 "lock.floor.body" = "これは現場用の電話です。ショップの帳簿のコピーを保持しないため、ロックするものがありません。ショップの Wi-Fi 上にある間、キューとプリンタを表示します。";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "ロック解除";
 "lock.use_passcode" = "パスコードを使う";
 "lock.reason" = "ショップを表示するには Khayt のロックを解除してください。";
+"lock.reason.change" = "Khayt のロックを変更するには本人確認をしてください。";
 "alert.print.a_print" = "印刷";
 "intake.remind.alert.hidden" = "顧客からの依頼が返答を待っています。";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
@@ -1637,3 +1638,61 @@
 "printer.why.read_only" = "Mac はサンプルショップを表示中で、変更できません。";
 "printer.why.not_saved" = "Mac が今は保存できませんでした。もう一度お試しください。";
 "printer.why.role" = "この電話の役割ではできません。オーナーに確認してください。";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "ペアリング済みの電話";
+"owner.phones.this" = "%@（この電話）";
+"owner.phones.unnamed" = "電話";
+"owner.phones.by_pin" = "PIN でペアリング";
+"owner.phones.by_code" = "番号でペアリング";
+"owner.phones.seen" = "最終確認 %@";
+"owner.phones.now" = "たった今";
+"owner.phones.yesterday" = "昨日";
+"owner.phones.foot" = "役割の設定と電話の削除は Mac で行います（設定 › 電話と Wi-Fi）。オーナーにのみ、ショップの Wi-Fi 上で表示されます。";
+"owner.role.owner" = "オーナー";
+"owner.role.manager" = "マネージャー";
+"owner.role.operator" = "オペレーター";
+"owner.role.viewer" = "閲覧者";
+"owner.prices.title" = "スライサーでの価格";
+"owner.prices.switch" = "スライサーに価格を表示";
+"owner.prices.switch.sub" = "Mac で設定";
+"owner.prices.may" = "価格を表示できます";
+"owner.prices.hidden" = "価格は非表示";
+"owner.prices.allowed" = "許可";
+"owner.prices.not_allowed" = "不許可";
+"owner.prices.unnamed" = "スライサー";
+"owner.prices.foot" = "どのスライサーがショップの価格を表示できるかはオーナーが Mac で決めます。電話は表示するだけです。";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "成功率";
+"success.window" = "%@ · 過去 30 日間";
+"success.counts" = "完了 %1$d、失敗 %2$d";
+"success.cancelled" = "キャンセル %d は対象外";
+"success.not_enough" = "まだ印刷数が足りません: 必要 %2$d 中 %1$d";
+/* The print's time-lapse as proof (signed frame 7b; Mac #2700) */
+"lapse.title" = "%@ · タイムラプス";
+"lapse.mb" = "%@ MB";
+"lapse.available.title" = "プリンタ上のタイムラプス";
+"lapse.available.sub" = "この印刷のためにプリンタが記録";
+"lapse.copying" = "Mac がコピー中です";
+"lapse.kept.title" = "タイムラプスを証拠として保存済み";
+"lapse.kept.sub" = "Mac 上のジョブのファイル内";
+"lapse.link.title" = "大きすぎてここには保存できません";
+"lapse.link.over" = "上限 %@ を超えています。プリンタへのリンクとして保持";
+"lapse.link.unknown" = "プリンタがサイズを示さなかったため、プリンタへのリンクとして保持";
+"lapse.keep" = "証拠として保存";
+"lapse.open" = "プリンタで開く";
+"lapse.keeping" = "Mac がプリンタからコピーしています。1 分ほどかかることがあります。";
+"lapse.foot" = "保存は Mac が行います（プリンタからコピー）。電話は依頼するだけです。";
+"lapse.why.no-timelapse" = "プリンタにこのジョブのタイムラプスはもうありません。";
+"lapse.why.no-machine" = "このジョブのプリンタはもうショップにありません。";
+"lapse.why.copying" = "Mac はすでにコピー中です。";
+"lapse.why.cancelled" = "Mac 側でコピーが中止されました。何も保存されていません。";
+"lapse.why.read-only" = "Mac はサンプルショップを表示中で、変更できません。";
+"lapse.why.not-saved" = "Mac が今は保存できませんでした。もう一度お試しください。";
+"lapse.why.printer-unreachable" = "Mac がプリンタに接続できませんでした。";
+"lapse.why.busy" = "Mac のアプリが起動中です。少ししてからお試しください。";
+"lapse.why.role-scope" = "この電話の役割ではできません。オーナーに確認してください。";
+"lapse.why.device-key-required" = "先にこの電話を Mac と再度ペアリングしてください。";
+"lapse.why.not-offered" = "電話からタイムラプスを保存するには、Mac のアプリを更新してください。";
+"lapse.why.unreachable" = "完了できませんでした。";
+"lapse.why.no_answer" = "Mac からまだ応答がありません。コピーが続いている可能性があります。現在の状態はこちらです。";

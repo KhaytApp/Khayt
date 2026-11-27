@@ -1,0 +1,4 @@
+- **iPhone: turning the Khayt lock off, or giving it longer before it locks, now asks for Face ID or the passcode first.** A shorter time asks nothing.
+- **iPhone: "Hide job names on the lock screen" changes a print card already on the Lock Screen straight away**, instead of at the printer's next update.
+- **iPhone: the first time a new version opens, Spotlight is filled again**, so customer names are hidden at once while the lock is on. Before that, Siri and Shortcuts name no customer unless the lock was turned off.
+- **iPhone: after Face ID at a locked start, the keyboard works straight away in the app's fields.**

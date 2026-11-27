@@ -1578,7 +1578,7 @@
 "lock.after.1" = "بعد دقيقة واحدة";
 "lock.after.5" = "بعد 5 دقائق";
 "lock.after.15" = "بعد 15 دقيقة";
-"lock.foot" = "مفعّل افتراضيًا على هواتف المالك والمدير. يفتح Face ID أو رمز دخول هذا الـ iPhone خيط عند تشغيله، ومرة أخرى بعد بقائه في الخلفية للمدة أعلاه. يبقى دفترك على الهاتف في الحالتين.";
+"lock.foot" = "مفعّل افتراضيًا على هواتف المالك والمدير. يفتح Face ID أو رمز دخول هذا الـ iPhone خيط عند تشغيله، ومرة أخرى بعد بقائه في الخلفية للمدة أعلاه. يبقى دفترك على الهاتف في الحالتين. تبقى Siri والاختصارات وأزرار تنبيهات الطباعة والنشاط المباشر تعمل أثناء قفل خيط: يحميها قفل هذا الـ iPhone نفسه.";
 "lock.no_passcode" = "لا يوجد رمز دخول على هذا الـ iPhone، لذلك لا يمكن قفل خيط. اضبط رمزًا من إعدادات الـ iPhone.";
 "lock.floor.title" = "لا حاجة إلى قفل";
 "lock.floor.body" = "هذا هاتف لأرضية الورشة: لا يحتفظ بنسخة من دفتر المتجر، فلا شيء عليه يحتاج إلى قفل. يعرض قائمة الانتظار والطابعات ما دام على واي فاي المتجر.";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "فتح";
 "lock.use_passcode" = "استخدام رمز الدخول";
 "lock.reason" = "افتح خيط لعرض متجرك.";
+"lock.reason.change" = "أكّد هويتك لتغيير قفل خيط.";
 "alert.print.a_print" = "طباعة";
 "intake.remind.alert.hidden" = "طلب عميل ينتظر ردّك.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
@@ -1637,3 +1638,61 @@
 "printer.why.read_only" = "الماك يعرض المتجر التجريبي، ولا يمكن تغييره.";
 "printer.why.not_saved" = "تعذّر على الماك حفظه الآن. حاول مجددًا.";
 "printer.why.role" = "دور هذا الهاتف لا يسمح بذلك. اسأل المالك.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "الهواتف المقترنة";
+"owner.phones.this" = "%@ (هذا الهاتف)";
+"owner.phones.unnamed" = "هاتف";
+"owner.phones.by_pin" = "اقترن برمز PIN";
+"owner.phones.by_code" = "اقترن برقم";
+"owner.phones.seen" = "آخر ظهور %@";
+"owner.phones.now" = "الآن";
+"owner.phones.yesterday" = "أمس";
+"owner.phones.foot" = "الأدوار وإزالة هاتف تُضبط على الماك (الإعدادات › الهواتف وواي فاي). تظهر للمالك فقط، على واي فاي المتجر.";
+"owner.role.owner" = "المالك";
+"owner.role.manager" = "مدير";
+"owner.role.operator" = "مشغّل";
+"owner.role.viewer" = "مشاهد";
+"owner.prices.title" = "الأسعار في برنامج التقطيع";
+"owner.prices.switch" = "إظهار الأسعار في برنامج التقطيع";
+"owner.prices.switch.sub" = "يُضبط على الماك";
+"owner.prices.may" = "يمكنه رؤية الأسعار";
+"owner.prices.hidden" = "الأسعار مخفية";
+"owner.prices.allowed" = "مسموح";
+"owner.prices.not_allowed" = "غير مسموح";
+"owner.prices.unnamed" = "برنامج تقطيع";
+"owner.prices.foot" = "اختيار برنامج التقطيع الذي يرى أسعار المتجر يعود للمالك، ويُضبط على الماك. الهاتف يعرضه فقط.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "معدل النجاح";
+"success.window" = "%@ · آخر 30 يومًا";
+"success.counts" = "%1$d اكتملت، %2$d فشلت";
+"success.cancelled" = "%d ملغاة غير محسوبة";
+"success.not_enough" = "لا توجد طبعات كافية بعد: %1$d من %2$d مطلوبة";
+/* The print's time-lapse as proof (signed frame 7b; Mac #2700) */
+"lapse.title" = "%@ · فيديو تسريع الزمن";
+"lapse.mb" = "%@ م.ب";
+"lapse.available.title" = "فيديو تسريع الزمن على الطابعة";
+"lapse.available.sub" = "سجّلته الطابعة لهذه الطبعة";
+"lapse.copying" = "الماك ينسخه الآن";
+"lapse.kept.title" = "حُفظ فيديو تسريع الزمن كإثبات";
+"lapse.kept.sub" = "في ملفات الطلب على الماك";
+"lapse.link.title" = "أكبر من أن يُحفظ هنا";
+"lapse.link.over" = "يتجاوز حد %@: يبقى كرابط إلى الطابعة";
+"lapse.link.unknown" = "لم تذكر الطابعة حجمه: يبقى كرابط إلى الطابعة";
+"lapse.keep" = "حفظ كإثبات";
+"lapse.open" = "فتح على الطابعة";
+"lapse.keeping" = "الماك ينسخه من الطابعة. قد يستغرق ذلك دقيقة.";
+"lapse.foot" = "يحفظه الماك (ينسخه من الطابعة)؛ والهاتف يطلب فقط.";
+"lapse.why.no-timelapse" = "لم يعد لدى الطابعة فيديو لهذا الطلب.";
+"lapse.why.no-machine" = "طابعة هذا الطلب لم تعد من طابعات المتجر.";
+"lapse.why.copying" = "الماك ينسخه بالفعل.";
+"lapse.why.cancelled" = "أوقف شخص عند الماك النسخ. لم يُحفظ شيء.";
+"lapse.why.read-only" = "الماك يعرض المتجر التجريبي، ولا يمكن تغييره.";
+"lapse.why.not-saved" = "تعذّر على الماك حفظه الآن. حاول مجددًا.";
+"lapse.why.printer-unreachable" = "تعذّر على الماك الوصول إلى الطابعة.";
+"lapse.why.busy" = "التطبيق على الماك قيد التشغيل. حاول بعد لحظة.";
+"lapse.why.role-scope" = "دور هذا الهاتف لا يسمح بذلك. اسأل المالك.";
+"lapse.why.device-key-required" = "يحتاج هذا الهاتف إلى الاقتران بالماك من جديد أولًا.";
+"lapse.why.not-offered" = "حدّث التطبيق على الماك لحفظ الفيديو من الهاتف.";
+"lapse.why.unreachable" = "لم يتم ذلك.";
+"lapse.why.no_answer" = "لم يُجب الماك بعد. قد يكون النسخ ما زال جاريًا؛ هذا ما يقوله الآن.";

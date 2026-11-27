@@ -1578,7 +1578,7 @@
 "lock.after.1" = "Après 1 minute";
 "lock.after.5" = "Après 5 minutes";
 "lock.after.15" = "Après 15 minutes";
-"lock.foot" = "Activé par défaut sur les téléphones du propriétaire et du responsable. Face ID ou le code de cet iPhone ouvre Khayt au démarrage, puis de nouveau après être resté en arrière-plan pendant la durée ci-dessus. Votre livre reste sur le téléphone dans tous les cas.";
+"lock.foot" = "Activé par défaut sur les téléphones du propriétaire et du responsable. Face ID ou le code de cet iPhone ouvre Khayt au démarrage, puis de nouveau après être resté en arrière-plan pendant la durée ci-dessus. Votre livre reste sur le téléphone dans tous les cas. Siri, Raccourcis et les boutons des alertes d'impression et de l'Activité en direct fonctionnent même quand Khayt est verrouillé : c'est le verrouillage de cet iPhone qui les protège.";
 "lock.no_passcode" = "Cet iPhone n’a pas de code, Khayt ne peut donc pas se verrouiller. Définissez-en un dans les Réglages de l’iPhone.";
 "lock.floor.title" = "Aucun verrouillage nécessaire";
 "lock.floor.body" = "C’est un téléphone d’atelier : il ne garde aucune copie du livre de l’atelier, il n’y a donc rien à verrouiller. Il affiche la file et les imprimantes tant qu’il est sur le Wi-Fi de l’atelier.";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Déverrouiller";
 "lock.use_passcode" = "Utiliser le code";
 "lock.reason" = "Déverrouillez Khayt pour voir votre atelier.";
+"lock.reason.change" = "Confirmez votre identité pour modifier le verrouillage de Khayt.";
 "alert.print.a_print" = "Une impression";
 "intake.remind.alert.hidden" = "Une demande client attend votre réponse.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
@@ -1637,3 +1638,61 @@
 "printer.why.read_only" = "Le Mac affiche l’atelier d’exemple, qui ne peut pas être modifié.";
 "printer.why.not_saved" = "Le Mac n’a pas pu l’enregistrer pour le moment. Réessayez.";
 "printer.why.role" = "Le rôle de ce téléphone ne le permet pas. Demandez au propriétaire.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "Téléphones jumelés";
+"owner.phones.this" = "%@ (ce téléphone)";
+"owner.phones.unnamed" = "Un téléphone";
+"owner.phones.by_pin" = "Jumelé avec le code PIN";
+"owner.phones.by_code" = "Jumelé par numéro";
+"owner.phones.seen" = "vu pour la dernière fois %@";
+"owner.phones.now" = "à l’instant";
+"owner.phones.yesterday" = "hier";
+"owner.phones.foot" = "Les rôles et le retrait d’un téléphone se règlent sur votre Mac (Réglages › Téléphones et Wi-Fi). Visible par le propriétaire uniquement, sur le Wi-Fi de l’atelier.";
+"owner.role.owner" = "Propriétaire";
+"owner.role.manager" = "Responsable";
+"owner.role.operator" = "Opérateur";
+"owner.role.viewer" = "Lecteur";
+"owner.prices.title" = "Prix dans le slicer";
+"owner.prices.switch" = "Afficher les prix dans le slicer";
+"owner.prices.switch.sub" = "Réglé sur votre Mac";
+"owner.prices.may" = "Peut voir les prix";
+"owner.prices.hidden" = "Prix masqués";
+"owner.prices.allowed" = "Autorisé";
+"owner.prices.not_allowed" = "Non autorisé";
+"owner.prices.unnamed" = "Un slicer";
+"owner.prices.foot" = "Le propriétaire choisit, sur le Mac, quel slicer peut voir les prix de l’atelier. Le téléphone se contente de l’afficher.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "Taux de réussite";
+"success.window" = "%@ · 30 derniers jours";
+"success.counts" = "%1$d terminées, %2$d échouées";
+"success.cancelled" = "%d annulées non comptées";
+"success.not_enough" = "Pas encore assez d’impressions : %1$d sur %2$d nécessaires";
+/* The print's time-lapse as proof (signed frame 7b; Mac #2700) */
+"lapse.title" = "%@ · accéléré";
+"lapse.mb" = "%@ Mo";
+"lapse.available.title" = "Accéléré sur l’imprimante";
+"lapse.available.sub" = "Enregistré par l’imprimante pour cette impression";
+"lapse.copying" = "Le Mac le copie en ce moment";
+"lapse.kept.title" = "Accéléré conservé comme preuve";
+"lapse.kept.sub" = "Dans les fichiers de la commande sur le Mac";
+"lapse.link.title" = "Trop volumineux pour être conservé ici";
+"lapse.link.over" = "Au-delà de la limite de %@ : conservé comme lien vers l’imprimante";
+"lapse.link.unknown" = "L’imprimante n’a pas indiqué sa taille : conservé comme lien vers l’imprimante";
+"lapse.keep" = "Conserver comme preuve";
+"lapse.open" = "Ouvrir sur l’imprimante";
+"lapse.keeping" = "Le Mac le copie depuis l’imprimante. Cela peut prendre une minute.";
+"lapse.foot" = "Conservé par le Mac (il copie depuis l’imprimante) ; le téléphone demande.";
+"lapse.why.no-timelapse" = "L’imprimante n’a plus d’accéléré pour cette commande.";
+"lapse.why.no-machine" = "L’imprimante de cette commande ne fait plus partie de l’atelier.";
+"lapse.why.copying" = "Le Mac est déjà en train de le copier.";
+"lapse.why.cancelled" = "Quelqu’un a arrêté la copie sur le Mac. Rien n’a été conservé.";
+"lapse.why.read-only" = "Le Mac affiche l’atelier d’exemple, qui ne peut pas être modifié.";
+"lapse.why.not-saved" = "Le Mac n’a pas pu l’enregistrer pour le moment. Réessayez.";
+"lapse.why.printer-unreachable" = "Le Mac n’a pas pu joindre l’imprimante.";
+"lapse.why.busy" = "L’app démarre sur le Mac. Réessayez dans un instant.";
+"lapse.why.role-scope" = "Le rôle de ce téléphone ne le permet pas. Demandez au propriétaire.";
+"lapse.why.device-key-required" = "Ce téléphone doit d’abord être de nouveau jumelé avec le Mac.";
+"lapse.why.not-offered" = "Mettez à jour l’app sur le Mac pour conserver un accéléré depuis le téléphone.";
+"lapse.why.unreachable" = "Cela n’a pas abouti.";
+"lapse.why.no_answer" = "Le Mac n’a pas encore répondu. La copie est peut-être encore en cours ; voici ce qu’il indique maintenant.";

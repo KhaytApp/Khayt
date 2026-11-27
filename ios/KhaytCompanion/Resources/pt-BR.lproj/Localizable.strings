@@ -1578,7 +1578,7 @@
 "lock.after.1" = "Após 1 minuto";
 "lock.after.5" = "Após 5 minutos";
 "lock.after.15" = "Após 15 minutos";
-"lock.foot" = "Ativado por padrão nos telefones do proprietário e do gerente. O Face ID ou o código deste iPhone abre o Khayt ao iniciar, e de novo depois de ficar em segundo plano pelo tempo acima. Seu livro fica no telefone de qualquer forma.";
+"lock.foot" = "Ativado por padrão nos telefones do proprietário e do gerente. O Face ID ou o código deste iPhone abre o Khayt ao iniciar, e de novo depois de ficar em segundo plano pelo tempo acima. Seu livro fica no telefone de qualquer forma. A Siri, os Atalhos e os botões dos alertas de impressão e da Atividade ao Vivo continuam funcionando com o Khayt bloqueado: o bloqueio do próprio iPhone os protege.";
 "lock.no_passcode" = "Este iPhone não tem código, então o Khayt não pode bloquear. Defina um nos Ajustes do iPhone.";
 "lock.floor.title" = "Não é preciso bloquear";
 "lock.floor.body" = "Este é um telefone de oficina: não guarda cópia do livro da loja, então não há nada nele para bloquear. Mostra a fila e as impressoras enquanto está no Wi-Fi da loja.";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Desbloquear";
 "lock.use_passcode" = "Usar o código";
 "lock.reason" = "Desbloqueie o Khayt para ver sua loja.";
+"lock.reason.change" = "Confirme que é você para alterar o bloqueio do Khayt.";
 "alert.print.a_print" = "Uma impressão";
 "intake.remind.alert.hidden" = "Um pedido de cliente aguarda sua resposta.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
@@ -1637,3 +1638,61 @@
 "printer.why.read_only" = "O Mac está mostrando a loja de exemplo, que não pode ser alterada.";
 "printer.why.not_saved" = "O Mac não conseguiu salvar agora. Tente de novo.";
 "printer.why.role" = "A função deste telefone não permite isso. Pergunte ao proprietário.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "Telefones pareados";
+"owner.phones.this" = "%@ (este telefone)";
+"owner.phones.unnamed" = "Um telefone";
+"owner.phones.by_pin" = "Pareado com o PIN";
+"owner.phones.by_code" = "Pareado por número";
+"owner.phones.seen" = "visto por último %@";
+"owner.phones.now" = "agora";
+"owner.phones.yesterday" = "ontem";
+"owner.phones.foot" = "Funções e a remoção de um telefone são definidas no seu Mac (Ajustes › Telefones e Wi-Fi). Visível só para o proprietário, no Wi-Fi da loja.";
+"owner.role.owner" = "Proprietário";
+"owner.role.manager" = "Gerente";
+"owner.role.operator" = "Operador";
+"owner.role.viewer" = "Leitor";
+"owner.prices.title" = "Preços no fatiador";
+"owner.prices.switch" = "Mostrar preços no fatiador";
+"owner.prices.switch.sub" = "Definido no seu Mac";
+"owner.prices.may" = "Pode ver os preços";
+"owner.prices.hidden" = "Preços ocultos";
+"owner.prices.allowed" = "Permitido";
+"owner.prices.not_allowed" = "Não permitido";
+"owner.prices.unnamed" = "Um fatiador";
+"owner.prices.foot" = "Qual fatiador pode ver os preços da loja é escolha do proprietário, feita no Mac. O telefone só mostra.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "Taxa de sucesso";
+"success.window" = "%@ · últimos 30 dias";
+"success.counts" = "%1$d concluídas, %2$d com falha";
+"success.cancelled" = "%d canceladas não contadas";
+"success.not_enough" = "Ainda não há impressões suficientes: %1$d de %2$d necessárias";
+/* The print's time-lapse as proof (signed frame 7b; Mac #2700) */
+"lapse.title" = "%@ · time-lapse";
+"lapse.mb" = "%@ MB";
+"lapse.available.title" = "Time-lapse na impressora";
+"lapse.available.sub" = "Gravado pela impressora para esta impressão";
+"lapse.copying" = "O Mac está copiando agora";
+"lapse.kept.title" = "Time-lapse guardado como prova";
+"lapse.kept.sub" = "Nos arquivos do trabalho no Mac";
+"lapse.link.title" = "Grande demais para guardar aqui";
+"lapse.link.over" = "Acima do limite de %@: mantido como link para a impressora";
+"lapse.link.unknown" = "A impressora não informou o tamanho: mantido como link para a impressora";
+"lapse.keep" = "Guardar como prova";
+"lapse.open" = "Abrir na impressora";
+"lapse.keeping" = "O Mac está copiando da impressora. Pode levar um minuto.";
+"lapse.foot" = "Guardado pelo Mac (ele copia da impressora); o telefone só pede.";
+"lapse.why.no-timelapse" = "A impressora não tem mais um time-lapse deste trabalho.";
+"lapse.why.no-machine" = "A impressora deste trabalho não é mais da loja.";
+"lapse.why.copying" = "O Mac já está copiando.";
+"lapse.why.cancelled" = "Alguém parou a cópia no Mac. Nada foi guardado.";
+"lapse.why.read-only" = "O Mac está mostrando a loja de exemplo, que não pode ser alterada.";
+"lapse.why.not-saved" = "O Mac não conseguiu salvar agora. Tente de novo.";
+"lapse.why.printer-unreachable" = "O Mac não conseguiu alcançar a impressora.";
+"lapse.why.busy" = "O app no Mac está iniciando. Tente de novo em instantes.";
+"lapse.why.role-scope" = "A função deste telefone não permite isso. Pergunte ao proprietário.";
+"lapse.why.device-key-required" = "Este telefone precisa parear com o Mac de novo primeiro.";
+"lapse.why.not-offered" = "Atualize o app no Mac para guardar um time-lapse pelo telefone.";
+"lapse.why.unreachable" = "Não foi possível concluir.";
+"lapse.why.no_answer" = "O Mac ainda não respondeu. A cópia pode estar em andamento; isto é o que ele diz agora.";
