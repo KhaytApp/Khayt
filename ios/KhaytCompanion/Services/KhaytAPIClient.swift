@@ -2536,6 +2536,26 @@ final class KhaytAPIClient: ObservableObject {
         return (http.statusCode, data, signed)
     }
 
+    // MARK: - The print's time-lapse (frame 7b)
+
+    /// What the Mac says about a job's time-lapse, and whether the Mac SIGNED
+    /// that answer (`x-khayt-reply-mac` over this request's nonce). The
+    /// answer carries an address the phone may open in Safari ("Open on the
+    /// printer"); anything on the shop's Wi-Fi can answer for the Mac, so an
+    /// address from an unsigned answer is never offered (review of #2701).
+    /// `keep`: the POST that asks the Mac to copy it ("Keep as proof").
+    func jobTimelapseAnswer(orderId: String, keep: Bool = false) async -> (status: Int, body: Data, signed: Bool)? {
+        let id = orderId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? orderId
+        guard !settings.isSampleShop, let device = usableDevice,
+              let url = try? makeURL(path: "/api/orders/\(id)/timelapse" + (keep ? "/keep" : "")) else { return nil }
+        let nonce = MacIdentity.nonce()
+        guard let (data, response) = try? await send(url, method: keep ? "POST" : "GET", body: nil, auth: .device(device), nonce: nonce),
+              let http = response as? HTTPURLResponse else { return nil }
+        let signed = DeviceKey.verifiesReply(device, nonce: nonce, status: http.statusCode, body: data,
+                                             replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+        return (http.statusCode, data, signed)
+    }
+
     // MARK: - A photo of the print, from this phone
 
     /// The Mac takes a job photo only from a phone it enrolled (signed), never

@@ -349,6 +349,11 @@ struct OrderDetailPage: View {
                     return reply
                 } : nil)
             }
+            // The print's time-lapse, when its printer recorded one (the Mac
+            // says; signed frame 7b). Nothing for a quote: it was never printed.
+            if !isQuote {
+                JobTimelapseCard(orderId: order.id, jobName: order.project ?? order.id)
+            }
             // The papers besides the invoice, from the book. A quote is not
             // work yet; a cancelled job is nothing to pack or make.
             if api.holdsBook, !settings.isFloorPhone, !isQuote, !isCancelled {
