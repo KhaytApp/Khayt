@@ -701,10 +701,17 @@ if [ -n "${KHAYT_APPCAST:-}" ] && [ "$SPARKLE_EMBEDDED" = "1" ]; then
   <!-- The archive's EdDSA signature is checked BEFORE it is unpacked, not
        after: a tampered download is refused without ever being extracted.
        Every archive is already signed (mac-publish.yml, sign_update), and
-       Sparkle 2.9.6 supports it. SURequireSignedFeed is deliberately NOT here
-       yet: it needs the appcast itself signed first, and an app that demands
-       a signed feed from an unsigned one can never update again. -->
-  <key>SUVerifyUpdateBeforeExtraction</key><true/>"
+       Sparkle 2.9.6 supports it. -->
+  <key>SUVerifyUpdateBeforeExtraction</key><true/>
+  <!-- THE FEED MUST BE SIGNED TOO (release N+1 of #2693). beta.43 was the
+       first release published with a signed appcast, and a Mac was seen to
+       update through it (beta.42 to beta.43, Nov 26). From this build on, a
+       feed without a valid signature by SUPublicEDKey is refused, so a feed
+       edited by hand, re-saved or served by anyone else cannot offer an
+       update. The flip side: every feed from now on MUST be signed (both
+       publish lanes sign and verify it before going public), or no Mac with
+       this build can update again. -->
+  <key>SURequireSignedFeed</key><true/>"
 fi
 
 # KHAYT'S OWN GOOGLE SIGN-IN, so a shop connects Google Drive with one click

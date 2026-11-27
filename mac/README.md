@@ -137,10 +137,11 @@ Bed Ready learned this first; see the note at the top of `release.yml`.
 **The feed is signed, and must not be edited after a cut.** The publish lanes
 sign `appcast.xml` with the key that signs the archive (a comment at the end
 of the file, covering every byte before it) and check it before the release is
-made public. The app does not require the signature yet; when it does
-(`SURequireSignedFeed`, one release after the first signed feed), a feed that
-was re-saved, reformatted or edited by hand in the website repo will be
-refused by every Mac. To check the live one, with the public key only:
+made public. From beta.44 the app requires the signature
+(`SURequireSignedFeed`, one release after beta.43's first signed feed), so a
+feed that was re-saved, reformatted or edited by hand in the website repo is
+refused by every Mac, and so is an unsigned one: a release that publishes an
+unsigned feed leaves every Mac on beta.44 or later unable to update. To check the live one, with the public key only:
 
 ```bash
 node scripts/mac-appcast-verify.js --url https://khaytapp.com/mac/appcast.xml
