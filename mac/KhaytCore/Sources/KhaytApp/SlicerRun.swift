@@ -128,50 +128,49 @@ enum SlicerRun {
         try ZipWrite.archive(kept).write(to: url, options: .atomic)
     }
 
-    /// Presets for a model with no settings of its own, sliced by an Orca or
-    /// Bambu Studio fork with the arguments Khayt chose (#1778): the printer
-    /// the shop last used in that slicer, a print and a filament profile it
-    /// accepts, flattened and written into the slice's own folder.
+    /// What an Orca or Bambu Studio fork slices for a model with no settings of
+    /// its own, run with the arguments Khayt chose: a PROJECT 3MF made from the
+    /// model, carrying the printer the shop last used in that slicer and a print
+    /// and filament profile it accepts (`SlicerProject`). Never preset flags:
+    /// Snapmaker Orca's command line segfaults on `--load-settings`, with or
+    /// without `--load-filaments` (reproduced Nov 27 2026, "signal 11" on every
+    /// U1 STL sent from Khayt); the same presets inside the project slice.
     ///
-    /// The desktop's `bareModelPresets` (main.js), step for step, and every
-    /// step is the shared rule's — which family, whether the default arguments
-    /// run, whether the model needs presets, where the slicer keeps them, which
-    /// to take, and the file each becomes. This only sequences them and does
-    /// the file I/O. Returns `.null` presets when none are needed or none can
-    /// be chosen (a slice is still attempted), and the reason in the second.
-    static func bareModelPresets(engine: KhaytEngine, slicer: KhaytEngine.Slicer,
-                                 template: String, model: URL,
-                                 outDir: URL) async -> (presets: JSONValue, problem: String?) {
+    /// Every decision is the shared rule's: which family, whether the default
+    /// arguments run, whether the model needs presets, where the slicer keeps
+    /// them, which to take, what the project holds. This sequences them and
+    /// does the file I/O. The model itself comes back when nothing is needed or
+    /// nothing can be done (a slice is still attempted), with the reason.
+    static func sliceInput(engine: KhaytEngine, slicer: KhaytEngine.Slicer,
+                           template: String, model: URL,
+                           outDir: URL) async -> SlicerProject.Prepared {
+        let asIs = SlicerProject.Prepared(model: model, problem: nil)
         guard (try? await engine.slicerFamily(path: slicer.path)) == "orca",
               (try? await engine.usesDefaultSliceArgs(template: template, slicer: slicer.path)) == true
-        else { return (.null, nil) }
+        else { return asIs }
         let entries = model.pathExtension.lowercased() == "3mf"
             ? (try? Zip.entries(of: model))?.map(\.name) : nil
-        guard (try? await engine.needsPresets(model: model.path, entries: entries)) == true else {
-            return (.null, nil)
+        guard (try? await engine.needsPresets(model: model.path, entries: entries)) == true,
+              let plan = try? await engine.slicerProjectPlan(model: model.path, entries: entries)
+        else { return asIs }
+        if plan == "unsupported" {
+            return SlicerProject.Prepared(model: model, problem: "Khayt can slice an STL or a 3MF with this slicer. Open this file in the slicer itself.")
         }
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         var isDir: ObjCBool = false
         guard let roots = (try? await engine.presetRoots(slicer: slicer.path, home: home))?
             .first(where: { FileManager.default.fileExists(atPath: $0.dir, isDirectory: &isDir) && isDir.boolValue })
         else {
-            return (.null, "Open the slicer once and pick your printer, so Khayt can use its settings.")
+            return SlicerProject.Prepared(model: model, problem: "Open the slicer once and pick your printer, so Khayt can use its settings.")
         }
         let conf = (try? String(contentsOfFile: roots.confFile, encoding: .utf8)) ?? ""
         guard let choice = try? await engine.choosePresets(conf: conf, user: roots.user,
                                                             system: roots.system, bundled: roots.bundled)
-        else { return (.null, nil) }
+        else { return asIs }
         guard choice.ok, let machine = choice.machine, let process = choice.process,
-              let filament = choice.filament else { return (.null, choice.error) }
-        func file(_ kind: String, _ preset: JSONValue) async -> String? {
-            guard let text = try? await engine.presetFileJson(kind: kind, preset: preset) else { return nil }
-            let url = outDir.appending(path: "khayt-\(kind).json")
-            return (try? text.write(to: url, atomically: true, encoding: .utf8)) != nil ? url.path : nil
-        }
-        guard let m = await file("machine", machine), let p = await file("process", process),
-              let f = await file("filament", filament) else { return (.null, nil) }
-        return (.object(["settings": .array([.string(m), .string(p)]),
-                         "filaments": .array([.string(f)])]), nil)
+              let filament = choice.filament else { return SlicerProject.Prepared(model: model, problem: choice.error) }
+        return await SlicerProject.prepare(model, plan: plan, machine: machine, process: process, filament: filament,
+                                           engine: engine, outDir: outDir)
     }
 
     /// A directory of our own to slice into, so nothing lands beside the model.

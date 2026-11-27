@@ -3945,12 +3945,15 @@ extension Shop {
         }
         // A customer's upload is nearly always a bare mesh, and an Orca fork
         // will not slice one without a printer, print and filament profile —
-        // its built-in defaults fail its own validation (#1778).
-        let presets = await SlicerRun.bareModelPresets(engine: engine, slicer: slicer, template: slicer.args,
-                                                       model: model, outDir: dir).presets
-        guard let argv = try? await engine.sliceArgv(template: slicer.args, model: model.path,
+        // its built-in defaults fail its own validation (#1778). It goes in as a
+        // PROJECT carrying them, never with preset flags: Snapmaker Orca
+        // segfaults on those (`SlicerRun.sliceInput`).
+        let input = await SlicerRun.sliceInput(engine: engine, slicer: slicer, template: slicer.args,
+                                               model: model, outDir: dir)
+        let sliceable = input.model
+        guard let argv = try? await engine.sliceArgv(template: slicer.args, model: sliceable.path,
                                                      output: output.path, outdir: dir.path,
-                                                     slicer: slicer.path, presets: presets) else { return nil }
+                                                     slicer: slicer.path, presets: .null) else { return nil }
         // OFF THE MAIN ACTOR. A slice takes up to three minutes and `slice`
         // blocks for all of it; run here, on the shop's main actor, a stranger's
         // upload froze the whole app — and a slicer that never exited froze it
@@ -3961,7 +3964,7 @@ extension Shop {
         // three-core Mac (see `LanServer.estimate`). Oct 2026.
         let text: String? = await withCheckedContinuation { (done: CheckedContinuation<String?, Never>) in
             LanServer.measureQueue.async {
-                guard (try? SlicerRun.slice(model, with: slicer, argv: argv, allowed: true)) != nil,
+                guard (try? SlicerRun.slice(sliceable, with: slicer, argv: argv, allowed: true)) != nil,
                       let gcode = SlicerRun.gcode(in: dir, expected: output) else {
                     done.resume(returning: nil); return
                 }

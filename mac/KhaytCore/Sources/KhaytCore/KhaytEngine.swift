@@ -1194,6 +1194,10 @@ public actor KhaytEngine {
         // Electron app spent months not calling it at all.
         "slicers",
         "slicer-presets",
+        // A bare model as a project 3MF, because Snapmaker Orca segfaults on
+        // preset flags (Nov 27 2026): what to slice, the settings member, and
+        // the model XML the Mac's streaming writer is held to.
+        "slicer-project",
         "rbac",
         // What a paired PHONE's role opens on the LAN server (C9): role →
         // scopes, and the scope each route needs. Unknown is owner-only.
@@ -4722,6 +4726,40 @@ public actor KhaytEngine {
     public func presetFileJson(kind: String, preset: JSONValue) throws -> String {
         try runtime.call2("KhaytSlicerPresets.presetFileJson(ARG0, ARG1)",
                           [.string(kind), preset], as: String.self)
+    }
+
+    // MARK: - A bare model as a project (`lib/slicer-project.js`)
+    //
+    // Snapmaker Orca's command line segfaults on preset flags; a project 3MF
+    // carrying the same presets slices. See the module's header.
+
+    /// The three chosen presets as one `project_settings.config`.
+    public func projectSettingsJson(machine: JSONValue, process: JSONValue, filament: JSONValue) throws -> String {
+        try runtime.call2("KhaytSlicerPresets.projectSettingsJson(ARG0, ARG1, ARG2)",
+                          [machine, process, filament], as: String.self)
+    }
+
+    /// "stl", "add-config", "as-is" or "unsupported": what a slice runs on.
+    public func slicerProjectPlan(model: String, entries: [String]?) throws -> String {
+        try runtime.call2("KhaytSlicerProject.plan(ARG0, ARG1)",
+                          [.string(model), entries.map { .array($0.map(JSONValue.string)) } ?? .null],
+                          as: String.self)
+    }
+
+    /// How far to move a mesh with this bounding box onto the printer's bed.
+    public func slicerProjectOffset(min: [Double], max: [Double], machine: JSONValue) throws -> [Double] {
+        try runtime.call2("KhaytSlicerProject.offsetFor({ min: ARG0, max: ARG1 }, KhaytSlicerProject.bedCentre(ARG2))",
+                          [.array(min.map(JSONValue.number)), .array(max.map(JSONValue.number)), machine],
+                          as: [Double].self)
+    }
+
+    /// The rule's own model XML for a small triangle list: the Mac's streaming
+    /// writer (`SlicerProject`) is held to it in a parity test.
+    public func slicerProjectModelXml(triangles: [[[Double]]], centre: [Double]) throws -> String {
+        try runtime.call2("KhaytSlicerProject.modelXml(ARG0, ARG1)",
+                          [.array(triangles.map { .array($0.map { .array($0.map(JSONValue.number)) }) }),
+                           .array(centre.map(JSONValue.number))],
+                          as: String.self)
     }
 
     // MARK: - The operator lock: who may do what (`lib/rbac.js`)
