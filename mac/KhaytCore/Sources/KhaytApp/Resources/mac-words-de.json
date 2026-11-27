@@ -4207,6 +4207,8 @@
  "mac.mbh_took": "Dauer {time}",
  "mac.mbh_overdue": "Überfällig · war fällig am {date}",
  "mac.moved_not_now": "Nicht jetzt",
+ "mac.heads_reading": "Drucker wird gelesen…",
+ "mac.heads_unread": "Der Drucker konnte nicht gelesen werden. Prüfe, ob er eingeschaltet und verbunden ist, und öffne dies dann erneut.",
  "mac.moved_dhcp_hint": "Khayt hat im Netzwerk gesucht und diesen Drucker unter keiner anderen Adresse gefunden. Wenn sich seine Adresse immer wieder ändert, gib ihm im Router eine feste Adresse (DHCP-Reservierung).",
  "mac.moved_why_serial": "Der Drucker dort hat die Seriennummer dieser Maschine gemeldet.",
  "mac.moved_why_mac": "Der Drucker dort hat die Netzwerkkarte dieser Maschine.",

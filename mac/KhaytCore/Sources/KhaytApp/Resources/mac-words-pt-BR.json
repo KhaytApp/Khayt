@@ -4207,6 +4207,8 @@
  "mac.mbh_took": "levou {time}",
  "mac.mbh_overdue": "Atrasado · era para {date}",
  "mac.moved_not_now": "Agora não",
+ "mac.heads_reading": "Lendo a impressora…",
+ "mac.heads_unread": "Não foi possível ler a impressora. Verifique se ela está ligada e conectada e abra isto de novo.",
  "mac.moved_dhcp_hint": "O Khayt procurou na rede e não encontrou esta impressora em outro endereço. Se o endereço dela muda com frequência, dê a ela um endereço fixo (uma reserva DHCP) no roteador.",
  "mac.moved_why_serial": "A impressora nesse endereço informou o número de série desta máquina.",
  "mac.moved_why_mac": "A impressora nesse endereço tem a placa de rede desta máquina.",

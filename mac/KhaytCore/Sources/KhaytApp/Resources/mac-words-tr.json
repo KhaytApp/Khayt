@@ -4207,6 +4207,8 @@
  "mac.mbh_took": "{time} sürdü",
  "mac.mbh_overdue": "Gecikti · teslim tarihi {date} idi",
  "mac.moved_not_now": "Şimdi değil",
+ "mac.heads_reading": "Yazıcı okunuyor…",
+ "mac.heads_unread": "Yazıcı okunamadı. Açık ve bağlı olduğunu kontrol edin, sonra bunu yeniden açın.",
  "mac.moved_dhcp_hint": "Khayt ağda aradı ve bu yazıcıyı başka bir adreste bulamadı. Adresi sürekli değişiyorsa, yönlendiricide ona sabit bir adres (DHCP rezervasyonu) verin.",
  "mac.moved_why_serial": "Oradaki yazıcı bu makinenin seri numarasını bildirdi.",
  "mac.moved_why_mac": "Oradaki yazıcı bu makinenin ağ kartına sahip.",

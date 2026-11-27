@@ -53,6 +53,16 @@ extension Shop {
         return nil
     }
 
+    /// What the book says this machine holds, head by head, as text: the
+    /// section re-reads when it changes, so a spool linked from a phone shows
+    /// without reopening the sheet. From `lanRestBook`, which is observed and
+    /// refilled on every load (a phone's link reloads the book).
+    func headsLinkKey(_ machineId: String) -> String {
+        guard let found = headsMachine(machineId), let links = found.raw["headSpools"],
+              let data = try? JSONEncoder().encode(links) else { return machineId }
+        return machineId + "|" + String(decoding: data, as: UTF8.self)
+    }
+
     /// The shop's spool with that id, raw, for its label and what is left.
     func headSpool(_ id: String) -> [String: JSONValue]? {
         for row in Self.rows(trayBookForTests ?? lanRestBook, "inventory") {
@@ -204,7 +214,9 @@ struct MachineHeadsSection: View {
     let machineId: String
     /// A capture's stand-ins.
     var pretend: [KhaytEngine.HeadRow]?
-    @State private var rows: [KhaytEngine.HeadRow]?
+    /// Nothing read yet, the printer's heads, or no answer.
+    enum Read: Equatable { case reading, rows([KhaytEngine.HeadRow]), unread }
+    @State private var read: Read = .reading
     @State private var linking: Linking?
 
     struct Linking: Identifiable { let row: KhaytEngine.HeadRow; let adding: Bool; var id: Int { row.head } }
@@ -213,25 +225,45 @@ struct MachineHeadsSection: View {
 
     var body: some View {
         let words = shop.words
-        Group {
-            if let rows = pretend ?? rows {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(rows) { row in line(row, words) }
-                    Text(words.callIt("mach.heads_note"))
-                        .font(.callout).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let problem = shop.moveProblem {
-                        Text(problem).font(.callout).foregroundStyle(Khayt.late).fixedSize(horizontal: false, vertical: true)
-                    }
+        // ── ALWAYS SOMETHING ON SCREEN, AND THE READ HANGS OFF IT ───────────
+        //
+        // This was `Group { if let rows { … } }.task { rows = … }`. A Group
+        // hands its modifiers to its children, and with no rows it had none,
+        // so the task never ran, nothing was read, and the row stood as a bare
+        // heading for good (Baby U1, Nov 27: the printer's own log shows the
+        // sheet never asked). The VStack is always there, so the task runs.
+        VStack(alignment: .leading, spacing: 10) {
+            switch pretend.map(Read.rows) ?? read {
+            case .reading:
+                Text(words.callIt("mac.heads_reading"))
+                    .font(.callout).foregroundStyle(.secondary)
+            case .unread:
+                Text(words.callIt("mac.heads_unread"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            case .rows(let rows):
+                ForEach(rows) { row in line(row, words) }
+                Text(words.callIt("mach.heads_note"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let problem = shop.moveProblem {
+                    Text(problem).font(.callout).foregroundStyle(Khayt.late).fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
-        .task(id: machineId) { if pretend == nil { rows = await shop.machineHeads(machineId) } }
+        // Keyed on what the book links too, so a phone's link re-reads it.
+        .task(id: shop.headsLinkKey(machineId)) { if pretend == nil { await reread() } }
         .shopSheet(item: $linking) { asked in
             LinkHeadSheet(shop: shop, machineId: machineId, row: asked.row, adding: asked.adding) {
-                rows = await shop.machineHeads(machineId)
+                await reread()
             }
         }
+    }
+
+    /// Ask the printer again. A read that finds nothing says so rather than leave the row blank.
+    private func reread() async {
+        if case .rows = read {} else { read = .reading }
+        read = await shop.machineHeads(machineId).map(Read.rows) ?? .unread
     }
 
     @ViewBuilder private func line(_ row: KhaytEngine.HeadRow, _ words: Words) -> some View {

@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import KhaytCore
 @testable import KhaytApp
@@ -171,5 +173,44 @@ struct MachineHeadsTests {
         // The printer is only ever read.
         #expect(mine.components(separatedBy: "PrinterWatch.get(").count == 2)
         for never in ["PrinterControl", "gcode", "PrinterWatch.send", "printers.commanding", "httpMethod"] { #expect(!mine.contains(never), Comment(rawValue: never)) }
+    }
+
+    /// THE SECTION THAT NEVER LOADED. Its body was `Group { if let rows … }`
+    /// with the read hung on the Group: with no rows the Group had no
+    /// children, so the read never ran (Baby U1, Nov 27: the printer was never
+    /// asked). Every capture passed `pretend`, so no test saw it. Shown for
+    /// real here, with nothing read yet, it must ask the printer.
+    @Test("shown with nothing read yet, the section asks the printer (no pretend rows)")
+    @MainActor func readsWhenShown() async throws {
+        let (shop, asked) = await Self.shop()
+        let size = NSRect(x: 0, y: 0, width: 620, height: 420)
+        let host = NSHostingView(rootView: MachineHeadsSection(shop: shop, machineId: "U1").frame(width: 620, height: 420))
+        let window = NSWindow(contentRect: size, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = host
+        host.frame = size
+        host.layoutSubtreeIfNeeded()
+        let deadline = Date().addingTimeInterval(5)
+        while asked.paths.isEmpty, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(asked.paths.contains { $0.contains("filament_detect") }, Comment(rawValue: "\(asked.paths)"))
+        window.contentView = nil
+    }
+
+    @Test("the section re-reads when the book links a spool to this machine (a phone's link)")
+    @MainActor func keyFollowsTheBook() async throws {
+        let (shop, _) = await Self.shop()
+        let before = shop.headsLinkKey("U1")
+        var book = try #require(shop.trayBookForTests)
+        guard case .array(var machines)? = book["machines"], case .object(var m)? = machines.first else {
+            Issue.record("no machine"); return
+        }
+        m["headSpools"] = .object(["0": .string("S1")])
+        machines[0] = .object(m)
+        book["machines"] = .array(machines)
+        shop.trayBookForTests = book
+        #expect(shop.headsLinkKey("U1") != before)
+        #expect(shop.headsLinkKey("U1").hasPrefix("U1|"))
     }
 }
