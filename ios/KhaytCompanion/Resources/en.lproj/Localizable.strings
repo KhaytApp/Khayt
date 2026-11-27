@@ -1662,3 +1662,9 @@
 "owner.prices.not_allowed" = "Not allowed";
 "owner.prices.unnamed" = "A slicer";
 "owner.prices.foot" = "Which slicer may see the shop's prices is the owner's choice, made on the Mac. The phone only shows it.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "Success rate";
+"success.window" = "%@ · last 30 days";
+"success.counts" = "%1$d finished, %2$d failed";
+"success.cancelled" = "%d cancelled not counted";
+"success.not_enough" = "Not enough prints yet: %1$d of %2$d needed";

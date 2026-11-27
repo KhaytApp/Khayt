@@ -1662,3 +1662,9 @@
 "owner.prices.not_allowed" = "Não permitido";
 "owner.prices.unnamed" = "Um fatiador";
 "owner.prices.foot" = "Qual fatiador pode ver os preços da loja é escolha do proprietário, feita no Mac. O telefone só mostra.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "Taxa de sucesso";
+"success.window" = "%@ · últimos 30 dias";
+"success.counts" = "%1$d concluídas, %2$d com falha";
+"success.cancelled" = "%d canceladas não contadas";
+"success.not_enough" = "Ainda não há impressões suficientes: %1$d de %2$d necessárias";

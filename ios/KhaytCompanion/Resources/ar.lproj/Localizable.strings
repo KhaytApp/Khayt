@@ -1662,3 +1662,9 @@
 "owner.prices.not_allowed" = "غير مسموح";
 "owner.prices.unnamed" = "برنامج تقطيع";
 "owner.prices.foot" = "اختيار برنامج التقطيع الذي يرى أسعار المتجر يعود للمالك، ويُضبط على الماك. الهاتف يعرضه فقط.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "معدل النجاح";
+"success.window" = "%@ · آخر 30 يومًا";
+"success.counts" = "%1$d اكتملت، %2$d فشلت";
+"success.cancelled" = "%d ملغاة غير محسوبة";
+"success.not_enough" = "لا توجد طبعات كافية بعد: %1$d من %2$d مطلوبة";
