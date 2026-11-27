@@ -1638,3 +1638,27 @@
 "printer.why.read_only" = "O Mac está mostrando a loja de exemplo, que não pode ser alterada.";
 "printer.why.not_saved" = "O Mac não conseguiu salvar agora. Tente de novo.";
 "printer.why.role" = "A função deste telefone não permite isso. Pergunte ao proprietário.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "Telefones pareados";
+"owner.phones.this" = "%@ (este telefone)";
+"owner.phones.unnamed" = "Um telefone";
+"owner.phones.by_pin" = "Pareado com o PIN";
+"owner.phones.by_code" = "Pareado por número";
+"owner.phones.seen" = "visto por último %@";
+"owner.phones.now" = "agora";
+"owner.phones.yesterday" = "ontem";
+"owner.phones.foot" = "Funções e a remoção de um telefone são definidas no seu Mac (Ajustes › Telefones e Wi-Fi). Visível só para o proprietário, no Wi-Fi da loja.";
+"owner.role.owner" = "Proprietário";
+"owner.role.manager" = "Gerente";
+"owner.role.operator" = "Operador";
+"owner.role.viewer" = "Leitor";
+"owner.prices.title" = "Preços no fatiador";
+"owner.prices.switch" = "Mostrar preços no fatiador";
+"owner.prices.switch.sub" = "Definido no seu Mac";
+"owner.prices.may" = "Pode ver os preços";
+"owner.prices.hidden" = "Preços ocultos";
+"owner.prices.allowed" = "Permitido";
+"owner.prices.not_allowed" = "Não permitido";
+"owner.prices.unnamed" = "Um fatiador";
+"owner.prices.foot" = "Qual fatiador pode ver os preços da loja é escolha do proprietário, feita no Mac. O telefone só mostra.";

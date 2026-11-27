@@ -1638,3 +1638,27 @@
 "printer.why.read_only" = "الماك يعرض المتجر التجريبي، ولا يمكن تغييره.";
 "printer.why.not_saved" = "تعذّر على الماك حفظه الآن. حاول مجددًا.";
 "printer.why.role" = "دور هذا الهاتف لا يسمح بذلك. اسأل المالك.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "الهواتف المقترنة";
+"owner.phones.this" = "%@ (هذا الهاتف)";
+"owner.phones.unnamed" = "هاتف";
+"owner.phones.by_pin" = "اقترن برمز PIN";
+"owner.phones.by_code" = "اقترن برقم";
+"owner.phones.seen" = "آخر ظهور %@";
+"owner.phones.now" = "الآن";
+"owner.phones.yesterday" = "أمس";
+"owner.phones.foot" = "الأدوار وإزالة هاتف تُضبط على الماك (الإعدادات › الهواتف وواي فاي). تظهر للمالك فقط، على واي فاي المتجر.";
+"owner.role.owner" = "المالك";
+"owner.role.manager" = "مدير";
+"owner.role.operator" = "مشغّل";
+"owner.role.viewer" = "مشاهد";
+"owner.prices.title" = "الأسعار في برنامج التقطيع";
+"owner.prices.switch" = "إظهار الأسعار في برنامج التقطيع";
+"owner.prices.switch.sub" = "يُضبط على الماك";
+"owner.prices.may" = "يمكنه رؤية الأسعار";
+"owner.prices.hidden" = "الأسعار مخفية";
+"owner.prices.allowed" = "مسموح";
+"owner.prices.not_allowed" = "غير مسموح";
+"owner.prices.unnamed" = "برنامج تقطيع";
+"owner.prices.foot" = "اختيار برنامج التقطيع الذي يرى أسعار المتجر يعود للمالك، ويُضبط على الماك. الهاتف يعرضه فقط.";

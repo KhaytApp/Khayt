@@ -1638,3 +1638,27 @@
 "printer.why.read_only" = "Mac örnek atölyeyi gösteriyor; değiştirilemez.";
 "printer.why.not_saved" = "Mac şu anda kaydedemedi. Yeniden deneyin.";
 "printer.why.role" = "Bu telefonun rolü buna izin vermiyor. Sahibine sorun.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "Eşleştirilmiş telefonlar";
+"owner.phones.this" = "%@ (bu telefon)";
+"owner.phones.unnamed" = "Bir telefon";
+"owner.phones.by_pin" = "PIN ile eşleştirildi";
+"owner.phones.by_code" = "Numarayla eşleştirildi";
+"owner.phones.seen" = "son görülme %@";
+"owner.phones.now" = "şimdi";
+"owner.phones.yesterday" = "dün";
+"owner.phones.foot" = "Roller ve telefon kaldırma Mac’inizde ayarlanır (Ayarlar › Telefonlar ve Wi-Fi). Yalnızca sahibine, atölyenin Wi-Fi’ında gösterilir.";
+"owner.role.owner" = "Sahip";
+"owner.role.manager" = "Yönetici";
+"owner.role.operator" = "Operatör";
+"owner.role.viewer" = "İzleyici";
+"owner.prices.title" = "Dilimleyicide fiyatlar";
+"owner.prices.switch" = "Dilimleyicide fiyatları göster";
+"owner.prices.switch.sub" = "Mac’inizde ayarlanır";
+"owner.prices.may" = "Fiyatları görebilir";
+"owner.prices.hidden" = "Fiyatlar gizli";
+"owner.prices.allowed" = "İzinli";
+"owner.prices.not_allowed" = "İzinli değil";
+"owner.prices.unnamed" = "Bir dilimleyici";
+"owner.prices.foot" = "Hangi dilimleyicinin atölyenin fiyatlarını görebileceğine sahip, Mac’te karar verir. Telefon yalnızca gösterir.";

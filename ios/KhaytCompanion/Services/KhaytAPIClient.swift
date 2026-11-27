@@ -2519,6 +2519,23 @@ final class KhaytAPIClient: ObservableObject {
         }
     }
 
+    // MARK: - A signed question, a signed answer
+
+    /// One request to the paired Mac, signed by this phone, with whether the
+    /// Mac SIGNED its answer (`x-khayt-reply-mac` over this request's nonce).
+    /// For answers the phone shows as the shop's own facts: one nobody signed
+    /// is not believed. Nil with no device key, on the sample shop, or with
+    /// no answer.
+    func signedLanAnswer(path: String, method: String, body: Data? = nil) async -> (status: Int, body: Data, signed: Bool)? {
+        guard !settings.isSampleShop, let device = usableDevice, let url = try? makeURL(path: path) else { return nil }
+        let nonce = MacIdentity.nonce()
+        guard let (data, response) = try? await send(url, method: method, body: body, auth: .device(device), nonce: nonce),
+              let http = response as? HTTPURLResponse else { return nil }
+        let signed = DeviceKey.verifiesReply(device, nonce: nonce, status: http.statusCode, body: data,
+                                             replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+        return (http.statusCode, data, signed)
+    }
+
     // MARK: - A photo of the print, from this phone
 
     /// The Mac takes a job photo only from a phone it enrolled (signed), never

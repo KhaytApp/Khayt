@@ -1638,3 +1638,27 @@
 "printer.why.read_only" = "Le Mac affiche l’atelier d’exemple, qui ne peut pas être modifié.";
 "printer.why.not_saved" = "Le Mac n’a pas pu l’enregistrer pour le moment. Réessayez.";
 "printer.why.role" = "Le rôle de ce téléphone ne le permet pas. Demandez au propriétaire.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "Téléphones jumelés";
+"owner.phones.this" = "%@ (ce téléphone)";
+"owner.phones.unnamed" = "Un téléphone";
+"owner.phones.by_pin" = "Jumelé avec le code PIN";
+"owner.phones.by_code" = "Jumelé par numéro";
+"owner.phones.seen" = "vu pour la dernière fois %@";
+"owner.phones.now" = "à l’instant";
+"owner.phones.yesterday" = "hier";
+"owner.phones.foot" = "Les rôles et le retrait d’un téléphone se règlent sur votre Mac (Réglages › Téléphones et Wi-Fi). Visible par le propriétaire uniquement, sur le Wi-Fi de l’atelier.";
+"owner.role.owner" = "Propriétaire";
+"owner.role.manager" = "Responsable";
+"owner.role.operator" = "Opérateur";
+"owner.role.viewer" = "Lecteur";
+"owner.prices.title" = "Prix dans le slicer";
+"owner.prices.switch" = "Afficher les prix dans le slicer";
+"owner.prices.switch.sub" = "Réglé sur votre Mac";
+"owner.prices.may" = "Peut voir les prix";
+"owner.prices.hidden" = "Prix masqués";
+"owner.prices.allowed" = "Autorisé";
+"owner.prices.not_allowed" = "Non autorisé";
+"owner.prices.unnamed" = "Un slicer";
+"owner.prices.foot" = "Le propriétaire choisit, sur le Mac, quel slicer peut voir les prix de l’atelier. Le téléphone se contente de l’afficher.";

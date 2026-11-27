@@ -1638,3 +1638,27 @@
 "printer.why.read_only" = "Mac はサンプルショップを表示中で、変更できません。";
 "printer.why.not_saved" = "Mac が今は保存できませんでした。もう一度お試しください。";
 "printer.why.role" = "この電話の役割ではできません。オーナーに確認してください。";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "ペアリング済みの電話";
+"owner.phones.this" = "%@（この電話）";
+"owner.phones.unnamed" = "電話";
+"owner.phones.by_pin" = "PIN でペアリング";
+"owner.phones.by_code" = "番号でペアリング";
+"owner.phones.seen" = "最終確認 %@";
+"owner.phones.now" = "たった今";
+"owner.phones.yesterday" = "昨日";
+"owner.phones.foot" = "役割の設定と電話の削除は Mac で行います（設定 › 電話と Wi-Fi）。オーナーにのみ、ショップの Wi-Fi 上で表示されます。";
+"owner.role.owner" = "オーナー";
+"owner.role.manager" = "マネージャー";
+"owner.role.operator" = "オペレーター";
+"owner.role.viewer" = "閲覧者";
+"owner.prices.title" = "スライサーでの価格";
+"owner.prices.switch" = "スライサーに価格を表示";
+"owner.prices.switch.sub" = "Mac で設定";
+"owner.prices.may" = "価格を表示できます";
+"owner.prices.hidden" = "価格は非表示";
+"owner.prices.allowed" = "許可";
+"owner.prices.not_allowed" = "不許可";
+"owner.prices.unnamed" = "スライサー";
+"owner.prices.foot" = "どのスライサーがショップの価格を表示できるかはオーナーが Mac で決めます。電話は表示するだけです。";

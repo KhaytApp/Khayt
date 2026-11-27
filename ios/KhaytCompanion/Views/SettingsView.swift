@@ -201,7 +201,11 @@ struct SettingsView: View {
         case .mac: SettingsMacPage()
         case .cloud: SettingsCloudPage()
         case .connectors:
-            SettingsPage { ConnectorsSettingsSection { EmptyView() }.padding(.top, 8) }
+            SettingsPage {
+                ConnectorsSettingsSection { EmptyView() }.padding(.top, 8)
+                // Which slicers may see prices, for the owner to look at (frame 268:28).
+                SlicerPricesSection()
+            }
                 .settingsPageTitle(L10n.tr("connectors.title"))
         case .help: EmptyView()   // a link, never pushed
         case .diagnostics: SettingsDiagnosticsPage()
@@ -625,6 +629,8 @@ struct SettingsMacPage: View {
             }
             unpairButton
             SettingsPieces.foot(L10n.tr("settings.unpair.footer"))
+            // The shop's phones, for the owner to look at (frame 268:7).
+            PairedPhonesSection()
         }
         .settingsPageTitle(L10n.tr("settings.phones_wifi"))
         .confirmationDialog(L10n.tr("settings.unpair.title"), isPresented: $confirmUnpair, titleVisibility: .visible) {

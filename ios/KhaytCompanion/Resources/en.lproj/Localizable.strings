@@ -1638,3 +1638,27 @@
 "printer.why.read_only" = "The Mac is showing the sample shop, which cannot be changed.";
 "printer.why.not_saved" = "The Mac could not save it just now. Try again.";
 "printer.why.role" = "This phone's role cannot do that. Ask the owner.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "Paired phones";
+"owner.phones.this" = "%@ (this phone)";
+"owner.phones.unnamed" = "A phone";
+"owner.phones.by_pin" = "Paired with the PIN";
+"owner.phones.by_code" = "Paired by number";
+"owner.phones.seen" = "last seen %@";
+"owner.phones.now" = "now";
+"owner.phones.yesterday" = "yesterday";
+"owner.phones.foot" = "Roles and removing a phone are set on your Mac (Settings › Phones & Wi-Fi). Shown to the owner only, on the shop's Wi-Fi.";
+"owner.role.owner" = "Owner";
+"owner.role.manager" = "Manager";
+"owner.role.operator" = "Operator";
+"owner.role.viewer" = "Viewer";
+"owner.prices.title" = "Prices in the slicer";
+"owner.prices.switch" = "Show prices in the slicer";
+"owner.prices.switch.sub" = "Set on your Mac";
+"owner.prices.may" = "May see prices";
+"owner.prices.hidden" = "Prices hidden";
+"owner.prices.allowed" = "Allowed";
+"owner.prices.not_allowed" = "Not allowed";
+"owner.prices.unnamed" = "A slicer";
+"owner.prices.foot" = "Which slicer may see the shop's prices is the owner's choice, made on the Mac. The phone only shows it.";

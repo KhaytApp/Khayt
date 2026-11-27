@@ -1638,3 +1638,27 @@
 "printer.why.read_only" = "Der Mac zeigt den Beispiel-Shop, der nicht geändert werden kann.";
 "printer.why.not_saved" = "Der Mac konnte es gerade nicht speichern. Versuchen Sie es erneut.";
 "printer.why.role" = "Die Rolle dieses Telefons erlaubt das nicht. Fragen Sie den Inhaber.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "Gekoppelte Telefone";
+"owner.phones.this" = "%@ (dieses Telefon)";
+"owner.phones.unnamed" = "Ein Telefon";
+"owner.phones.by_pin" = "Mit der PIN gekoppelt";
+"owner.phones.by_code" = "Per Nummer gekoppelt";
+"owner.phones.seen" = "zuletzt gesehen %@";
+"owner.phones.now" = "jetzt";
+"owner.phones.yesterday" = "gestern";
+"owner.phones.foot" = "Rollen und das Entfernen eines Telefons werden auf Ihrem Mac festgelegt (Einstellungen › Telefone & WLAN). Nur für den Inhaber sichtbar, im WLAN des Shops.";
+"owner.role.owner" = "Inhaber";
+"owner.role.manager" = "Manager";
+"owner.role.operator" = "Bediener";
+"owner.role.viewer" = "Betrachter";
+"owner.prices.title" = "Preise im Slicer";
+"owner.prices.switch" = "Preise im Slicer anzeigen";
+"owner.prices.switch.sub" = "Auf Ihrem Mac festgelegt";
+"owner.prices.may" = "Darf Preise sehen";
+"owner.prices.hidden" = "Preise ausgeblendet";
+"owner.prices.allowed" = "Erlaubt";
+"owner.prices.not_allowed" = "Nicht erlaubt";
+"owner.prices.unnamed" = "Ein Slicer";
+"owner.prices.foot" = "Welcher Slicer die Preise des Shops sehen darf, entscheidet der Inhaber am Mac. Das Telefon zeigt es nur an.";
