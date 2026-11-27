@@ -1662,3 +1662,9 @@
 "owner.prices.not_allowed" = "Nicht erlaubt";
 "owner.prices.unnamed" = "Ein Slicer";
 "owner.prices.foot" = "Welcher Slicer die Preise des Shops sehen darf, entscheidet der Inhaber am Mac. Das Telefon zeigt es nur an.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "Erfolgsquote";
+"success.window" = "%@ · letzte 30 Tage";
+"success.counts" = "%1$d fertig, %2$d fehlgeschlagen";
+"success.cancelled" = "%d abgebrochen, nicht gezählt";
+"success.not_enough" = "Noch nicht genug Drucke: %1$d von %2$d nötig";

@@ -1662,3 +1662,9 @@
 "owner.prices.not_allowed" = "İzinli değil";
 "owner.prices.unnamed" = "Bir dilimleyici";
 "owner.prices.foot" = "Hangi dilimleyicinin atölyenin fiyatlarını görebileceğine sahip, Mac’te karar verir. Telefon yalnızca gösterir.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "Başarı oranı";
+"success.window" = "%@ · son 30 gün";
+"success.counts" = "%1$d tamamlandı, %2$d başarısız";
+"success.cancelled" = "%d iptal sayılmadı";
+"success.not_enough" = "Henüz yeterli baskı yok: gereken %2$d baskıdan %1$d";

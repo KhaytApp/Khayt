@@ -1662,3 +1662,9 @@
 "owner.prices.not_allowed" = "不允许";
 "owner.prices.unnamed" = "一个切片软件";
 "owner.prices.foot" = "哪个切片软件可以查看店铺价格由店主在 Mac 上决定。手机仅作显示。";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "成功率";
+"success.window" = "%@ · 最近 30 天";
+"success.counts" = "%1$d 次完成，%2$d 次失败";
+"success.cancelled" = "%d 次取消不计入";
+"success.not_enough" = "打印次数还不够：需要 %2$d 次，已有 %1$d 次";

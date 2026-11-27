@@ -1662,3 +1662,9 @@
 "owner.prices.not_allowed" = "不許可";
 "owner.prices.unnamed" = "スライサー";
 "owner.prices.foot" = "どのスライサーがショップの価格を表示できるかはオーナーが Mac で決めます。電話は表示するだけです。";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "成功率";
+"success.window" = "%@ · 過去 30 日間";
+"success.counts" = "完了 %1$d、失敗 %2$d";
+"success.cancelled" = "キャンセル %d は対象外";
+"success.not_enough" = "まだ印刷数が足りません: 必要 %2$d 中 %1$d";
