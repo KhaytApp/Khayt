@@ -180,11 +180,11 @@ struct FindPrintersSheet: View {
         // after midnight, so the same sighting changed words with the time of
         // night (a test failed every run between 00:00 and 02:00, Nov 28).
         // Never "in 3 seconds": a clock that moved does not put a sighting in the future.
-        let formatter = RelativeDateTimeFormatter()
-        formatter.dateTimeStyle = .named
-        formatter.unitsStyle = .full
-        formatter.locale = words.locale
-        let when = formatter.localizedString(for: min(find.lastSeen, now), relativeTo: now)
+        // Anchored at the sighting and formatted FROM `now`, in the shop's
+        // locale (Digits), so the words depend on the two dates and nothing else.
+        let when = Date.AnchoredRelativeFormatStyle(anchor: min(find.lastSeen, now), presentation: .named, unitsStyle: .wide)
+            .locale(words.locale)
+            .format(now)
         if let was = find.previousHost {
             return words.callIt("mac.find_seen_moved", ["when": .string(when), "host": .string(was)])
         }
