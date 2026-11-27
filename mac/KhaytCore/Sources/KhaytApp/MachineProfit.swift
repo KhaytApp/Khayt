@@ -53,6 +53,22 @@ struct MachineProfitPage: View {
     /// Each printer's rate as the whole per cent a person reads, by the
     /// shared rule's own rounding (`KhaytEngine.successPercent`).
     var successPercent: [String: Int] = [:]
+    /// And how that per cent is coloured, by the shared rule
+    /// (`KhaytEngine.successTone`): red under 80, green from 95, none between
+    /// and none with too few prints. The per cent is always shown with it.
+    var successTone: [String: KhaytEngine.SuccessTone] = [:]
+
+    /// The colour of "Came out right": the app's own red and green (the ones
+    /// the margin beside it uses, contrast-checked in both appearances), the
+    /// normal text colour between, and the quieter one with too few prints.
+    static func toneStyle(_ tone: KhaytEngine.SuccessTone?, enough: Bool) -> Color {
+        switch tone {
+        case .bad?: return Khayt.late
+        case .good?: return Khayt.done
+        case .neutral?: return .primary
+        case nil: return enough ? .primary : .secondary
+        }
+    }
 
     /// "14 · 3 failed · 1 cancelled", "3 · not marked yet", or "—" for a
     /// printer that printed nothing in the range.
@@ -165,7 +181,7 @@ struct MachineProfitPage: View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(report.rows) { row in
                 Row(shop: shop, row: row, success: success.first { $0.machineId == row.machineId },
-                    percent: successPercent[row.machineId])
+                    percent: successPercent[row.machineId], tone: successTone[row.machineId])
             }
             // The rows, added up — and they ARE the rows: the rule returns both
             // so a screen cannot show a sum that is not in the table above it.
@@ -233,6 +249,7 @@ struct MachineProfitPage: View {
         let row: KhaytEngine.MachineProfit
         var success: KhaytEngine.SuccessRow?
         var percent: Int?
+        var tone: KhaytEngine.SuccessTone?
 
         var body: some View {
             let words = shop.words
@@ -309,7 +326,7 @@ struct MachineProfitPage: View {
                         Text(words.callIt("mac.mpl_right")).font(.caption).foregroundStyle(.secondary)
                         Text(MachineProfitPage.cameOutRight(success, percent: percent, words))
                             .font(.callout.monospacedDigit())
-                            .foregroundStyle(success?.enough == true ? .primary : .secondary)
+                            .foregroundStyle(MachineProfitPage.toneStyle(tone, enough: success?.enough == true))
                     }
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(words.callIt("an.utilization_pct")).font(.caption)

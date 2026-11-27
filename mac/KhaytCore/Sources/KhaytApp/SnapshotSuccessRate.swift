@@ -43,12 +43,17 @@ extension Snapshot {
         }
         let success = [row("M1", 11, 3, 1, 0), row("M2", 39, 2, 0, 0), row("M3", 25, 0, 4, 0), row("M4", 1, 1, 0, 0), row("M5", 0, 0, 0, 3)]
         var percents: [String: Int] = [:]
+        var tones: [String: KhaytEngine.SuccessTone] = [:]
         if let engine = shop.engine {
-            for r in success { if let p = try? await engine.successPercent(r.rate) { percents[r.machineId] = p } }
+            for r in success {
+                if let p = try? await engine.successPercent(r.rate) { percents[r.machineId] = p }
+                if let t = try? await engine.successTone(r.rate, enough: r.enough) { tones[r.machineId] = t }
+            }
         }
         var page = MachineProfitPage(shop: shop, report: report)
         page.success = success
         page.successPercent = percents
+        page.successTone = tones
         // The rows only: the page's own scroll view photographs blank.
         shot("machines", width: 1100, page.rows(report))
         shot("machines-narrow", width: 820, page.rows(report))

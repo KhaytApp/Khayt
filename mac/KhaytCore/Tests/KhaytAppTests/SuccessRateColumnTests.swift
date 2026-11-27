@@ -104,9 +104,12 @@ struct SuccessRateColumnTests {
         // By the shop's own day, picked here; the rule is asked with no dates (its own slice the UTC day).
         #expect(reports.contains("engine.successRates(orders: sent, machines: shop.machineRows)"))
         #expect(reports.contains("Shop.runsSent(shop.orderRows)") && !reports.contains("successRates(orders: shop.orderRows"))
-        #expect(reports.contains("sites: sites, success: success, successPercent: successPercent)"))
-        // The per cent is the shared rule's, asked of the engine: the page rounds nothing itself.
+        #expect(reports.contains("sites: sites, success: success, successPercent: successPercent,"))
+        #expect(reports.contains("successTone: successTone)"))
+        // The per cent and its colour are the shared rule's, asked of the engine:
+        // the page rounds nothing and holds no threshold itself.
         #expect(reports.contains("engine.successPercent(row.rate)"))
+        #expect(reports.contains("engine.successTone(row.rate, enough: row.enough)"))
         let page = try String(contentsOf: app.appending(path: "MachineProfit.swift"), encoding: .utf8)
         #expect(!page.contains("rate * 100"), "the page rounds a rate itself")
         #expect(page.contains("success.first { $0.machineId == row.machineId }") && page.contains(#"words.callIt("mac.mpl_right_note")"#))
