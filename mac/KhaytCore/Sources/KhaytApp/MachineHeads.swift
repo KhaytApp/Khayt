@@ -278,8 +278,10 @@ struct MachineHeadsSection: View {
             // looked the same).
             Circle()
                 .fill(Swatch.rgb(fromHex: row.hex).map { Color(red: $0.r, green: $0.g, blue: $0.b) } ?? Color.clear)
-                .overlay(Circle().strokeBorder(Color.secondary.opacity(empty ? 0.5 : 0.55),
-                                               style: StrokeStyle(lineWidth: 1, dash: empty ? [2, 2] : [])))
+                // The phone's ring (review W7): 1.5 pt on a small dot, secondary
+                // at 0.55. A 1 pt faint ring vanished round a near-black spool.
+                .overlay(Circle().strokeBorder(Color.secondary.opacity(0.55),
+                                               style: StrokeStyle(lineWidth: 1.5, dash: empty ? [2, 2] : [])))
                 .frame(width: 12, height: 12).padding(.top, 3)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
