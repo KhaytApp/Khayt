@@ -194,6 +194,10 @@ public actor KhaytEngine {
         // spools mix in LINEAR light, and "closest" means perceptual distance
         // rather than the nearest hex triple.
         "color-mix",
+        // A colour's plain name ("Black", "Light grey"), never its code: the
+        // spool's own name first, else the nearest everyday name by CIEDE2000
+        // (on color-mix, above), else none (Turki, Nov 27 2026).
+        "colour-name",
         // The multicolour print planner's rules: which spool each colour of a
         // print file starts on, what it costs, and how the spools load into an
         // AMS. Reads `KhaytColor` off the global, so after `color-mix`.
