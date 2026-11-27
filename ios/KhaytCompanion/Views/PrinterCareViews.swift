@@ -141,6 +141,8 @@ struct MachineCarePage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let success { SuccessRateCard(name: name, success: success) }
+                // The spool tags its heads read (a Snapmaker U1): nothing for any other printer.
+                SpoolTagCards(machineId: machineId, machineName: name)
                 if api.shopMode.isProfessionalOnly("machineUpkeep") {
                     ProfessionalGateCard(title: L10n.tr("simple.gate.care.title"),
                                          message: L10n.tr("simple.gate.care.body"),
