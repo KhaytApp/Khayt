@@ -20,6 +20,8 @@
  *       one failure in two prints does not read as a 50% printer.
  *   successPercent(rate) → whole percent to SHOW, or null: never 100 unless
  *       every decided run succeeded, never 0 unless none did.
+ *   successTone(rate, enough) → 'bad' | 'neutral' | 'good' | null: how the
+ *       percent is coloured, judged on the percent shown (Turki, Nov 27).
  *
  * `from`/`to` are YYYY-MM-DD, compared with the day each run was SENT, as
  * `dayOf(run.at)` gives it. A run's `at` is a full UTC stamp (the desktop's
@@ -109,7 +111,31 @@ function successPercent(rate) {
   return pct;
 }
 
-const api = { MIN_RUNS, successRates, localDayOf, successPercent };
+/**
+ * How a printer's rate is coloured, the same in every app (Turki, Nov 27,
+ * "do recommended rate color"): under 80% 'bad' (red), 80 to 94% 'neutral'
+ * (the normal text colour), 95% and over 'good' (green). Judged on the whole
+ * percent the app SHOWS (`successPercent`), so the colour always agrees with
+ * the figure beside it: 199 of 200 shows 99 and is good; 0.796 shows 80 and is
+ * neutral; 0.794 shows 79 and is bad. The percent is always shown as well, so
+ * colour is never the only signal.
+ *
+ * null, meaning no colour at all, when the printer has too few decided runs
+ * (`enough` is not exactly true: the "Not enough prints yet" look stays as it
+ * is) or no rate.
+ */
+const TONE_BAD_BELOW = 80;
+const TONE_GOOD_FROM = 95;
+function successTone(rate, enough) {
+  if (enough !== true) return null;
+  const pct = successPercent(rate);
+  if (pct === null) return null;
+  if (pct < TONE_BAD_BELOW) return 'bad';
+  if (pct >= TONE_GOOD_FROM) return 'good';
+  return 'neutral';
+}
+
+const api = { MIN_RUNS, successRates, localDayOf, successPercent, successTone, TONE_BAD_BELOW, TONE_GOOD_FROM };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (global) global.KhaytPrinterSuccess = api;
 

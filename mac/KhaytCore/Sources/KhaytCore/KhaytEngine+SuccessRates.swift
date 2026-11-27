@@ -131,6 +131,28 @@ extension KhaytEngine {
         }
     }
 
+    /// How a shown rate is coloured, the same in every app (Turki, Nov 27).
+    public enum SuccessTone: String, Sendable, Equatable {
+        /// Under 80%: red.
+        case bad
+        /// 80 to 94%: the normal text colour.
+        case neutral
+        /// 95% and over: green.
+        case good
+    }
+
+    /// The rule's own `successTone`: judged on the whole per cent shown
+    /// (`successPercent`), so the colour always agrees with the figure. Nil,
+    /// meaning no colour, when the printer has too few decided runs or no
+    /// rate. No threshold is written here: the rule holds them.
+    public func successTone(_ rate: Double?, enough: Bool) throws -> SuccessTone? {
+        guard let rate, rate.isFinite else { return nil }
+        let said = try runtime.call2("globalThis.KhaytPrinterSuccess.successTone(ARG0, ARG1)",
+                                     [.number(rate), .bool(enough)], as: JSONValue.self)
+        guard case .string(let name) = said else { return nil }
+        return SuccessTone(rawValue: name)
+    }
+
     /// How many decided runs a printer needs before its rate is shown
     /// ("Not enough prints yet: 3 of 5 needed").
     public func successRunsNeeded() throws -> Int {

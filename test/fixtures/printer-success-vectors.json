@@ -1932,5 +1932,87 @@
     "want": null
    }
   ]
+ },
+ "tone": {
+  "about": "successTone(rate, enough): how the shown percent is coloured, the same in every app (Turki, Nov 27). Judged on successPercent(rate): under 80 'bad', 80 to 94 'neutral', 95 and over 'good'. null (no colour) unless enough is exactly true, or with no rate. A separate list beside `cases` and `percent`; neither of those changed shape.",
+  "cases": [
+   {
+    "why": "199 of 200 shows 99: good",
+    "rate": 0.995,
+    "enough": true,
+    "want": "good"
+   },
+   {
+    "why": "every run came out right",
+    "rate": 1,
+    "enough": true,
+    "want": "good"
+   },
+   {
+    "why": "95 is the first good percent",
+    "rate": 0.95,
+    "enough": true,
+    "want": "good"
+   },
+   {
+    "why": "0.945 shows 94 (rounds down): neutral",
+    "rate": 0.944,
+    "enough": true,
+    "want": "neutral"
+   },
+   {
+    "why": "80 is the first neutral percent",
+    "rate": 0.8,
+    "enough": true,
+    "want": "neutral"
+   },
+   {
+    "why": "0.796 shows 80: neutral, as the figure beside it",
+    "rate": 0.796,
+    "enough": true,
+    "want": "neutral"
+   },
+   {
+    "why": "0.794 shows 79: bad",
+    "rate": 0.794,
+    "enough": true,
+    "want": "bad"
+   },
+   {
+    "why": "none came out right",
+    "rate": 0,
+    "enough": true,
+    "want": "bad"
+   },
+   {
+    "why": "too few decided runs: no colour, whatever the rate",
+    "rate": 0.5,
+    "enough": false,
+    "want": null
+   },
+   {
+    "why": "too few decided runs, all good: still no colour",
+    "rate": 1,
+    "enough": false,
+    "want": null
+   },
+   {
+    "why": "enough missing is not enough",
+    "rate": 0.99,
+    "want": null
+   },
+   {
+    "why": "no decided runs",
+    "rate": null,
+    "enough": true,
+    "want": null
+   },
+   {
+    "why": "not a rate",
+    "rate": 1.5,
+    "enough": true,
+    "want": null
+   }
+  ]
  }
 }
