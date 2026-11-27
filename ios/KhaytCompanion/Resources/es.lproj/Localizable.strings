@@ -1662,3 +1662,9 @@
 "owner.prices.not_allowed" = "No permitido";
 "owner.prices.unnamed" = "Un laminador";
 "owner.prices.foot" = "Qué laminador puede ver los precios de la tienda lo decide el propietario, en el Mac. El teléfono solo lo muestra.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "Tasa de éxito";
+"success.window" = "%@ · últimos 30 días";
+"success.counts" = "%1$d terminadas, %2$d fallidas";
+"success.cancelled" = "%d canceladas no contadas";
+"success.not_enough" = "Aún no hay suficientes impresiones: %1$d de %2$d necesarias";
