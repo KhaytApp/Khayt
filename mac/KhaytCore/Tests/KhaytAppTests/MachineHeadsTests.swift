@@ -190,9 +190,10 @@ struct MachineHeadsTests {
         host.frame = size
         host.layoutSubtreeIfNeeded()
         let deadline = Date().addingTimeInterval(5)
+        // Awaiting on the main actor lets the main run loop turn, which is
+        // where SwiftUI starts the view's task.
         while asked.paths.isEmpty, Date() < deadline {
-            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-            try await Task.sleep(for: .milliseconds(20))
+            try await Task.sleep(for: .milliseconds(50))
         }
         #expect(asked.paths.contains { $0.contains("filament_detect") }, Comment(rawValue: "\(asked.paths)"))
         window.contentView = nil
