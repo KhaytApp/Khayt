@@ -1198,6 +1198,9 @@ public actor KhaytEngine {
         // preset flags (Nov 27 2026): what to slice, the settings member, and
         // the model XML the Mac's streaming writer is held to.
         "slicer-project",
+        // One spool, one head: linking takes a spool out of every other head
+        // (Baby U1, Nov 27 2026: one spool in two heads).
+        "head-spools",
         "rbac",
         // What a paired PHONE's role opens on the LAN server (C9): role →
         // scopes, and the scope each route needs. Unknown is owner-only.
