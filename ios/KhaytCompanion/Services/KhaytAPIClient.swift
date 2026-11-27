@@ -1808,6 +1808,13 @@ final class KhaytAPIClient: ObservableObject {
     /// When the Mac last failed to answer: for a minute after, the library
     /// goes straight to the phone's copy rather than wait on every letter typed.
     private var libraryMacDownSince: Date?
+    /// Whether the last picture asked of the Mac failed (no answer, or an
+    /// answer other than the picture or "it has none").
+    private var lastThumbFailed = false
+    /// The pause between two pictures while keeping the whole library.
+    static var picturePause: Duration = .milliseconds(100)
+    /// After two failed pictures in a row, the next try is this much later.
+    static let picturesRetry: TimeInterval = 600
 
     private func isMissingRoute(_ error: Error) -> Bool {
         if case KhaytAPIError.server(let said) = error { return said == L10n.tr("library.needs_mac") }
@@ -1849,6 +1856,7 @@ final class KhaytAPIClient: ObservableObject {
     /// (`LibraryThumbs`) for away from the shop. One the Mac sent within the
     /// day (its `max-age`) is not asked for again.
     func libraryThumb(id: String) async -> Data? {
+        lastThumbFailed = false
         if let hit = thumbs.object(forKey: id as NSString) { return hit as Data }
         let kept = await thumbShelf.get(id)
         func use(_ data: Data) -> Data { thumbs.setObject(data as NSData, forKey: id as NSString); return data }
@@ -1860,6 +1868,7 @@ final class KhaytAPIClient: ObservableObject {
         do {
             answer = try await request(path: "/api/library/\(encoded)/thumb", method: "GET", body: nil, requiresPin: true)
         } catch {
+            lastThumbFailed = true
             if Self.isUnreachable(error) { libraryMacDownSince = Date() }
             return kept.map { use($0.data) }
         }
@@ -1874,6 +1883,7 @@ final class KhaytAPIClient: ObservableObject {
             await thumbShelf.remove(id)
             return nil
         default:
+            lastThumbFailed = true
             return kept.map { use($0.data) }
         }
     }
@@ -1898,6 +1908,7 @@ final class KhaytAPIClient: ObservableObject {
         keepingPictures = true
         defer { keepingPictures = false }
         var fetched = 0
+        var failedInARow = 0
         var folders = [""], walked: Set<String> = [], pictured: Set<String> = []
         while let folder = folders.popLast() {
             guard walked.insert(folder).inserted else { continue }
@@ -1914,6 +1925,17 @@ final class KhaytAPIClient: ObservableObject {
                     if await libraryThumb(id: id) != nil { fetched += 1 }
                     // The Mac stopped answering: try again on the next visit.
                     if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60 { return fetched }
+                    // Two refusals in a row: the Mac is struggling, so leave
+                    // it be and come back in ten minutes, not on the next poll.
+                    failedInARow = lastThumbFailed ? failedInARow + 1 : 0
+                    if failedInARow >= 2 {
+                        defaults.set(now.addingTimeInterval(Self.picturesRetry - 12 * 3600), forKey: Self.picturesKeptAtKey)
+                        return fetched
+                    }
+                    // A short pause between pictures: a library of hundreds
+                    // was a burst of hundreds of requests on the Mac (U1 run,
+                    // Nov 27: 317 connections in 65 s).
+                    try? await Task.sleep(for: Self.picturePause)
                 }
                 offset += page.items.count
                 if page.items.isEmpty || offset >= page.total { break }
