@@ -140,6 +140,24 @@ async function run(lang) {
       await window.keyboard.press('Escape');   // the spool editor opened for its price
       await window.waitForTimeout(200);
 
+      // One spool, one head (lib/head-spools.js, #2733; the Baby U1 on Nov 27):
+      // tool 1's spool is moved to tool 3, so its tag now reads there. Linking
+      // it to tool 3 takes it out of tool 1; before, it stayed in both.
+      await window.evaluate((t) => { setHeadTags('U1', [null, t[1], t[0], null]); renderMachines(); }, tags);
+      await window.waitForTimeout(250);
+      await window.click('[data-head-link="U1"][data-head="2"]');
+      await window.waitForSelector('.mlink-opt', { timeout: 5000 });
+      ok(await window.evaluate(() => document.querySelector('input[name="mlinkPick"]:checked')?.value) === 'S2', 'tool 3: its tag picks the spool that was in tool 1');
+      await window.click('[data-act="save"]');
+      await window.waitForTimeout(300);
+      const moved = await window.evaluate(() => machines.find((m) => m.id === 'U1').headSpools);
+      ok(moved['2'] === 'S2' && !('0' in moved), 'linking it to tool 3 took it out of tool 1');
+      ok(moved['1'] === after.made.id, 'tool 2 keeps its own spool');
+      const shown = await window.evaluate(() => [...document.querySelectorAll('[data-machine-heads="U1"] .mhead')].map((h) => h.innerText.replace(/\s+/g, ' ')));
+      ok(!/Linked to Snapmaker PLA Black/.test(shown[0]) && /Linked to Snapmaker PLA Black/.test(shown[2]), 'the card shows it in tool 3 only');
+      await window.evaluate((t) => { setHeadTags('U1', t); renderMachines(); }, tags);   // back as it was, for CAP2
+      await window.waitForTimeout(250);
+
       // CAP2: tick the P1P's kit in Edit printer; its card gains the light.
       await window.click('.machine-row[data-machine-id="P1"] [data-act="edit-mach"]');
       await window.waitForSelector('#machAccessories [data-addon]', { timeout: 5000 });
