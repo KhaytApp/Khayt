@@ -59,7 +59,9 @@
     return inv.filter((i) => i && hexOf(i.color));
   }
   function stockLabel(i) {
-    return [i.brand, i.material, i.colourVariant || i.colorName].filter((x) => x && String(x).trim()).join(' · ') || hexOf(i.color);
+    // Its colour by name (its own, or the nearest everyday one), never the code (Turki, Nov 27).
+    const word = typeof spoolColourWord === 'function' ? spoolColourWord(i) : (i.colourVariant || i.colorName || '');
+    return [i.brand, i.material, word].filter((x) => x && String(x).trim()).join(' · ') || tr('cmix.filament', 'Filament');
   }
 
   /**

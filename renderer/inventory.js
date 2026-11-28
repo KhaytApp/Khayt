@@ -788,9 +788,9 @@ async function openFilamentScanner() {
           return;
         }
 
-        const colorDot = nfcData.hex
-          ? `<span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:${safeCssColor(nfcData.hex)};border:2px solid rgba(255,255,255,0.2);vertical-align:middle;margin-inline-end:8px;"></span>`
-          : '';
+        const colorDot = nfcData.hex ? colourSwatchHtml(nfcData.hex, 22) : '';
+        // The tag's own colour name, else the nearest everyday one; never the code.
+        const tagColour = spoolColourWord({ hex: nfcData.hex, known: nfcData.colorName || '' });
         const stdBadge = `<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(91,156,240,0.18);color:var(--primary);font-weight:600;">${escapeHtml(nfcData.standard)}</span>`;
 
         // The parsers coerce these to numbers, and this escapes them anyway: the
@@ -811,7 +811,7 @@ async function openFilamentScanner() {
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
             ${colorDot}
             <div style="flex:1;">
-              <div style="font-weight:600;font-size:13px;">${escapeHtml(nfcData.colorName || nfcData.material || '—')}</div>
+              <div style="font-weight:600;font-size:13px;">${escapeHtml(tagColour || nfcData.material || '—')}</div>
               <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(nfcData.manufacturer||'')} · ${escapeHtml(nfcData.material||'')} ${stdBadge}</div>
             </div>
             <button class="btn small primary" id="btnUseNFC">${escapeHtml(t('scan.use')||'Use this')}</button>
@@ -1616,8 +1616,8 @@ function renderReorderAlerts() {
       : '';
     const threshold = item.reorderPoint ?? settings.lowStockThreshold ?? 200;
     return `<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(245,166,35,0.08);border-radius:var(--radius-sm);margin-bottom:4px;flex-wrap:wrap;">
-      <span style="width:10px;height:10px;border-radius:50%;background:${safeCssColor(item.color, '#f5a623')};display:inline-block;flex-shrink:0;"></span>
-      <span style="flex:1;font-size:12.5px;font-weight:600;">${escapeHtml(item.material)}${item.colourVariant ? ` — ${escapeHtml(item.colourVariant)}` : ''}</span>
+      ${colourSwatchHtml(item.color, 10)}
+      <span style="flex:1;font-size:12.5px;font-weight:600;">${escapeHtml(item.material)}${spoolColourWord(item) ? ` — ${escapeHtml(spoolColourWord(item))}` : ''}</span>
       <span style="font-size:11.5px;color:var(--danger);white-space:nowrap;">${Math.round(item.weight)}g / ${Math.round(threshold)}g</span>
       ${daysHtml}
       <button class="btn small primary" data-act="reorder-alert-item" data-simple-pro="inventory" data-id="${escapeHtml(item.id)}" style="font-size:11px;padding:2px 8px;">${escapeHtml(t('inv.draft_po') || 'Draft PO')}</button>
@@ -1764,7 +1764,9 @@ function renderInventory() {
       const isResin = item.materialType === 'resin';
       const weightUnit = isResin ? 'mL' : escapeHtml(t('common.grams'));
       const resinBadge = isResin ? ` <span class="resin-badge">${escapeHtml(t('inv.type_resin'))}</span>` : '';
-      const colourChip = item.colourVariant ? ` <span class="variant-chip">${escapeHtml(item.colourVariant)}</span>` : '';
+      // The colour by NAME: its own (colourVariant) or the nearest everyday one; never its code.
+      const colourWord = spoolColourWord(item);
+      const colourChip = colourWord ? ` <span class="variant-chip">${escapeHtml(colourWord)}</span>` : '';
       const lotChip = item.lot ? ` <span style="font-size:10px; color:var(--text-dim); background:var(--bg-elev); border:1px solid var(--border-soft); border-radius:3px; padding:0 4px;" title="${escapeHtml(t('inv.lot') || 'Lot')}">${escapeHtml(item.lot)}</span>` : '';
       // Per-location: show which branch a spool belongs to (legacy/unassigned hidden).
       const locChip = (item.locationId && typeof locationBadgeHtml === 'function')
@@ -1773,7 +1775,7 @@ function renderInventory() {
       return `
         <tr data-inv-id="${escapeHtml(item.id)}"${low ? ' style="background: rgba(245,166,35,0.08);"' : ''}>
           <td style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${safeCssColor(item.color, '#888888')}; flex-shrink:0; border:1px solid rgba(255,255,255,0.15);"></span>
+            ${colourSwatchHtml(item.color, 12)}
             <strong>${escapeHtml(item.material)}</strong>${low ? ' <span style="color:var(--low-stock); font-size:11px;">· low</span>' : ''}${resinBadge}${colourChip}${lotChip}${locChip}${ageBadge}${reservedBadge}${overcommitBadge}${testBadge}${runoutBadge}
             ${item.printTemp || item.bedTemp ? `<span style="font-size:10px; color:var(--primary);">${_iIcoL('thermo', '🌡', 12)}${item.printTemp ? item.printTemp + '°C print' : ''}${item.printTemp && item.bedTemp ? ' / ' : ''}${item.bedTemp ? item.bedTemp + '°C bed' : ''}</span>` : ''}
           </td>
@@ -2651,8 +2653,8 @@ function renderSupplierReorderList() {
     const itemRows = items.map(item => {
       const needed = Math.max(0, (item.reorderPoint ?? settings.lowStockThreshold ?? 200) * 2 - item.weight);
       return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-elev);border-radius:var(--radius-sm);margin-bottom:4px;">
-        <span style="width:10px;height:10px;border-radius:50%;background:${safeCssColor(item.color, '#888')};display:inline-block;flex-shrink:0;"></span>
-        <span style="flex:1;font-size:12.5px;">${escapeHtml(item.material)}${item.brand ? ` — ${escapeHtml(item.brand)}` : ''}</span>
+        ${colourSwatchHtml(item.color, 10)}
+        <span style="flex:1;font-size:12.5px;">${escapeHtml([item.material, spoolColourWord(item)].filter(Boolean).join(' · '))}${item.brand ? ` — ${escapeHtml(item.brand)}` : ''}</span>
         <span style="font-size:11.5px;color:var(--danger);white-space:nowrap;">${Math.round(item.weight)}g left</span>
         <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">need ~${Math.round(needed)}g</span>
         <button class="btn small primary" data-act="reorder-item" data-id="${item.id}" style="font-size:11px;padding:2px 8px;">${escapeHtml(t('inv.reorder') || 'Order')}</button>
@@ -5069,7 +5071,7 @@ async function printSpoolLabel(itemId) {
     <div class="shop">${escapeHtml(shopName)}</div>
     <div class="mat"><span class="swatch" style="background:${colorHex};"></span>${escapeHtml(item.material || '—')}</div>
     <div class="meta">
-      ${item.colourVariant ? `<span>${escapeHtml(item.colourVariant)}</span>` : ''}
+      ${spoolColourWord(item) ? `<span>${escapeHtml(spoolColourWord(item))}</span>` : ''}
       <span>${escapeHtml(weightStr)}</span>
       ${item.lot ? `<span>${L('inv.lot', 'Lot')}: ${escapeHtml(item.lot)}</span>` : ''}
       ${locName ? `<span>${escapeHtml(locName)}</span>` : ''}
