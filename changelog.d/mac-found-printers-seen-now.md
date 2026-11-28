@@ -1,0 +1,1 @@
+- **Mac: Find printers says when a printer was last seen the same way at any hour.** A printer seen 26 hours earlier read "Seen yesterday" during the day and "Seen 2 days ago" just after midnight. It is now counted from the time of the search.
