@@ -155,6 +155,16 @@ async function run(lang) {
       ok(moved['1'] === after.made.id, 'tool 2 keeps its own spool');
       const shown = await window.evaluate(() => [...document.querySelectorAll('[data-machine-heads="U1"] .mhead')].map((h) => h.innerText.replace(/\s+/g, ' ')));
       ok(!/Linked to Snapmaker PLA Black/.test(shown[0]) && /Linked to Snapmaker PLA Black/.test(shown[2]), 'the card shows it in tool 3 only');
+      // Colours by NAME, never a code (lib/colour-name.js, #2736; Turki, Nov 27).
+      ok(shown.every((h) => !/#[0-9a-f]{6}/i.test(h)), 'no head row shows a hex code');
+      ok(/Tool 3 · PLA · Snapmaker · Black/.test(shown[2]), 'tool 3 names its colour');
+      const row = await window.evaluate((id) => {
+        if (typeof renderInventory === 'function') renderInventory();
+        const r = document.querySelector(`tr[data-inv-id="${id}"]`);
+        return r ? { text: r.innerText.replace(/\s+/g, ' '), label: r.getAttribute('aria-label') || '', swatchHidden: r.querySelector('.colour-swatch')?.getAttribute('aria-hidden') } : null;
+      }, after.made.id);
+      ok(row && /White/.test(row.text) && !/#[0-9a-f]{6}/i.test(row.text + row.label), 'a spool with no colour name of its own reads "White" in the inventory, not its code');
+      ok(row && row.swatchHidden === 'true', 'its swatch is hidden from a screen reader; the name is read');
       await window.evaluate((t) => { setHeadTags('U1', t); renderMachines(); }, tags);   // back as it was, for CAP2
       await window.waitForTimeout(250);
 

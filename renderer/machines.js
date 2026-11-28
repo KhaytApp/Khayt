@@ -610,7 +610,9 @@ async function renderMachineHeads() {
 
 function _spoolLabel(s) {
   if (!s) return '';
-  const name = [s.brand, s.material, s.colourVariant].filter((x) => x && String(x).trim()).join(' ');
+  // Its colour by name (its own, or the nearest everyday one), never the code.
+  const word = typeof spoolColourWord === 'function' ? spoolColourWord(s) : (s.colourVariant || '');
+  const name = [s.brand, s.material, word].filter((x) => x && String(x).trim()).join(' ');
   return name || String(s.id);
 }
 function _kgOrG(g) {
@@ -652,14 +654,18 @@ function paintMachineHeads(machineId) {
     if (!src && !r.spool) return `<div class="mhead"><span class="mhead-dot mhead-empty" aria-hidden="true"></span><div class="mhead-text"><div class="mhead-title">${escapeHtml(t('mach.heads_nothing', { n }))}</div></div></div>`;
     const maker = r.tag ? (r.tag.manufacturer || r.tag.vendor || '') : '';
     const material = r.tag ? [r.tag.material, r.tag.sub].filter(Boolean).join(' ') : (r.live ? r.live.material : (r.spool && r.spool.material) || '');
-    const title = [t('mach.heads_tool', { n }), material, maker].filter(Boolean).join(' · ');
+    // What the head holds, by colour NAME: the linked spool's own name when it
+    // has one, else the nearest everyday name for the colour shown; never its code.
+    const colourWord = r.hex && typeof spoolColourWord === 'function'
+      ? spoolColourWord({ hex: r.hex, known: (r.spool && r.spool.colourVariant) || '' }) : '';
+    const title = [t('mach.heads_tool', { n }), material, maker, colourWord].filter(Boolean).join(' · ');
     const how = r.tag ? [t('mach.heads_tag_read'), _kgOrG(r.tag.weightG) ? t('mach.heads_spool_of', { size: _kgOrG(r.tag.weightG) }) : ''].filter(Boolean).join(' · ')
       : (r.live ? t('mach.heads_set_on_printer') : '');
     let linkLine;
     if (r.spool) linkLine = `<div class="mhead-sub mhead-ink">${escapeHtml(t('mach.heads_linked', { spool: _spoolLabel(r.spool), left: _kgOrG(r.spool.weight) || '0 g' }))}</div>`;
     else if (r.tag && RT && RT.spoolMatch(r.tag, inventory).action === 'new') linkLine = `<div class="mhead-sub mhead-amber">${escapeHtml(t('mach.heads_no_match'))}</div>`;
     else linkLine = `<div class="mhead-sub">${escapeHtml(t('mach.heads_not_linked'))}</div>`;
-    const dot = r.hex ? `<span class="mhead-dot" style="background:${safeCssColor(r.hex)};" aria-hidden="true"></span>` : '<span class="mhead-dot mhead-empty" aria-hidden="true"></span>';
+    const dot = r.hex ? `<span class="mhead-dot" style="background:${safeCssColor(r.hex)};box-shadow:0 0 0 1px var(--border-strong, rgba(127,127,127,0.6));" aria-hidden="true"></span>` : '<span class="mhead-dot mhead-empty" aria-hidden="true"></span>';
     return `<div class="mhead">${dot}<div class="mhead-text"><div class="mhead-title">${escapeHtml(title)}</div>${how ? `<div class="mhead-sub">${escapeHtml(how)}</div>` : ''}${linkLine}</div>
       <button type="button" class="btn small" data-head-link="${escapeHtml(m.id)}" data-head="${r.head}">${escapeHtml(t(r.spool ? 'mach.heads_change' : 'mach.heads_link'))}</button></div>`;
   }).join('');

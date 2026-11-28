@@ -241,6 +241,11 @@ function renderStudioKanbanCard(b) {
   if (part0?.filamentId) {
     const inv = inventory.find(i => i.id === part0.filamentId);
     if (inv?.color) swatchHex = inv.color;
+    // The spool's colour by name when the part names none (never its code).
+    if (!part0?.colour && inv && typeof spoolColourWord === 'function') {
+      const word = spoolColourWord(inv);
+      if (word) swatchLabel = [part0?.material || inv.material, word].filter(Boolean).join(' ');
+    }
     if (!swatchLabel) swatchLabel = inv?.material || '';
   }
   const progress = studioKanbanProgress(log);
@@ -266,7 +271,7 @@ function renderStudioKanbanCard(b) {
       <strong class="khayt-kcard-title">${priBadge}${escapeHtml(log.project || jobRef(log))}${splitSpan}</strong>
       ${clientLine ? `<span class="khayt-kcard-client">${escapeHtml(clientLine)}</span>` : ''}
       <div class="row gap8 khayt-kcard-mat" style="margin-top:8px;align-items:center;flex-wrap:wrap">
-        ${swatchLabel ? `<span class="khayt-swatch" style="background:${safeCssColor(swatchHex)}"></span><span class="khayt-cname">${escapeHtml(swatchLabel)}</span>` : ''}
+        ${swatchLabel ? `<span class="khayt-swatch" aria-hidden="true" style="background:${safeCssColor(swatchHex)};box-shadow:0 0 0 1px var(--border-strong, rgba(127,127,127,0.6))"></span><span class="khayt-cname">${escapeHtml(swatchLabel)}</span>` : ''}
         <span class="grow"></span>
         <span class="pill" style="padding:2px 7px;font-size:10.5px">${escapeHtml(partsLabel)}</span>
       </div>`

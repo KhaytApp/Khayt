@@ -23,7 +23,9 @@
     return CP().colouredFilaments(Array.isArray(inventory) ? inventory : []);
   }
   function filamentLabel(it) {
-    return [it.material, it.colourVariant].filter(Boolean).join(' — ') || (t('cmix.filament') || 'Filament');
+    // A spool's colour by name (its own, or the nearest everyday one), never the code.
+    const word = typeof spoolColourWord === 'function' ? spoolColourWord(it) : it.colourVariant;
+    return [it.material, word].filter(Boolean).join(' — ') || (t('cmix.filament') || 'Filament');
   }
   function swatch(hex, size) {
     const s = size || 18;
