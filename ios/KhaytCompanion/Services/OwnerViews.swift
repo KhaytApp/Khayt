@@ -125,19 +125,33 @@ enum OwnerViews {
     }
 
     /// "now", "14:12", "yesterday" or a date, in the app's language.
-    static func lastSeen(_ iso: String?, now: Date = Date(), calendar: Calendar = .current) -> String? {
+    static func lastSeen(_ iso: String?, now: Date = Date(), calendar: Calendar = bookCalendar) -> String? {
         guard let iso, !iso.isEmpty else { return nil }
         let fractional = ISO8601DateFormatter()
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         guard let at = fractional.date(from: iso) ?? ISO8601DateFormatter().date(from: iso) else { return nil }
         if abs(now.timeIntervalSince(at)) < 600 { return L10n.tr("owner.phones.now") }
+        // Shown in the same calendar the day was worked out in: "Nov 10",
+        // never "Jmd. I 30, 1448 AH" on a phone whose region is Umm al-Qura.
+        let shown = { (date: Date.FormatStyle.DateStyle, time: Date.FormatStyle.TimeStyle) in
+            at.formatted(Date.FormatStyle(date: date, time: time, locale: L10n.locale,
+                                          calendar: calendar, timeZone: calendar.timeZone))
+        }
         if calendar.isDate(at, inSameDayAs: now) {
-            return at.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale))
+            return shown(.omitted, .shortened)
         }
         if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(at, inSameDayAs: yesterday) {
             return L10n.tr("owner.phones.yesterday")
         }
-        return at.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(L10n.locale))
+        return shown(.abbreviated, .omitted)
+    }
+
+    /// The book's calendar: Gregorian, in this phone's time zone, whatever
+    /// calendar the phone's region uses (a Saudi phone's is Umm al-Qura).
+    static var bookCalendar: Calendar {
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = .current
+        return gregorian
     }
 
     /// The role's word; a role this build does not know shows no word, never a guess.
