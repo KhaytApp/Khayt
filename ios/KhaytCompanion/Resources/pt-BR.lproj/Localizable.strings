@@ -1699,3 +1699,4 @@
 "tray.why.not-offered" = "Atualize o app no Mac para vincular carretéis pelo telefone.";
 "tray.why.unreachable" = "Não foi possível concluir. Nada foi alterado.";
 "tray.linked.unnamed" = "Há um carretel registrado neste cabeçote";
+"tray.not_in_printer" = "Não está na impressora agora. Continua vinculada a este cabeçote.";

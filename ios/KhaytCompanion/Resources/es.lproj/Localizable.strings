@@ -1699,3 +1699,4 @@
 "tray.why.not-offered" = "Actualiza la app del Mac para vincular bobinas desde el teléfono.";
 "tray.why.unreachable" = "No se pudo completar. No se cambió nada.";
 "tray.linked.unnamed" = "Hay una bobina registrada en este cabezal";
+"tray.not_in_printer" = "No está en la impresora ahora. Sigue vinculada a este cabezal.";

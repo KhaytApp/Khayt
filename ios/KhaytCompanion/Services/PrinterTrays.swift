@@ -79,8 +79,11 @@ struct PrinterTray: Decodable, Equatable, Identifiable, Sendable {
     /// Every colour the tag names that is a plain `#RRGGBB`, in its order.
     /// Drawn as swatches only, never shown as text.
     var colourHexes: [String] {
-        (tag?.colours ?? []).filter { $0.count == 7 && $0.hasPrefix("#") && $0.dropFirst().allSatisfy(\.isHexDigit) }
+        (tag?.colours ?? []).filter(Self.isPlainHex)
     }
+
+    /// `#RRGGBB`, and nothing else.
+    static func isPlainHex(_ s: String) -> Bool { s.count == 7 && s.hasPrefix("#") && s.dropFirst().allSatisfy(\.isHexDigit) }
 }
 
 enum PrinterTrays {
@@ -119,6 +122,19 @@ enum PrinterTrays {
 
     /// Only heads with a tag are worth a card.
     static func tagged(_ rows: [PrinterTray]) -> [PrinterTray] { rows.filter { $0.tag != nil && $0.match.kind != "none" } }
+
+    /// The cards a printer gets: every tagged head, and every head that has a
+    /// spool linked while the printer reads nothing there. That link is KEPT
+    /// (a U1 clears a head's tag when the filament comes out, and one empty
+    /// read can be a missed tag) and said: "not in the printer now". Whether
+    /// it is said is `lib/head-spools.js shown`, the Mac's and the desktop's
+    /// rule; `notInPrinter` holds the heads it said it for.
+    static func shown(_ rows: [PrinterTray], notInPrinter: Set<Int>) -> [PrinterTray] {
+        rows.filter { ($0.tag != nil && $0.match.kind != "none") || ($0.tag == nil && notInPrinter.contains($0.head)) }
+    }
+
+    /// Heads with a spool linked and no tag read: the ones to ask `shown` about.
+    static func emptyButLinked(_ rows: [PrinterTray]) -> [PrinterTray] { rows.filter { $0.tag == nil && $0.linked != nil } }
 
     enum Ask: Equatable, Sendable {
         case link(spoolId: String)

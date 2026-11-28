@@ -1699,3 +1699,4 @@
 "tray.why.not-offered" = "请更新 Mac 上的应用，以便从手机关联料盘。";
 "tray.why.unreachable" = "未能完成。未作任何更改。";
 "tray.linked.unnamed" = "此喷头已记录有料盘";
+"tray.not_in_printer" = "现在不在打印机中。仍与此打印头关联。";

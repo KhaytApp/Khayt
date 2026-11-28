@@ -91,11 +91,47 @@ final class PrinterTraysTests: XCTestCase {
     func testTheCardDrawsTheSwatchAndNeverPrintsTheCode() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let card = try String(contentsOf: root.appending(path: "KhaytCompanion/Views/SpoolTagCards.swift"), encoding: .utf8)
-        XCTAssertTrue(card.contains("if !tray.colourHexes.isEmpty { colour(tray) }"), "every tagged colour is shown")
+        XCTAssertTrue(card.contains("if !Self.swatches(tray, spools: spools).isEmpty { colour(tray) }"), "every tagged colour is shown")
+        XCTAssertTrue(card.contains("let name = names[tray.head]"), "the name is the shared rule's")
         XCTAssertTrue(card.contains("SpoolSwatch(hex: $0.element, size: 22)"), "the shared ringed swatch")
         XCTAssertTrue(card.contains(#".accessibilityLabel(name ?? L10n.tr("spool.form.colour"))"#), "VoiceOver hears a name, never a code")
         XCTAssertFalse(card.contains("Text(tray.colourHex"), "the code is never shown as text")
         XCTAssertFalse(card.contains("Text(hex"))
+    }
+
+    /// The shared rules on the phone (`lib/colour-name.js`, #2736;
+    /// `lib/head-spools.js shown`, #2733): a tag with no spool to name it
+    /// gets the nearest everyday name, never its code; the spool's own name
+    /// beats a guess; a head the printer reads empty with a spool linked is
+    /// shown, and said to be not in the printer now.
+    func testTheSharedRulesNameTheColourAndSayAnEmptyHead() async throws {
+        let engine = try BookReader.appWideEngine()
+        let unnamed = PrinterTray(head: 1, tag: .init(material: "PLA", colours: ["#080A0D"]), key: "k", match: .init(kind: "new"), linked: nil)
+        let own = rows[0]   // matched to INV-1, whose colour is "Black"
+        let galaxy = try JSONDecoder().decode([InventorySpool].self, from: Data(
+            ##"[{"id":"INV-1","material":"PLA","color":"Galaxy Black"},{"id":"INV-9","material":"PLA","color":"#E2DEDB"}]"##.utf8))
+        let empty = PrinterTray(head: 2, tag: nil, key: "", match: .init(kind: "none"), linked: "INV-9")
+        let bare = PrinterTray(head: 3, tag: nil, key: "", match: .init(kind: "none"), linked: nil)
+        let all = [unnamed, empty, bare]
+
+        let (names, gone) = await SpoolTagCards.describe(all, spools: galaxy, engine: engine, lang: "en")
+        XCTAssertEqual(names[1], "Black", "the nearest everyday name")
+        XCTAssertEqual(gone, [2], "linked and read empty: not in the printer now")
+        XCTAssertEqual(PrinterTrays.shown(all, notInPrinter: gone).map(\.head), [1, 2], "an empty head with nothing linked gets no card")
+        XCTAssertEqual(SpoolTagCards.swatches(empty, spools: galaxy), ["#E2DEDB"], "the linked spool's own colour, as a swatch")
+        XCTAssertEqual(names[2], "White", "and its everyday name")
+        XCTAssertNil(names[3])
+
+        let (ownNames, _) = await SpoolTagCards.describe([own], spools: galaxy, engine: engine, lang: "en")
+        XCTAssertEqual(ownNames[1], "Galaxy Black", "the spool's own name beats a guess")
+        let (ar, _) = await SpoolTagCards.describe([unnamed], spools: [], engine: engine, lang: "ar")
+        XCTAssertEqual(ar[1], "أسود", "in the phone's language")
+        for name in names.values + ownNames.values + ar.values { XCTAssertFalse(name.contains("#"), "never a code: \(name)") }
+
+        // No engine: the spool's own name only, and the empty head still said.
+        let (bareNames, bareGone) = await SpoolTagCards.describe(all, spools: galaxy, engine: nil, lang: "en")
+        XCTAssertTrue(bareNames.isEmpty)
+        XCTAssertEqual(bareGone, [2])
     }
 
     /// "Add spool from the tag" sent with no answer: the Mac may still be

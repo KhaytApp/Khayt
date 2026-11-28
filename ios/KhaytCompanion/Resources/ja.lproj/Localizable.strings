@@ -1699,3 +1699,4 @@
 "tray.why.not-offered" = "電話からスプールをリンクするには、Mac のアプリを更新してください。";
 "tray.why.unreachable" = "完了できませんでした。何も変更されていません。";
 "tray.linked.unnamed" = "このヘッドにはスプールが記録されています";
+"tray.not_in_printer" = "今はプリンターに入っていません。このヘッドとのリンクはそのままです。";

@@ -22,6 +22,11 @@ struct SpoolTagCards: View {
     /// head linked, Add is not offered again there, so a second tap can
     /// never add a second spool (review of #2699).
     @State private var addUnanswered: Set<String> = []
+    /// Each head's colour name (`lib/colour-name.js`), by head.
+    @State private var names: [Int: String] = [:]
+    /// Heads with a spool linked that the printer reads as empty, as
+    /// `lib/head-spools.js shown` says ("not-in-printer").
+    @State private var notInPrinter: Set<Int> = []
 
     static func slot(_ tray: PrinterTray) -> String { "\(tray.head)|\(tray.key)" }
 
@@ -34,8 +39,8 @@ struct SpoolTagCards: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            ForEach(PrinterTrays.tagged(trays)) { tray in card(tray) }
-            if !PrinterTrays.tagged(trays).isEmpty {
+            ForEach(PrinterTrays.shown(trays, notInPrinter: notInPrinter)) { tray in card(tray) }
+            if !PrinterTrays.shown(trays, notInPrinter: notInPrinter).isEmpty {
                 Text(L10n.tr("tray.foot"))
                     .font(.khayt(12, relativeTo: .caption))
                     .foregroundStyle(KhaytDesign.note)
@@ -51,6 +56,43 @@ struct SpoolTagCards: View {
         // A head that now shows its spool has been answered.
         for tray in trays where tray.linked != nil { addUnanswered.remove(Self.slot(tray)) }
         if !trays.isEmpty { spools = (try? await api.fetchInventory()) ?? [] }
+        let engine = try? BookReader.appWideEngine()
+        (names, notInPrinter) = await Self.describe(trays, spools: spools, engine: engine, lang: L10n.engineLanguage)
+    }
+
+    /// The colour a head shows: the tag's colours; for a head read empty, the
+    /// linked spool's own colour when the shelf records it as a colour.
+    static func swatches(_ tray: PrinterTray, spools: [InventorySpool]) -> [String] {
+        if !tray.colourHexes.isEmpty { return tray.colourHexes }
+        guard tray.tag == nil, let id = tray.linked,
+              let c = spools.first(where: { $0.id == id })?.color?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(),
+              PrinterTray.isPlainHex(c) else { return [] }
+        return [c]
+    }
+
+    /// Each head's colour name and which heads are "not in the printer now",
+    /// by the shared rules (`lib/colour-name.js`, `lib/head-spools.js`), so
+    /// the phone says it as the Mac and the desktop do. The name is the
+    /// spool's own when it has one, else the nearest everyday name, else none
+    /// (the swatch stands alone). Without the engine: the spool's own name
+    /// only, and an empty head with a link is still said, as the rule would.
+    static func describe(_ trays: [PrinterTray], spools: [InventorySpool], engine: KhaytEngine?, lang: String) async -> ([Int: String], Set<Int>) {
+        var names: [Int: String] = [:]
+        var empty: Set<Int> = []
+        for tray in trays {
+            if tray.tag == nil, tray.linked != nil {
+                let said = (try? await engine?.headSpoolsShown(linked: tray.linked, reportsEmpty: true)) ?? "not-in-printer"
+                if said == "not-in-printer" { empty.insert(tray.head) }
+            }
+            let known = colourName(tray, spools: spools)
+            if let hex = swatches(tray, spools: spools).first, let engine,
+               let name = try? await engine.colourName(hex: hex, lang: lang, known: known) {
+                names[tray.head] = name
+            } else if let known {
+                names[tray.head] = known
+            }
+        }
+        return (names, empty)
     }
 
     static func spoolName(_ id: String?, in spools: [InventorySpool]) -> String? {
@@ -70,6 +112,8 @@ struct SpoolTagCards: View {
     /// The name of the tag's colour: the spool recorded in the head first,
     /// then the one the Mac matched it to. Nil when neither names it; the
     /// swatch then stands alone.
+    /// This is the `known` name the shared rule is given; `describe` adds the
+    /// nearest everyday name when there is none.
     static func colourName(_ tray: PrinterTray, spools: [InventorySpool]) -> String? {
         let suggested = tray.match.kind == "link" ? tray.match.spoolId : nil
         for id in [tray.linked, suggested] {
@@ -93,12 +137,12 @@ struct SpoolTagCards: View {
 
     /// The tag's colour, shown: a swatch per colour it names (the shared
     /// ringed swatch, so near-black shows on a dark card and off-white on a
-    /// light one), and the colour's name beside it when a spool names it.
+    /// light one), and the colour's name beside it when it has one.
     private func colour(_ tray: PrinterTray) -> some View {
-        let name = Self.colourName(tray, spools: spools)
+        let name = names[tray.head]
         return HStack(spacing: 8) {
             HStack(spacing: -6) {
-                ForEach(Array(tray.colourHexes.enumerated()), id: \.offset) { SpoolSwatch(hex: $0.element, size: 22) }
+                ForEach(Array(Self.swatches(tray, spools: spools).enumerated()), id: \.offset) { SpoolSwatch(hex: $0.element, size: 22) }
             }
             if let name {
                 Text(name)
@@ -115,10 +159,11 @@ struct SpoolTagCards: View {
             Text(L10n.format("tray.title", machineName, tray.head))
                 .font(.khayt(17, .semibold, relativeTo: .headline))
                 .foregroundStyle(KhaytDesign.ink)
-            if !tray.colourHexes.isEmpty { colour(tray) }
+            if !Self.swatches(tray, spools: spools).isEmpty { colour(tray) }
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(L10n.format("tray.tag_says", tray.tagWords ?? L10n.tr("tray.tag_unknown")))
+                    Text(tray.tag == nil ? L10n.tr("tray.not_in_printer")
+                                         : L10n.format("tray.tag_says", tray.tagWords ?? L10n.tr("tray.tag_unknown")))
                         .font(.khayt(14.5, relativeTo: .subheadline))
                         .foregroundStyle(KhaytDesign.ink)
                         .fixedSize(horizontal: false, vertical: true)

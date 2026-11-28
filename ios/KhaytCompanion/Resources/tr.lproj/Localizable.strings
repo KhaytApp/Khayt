@@ -1699,3 +1699,4 @@
 "tray.why.not-offered" = "Telefondan makara bağlamak için Mac’teki uygulamayı güncelleyin.";
 "tray.why.unreachable" = "İşlem tamamlanamadı. Hiçbir şey değişmedi.";
 "tray.linked.unnamed" = "Bu kafada kayıtlı bir makara var";
+"tray.not_in_printer" = "Şu an yazıcıda değil. Bu kafaya hâlâ bağlı.";

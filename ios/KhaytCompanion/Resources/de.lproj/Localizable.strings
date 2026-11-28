@@ -1699,3 +1699,4 @@
 "tray.why.not-offered" = "Aktualisieren Sie die App auf dem Mac, um Spulen vom Telefon aus zu verknüpfen.";
 "tray.why.unreachable" = "Das hat nicht geklappt. Nichts wurde geändert.";
 "tray.linked.unnamed" = "In diesem Kopf ist eine Spule eingetragen";
+"tray.not_in_printer" = "Gerade nicht im Drucker. Noch mit diesem Kopf verknüpft.";
