@@ -2131,6 +2131,13 @@ private struct Live: View {
                         .font(.caption2).foregroundStyle(Khayt.faint)
                 }
             }
+            // PAGE 29, FRAME 2: the heads as nozzles in their spools' colours,
+            // the filament TYPE under each (Turki, Nov 28: "show filament type
+            // not color name"). From the status the card already holds, so the
+            // tile never asks the printer anything of its own.
+            if let loaded = status.loaded, !loaded.isEmpty {
+                FloorHeads(loaded: loaded, words: shop.words)
+            }
             // A SPOOL THAT RAN OUT, said on the card as well as in the alert.
             // Only `true` is drawn: false is a loaded head and nil is a machine
             // with no sensor, and neither is something to look at.
@@ -2199,4 +2206,38 @@ private struct Live: View {
     /// protocol calls it something else.
     static func isPrinting(_ raw: String) -> Bool { PrinterWatch.isPrinting(raw) }
 
+}
+
+/// A printer's heads on its Shop floor tile (page 29, frame 2): one nozzle per
+/// head in its spool's colour, the head's number, and the filament TYPE under
+/// it ("PLA", "PETG"), never the colour's name or code. A head the printer
+/// reports nothing in is a dashed nozzle with only its number.
+struct FloorHeads: View {
+    let loaded: [KhaytEngine.LoadedSlot]
+    let words: Words
+
+    /// "PLA SnapSpeed" → "PLA": the type alone fits under a small nozzle.
+    nonisolated static func type(_ material: String) -> String {
+        material.split(separator: " ").first.map(String.init) ?? material
+    }
+
+    var body: some View {
+        let top = min(loaded.map(\.slot).max() ?? 0, 15)
+        HStack(alignment: .top, spacing: 12) {
+            ForEach(0...max(0, top), id: \.self) { i in
+                let slot = loaded.first { $0.slot == i }
+                VStack(spacing: 2) {
+                    NozzleMark(hex: slot.map(\.hex))
+                        .scaleEffect(0.7, anchor: .top)
+                        .frame(width: 24, height: 33, alignment: .top)
+                    Text(words.numeral(i + 1)).font(.caption2).foregroundStyle(.secondary)
+                    if let slot, !slot.material.isEmpty {
+                        Text(Self.type(slot.material)).font(.caption.weight(.semibold))
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(.top, 2)
+    }
 }
