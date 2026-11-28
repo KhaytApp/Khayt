@@ -1,0 +1,1 @@
+- **Mac: a print's Live Activity now ends when the print does, even if the phone signed up mid-print.** If the iPhone registered after Khayt Cloud had said no phone was listening, the Lock Screen kept showing the last percentage after the print finished. The end of every print is now always sent, and progress is re-sent every ten minutes, so a phone that joins late is picked up.

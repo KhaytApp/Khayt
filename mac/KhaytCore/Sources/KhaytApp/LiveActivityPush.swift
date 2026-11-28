@@ -27,8 +27,10 @@ import KhaytCore
 /// - No alarm. A failure is retried on a later reading and never shown: this
 ///   runs every few seconds, and a banner per poll would be noise. Retried
 ///   with a growing wait (`backoff`), never on every poll.
-/// - No posts to nobody. A 200 that says no phone is registered (`tokens: 0`)
-///   goes quiet: only a print's START asks again, at most every ten minutes.
+/// - Few posts to nobody. A 200 that says no phone is registered (`tokens: 0`)
+///   goes quiet: a start or an update asks again at most every ten minutes,
+///   and every END is still posted, once per print, so a phone that
+///   registered after that reply is never left showing a finished print.
 /// - Not gated by the staff lock: no person does this — it is the shop's own
 ///   printers reporting, like the printer polling it rides on, and it changes
 ///   nothing a lock protects.
@@ -281,12 +283,19 @@ extension Shop {
             step = .end(machineId: id, ended)
         }
         guard liveActivityMayTry(step, memory: memory, now: now) else { return }
-        // No phone to tell: the plan still moves, so the next print is seen
-        // as a start, but only a start asks the cloud again — and not within
-        // ten minutes of the last time it said nobody was listening.
+        // No phone to tell (the last reply said so): the plan still moves, and
+        // the cloud is asked again on a start or an update at most every ten
+        // minutes. An END is ALWAYS posted, one per print: a phone that
+        // registered its token after that reply would otherwise keep the
+        // Activity on its Lock Screen at the last percentage for good (Turki,
+        // Nov 28: stuck at 61% after the print finished). The update is the
+        // probe that notices such a phone mid-print and lifts the quiet.
         if let since = memory.noPhonesSince {
             let probe: Bool
-            if case .start = step { probe = now.timeIntervalSince(since) >= LiveActivityPush.noPhonesProbe } else { probe = false }
+            switch step {
+            case .end: probe = true
+            case .start, .update: probe = now.timeIntervalSince(since) >= LiveActivityPush.noPhonesProbe
+            }
             guard probe else { liveActivityRecord(step, outcome: .sent, now: now, quietly: true); return }
         }
 
@@ -309,9 +318,8 @@ extension Shop {
         let step = LiveActivityPlan.Step.end(machineId: machineId, LiveActivityPlan.State(
             phase: .cancelled, job: was.job, progress: was.progress, startedAt: was.startedAt, endsAt: now))
         guard liveActivityMayTry(step, memory: memory, now: now) else { return }
-        if memory.noPhonesSince != nil {
-            liveActivityRecord(step, outcome: .sent, now: now, quietly: true); return
-        }
+        // Posted even while no phone was said to be listening: an end is the
+        // one step a late phone cannot do without (see liveActivityHeard).
         liveActivityPost(step, cloud: cloud, shopId: shopId, now: now)
     }
 
