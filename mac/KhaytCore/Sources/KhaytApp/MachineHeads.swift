@@ -245,7 +245,9 @@ enum HeadWords {
     /// the U1, but printers with a different nozzle per head are coming).
     static func nozzle(_ row: KhaytEngine.HeadRow, machine: Double?, _ words: Words) -> String {
         guard let mm = row.nozzleMm ?? machine, mm > 0 else { return "" }
-        return words.callIt("mach.heads_mm", ["n": .string(Money.quantity(mm, decimals: 2))])
+        // "0.4 mm", "0.25 mm": as many places as the size has, at most two.
+        let places = (mm * 10).rounded() == mm * 10 ? 1 : 2
+        return words.callIt("mach.heads_mm", ["n": .string(Money.quantity(mm, decimals: places))])
     }
 
     /// The last line, and its colour: grams left (green), a link to make (amber), or why not.
@@ -273,8 +275,10 @@ enum HeadWords {
 struct MachineHeadsSection: View {
     let shop: Shop
     let machineId: String
-    /// A capture's stand-ins.
+    /// A capture's stand-ins: rows, their colour names, and the machine's nozzle size.
     var pretend: [KhaytEngine.HeadRow]?
+    var pretendNames: [Int: String]?
+    var pretendNozzleMm: Double?
     /// Nothing read yet, the printer's heads, or no answer.
     enum Read: Equatable { case reading, rows([KhaytEngine.HeadRow]), unread }
     @State private var read: Read = .reading
@@ -320,7 +324,12 @@ struct MachineHeadsSection: View {
             }
         }
         // Keyed on what the book links too, so a phone's link re-reads it.
-        .task(id: shop.headsLinkKey(machineId)) { if pretend == nil { await reread() } }
+        .task(id: shop.headsLinkKey(machineId)) {
+            // A capture's rows are named the same way, so it shows what a shop sees.
+            if let pretend {
+                if let pretendNames { names = pretendNames } else { names = await shop.headColourNames(pretend) }
+            } else { await reread() }
+        }
         .shopSheet(item: $linking) { asked in
             LinkHeadSheet(shop: shop, machineId: machineId, row: asked.row, adding: asked.adding) {
                 await reread()
@@ -342,16 +351,17 @@ struct MachineHeadsSection: View {
         let spool = row.spoolId.flatMap { shop.headSpool($0) }
         let state = HeadWords.state(row, spool: spool)
         let line = HeadWords.spoolLine(row, spool: spool, state: state, words)
-        let size = HeadWords.nozzle(row, machine: shop.headsMachineNozzle(machineId), words)
+        let size = HeadWords.nozzle(row, machine: pretendNozzleMm ?? shop.headsMachineNozzle(machineId), words)
+        let name = (pretendNames ?? names)[row.head]
         let body = VStack(spacing: 3) {
             NozzleMark(hex: state == .empty ? nil : row.hex, faded: state == .notInPrinter)
                 .padding(.bottom, 2)
             Text(words.callIt("mach.heads_tool", ["n": .string(words.numeral(row.head + 1))]))
                 .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-            Text(state == .empty ? words.callIt("mac.heads_empty") : (names[row.head] ?? HeadWords.material(row, spool: spool)))
+            Text(state == .empty ? words.callIt("mac.heads_empty") : (name ?? HeadWords.material(row, spool: spool)))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(state == .empty ? .secondary : .primary)
-            if state != .empty, names[row.head] != nil, !HeadWords.material(row, spool: spool).isEmpty {
+            if state != .empty, name != nil, !HeadWords.material(row, spool: spool).isEmpty {
                 Text(HeadWords.material(row, spool: spool)).font(.system(size: 11))
             }
             if !size.isEmpty { Text(size).font(.system(size: 11)).foregroundStyle(.secondary) }

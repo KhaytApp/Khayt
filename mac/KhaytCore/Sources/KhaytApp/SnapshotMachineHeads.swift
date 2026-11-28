@@ -41,7 +41,10 @@ extension Snapshot {
         shop.trayBookForTests = ["inventory": .array(shelf1), "machines": .array([])]
         let loaded: JSONValue = .array([.object(["slot": .number(2), "hex": .string("#FF3B30"), "material": .string("PLA")])])
         if let rows = try? await engine.machineHeads(filamentDetect: detect, loaded: loaded, spools: shelf1, linked: .object(["0": .string("S2")])) {
-            shot("1-loaded", width: 680, MachineHeadsSection(shop: shop, machineId: "snapshot", pretend: rows).padding(20))
+            // Named before the camera, as the live section names them after a read (page 29).
+            let names = await shop.headColourNames(rows)
+            shot("1-loaded", width: 680, MachineHeadsSection(shop: shop, machineId: "snapshot", pretend: rows,
+                                                             pretendNames: names, pretendNozzleMm: 0.4).padding(20))
         }
         // Frame 2: tool 2's tag, a best match and a near one, and "Add as a new spool".
         let shelf2 = shelf1 + [spool("S7", "Snapmaker", "PETG", "#F5F5F5", 1000), spool("S9", "Other", "PETG", "#F5F5F5", 220)]
