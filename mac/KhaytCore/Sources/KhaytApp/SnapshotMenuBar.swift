@@ -95,14 +95,14 @@ extension Snapshot {
         // THE SHOP FLOOR TILE'S HEADS (page 29, frame 2): a U1 with four
         // heads, one of them empty, drawn as nozzles with the filament type.
         plant(.one, on: shop, at: now)
-        shop.printers.setReadingForTesting("MACH-u1", PrinterWatch.Reading(
-            status: KhaytEngine.PrinterStatus(
+        var fourHeads = KhaytEngine.PrinterStatus(
                 state: "printing", progress: 61, progressSource: "layers", filename: "gear-set.gcode",
                 timeRemaining: 40 * 60, tempNozzle: 220, tempBed: 60, type: "moonraker",
                 loaded: [.init(slot: 0, hex: "#111111", material: "PLA SnapSpeed"),
                          .init(slot: 1, hex: "#F5F5F5", material: "PETG"),
-                         .init(slot: 2, hex: "#FF3B30", material: "PLA")]),
-            problem: nil, at: now))
+                         .init(slot: 2, hex: "#FF3B30", material: "PLA")])
+        fourHeads.heads = 4
+        shop.printers.setReadingForTesting("MACH-u1", PrinterWatch.Reading(status: fourHeads, problem: nil, at: now))
         await settle()
         if let u1 = shop.machines.first(where: { $0.id == "MACH-u1" }) {
             captureView(named: "floor-tile-heads\(tag)",

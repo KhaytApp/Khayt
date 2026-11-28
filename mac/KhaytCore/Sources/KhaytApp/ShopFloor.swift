@@ -2135,8 +2135,11 @@ private struct Live: View {
             // the filament TYPE under each (Turki, Nov 28: "show filament type
             // not color name"). From the status the card already holds, so the
             // tile never asks the printer anything of its own.
-            if let loaded = status.loaded, !loaded.isEmpty {
-                FloorHeads(loaded: loaded, words: shop.words)
+            // Only for a printer that says how many heads it has (Dev Hub,
+            // Nov 28): a single nozzle with an AMS gets no strip, because a
+            // tray is not a head, and its tray display is left as it was.
+            if let heads = status.heads, heads > 0 {
+                FloorHeads(heads: heads, loaded: status.loaded ?? [], words: shop.words)
             }
             // A SPOOL THAT RAN OUT, said on the card as well as in the alert.
             // Only `true` is drawn: false is a loaded head and nil is a machine
@@ -2210,9 +2213,11 @@ private struct Live: View {
 
 /// A printer's heads on its Shop floor tile (page 29, frame 2): one nozzle per
 /// head in its spool's colour, the head's number, and the filament TYPE under
-/// it ("PLA", "PETG"), never the colour's name or code. A head the printer
-/// reports nothing in is a dashed nozzle with only its number.
+/// it ("PLA", "PETG"), never the colour's name or code. As many nozzles as the
+/// printer has heads; a head it reports nothing in is a dashed nozzle with
+/// only its number.
 struct FloorHeads: View {
+    let heads: Int
     let loaded: [KhaytEngine.LoadedSlot]
     let words: Words
 
@@ -2222,9 +2227,8 @@ struct FloorHeads: View {
     }
 
     var body: some View {
-        let top = min(loaded.map(\.slot).max() ?? 0, 15)
         HStack(alignment: .top, spacing: 12) {
-            ForEach(0...max(0, top), id: \.self) { i in
+            ForEach(0..<min(max(heads, 1), 16), id: \.self) { i in
                 let slot = loaded.first { $0.slot == i }
                 VStack(spacing: 2) {
                     NozzleMark(hex: slot.map(\.hex))

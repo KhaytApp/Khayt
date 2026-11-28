@@ -20,7 +20,9 @@ struct FloorHeadsTests {
         let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
         let floor = try String(contentsOf: app.appending(path: "ShopFloor.swift"), encoding: .utf8)
-        #expect(floor.contains("FloorHeads(loaded: loaded, words: shop.words)"))
+        // Drawn only from the printer's own head count: no count, no strip.
+        #expect(floor.contains("if let heads = status.heads, heads > 0 {"))
+        #expect(floor.contains("FloorHeads(heads: heads, loaded: status.loaded ?? [], words: shop.words)"))
         let start = try #require(floor.range(of: "struct FloorHeads: View"))
         let mine = String(floor[start.lowerBound...])
         for never in ["machineHeads(", "PrinterWatch.get", "filament_detect", "slot.hex)"] {

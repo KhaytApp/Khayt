@@ -60,8 +60,18 @@ test('the query asks for what discovery found, encoded, and the bare list still 
 });
 
 test('a machine with no list reply discovers nothing rather than throwing', () => {
-  assert.deepEqual(M.discover(null), { sensors: [], chamber: null, headFans: [] });
-  assert.deepEqual(M.discover({ result: { objects: 'nope' } }), { sensors: [], chamber: null, headFans: [] });
+  assert.deepEqual(M.discover(null), { sensors: [], chamber: null, headFans: [], heads: null });
+  assert.deepEqual(M.discover({ result: { objects: 'nope' } }), { sensors: [], chamber: null, headFans: [], heads: null });
+});
+
+test('the head count is the toolheads the firmware lists, read with no request of its own', () => {
+  // extruder, extruder1..3: not extruder_offset_calibration, which is also listed.
+  assert.equal(M.discover(list).heads, 4);
+  assert.equal(M.readStatus(query, hot, 'extruder1', M.discover(list)).heads, 4);
+  // A single-head Klipper machine has one; a bare sensor list or no discovery says nothing.
+  assert.equal(M.discover({ result: { objects: ['extruder', 'heater_bed', 'print_stats'] } }).heads, 1);
+  assert.equal(M.readStatus(query, hot, 'extruder1', []).heads, null);
+  assert.equal(M.readStatus(query, hot, 'extruder1', null).heads, null);
 });
 
 test('the U1 idle: every richer field read from its own reply', () => {
