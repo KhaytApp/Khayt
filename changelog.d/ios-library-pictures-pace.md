@@ -1,0 +1,1 @@
+- **iPhone: keeping the library's pictures is gentler on the Mac.** On the shop's Wi-Fi the phone keeps a small copy of every library picture, at most twice a day. It now pauses briefly between two pictures instead of asking for hundreds back to back, and after two failed pictures in a row it leaves the Mac alone for ten minutes instead of trying again on the next check.

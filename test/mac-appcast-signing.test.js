@@ -182,10 +182,10 @@ test('both publish lanes sign the feed with the archive\'s key, check it twice, 
   }
 });
 
-test('the app does not REQUIRE a signed feed yet: that is the release after the first signed one', () => {
-  // Release N signs. Release N+1 requires. Requiring before a signed feed has been
-  // published and seen to work would cost every updated Mac its updates.
+test('the app REQUIRES a signed feed: release N (beta.43) signed it and a Mac updated through it; this is N+1', () => {
+  // From here on an unsigned feed strands every Mac with this build, so both
+  // publish lanes must keep signing and verifying it (the tests above).
   const script = fs.readFileSync(path.join(__dirname, '..', 'mac', 'make-app.sh'), 'utf8');
-  assert.ok(!script.includes('<key>SURequireSignedFeed</key>'));
+  assert.ok(script.includes('<key>SURequireSignedFeed</key><true/>'));
   assert.ok(script.includes('<key>SUVerifyUpdateBeforeExtraction</key><true/>'), 'Sparkle refuses SURequireSignedFeed without it');
 });

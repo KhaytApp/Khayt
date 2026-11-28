@@ -26,6 +26,8 @@ final class KhaytAPIClient: ObservableObject {
     /// phone with nothing to send and a phone that cannot send are different
     /// things, but neither has anything waiting.
     @Published private(set) var pendingCount = 0
+    /// What forgetting the shop's traces does (`forgetBookForFloorMode`); a test counts it.
+    var forgetTraces: () -> Void = { ShopTraces.forget() }
     /// The phone writes the paired Mac serves for THIS phone beyond its role's
     /// scopes (`can` on `/api/devices/self`): today `network-switch`. Empty
     /// until the Mac says so, signed; never kept between launches.
@@ -278,8 +280,29 @@ final class KhaytAPIClient: ObservableObject {
 
     func fetchStatus() async throws -> ShopStatus {
         if let local = await fromBook({ try await $0.status() }) { return local }
-        return try await get("/api/status?format=json", requiresPin: false, as: ShopStatus.self)
+        // A phone with no book (a floor phone) learns the shop's internet
+        // switch from this answer (#2640, H1). The Mac includes `network` only
+        // for a request whose device signature verified, and signs its answer
+        // with `x-khayt-reply-mac` over this nonce; the phone believes the
+        // block only when that verifies (`PhoneOutbound.StatusNetwork.read`).
+        if let device = usableDevice, let url = try? makeURL(path: Self.statusPath) {
+            let nonce = MacIdentity.nonce()
+            if let (data, response) = try? await send(url, method: "GET", body: nil, auth: .device(device), nonce: nonce),
+               let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+               let status = try? JSONDecoder().decode(ShopStatus.self, from: data) {
+                PhoneOutbound.statusAnswer(.read(device, nonce: nonce, status: http.statusCode, body: data,
+                                                 replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac")))
+                await CompanionCache.shared.store(status, for: Self.statusPath)
+                servingCachedSince = nil
+                return status
+            }
+            // Refused or unreadable: the plain read below, as before. Nothing
+            // it says touches the gate.
+        }
+        return try await get(Self.statusPath, requiresPin: false, as: ShopStatus.self)
     }
+
+    static let statusPath = "/api/status?format=json"
 
     func fetchQueue() async throws -> [QueueOrder] {
         if let local = await fromBook({ try await $0.queue() }) { return local }
@@ -622,6 +645,9 @@ final class KhaytAPIClient: ObservableObject {
         if settings.isConfigured, (try? await sendPendingChanges()) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
         }
+        // A phone moved to the floor kept its book only for unsent edits: once
+        // they are sent, it goes now rather than at the next round (M2).
+        followRole()
         var cloudDone = false
         if cloud != nil {
             // A refused round adopted nothing: the Mac's book still comes down.
@@ -1037,6 +1063,7 @@ final class KhaytAPIClient: ObservableObject {
         refreshHoldsBook()
         // Spotlight, the feed, the widgets, delivered alerts, shared papers.
         ShopTraces.forget()
+        floorTracesForgotten = false
         pendingCount = 0
         historyWindow = nil
         lastSync = nil
@@ -1781,6 +1808,13 @@ final class KhaytAPIClient: ObservableObject {
     /// When the Mac last failed to answer: for a minute after, the library
     /// goes straight to the phone's copy rather than wait on every letter typed.
     private var libraryMacDownSince: Date?
+    /// Whether the last picture asked of the Mac failed (no answer, or an
+    /// answer other than the picture or "it has none").
+    private var lastThumbFailed = false
+    /// The pause between two pictures while keeping the whole library.
+    static var picturePause: Duration = .milliseconds(100)
+    /// After two failed pictures in a row, the next try is this much later.
+    static let picturesRetry: TimeInterval = 600
 
     private func isMissingRoute(_ error: Error) -> Bool {
         if case KhaytAPIError.server(let said) = error { return said == L10n.tr("library.needs_mac") }
@@ -1822,6 +1856,7 @@ final class KhaytAPIClient: ObservableObject {
     /// (`LibraryThumbs`) for away from the shop. One the Mac sent within the
     /// day (its `max-age`) is not asked for again.
     func libraryThumb(id: String) async -> Data? {
+        lastThumbFailed = false
         if let hit = thumbs.object(forKey: id as NSString) { return hit as Data }
         let kept = await thumbShelf.get(id)
         func use(_ data: Data) -> Data { thumbs.setObject(data as NSData, forKey: id as NSString); return data }
@@ -1833,6 +1868,7 @@ final class KhaytAPIClient: ObservableObject {
         do {
             answer = try await request(path: "/api/library/\(encoded)/thumb", method: "GET", body: nil, requiresPin: true)
         } catch {
+            lastThumbFailed = true
             if Self.isUnreachable(error) { libraryMacDownSince = Date() }
             return kept.map { use($0.data) }
         }
@@ -1847,6 +1883,7 @@ final class KhaytAPIClient: ObservableObject {
             await thumbShelf.remove(id)
             return nil
         default:
+            lastThumbFailed = true
             return kept.map { use($0.data) }
         }
     }
@@ -1871,6 +1908,7 @@ final class KhaytAPIClient: ObservableObject {
         keepingPictures = true
         defer { keepingPictures = false }
         var fetched = 0
+        var failedInARow = 0
         var folders = [""], walked: Set<String> = [], pictured: Set<String> = []
         while let folder = folders.popLast() {
             guard walked.insert(folder).inserted else { continue }
@@ -1887,6 +1925,17 @@ final class KhaytAPIClient: ObservableObject {
                     if await libraryThumb(id: id) != nil { fetched += 1 }
                     // The Mac stopped answering: try again on the next visit.
                     if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60 { return fetched }
+                    // Two refusals in a row: the Mac is struggling, so leave
+                    // it be and come back in ten minutes, not on the next poll.
+                    failedInARow = lastThumbFailed ? failedInARow + 1 : 0
+                    if failedInARow >= 2 {
+                        defaults.set(now.addingTimeInterval(Self.picturesRetry - 12 * 3600), forKey: Self.picturesKeptAtKey)
+                        return fetched
+                    }
+                    // A short pause between pictures: a library of hundreds
+                    // was a burst of hundreds of requests on the Mac (U1 run,
+                    // Nov 27: 317 connections in 65 s).
+                    try? await Task.sleep(for: Self.picturePause)
                 }
                 offset += page.items.count
                 if page.items.isEmpty || offset >= page.total { break }
@@ -2492,6 +2541,23 @@ final class KhaytAPIClient: ObservableObject {
         }
     }
 
+    // MARK: - A signed question, a signed answer
+
+    /// One request to the paired Mac, signed by this phone, with whether the
+    /// Mac SIGNED its answer (`x-khayt-reply-mac` over this request's nonce).
+    /// For answers the phone shows as the shop's own facts: one nobody signed
+    /// is not believed. Nil with no device key, on the sample shop, or with
+    /// no answer.
+    func signedLanAnswer(path: String, method: String, body: Data? = nil) async -> (status: Int, body: Data, signed: Bool)? {
+        guard !settings.isSampleShop, let device = usableDevice, let url = try? makeURL(path: path) else { return nil }
+        let nonce = MacIdentity.nonce()
+        guard let (data, response) = try? await send(url, method: method, body: body, auth: .device(device), nonce: nonce),
+              let http = response as? HTTPURLResponse else { return nil }
+        let signed = DeviceKey.verifiesReply(device, nonce: nonce, status: http.statusCode, body: data,
+                                             replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+        return (http.statusCode, data, signed)
+    }
+
     // MARK: - A photo of the print, from this phone
 
     /// The Mac takes a job photo only from a phone it enrolled (signed), never
@@ -2829,7 +2895,9 @@ extension KhaytAPIClient {
         // The approved screen says which role first; its Continue marks the
         // phone paired (frame "Pair 2 · Approved").
         if markPaired { settings.isPaired = true }
-        if !settings.mayHoldBook { forgetBookForFloorMode() }
+        // A new pairing is a new demotion, if it is one: forget anything held.
+        floorTracesForgotten = false
+        followRole()
         return usableDevice == credential
     }
 
@@ -2857,8 +2925,8 @@ extension KhaytAPIClient {
               let (data, response) = try? await send(url, method: "GET", body: nil, auth: .device(credential),
                                                      nonce: nonce),
               let http = response as? HTTPURLResponse, http.statusCode == 200,
-              DeviceKey.replyVerifies(credential, nonce: nonce, status: 200, body: data,
-                                      header: http.value(forHTTPHeaderField: "x-khayt-reply-mac")),
+              DeviceKey.verifiesReply(credential, nonce: nonce, status: 200, body: data,
+                                      replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac")),
               case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: data) else { return nil }
         return o
     }
@@ -2885,8 +2953,8 @@ extension KhaytAPIClient {
         var outcome = PhoneNetworkSwitch.Outcome.failed
         if let (data, response) = try? await send(url, method: "POST", body: body, auth: .device(device), nonce: nonce),
            let http = response as? HTTPURLResponse {
-            let verified = DeviceKey.replyVerifies(device, nonce: nonce, status: http.statusCode, body: data,
-                                                   header: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
+            let verified = DeviceKey.verifiesReply(device, nonce: nonce, status: http.statusCode, body: data,
+                                                   replyMac: http.value(forHTTPHeaderField: "x-khayt-reply-mac"))
             outcome = PhoneNetworkSwitch.outcome(status: http.statusCode, body: data, verified: verified)
         }
         switch outcome {
@@ -2915,9 +2983,23 @@ extension KhaytAPIClient {
         guard settings.pairedByCode, let device = usableDevice,
               case .some(let role) = await deviceSelf(device) else { return }
         settings.deviceRole = role
-        if !settings.mayHoldBook { forgetBookForFloorMode() }
+        followRole()
     }
 
+    /// After the role may have changed: a floor phone forgets its book, and a
+    /// phone raised back to manager or owner may be demoted (and forget its
+    /// traces) again later.
+    func followRole() {
+        if settings.mayHoldBook { floorTracesForgotten = false } else { forgetBookForFloorMode() }
+    }
+
+    /// Whether the shop's traces were forgotten for the current demotion. Kept
+    /// on disk, so a relaunch while edits still wait does not wipe again.
+    nonisolated static let floorTracesForgottenKey = "khayt.floorTracesForgotten"
+    var floorTracesForgotten: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.floorTracesForgottenKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.floorTracesForgottenKey) }
+    }
     /// D-P6 a: an operator or viewer phone keeps no book, nor anything taken
     /// from one: the book with its rollback copy, the cached answers (clients,
     /// orders, stock), the library pictures and the shop's traces (Spotlight,
@@ -2927,12 +3009,24 @@ extension KhaytAPIClient {
         // Only on the way down (a book is held): a floor phone's own cached
         // answers are what it is allowed to see, and clearing them each round
         // would leave its screens blank offline.
-        guard settings.pairedByCode, !settings.mayHoldBook, !settings.isSampleShop, pendingCount == 0,
+        guard settings.pairedByCode, !settings.mayHoldBook, !settings.isSampleShop,
               holdsBookOnDisk || holdsBook else { return }
+        // What the book left behind outside it goes at once, edits waiting or
+        // not (M2): Spotlight, the feed and the widgets name customers, and a
+        // floor phone shows none of them. ONCE per demotion: while edits wait
+        // (a floor phone cannot send them: /api/store/deltas needs
+        // `book:write`), this runs every round, and each run would also
+        // delete the print alerts and reminders the phone has posted since.
+        if !floorTracesForgotten {
+            floorTracesForgotten = true
+            forgetTraces()
+        }
+        // The book itself waits for its edits to be sent, and goes the moment
+        // they are (`refreshEverywhere` asks again right after a send).
+        guard pendingCount == 0 else { return }
         book?.forget()
         Task { await CompanionCache.shared.clear() }
         Task { await LibraryThumbs.shared.clear() }
-        ShopTraces.forget()
         refreshHoldsBook()
     }
 

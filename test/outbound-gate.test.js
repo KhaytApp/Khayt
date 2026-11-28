@@ -177,20 +177,34 @@ test('the switch going on purges what was saved up before it (D5), once per chan
 test('PR 4: gateFor — a purpose, or lan for the shop\'s own network, resolved while offline', async () => {
   let settings = { network: { offline: true } };
   let answers = [{ address: '192.168.1.9' }];
-  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => ({}), lookup: async () => answers });
+  const looked = [];
+  const g = createOutboundGate({ getSettings: () => settings, readLocal: () => ({}), lookup: async (h) => { looked.push(h); return answers; } });
   await assert.rejects(g.gateFor('messaging', 'https://api.mailgun.net/'), (e) => isBlocked(e) && e.reason === 'offline');
-  // A self-hosted ntfy on the LAN, by name: resolved, every answer on the LAN.
-  assert.equal((await g.gateFor('messaging', 'http://ntfy.lan/topic')).allowed, true);
+  // A self-hosted ntfy on the LAN, by its .local (multicast DNS) name: resolved, every answer on the LAN.
+  assert.equal((await g.gateFor('messaging', 'http://ntfy.local/topic')).allowed, true);
   answers = [{ address: '192.168.1.9' }, { address: '93.184.216.34' }];
-  await assert.rejects(g.gateFor('messaging', 'http://ntfy.lan/topic'), (e) => isBlocked(e) && e.purpose === 'messaging' && e.reason === 'offline', 'one public answer: not the shop\'s network, so judged as messaging');
+  await assert.rejects(g.gateFor('messaging', 'http://ntfy.local/topic'), (e) => isBlocked(e) && e.purpose === 'messaging' && e.reason === 'offline', 'one public answer: not the shop\'s network, so judged as messaging');
   assert.equal(g.blocked().lan.reason, 'lan-host-public', 'and the lan refusal is counted');
+  // A name that only LOOKS local (.lan, .internal, one label) is never resolved for a
+  // purpose other than lan while offline: a unicast resolver can carry it upstream
+  // (review of 4.12.0, LOW-5). It is judged as the purpose it is.
+  looked.length = 0;
+  answers = [{ address: '192.168.1.9' }];
+  for (const url of ['http://ntfy.lan/topic', 'http://mail.internal/', 'http://octopi/']) {
+    await assert.rejects(g.gateFor('messaging', url), (e) => isBlocked(e) && e.purpose === 'messaging' && e.reason === 'offline', url);
+  }
+  assert.deepEqual(looked, [], 'no name went to the resolver');
+  // For lan itself (a printer by name), the name is still resolved and checked.
+  assert.equal((await g.gateFor('lan', 'http://octopi/')).allowed, true);
+  assert.deepEqual(looked, ['octopi']);
   answers = [];
-  await assert.rejects(g.gateFor('messaging', 'http://octopi/'), (e) => isBlocked(e), 'no answer: refused');
+  await assert.rejects(g.gateFor('lan', 'http://octopi/'), (e) => isBlocked(e), 'no answer: refused');
   // An IP literal on the LAN needs no lookup.
   assert.equal((await g.gateFor('webhooks', 'http://10.0.0.7:8080/hook')).allowed, true);
-  // Kept messaging still goes when the name leads outside (review of #2629).
+  // Kept messaging still goes, by any name (review of #2629).
   settings = { network: { offline: true, keep: ['messaging'] } };
   answers = [{ address: '93.184.216.34' }];
+  assert.equal((await g.gateFor('messaging', 'http://ntfy.local/topic')).reason, 'kept');
   assert.equal((await g.gateFor('messaging', 'http://ntfy.lan/topic')).reason, 'kept');
   // Online: no lookup at all, today's behaviour.
   settings = {};
@@ -261,6 +275,20 @@ test('review of #2629: an unreadable book holds back only the automatic calls ho
   const g = createOutboundGate({ getSettings: () => null, readLocal: () => ({}), bookUnreadable: () => true });
   for (const p of ['cloud', 'messaging', 'storage', 'ai', 'payments']) assert.equal(g.check(p).allowed, true, p);
   for (const p of ['updates', 'install-count', 'crash-reports', 'usage-stats']) assert.equal(g.check(p).reason, 'settings-unknown', p);
+});
+
+test('review of 4.12.0, MED-2: an unreadable book never overrides THIS computer\'s own offline switch', async () => {
+  const g = createOutboundGate({ getSettings: () => null, readLocal: () => ({ offline: true }), bookUnreadable: () => true });
+  // The integrations a person starts, the non-fetch transports among them (webhook-send's
+  // https.request, custom SMTP, the tunnel), and Khayt Cloud: none goes out.
+  for (const p of ['cloud', 'messaging', 'storage', 'ai', 'payments', 'webhooks', 'tunnel', 'storefront']) {
+    const r = g.check(p);
+    assert.deepEqual([r.allowed, r.reason], [false, 'offline-here'], p);
+    await assert.rejects(g.gateFor(p, 'https://example.com/x'), (e) => e.code === 'outbound.blocked' && e.reason === 'offline-here', p);
+  }
+  // And the same computer with its own switch off still lets the shop restore through Khayt Cloud.
+  const g2 = createOutboundGate({ getSettings: () => null, readLocal: () => ({}), bookUnreadable: () => true });
+  assert.equal(g2.check('cloud').allowed, true);
 });
 
 test('round 2 (Nov 22): only the owner changes the switch under the staff lock, the book\'s and this computer\'s', () => {

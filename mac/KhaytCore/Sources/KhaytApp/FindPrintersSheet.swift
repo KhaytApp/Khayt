@@ -174,12 +174,17 @@ struct FindPrintersSheet: View {
     /// "Seen 2 hours ago. It may be asleep or busy." or, for a printer whose
     /// address moved, "Seen yesterday, at another address before: 192.168.1.50".
     @MainActor static func seen(_ find: EarlierFind, now: Date, words: Words) -> String {
-        // How long ago, as of `now`, said from the present: a relative style
-        // has no "as of", so the same span is laid back from this instant.
+        // How long ago, AS OF `now`. This used to lay the span back from the
+        // real clock (`Date()`) and format that, and the named style counts
+        // calendar days: 26 hours read "yesterday" by day and "2 days ago" just
+        // after midnight, so the same sighting changed words with the time of
+        // night (a test failed every run between 00:00 and 02:00, Nov 28).
         // Never "in 3 seconds": a clock that moved does not put a sighting in the future.
-        let ago = max(0, now.timeIntervalSince(find.lastSeen))
-        let when = Date().addingTimeInterval(-ago)
-            .formatted(Date.RelativeFormatStyle(presentation: .named, unitsStyle: .wide).locale(words.locale))
+        // Anchored at the sighting and formatted FROM `now`, in the shop's
+        // locale (Digits), so the words depend on the two dates and nothing else.
+        let when = Date.AnchoredRelativeFormatStyle(anchor: min(find.lastSeen, now), presentation: .named, unitsStyle: .wide)
+            .locale(words.locale)
+            .format(now)
         if let was = find.previousHost {
             return words.callIt("mac.find_seen_moved", ["when": .string(when), "host": .string(was)])
         }

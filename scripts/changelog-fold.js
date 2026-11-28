@@ -42,6 +42,9 @@ function entryLines(text) {
  * @returns {string} the file with every fragment's lines at the top of [Unreleased]
  */
 function fold(changelog, fragments) {
+  // A Windows clone (core.autocrlf) checks CHANGELOG.md out with CRLF: fold the
+  // LF text and give the file back in its own line endings (review of 4.12.0, L4).
+  if (/\r\n/.test(String(changelog))) return fold(String(changelog).replace(/\r\n/g, '\n'), fragments).replace(/\n/g, '\r\n');
   const src = String(changelog);
   const list = (Array.isArray(fragments) ? fragments : []).map((f) => entryLines(f && f.text)).filter((l) => l.length);
   if (!list.length) return src;

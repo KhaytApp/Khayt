@@ -380,6 +380,18 @@ struct MachineSheet: View {
                         .fixedSize()
                     }
                 }
+                // WHAT EACH HEAD HOLDS, for a printer that CAN say (a Snapmaker
+                // U1's spool tags, or its own word for what is loaded), and
+                // which of the shop's spools that is (page 25, frames 1 and 2).
+                // It shows nothing for a printer that reports neither. Its
+                // buttons write at once, apart from this sheet's Save: a link
+                // is a note on the machine, not an edit of the form.
+                if let existing, existing.printerApi?.type == "moonraker" {
+                    GridRow(alignment: .top) {
+                        Text(shop.words.callIt("mach.heads_title")).foregroundStyle(.secondary)
+                        MachineHeadsSection(shop: shop, machineId: existing.id)
+                    }
+                }
                 // WHAT IS LOADED, for a printer that cannot say. The library's
                 // "Ready on" chip reads it; a printer that reports its spools
                 // (a U1) is read instead, so for those this is only a fallback.

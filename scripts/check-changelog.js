@@ -155,9 +155,11 @@ function headingOf(line) {
  *
  * @param {string} diff   `git diff <base>...HEAD -- CHANGELOG.md`, unified.
  * @param {string} after  the file as the PR leaves it.
+ * @param {string} [before]  the file on the base. With it, an entry reworded
+ *                  in place in a shipped section is not an addition.
  * @returns {{ok: boolean, misplaced: Array<{section: string, text: string}>}}
  */
-function placement(diff, after) {
+function placement(diff, after, before) {
   const lines = String(after || '').split('\n');
 
   // Which section each line of the new file belongs to.
@@ -169,34 +171,59 @@ function placement(diff, after) {
     sectionAt.push(current);
   }
 
-  // Walk the diff's hunks, tracking the line number in the NEW file.
-  const addedBullets = [];   // {lineNo, text}
+  // The OLD file's sections too, when the caller has it: a reworded entry is
+  // a removed line and an added one, and only the old file says where the
+  // removed one was (review of the 4.12.0 notes, Nov 26).
+  const oldSectionAt = [];
+  if (typeof before === 'string') {
+    let cur = null;
+    for (const line of before.split('\n')) { const n = headingOf(line); if (n) cur = n; oldSectionAt.push(cur); }
+  }
+
+  // Walk the diff's hunks, tracking the line number in the NEW file (and the OLD one).
+  const addedBullets = [];   // {lineNo, text, hunk}
+  const removedBullets = []; // {section, hunk, used}
   const addedSections = new Set();
   let lineNo = 0;
+  let oldNo = 0;
+  let hunkNo = -1;
   for (const raw of String(diff || '').split('\n')) {
-    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
-    if (hunk) { lineNo = Number(hunk[1]) - 1; continue; }
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
+    if (hunk) { oldNo = Number(hunk[1]) - 1; lineNo = Number(hunk[2]) - 1; hunkNo += 1; continue; }
     if (raw.startsWith('+++') || raw.startsWith('---')) continue;
     if (raw.startsWith('+')) {
       lineNo += 1;
       const text = raw.slice(1);
       const name = headingOf(text);
       if (name) { addedSections.add(name); continue; }
-      if (text.startsWith('- ')) addedBullets.push({ lineNo, text });
+      if (text.startsWith('- ')) addedBullets.push({ lineNo, text, hunk: hunkNo });
       continue;
     }
-    if (raw.startsWith('-')) continue;       // gone from the new file
-    if (raw.startsWith(' ')) { lineNo += 1; continue; }
+    if (raw.startsWith('-')) {               // gone from the new file
+      oldNo += 1;
+      if (raw.slice(1).startsWith('- ') && oldSectionAt.length) {
+        removedBullets.push({ section: oldSectionAt[oldNo - 1], hunk: hunkNo, used: false });
+      }
+      continue;
+    }
+    if (raw.startsWith(' ')) { lineNo += 1; oldNo += 1; continue; }
   }
 
   const misplaced = [];
-  for (const { lineNo: n, text } of addedBullets) {
+  for (const { lineNo: n, text, hunk } of addedBullets) {
     const section = sectionAt[n - 1];
     // Above the first heading, or in a file with none: not this rule's business.
     if (!section) continue;
     if (section === 'Unreleased') continue;
     // A release cut writes the section and its entries together.
     if (addedSections.has(section)) continue;
+    // A shipped entry REWORDED in place: the hunk also removes a bullet that
+    // was in this same section in the old file. One added line per removed
+    // one, so a new entry slipped in beside a rewording still counts. An
+    // entry MOVED from [Unreleased] pairs with nothing (its removed line was
+    // in another section), which is the case this rule exists for.
+    const pair = removedBullets.find((r) => !r.used && r.hunk === hunk && r.section === section);
+    if (pair) { pair.used = true; continue; }
     misplaced.push({ section, text: text.slice(0, 90) });
   }
   return { ok: misplaced.length === 0, misplaced };
@@ -224,21 +251,53 @@ function releaseSignals(d) {
   return out;
 }
 
+/**
+ * Fragments removed by a PR whose entries are not in the CHANGELOG.md it
+ * leaves. An entry is found by its bold title (`- **Title.**`), so a cut that
+ * fixes a typo in an entry's body still passes; a bullet with no bold title
+ * must be there as written. A fragment with no entry lines is not lost.
+ *
+ * @param {Array<{name: string, text: string}>} removed  each fragment as it was on the base
+ * @param {string} changelog  CHANGELOG.md as the PR leaves it
+ * @returns {string[]} names of the fragments whose entries went nowhere
+ */
+function lostFragments(removed, changelog) {
+  const file = String(changelog || '');
+  const out = [];
+  for (const f of Array.isArray(removed) ? removed : []) {
+    const bullets = String((f && f.text) || '').replace(/\r\n/g, '\n').split('\n').filter((l) => l.startsWith('- ') && l.trim().length > 2);
+    const found = bullets.every((l) => {
+      const title = /^- (\*\*.+?\*\*)/.exec(l);
+      return title ? file.includes(`- ${title[1]}`) : file.split('\n').includes(l);
+    });
+    if (!found) out.push(f.name);
+  }
+  return out;
+}
+
 /** Everything in changelog.d/ but its README: the one rule for "waiting" (the fold's --check and cut-release.yml say the same). */
 function waitingFragments(names) {
   return (Array.isArray(names) ? names : []).map(String).filter((n) => n && n !== 'README.md').sort();
 }
 
-module.exports = { verdict, isWatched, WATCHED, OVERRIDE, CHANGELOG, placement, checkFragment, isFragmentPath, FRAGMENT_DIR, releaseSignals, waitingFragments };
+module.exports = { verdict, isWatched, WATCHED, OVERRIDE, CHANGELOG, placement, checkFragment, isFragmentPath, FRAGMENT_DIR, releaseSignals, waitingFragments, lostFragments };
 
 if (require.main === module) {
   const { execFileSync } = require('child_process');
   const fs = require('fs');
   const path = require('path');
-  const base = process.env.BASE_REF || process.argv[2] || 'main';
+  // In the merge queue each queued PR is one squash commit on top of those
+  // ahead of it, and each gets its own group run. The release rule is about THIS
+  // PR, so it is judged against its own parent: a fragment PR queued behind a
+  // release PR otherwise saw the release ahead of it, counted its own fragment as
+  // left over and was ejected (review of 4.12.0, L2). The release PR's own group
+  // run still sees every fragment in the tree it will merge.
+  const base = process.env.CHANGELOG_CHECK_SCOPE === 'release' ? 'HEAD^1' : (process.env.BASE_REF || process.argv[2] || 'main');
   // From the repo root whatever the cwd, and paths exactly as written (no
   // octal quoting of a non-ASCII name, which would hide it from the rules).
-  const sh = (args) => execFileSync('git', ['-c', 'core.quotePath=false', ...args], { encoding: 'utf8', cwd: TOP });
+  // maxBuffer: CHANGELOG.md is over 2 MB, past execFileSync's 1 MB default, and
+  // a read that overflowed was caught below as "not checked" (Nov 26).
+  const sh = (args) => execFileSync('git', ['-c', 'core.quotePath=false', ...args], { encoding: 'utf8', cwd: TOP, maxBuffer: 256 * 1024 * 1024 });
   const TOP = (() => { try { return execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim(); } catch (_) { return process.cwd(); } })();
   const nul = (s) => String(s || '').split('\0').filter(Boolean);
 
@@ -274,8 +333,10 @@ if (require.main === module) {
   // A RELEASE PR must carry every entry its tag will carry. A fragment that
   // lands while the release PR's CI runs comes in with the rebase, with no
   // conflict; caught only at tag time, it could be filed nowhere but
-  // [Unreleased] (the placement rule) and missed its release. Here, under the
-  // strict rule, the checked tree IS the merged tree (review of #2706).
+  // [Unreleased] (the placement rule) and missed its release. The tree that
+  // will merge is checked here: the PR's own under `strict`, and since the
+  // merge queue (Nov 26) the queue's run as well, which sees every PR ahead of
+  // this one (review of #2706; ci.yml runs this on merge_group).
   if (releasing.length && leftover.length) {
     process.stderr.write(
       `\nchangelog check failed — this is a release (${releasing.join('; ')}), and ${FRAGMENT_DIR}/ still ` +
@@ -285,14 +346,30 @@ if (require.main === module) {
     process.exit(1);
   }
 
+  // In the merge queue only the release rule above can change between the
+  // PR's own run and the merge (another PR's fragment landing ahead). The rest
+  // was decided on the PR, and the queue's commits do not carry the PR's own
+  // messages, so a "[no changelog]" there would read as missing and stall the
+  // queue for a PR that was right.
+  if (process.env.CHANGELOG_CHECK_SCOPE === 'release') {
+    process.stdout.write(`changelog check ok — merge queue: ${releasing.length ? 'a release with no fragments waiting' : 'not a release'}\n`);
+    process.exit(0);
+  }
+
   // Only the fold removes a fragment that is already on main, and the fold
   // writes its lines into CHANGELOG.md in the same PR. Anything else that
   // removes one (or renames, or rewrites-and-renames it) drops another PR's
-  // entry before any release could carry it.
-  if (deleted.length && !files.includes(CHANGELOG)) {
+  // entry before any release could carry it. Touching CHANGELOG.md is not
+  // proof of a fold (a "Before you update" item goes there too): each removed
+  // fragment's entries must be IN the file this PR leaves (review of 4.12.0, L3).
+  const lost = deleted.length ? lostFragments(
+    deleted.map((f) => { let text = ''; try { text = sh(['show', `${base}:${f}`]); } catch (_) { /* unreadable: counts as lost */ } return { name: f, text }; }),
+    (() => { try { return fs.readFileSync(path.join(TOP, CHANGELOG), 'utf8'); } catch (_) { return ''; } })(),
+  ) : [];
+  if (lost.length) {
     process.stderr.write(
-      `\nchangelog check failed — this removes ${deleted.length === 1 ? 'an entry' : 'entries'} another pull request wrote, ` +
-      `and puts ${deleted.length === 1 ? 'it' : 'them'} nowhere:\n\n` + deleted.map((f) => `  ${f}\n`).join('') +
+      `\nchangelog check failed — this removes ${lost.length === 1 ? 'an entry' : 'entries'} another pull request wrote, ` +
+      `and puts ${lost.length === 1 ? 'it' : 'them'} nowhere in ${CHANGELOG}:\n\n` + lost.map((f) => `  ${f}\n`).join('') +
       `\nWrite your own entry in a new file of yours, and leave these as they are. Only the\n` +
       `release cut removes them, by folding them into ${CHANGELOG} (npm run changelog:fold).\n`
     );
@@ -326,7 +403,10 @@ if (require.main === module) {
     let where = { ok: true, misplaced: [] };
     try {
       const diff = sh(['diff', '--unified=3', `${base}...HEAD`, '--', CHANGELOG]);
-      where = placement(diff, fs.readFileSync(path.join(TOP, CHANGELOG), 'utf8'));
+      // The old side of `base...HEAD` is the merge base's file.
+      let before;
+      try { before = sh(['show', `${sh(['merge-base', base, 'HEAD']).trim()}:${CHANGELOG}`]); } catch (_) { before = undefined; }
+      where = placement(diff, fs.readFileSync(path.join(TOP, CHANGELOG), 'utf8'), before);
     } catch (e) {
       process.stdout.write(`changelog placement not checked — ${(e && e.message) || e}\n`);
     }

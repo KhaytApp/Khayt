@@ -1578,7 +1578,7 @@
 "lock.after.1" = "1 分钟后";
 "lock.after.5" = "5 分钟后";
 "lock.after.15" = "15 分钟后";
-"lock.foot" = "店主和经理的手机默认开启。Khayt 启动时，以及在后台停留超过上述时间后，需用 Face ID 或这部 iPhone 的密码打开。无论哪种情况，账本都保留在手机上。";
+"lock.foot" = "店主和经理的手机默认开启。Khayt 启动时，以及在后台停留超过上述时间后，需用 Face ID 或这部 iPhone 的密码打开。无论哪种情况，账本都保留在手机上。Khayt 锁定时，Siri、快捷指令以及打印提醒和实时活动上的按钮仍可使用：由这部 iPhone 自身的锁保护。";
 "lock.no_passcode" = "这部 iPhone 没有设置密码，因此 Khayt 无法锁定。请在 iPhone 的设置中设置密码。";
 "lock.floor.title" = "无需锁定";
 "lock.floor.body" = "这是一部车间手机：它不保存店铺账本的副本，因此没有需要锁定的内容。连接店铺 Wi-Fi 时，它显示队列和打印机。";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "解锁";
 "lock.use_passcode" = "使用密码";
 "lock.reason" = "解锁 Khayt 以查看你的店铺。";
+"lock.reason.change" = "请验证身份以更改 Khayt 锁定。";
 "alert.print.a_print" = "一次打印";
 "intake.remind.alert.hidden" = "有一个客户请求在等待你的答复。";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
@@ -1637,3 +1638,33 @@
 "printer.why.read_only" = "Mac 正在显示示例店铺，无法更改。";
 "printer.why.not_saved" = "Mac 暂时无法保存。请重试。";
 "printer.why.role" = "这部手机的角色不能执行此操作。请询问店主。";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "已配对的手机";
+"owner.phones.this" = "%@（本机）";
+"owner.phones.unnamed" = "一部手机";
+"owner.phones.by_pin" = "通过 PIN 配对";
+"owner.phones.by_code" = "通过数字配对";
+"owner.phones.seen" = "最近出现 %@";
+"owner.phones.now" = "刚刚";
+"owner.phones.yesterday" = "昨天";
+"owner.phones.foot" = "角色设置和移除手机在你的 Mac 上进行（设置 › 手机与 Wi-Fi）。仅在店铺 Wi-Fi 下向店主显示。";
+"owner.role.owner" = "店主";
+"owner.role.manager" = "经理";
+"owner.role.operator" = "操作员";
+"owner.role.viewer" = "查看者";
+"owner.prices.title" = "切片软件中的价格";
+"owner.prices.switch" = "在切片软件中显示价格";
+"owner.prices.switch.sub" = "在你的 Mac 上设置";
+"owner.prices.may" = "可以查看价格";
+"owner.prices.hidden" = "价格已隐藏";
+"owner.prices.allowed" = "允许";
+"owner.prices.not_allowed" = "不允许";
+"owner.prices.unnamed" = "一个切片软件";
+"owner.prices.foot" = "哪个切片软件可以查看店铺价格由店主在 Mac 上决定。手机仅作显示。";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "成功率";
+"success.window" = "%@ · 最近 30 天";
+"success.counts" = "%1$d 次完成，%2$d 次失败";
+"success.cancelled" = "%d 次取消不计入";
+"success.not_enough" = "打印次数还不够：需要 %2$d 次，已有 %1$d 次";
