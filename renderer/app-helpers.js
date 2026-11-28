@@ -658,6 +658,41 @@ function openActivityLog() {
 }
 
 
+
+/* ============================================================
+   A spool's colour, in words (Turki, Nov 27: "dont want the color code,
+   the actual color showing, and color name if known").
+   ============================================================ */
+/**
+ * The words for a spool's colour, in the window's language: the spool's own
+ * name (the catalogue's `colourVariant`, a tag's `colorName`) when it has
+ * one, else the nearest everyday name (lib/colour-name.js), else ''. Never a
+ * hex code. `spool` may also be `{ hex, known }`.
+ */
+function spoolColourWord(spool) {
+  if (!spool || typeof spool !== 'object') return '';
+  const hex = spool.hex != null ? spool.hex : spool.color;
+  const known = spool.known != null ? spool.known : (spool.colourVariant || spool.colorName || '');
+  const CN = (typeof globalThis !== 'undefined' && globalThis.KhaytColourName)
+    || (typeof require === 'function' ? (() => { try { return require('../lib/colour-name.js'); } catch (_) { return null; } })() : null);
+  const lang = (typeof i18n !== 'undefined' && i18n && i18n.current) || 'en';
+  const k = typeof known === 'string' ? known.trim() : '';
+  if (!CN) return k && !/^#?[0-9a-f]{6}$/i.test(k) ? k : '';
+  return CN.colourName(hex, lang, { known: k }) || '';
+}
+
+/**
+ * A colour swatch with an outline, so white, black and a colour close to the
+ * page's own stay visible. Hidden from screen readers: the colour's NAME next
+ * to it is what is read, never its code.
+ */
+function colourSwatchHtml(hex, size) {
+  const s = Number(size) > 0 ? Number(size) : 10;
+  const bg = typeof safeCssColor === 'function' ? safeCssColor(hex, '#888888') : '#888888';
+  return `<span class="colour-swatch" aria-hidden="true" style="display:inline-block;width:${s}px;height:${s}px;border-radius:50%;background:${bg};`
+    + 'box-shadow:0 0 0 1px var(--border-strong, rgba(127,127,127,0.6));flex-shrink:0;vertical-align:middle;"></span>';
+}
+
 (function (global) {
   const api = {
     logActivity,
@@ -695,44 +730,13 @@ function openActivityLog() {
     wouldExceedWipLimit,
     toArabicNumerals,
     hijriDate,
+    // A spool's colour by name, never its code (lib/colour-name.js).
+    spoolColourWord,
+    colourSwatchHtml,
   };
   Object.assign(global, api);
   global.KhaytAppHelpers = api;
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ...api, customRangeFrom, customRangeTo, DAY_KEYS, spoolColourWord, colourSwatchHtml };
+    module.exports = { ...api, customRangeFrom, customRangeTo, DAY_KEYS };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : window);
-
-/* ============================================================
-   A spool's colour, in words (Turki, Nov 27: "dont want the color code,
-   the actual color showing, and color name if known").
-   ============================================================ */
-/**
- * The words for a spool's colour, in the window's language: the spool's own
- * name (the catalogue's `colourVariant`, a tag's `colorName`) when it has
- * one, else the nearest everyday name (lib/colour-name.js), else ''. Never a
- * hex code. `spool` may also be `{ hex, known }`.
- */
-function spoolColourWord(spool) {
-  if (!spool || typeof spool !== 'object') return '';
-  const hex = spool.hex != null ? spool.hex : spool.color;
-  const known = spool.known != null ? spool.known : (spool.colourVariant || spool.colorName || '');
-  const CN = (typeof globalThis !== 'undefined' && globalThis.KhaytColourName)
-    || (typeof require === 'function' ? (() => { try { return require('../lib/colour-name.js'); } catch (_) { return null; } })() : null);
-  const lang = (typeof i18n !== 'undefined' && i18n && i18n.current) || 'en';
-  const k = typeof known === 'string' ? known.trim() : '';
-  if (!CN) return k && !/^#?[0-9a-f]{6}$/i.test(k) ? k : '';
-  return CN.colourName(hex, lang, { known: k }) || '';
-}
-
-/**
- * A colour swatch with an outline, so white, black and a colour close to the
- * page's own stay visible. Hidden from screen readers: the colour's NAME next
- * to it is what is read, never its code.
- */
-function colourSwatchHtml(hex, size) {
-  const s = Number(size) > 0 ? Number(size) : 10;
-  const bg = typeof safeCssColor === 'function' ? safeCssColor(hex, '#888888') : '#888888';
-  return `<span class="colour-swatch" aria-hidden="true" style="display:inline-block;width:${s}px;height:${s}px;border-radius:50%;background:${bg};`
-    + 'box-shadow:0 0 0 1px var(--border-strong, rgba(127,127,127,0.6));flex-shrink:0;vertical-align:middle;"></span>';
-}
