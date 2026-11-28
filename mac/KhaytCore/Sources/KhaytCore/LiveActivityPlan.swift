@@ -139,12 +139,17 @@ public enum LiveActivityPlan {
     /// stream never goes stale while the printer is still printing.
     public static let refreshAfter: TimeInterval = 4 * 60
 
-    /// The `staleAt` a state carries: its own finish, or `staleWindow` from
-    /// now, whichever is sooner.
+    /// The `staleAt` a state carries: `staleWindow` from now, or, when the
+    /// print has a finish estimate, whichever is LATER of that and the finish.
+    /// A Mac that goes quiet mid-print (asleep, off) used to make the card
+    /// stale five minutes after its last push while the finish was still
+    /// ahead, so iOS never redrew it and it froze at 0:00, and the phone's
+    /// "Should be done — open Khayt" state at the finish never showed (Nov 28).
+    /// The phone's own PrintActivityPlan already uses the later of the two.
     public static func staleAt(_ state: State, now: Date) -> Date {
         let window = now.addingTimeInterval(staleWindow)
         guard let ends = state.endsAt else { return window }
-        return min(ends, window)
+        return max(ends, window)
     }
 
     /// The same state sent again, when nothing a person would notice changed

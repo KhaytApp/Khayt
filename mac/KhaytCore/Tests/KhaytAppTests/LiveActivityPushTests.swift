@@ -69,9 +69,10 @@ struct LiveActivityPushTests {
         let encoded = String(decoding: try JSONEncoder().encode(JSONValue.object(start)), as: UTF8.self)
         #expect(encoded.contains("\"progress\":42") && !encoded.contains("42."), Comment(rawValue: encoded))
         #expect(state["startedAt"] == .string("2026-08-29T10:40:00Z"))
-        // Five minutes, not the print's finish an hour away: a stream that
-        // stops goes stale on the phone within that (push review M1).
-        #expect(start["staleAt"] == .string("2026-08-29T10:45:00Z"))
+        // The print's finish an hour away, not five minutes: a Mac that goes
+        // quiet leaves the card live until the finish, where the phone shows
+        // "Should be done" itself (Nov 28; was five minutes, push review M1).
+        #expect(start["staleAt"] == .string("2026-08-29T11:40:00Z"))
         // When it happened on the Mac, in Unix seconds (push review C3).
         #expect(start["at"] == .number(1_788_000_000))
 
@@ -92,8 +93,12 @@ struct LiveActivityPushTests {
     func staleAndRefresh() {
         let none = LiveActivityPlan.State(phase: .printing, job: "a.gcode", progress: 10, startedAt: Self.now, endsAt: nil)
         #expect(LiveActivityPlan.staleAt(none, now: Self.now) == Self.now.addingTimeInterval(300))
+        // A finish sooner than the window: still the window, so a late print stays live.
         var soon = none; soon.endsAt = Self.now.addingTimeInterval(60)
-        #expect(LiveActivityPlan.staleAt(soon, now: Self.now) == Self.now.addingTimeInterval(60))
+        #expect(LiveActivityPlan.staleAt(soon, now: Self.now) == Self.now.addingTimeInterval(300))
+        // The last push 40 minutes before the finish carries the finish.
+        var later = none; later.endsAt = Self.now.addingTimeInterval(40 * 60)
+        #expect(LiveActivityPlan.staleAt(later, now: Self.now) == Self.now.addingTimeInterval(40 * 60))
         let body = LiveActivityPush.body(.update(machineId: "m1", none), now: Self.now)
         #expect(body["staleAt"] == .string("2026-08-29T10:45:00Z"), "an update with no finish has no staleAt")
 
