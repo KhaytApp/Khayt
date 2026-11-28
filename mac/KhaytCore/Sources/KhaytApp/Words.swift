@@ -5782,6 +5782,8 @@ final class Words {
                                       "ar": "لا شيء استجاب في الشبكة."],
         "mac.moved_not_now": ["en": "Not now", "ar": "ليس الآن"],
         "mac.heads_reading": ["en": "Reading the printer…", "ar": "جارٍ القراءة من الطابعة…"],
+        "mac.heads_empty": ["en": "Empty", "ar": "فارغ"],
+        "mac.heads_not_in_printer": ["en": "Not in the printer now", "ar": "ليست في الطابعة الآن"],
         "mac.heads_unread": ["en": "Couldn’t read the printer. Check that it is on and connected, then open this again.",
                              "ar": "تعذّرت القراءة من الطابعة. تأكّد أنها تعمل ومتصلة، ثم افتح هذا مرة أخرى."],
         "mac.moved_why_serial": ["en": "The printer there reported this machine's serial number.",

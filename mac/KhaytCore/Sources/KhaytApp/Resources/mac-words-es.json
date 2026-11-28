@@ -4216,6 +4216,8 @@
  "mac.mbh_overdue": "Atrasado · vencía el {date}",
  "mac.moved_not_now": "Ahora no",
  "mac.heads_reading": "Leyendo la impresora…",
+ "mac.heads_empty": "Vacío",
+ "mac.heads_not_in_printer": "Ya no está en la impresora",
  "mac.heads_unread": "No se pudo leer la impresora. Comprueba que esté encendida y conectada y vuelve a abrir esto.",
  "mac.moved_dhcp_hint": "Khayt buscó en la red y no encontró esta impresora en otra dirección. Si su dirección cambia a menudo, dale una fija (una reserva DHCP) en el router.",
  "mac.moved_why_serial": "La impresora en esa dirección informó el número de serie de esta máquina.",

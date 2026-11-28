@@ -115,6 +115,9 @@ extension KhaytEngine {
         /// What "Add as a new spool" would add. Only from a TAG: a printer's own
         /// word for what is loaded is not enough to make a spool from.
         public let prefill: Prefill?
+        /// The head's own nozzle size, when the printer reports it per extruder; nil
+        /// today (the machine's is used). A data change, not a redesign, when it does.
+        public var nozzleMm: Double? = nil
         public var id: Int { head }
     }
 

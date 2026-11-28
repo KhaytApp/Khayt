@@ -4216,6 +4216,8 @@
  "mac.mbh_overdue": "En retard · était à rendre le {date}",
  "mac.moved_not_now": "Pas maintenant",
  "mac.heads_reading": "Lecture de l’imprimante…",
+ "mac.heads_empty": "Vide",
+ "mac.heads_not_in_printer": "Plus dans l’imprimante",
  "mac.heads_unread": "Impossible de lire l’imprimante. Vérifiez qu’elle est allumée et connectée, puis rouvrez ceci.",
  "mac.moved_dhcp_hint": "Khayt a cherché sur le réseau et n'a pas trouvé cette imprimante à une autre adresse. Si son adresse change souvent, donnez-lui une adresse fixe (une réservation DHCP) dans votre routeur.",
  "mac.moved_why_serial": "L'imprimante à cette adresse a donné le numéro de série de cette machine.",

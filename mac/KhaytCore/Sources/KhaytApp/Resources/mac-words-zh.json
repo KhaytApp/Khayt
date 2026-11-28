@@ -4216,6 +4216,8 @@
  "mac.mbh_overdue": "已逾期 · 原定 {date} 到期",
  "mac.moved_not_now": "暂不",
  "mac.heads_reading": "正在读取打印机…",
+ "mac.heads_empty": "空",
+ "mac.heads_not_in_printer": "目前不在打印机中",
  "mac.heads_unread": "无法读取打印机。请确认它已开机并已连接，然后重新打开此处。",
  "mac.moved_dhcp_hint": "Khayt 在网络上查找过，但没有在其他地址找到这台打印机。如果它的地址经常变化，请在路由器里给它分配固定地址（DHCP 保留）。",
  "mac.moved_why_serial": "该地址的打印机报告了这台机器的序列号。",

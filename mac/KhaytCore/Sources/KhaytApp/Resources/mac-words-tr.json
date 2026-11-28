@@ -4216,6 +4216,8 @@
  "mac.mbh_overdue": "Gecikti · teslim tarihi {date} idi",
  "mac.moved_not_now": "Şimdi değil",
  "mac.heads_reading": "Yazıcı okunuyor…",
+ "mac.heads_empty": "Boş",
+ "mac.heads_not_in_printer": "Şu an yazıcıda değil",
  "mac.heads_unread": "Yazıcı okunamadı. Açık ve bağlı olduğunu kontrol edin, sonra bunu yeniden açın.",
  "mac.moved_dhcp_hint": "Khayt ağda aradı ve bu yazıcıyı başka bir adreste bulamadı. Adresi sürekli değişiyorsa, yönlendiricide ona sabit bir adres (DHCP rezervasyonu) verin.",
  "mac.moved_why_serial": "Oradaki yazıcı bu makinenin seri numarasını bildirdi.",

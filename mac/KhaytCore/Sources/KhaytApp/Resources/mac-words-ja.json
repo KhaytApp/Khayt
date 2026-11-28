@@ -4216,6 +4216,8 @@
  "mac.mbh_overdue": "期限切れ · 納期は {date} でした",
  "mac.moved_not_now": "今はしない",
  "mac.heads_reading": "プリンターを読み取っています…",
+ "mac.heads_empty": "空",
+ "mac.heads_not_in_printer": "今はプリンターにありません",
  "mac.heads_unread": "プリンターを読み取れませんでした。電源が入って接続されているか確認してから、もう一度開いてください。",
  "mac.moved_dhcp_hint": "Khayt はネットワークを探しましたが、このプリンターを別のアドレスで見つけられませんでした。アドレスが変わり続ける場合は、ルーターで固定アドレス（DHCP 予約）を割り当ててください。",
  "mac.moved_why_serial": "そのアドレスのプリンターが、この機械のシリアル番号を返しました。",

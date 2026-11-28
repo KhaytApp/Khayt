@@ -53,6 +53,25 @@ extension Shop {
         return nil
     }
 
+    /// The machine's own nozzle size, for heads that report none.
+    func headsMachineNozzle(_ machineId: String) -> Double? {
+        headsMachine(machineId)?.machine.nozzleDiameter
+    }
+
+    /// Each head's colour in words, by the shared rule (`lib/colour-name.js`):
+    /// the linked spool's own colour name first, else the nearest everyday
+    /// name in the shop's language, else none (the nozzle alone). Never a code.
+    func headColourNames(_ rows: [KhaytEngine.HeadRow]) async -> [Int: String] {
+        guard let engine else { return [:] }
+        var out: [Int: String] = [:]
+        for row in rows where !row.hex.isEmpty {
+            var known: String?
+            if let spool = row.spoolId.flatMap({ headSpool($0) }), case .string(let v)? = spool["colourVariant"] { known = v }
+            if let name = try? await engine.colourName(hex: row.hex, lang: words.language, known: known) { out[row.head] = name }
+        }
+        return out
+    }
+
     /// What the book says this machine holds, head by head, as text: the
     /// section re-reads when it changes, so a spool linked from a phone shows
     /// without reopening the sheet. From `lanRestBook`, which is observed and
@@ -199,6 +218,48 @@ enum HeadWords {
         return (words.callIt("mach.heads_not_linked"), false)
     }
 
+    /// What a head is, for how it is drawn (page 29, the Head states).
+    enum State: Equatable { case linked, unlinked, noMatch, notInPrinter, empty }
+
+    /// A head the printer reports empty that still has a spool linked is
+    /// "not in the printer now": the link is kept (one empty read can be a
+    /// missed tag) and said (`lib/head-spools.js shown`).
+    static func state(_ row: KhaytEngine.HeadRow, spool: [String: JSONValue]?) -> State {
+        let reportsEmpty = row.tag == nil && row.live == nil
+        if let _ = spool { return reportsEmpty ? .notInPrinter : .linked }
+        if reportsEmpty { return .empty }
+        if row.tag != nil, row.match == "new" { return .noMatch }
+        return .unlinked
+    }
+
+    /// "PLA SnapSpeed": the tag's material and type, else the printer's word, else the spool's.
+    static func material(_ row: KhaytEngine.HeadRow, spool: [String: JSONValue]?) -> String {
+        if let tag = row.tag { return [tag.material, tag.sub].filter { !$0.isEmpty }.joined(separator: " ") }
+        if let live = row.live, !live.material.isEmpty { return live.material }
+        if case .string(let m)? = spool?["material"] { return m }
+        return ""
+    }
+
+    /// The nozzle under a head: its own size when the printer reports one,
+    /// else the machine's, else nothing (Turki, Nov 28: one size is fine for
+    /// the U1, but printers with a different nozzle per head are coming).
+    static func nozzle(_ row: KhaytEngine.HeadRow, machine: Double?, _ words: Words) -> String {
+        guard let mm = row.nozzleMm ?? machine, mm > 0 else { return "" }
+        return words.callIt("mach.heads_mm", ["n": .string(Money.quantity(mm, decimals: 2))])
+    }
+
+    /// The last line, and its colour: grams left (green), a link to make (amber), or why not.
+    static func spoolLine(_ row: KhaytEngine.HeadRow, spool: [String: JSONValue]?, state: State,
+                          _ words: Words) -> (text: String, tone: Color) {
+        switch state {
+        case .linked: return (words.callIt("mach.heads_left", ["left": .string(left(spool, words))]), Khayt.done)
+        case .notInPrinter: return (words.callIt("mac.heads_not_in_printer"), Khayt.attention)
+        case .noMatch: return (words.callIt("mach.heads_link"), Khayt.attention)
+        case .unlinked: return (words.callIt("mach.heads_not_linked"), .secondary)
+        case .empty: return ("", .secondary)
+        }
+    }
+
     /// "PLA SnapSpeed · Polymaker · 500 g · 1.75 mm": what the tag says, for the sheet's first line. "" with no tag.
     static func fromTag(_ row: KhaytEngine.HeadRow, _ words: Words) -> String {
         guard let tag = row.tag else { return "" }
@@ -217,6 +278,8 @@ struct MachineHeadsSection: View {
     /// Nothing read yet, the printer's heads, or no answer.
     enum Read: Equatable { case reading, rows([KhaytEngine.HeadRow]), unread }
     @State private var read: Read = .reading
+    /// Each head's colour in words ("Black", "Galaxy Black"), by head: never a code (page 29).
+    @State private var names: [Int: String] = [:]
     @State private var linking: Linking?
 
     struct Linking: Identifiable { let row: KhaytEngine.HeadRow; let adding: Bool; var id: Int { row.head } }
@@ -242,7 +305,12 @@ struct MachineHeadsSection: View {
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             case .rows(let rows):
-                ForEach(rows) { row in line(row, words) }
+                // Page 29, frame 1: one nozzle per tool, in its spool's colour,
+                // side by side; up to sixteen wrap onto more rows.
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 104, maximum: 132), alignment: .top)],
+                          alignment: .leading, spacing: 14) {
+                    ForEach(rows) { row in column(row, words) }
+                }
                 Text(words.callIt("mach.heads_note"))
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -264,6 +332,44 @@ struct MachineHeadsSection: View {
     private func reread() async {
         if case .rows = read {} else { read = .reading }
         read = await shop.machineHeads(machineId).map(Read.rows) ?? .unread
+        if case .rows(let rows) = read { names = await shop.headColourNames(rows) }
+    }
+
+    /// One tool, as page 29 draws it: the nozzle in the spool's colour, then
+    /// the tool, the colour's NAME, the material, the nozzle size and the
+    /// spool (grams left), or what is missing. A click links or changes it.
+    @ViewBuilder private func column(_ row: KhaytEngine.HeadRow, _ words: Words) -> some View {
+        let spool = row.spoolId.flatMap { shop.headSpool($0) }
+        let state = HeadWords.state(row, spool: spool)
+        let line = HeadWords.spoolLine(row, spool: spool, state: state, words)
+        let size = HeadWords.nozzle(row, machine: shop.headsMachineNozzle(machineId), words)
+        let body = VStack(spacing: 3) {
+            NozzleMark(hex: state == .empty ? nil : row.hex, faded: state == .notInPrinter)
+                .padding(.bottom, 2)
+            Text(words.callIt("mach.heads_tool", ["n": .string(words.numeral(row.head + 1))]))
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+            Text(state == .empty ? words.callIt("mac.heads_empty") : (names[row.head] ?? HeadWords.material(row, spool: spool)))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(state == .empty ? .secondary : .primary)
+            if state != .empty, names[row.head] != nil, !HeadWords.material(row, spool: spool).isEmpty {
+                Text(HeadWords.material(row, spool: spool)).font(.system(size: 11))
+            }
+            if !size.isEmpty { Text(size).font(.system(size: 11)).foregroundStyle(.secondary) }
+            if !line.text.isEmpty {
+                Text(line.text).font(.system(size: 11, weight: .medium)).foregroundStyle(line.tone)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity, alignment: .top)
+        .accessibilityElement(children: .combine)
+        if state == .empty && spool == nil {
+            body
+        } else {
+            Button { linking = Linking(row: row, adding: spool == nil && row.match == "new" && row.prefill != nil && shop.mayAddSpoolFromTag) } label: { body }
+                .buttonStyle(.plain)
+                .disabled(!mayEdit)
+                .help(words.callIt(spool == nil ? "mach.heads_link" : "mach.heads_change"))
+        }
     }
 
     @ViewBuilder private func line(_ row: KhaytEngine.HeadRow, _ words: Words) -> some View {
@@ -413,5 +519,45 @@ struct LinkHeadSheet: View {
             if !said.sub.isEmpty { Text(said.sub).font(.system(size: 11)).foregroundStyle(.secondary) }
         }
         .padding(.vertical, 2)
+    }
+}
+
+
+/// A printer head drawn as a nozzle (page 29, the Head component): a heater
+/// block in the spool's colour over a tapered tip, outlined 1.5 pt in the
+/// secondary colour at 0.55 like the phone's swatch ring (review W7), so a
+/// near-black or near-white spool still has an edge. Dashed when empty.
+struct NozzleMark: View {
+    let hex: String?
+    var faded = false
+
+    var body: some View {
+        let fill = hex.flatMap { Swatch.rgb(fromHex: $0) }.map { Color(red: $0.r, green: $0.g, blue: $0.b) }
+        let ring = Color.secondary.opacity(0.55)
+        VStack(spacing: -1) {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(fill ?? Color.clear)
+                .overlay(RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(ring, style: StrokeStyle(lineWidth: 1.5, dash: fill == nil ? [3, 3] : [])))
+                .frame(width: 32, height: 30)
+            NozzleTip().fill(Color.secondary.opacity(0.45))
+                .overlay(NozzleTip().stroke(ring, lineWidth: 1.5))
+                .frame(width: 14, height: 16)
+        }
+        .opacity(faded ? 0.45 : 1)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The tapered tip under the heater block.
+struct NozzleTip: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.midX + r.width * 0.18, y: r.maxY - 2))
+        p.addQuadCurve(to: CGPoint(x: r.midX - r.width * 0.18, y: r.maxY - 2), control: CGPoint(x: r.midX, y: r.maxY + 1))
+        p.closeSubpath()
+        return p
     }
 }
