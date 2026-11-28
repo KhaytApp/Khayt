@@ -75,20 +75,21 @@ extension Shop {
         defer { slicingFor = nil }
 
         let output = dir.appending(path: "out.gcode")
-        // A bare mesh sliced by an Orca fork needs the fork's own presets (#1778).
-        let presets = await SlicerRun.bareModelPresets(engine: engine, slicer: slicer, template: slicer.args,
-                                                       model: model, outDir: dir)
-        guard let argv = try? await engine.sliceArgv(template: slicer.args, model: model.path,
+        // A bare mesh sliced by an Orca fork goes in as a PROJECT carrying the
+        // fork's own presets, never with preset flags (`SlicerRun.sliceInput`).
+        let input = await SlicerRun.sliceInput(engine: engine, slicer: slicer, template: slicer.args,
+                                               model: model, outDir: dir)
+        guard let argv = try? await engine.sliceArgv(template: slicer.args, model: input.model.path,
                                                      output: output.path, outdir: dir.path,
-                                                     slicer: slicer.path, presets: presets.presets) else {
+                                                     slicer: slicer.path, presets: .null) else {
             sendNote = words.callIt("slicer.fail"); return
         }
         let sliced: Result<URL, SlicerRun.Failure> = await withCheckedContinuation { done in
             SlicerRun.queue.async {
                 do {
-                    try SlicerRun.slice(model, with: slicer, argv: argv, allowed: true)
+                    try SlicerRun.slice(input.model, with: slicer, argv: argv, allowed: true)
                     guard let gcode = SlicerRun.gcode(in: dir, expected: output) else {
-                        done.resume(returning: .failure(.producedNothing(presets.problem ?? ""))); return
+                        done.resume(returning: .failure(.producedNothing(input.problem ?? ""))); return
                     }
                     // Named after the model: the printer lists it, and the job
                     // records the file it ran (`recordPrintRun`).

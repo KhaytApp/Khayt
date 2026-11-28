@@ -1,0 +1,1 @@
+- **iPhone: a paired phone's "last seen" date follows the book's calendar.** On the owner's list of paired phones, an older "last seen" date showed in the phone region's own calendar (on a Saudi iPhone, Umm al-Qura: "Jmd. I 30, 1448 AH") while the day itself was worked out in Gregorian. It now shows in the book's Gregorian calendar, as every other date on the phone does.
