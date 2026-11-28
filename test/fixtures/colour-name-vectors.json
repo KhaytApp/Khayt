@@ -1,0 +1,23 @@
+{
+ "about": "lib/colour-name.js colourName(hex, lang, { known }): a colour's plain name, never its code (Turki, Nov 27 2026). The spool's own name wins; else the nearest everyday name within CIEDE2000 18; else null (the swatch alone). The first two are Baby U1's spools from the watched run.",
+ "cases": [
+  { "why": "Baby U1 head 1: Polymaker PLA SnapSpeed, near-black", "hex": "#080A0D", "lang": "en", "want": "Black" },
+  { "why": "Baby U1 head 2: the light spool reads as white", "hex": "#E2DEDB", "lang": "en", "want": "White" },
+  { "why": "in Arabic", "hex": "#080A0D", "lang": "ar", "want": "أسود" },
+  { "why": "a region tag takes its language", "hex": "#080A0D", "lang": "zh-Hans", "want": "黑色" },
+  { "why": "Portuguese (Brazil)", "hex": "#808080", "lang": "pt-BR", "want": "Cinza" },
+  { "why": "a light grey", "hex": "#C0C0C0", "lang": "en", "want": "Light grey" },
+  { "why": "a dark blue", "hex": "#123456", "lang": "en", "want": "Navy" },
+  { "why": "pure red is still red", "hex": "#FF0000", "lang": "de", "want": "Rot" },
+  { "why": "an olive", "hex": "#7F7F00", "lang": "en", "want": "Olive" },
+  { "why": "between names (FLASHFORGE Marsala): no name rather than a wrong one", "hex": "#6E485F", "lang": "en", "want": null },
+  { "why": "Bambu Lab Mint, from the filament catalogue", "hex": "#7AE1BF", "lang": "en", "want": "Mint" },
+  { "why": "Bambu Lab Pine Green, from the filament catalogue", "hex": "#034638", "lang": "en", "want": "Dark green" },
+  { "why": "Bambu Lab Azure, from the filament catalogue", "hex": "#489FDF", "lang": "en", "want": "Light blue" },
+  { "why": "a cyan, in Turkish (teal is a different word)", "hex": "#1FC7D4", "lang": "tr", "want": "Camgöbeği" },
+  { "why": "the spool's own name wins", "hex": "#080A0D", "lang": "en", "known": "Galaxy Black", "want": "Galaxy Black" },
+  { "why": "a stored name that is only a code is never shown", "hex": "#080A0D", "lang": "en", "known": "#080A0D", "want": "Black" },
+  { "why": "not a colour", "hex": "black", "lang": "en", "want": null },
+  { "why": "an unknown language falls back to English", "hex": "#080A0D", "lang": "xx", "want": "Black" }
+ ]
+}
