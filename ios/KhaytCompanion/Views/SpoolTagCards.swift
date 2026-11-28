@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytCore
 
 /// A spool tag on a head (signed frame 7a): "Snapmaker U1 · head 2 / The tag
 /// says … / Matches your spool …" with Link to this spool and Choose another,

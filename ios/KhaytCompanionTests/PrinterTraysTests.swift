@@ -126,7 +126,7 @@ final class PrinterTraysTests: XCTestCase {
         XCTAssertEqual(ownNames[1], "Galaxy Black", "the spool's own name beats a guess")
         let (ar, _) = await SpoolTagCards.describe([unnamed], spools: [], engine: engine, lang: "ar")
         XCTAssertEqual(ar[1], "أسود", "in the phone's language")
-        for name in names.values + ownNames.values + ar.values { XCTAssertFalse(name.contains("#"), "never a code: \(name)") }
+        for name in Array(names.values) + Array(ownNames.values) + Array(ar.values) { XCTAssertFalse(name.contains("#"), "never a code: \(name)") }
 
         // No engine: the spool's own name only, and the empty head still said.
         let (bareNames, bareGone) = await SpoolTagCards.describe(all, spools: galaxy, engine: nil, lang: "en")
@@ -242,7 +242,7 @@ final class PrinterTraysTests: XCTestCase {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let en = try XCTUnwrap(NSDictionary(contentsOf: root.appending(path: "KhaytCompanion/Resources/en.lproj/Localizable.strings")) as? [String: String])
         let keys = en.keys.filter { $0.hasPrefix("tray.") }
-        XCTAssertEqual(keys.count, 30)
+        XCTAssertEqual(keys.count, 31)
         for lang in ["ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
             let url = root.appending(path: "KhaytCompanion/Resources/\(lang).lproj/Localizable.strings")
             let table = try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String], lang)
