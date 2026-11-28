@@ -154,4 +154,7 @@ test('presets go on the argv only for a fork running the arguments Khayt chose',
 test('a slicer that crashed is said to have crashed', () => {
   assert.match(S.sliceFailureReason({ code: null, signal: 'SIGSEGV', stdout: '' }), /crashed \(SIGSEGV\)/);
   assert.match(S.sliceFailureReason({ code: 139, stdout: '' }), /crashed/);
+  // One sentence that reads right on the desktop's quote screen AND the Mac's Send sheet (Nov 28).
+  assert.equal(S.sliceFailureReason({ code: 0, signal: 'signal 11', stdout: '' }),
+    'The slicer crashed (signal 11). Try another slicer, or slice the file in the slicer itself.');
 });

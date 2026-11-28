@@ -2027,6 +2027,7 @@
  "mac.net_title": "Internetnutzung",
  "mac.net_open": "Internetnutzung…",
  "mac.net_sub": "Legen Sie fest, was Khayt über das Internet senden darf. Drucker, Kameras und Telefone im Netzwerk Ihres Betriebs funktionieren immer weiter.",
+ "mac.net_slicers": "Ein Slicer, den Khayt startet, etwa Snapmaker Orca, kann trotzdem selbst ins Internet gehen: Er sendet seine Absturzberichte an seinen Hersteller. Dieser Schalter verhindert das nicht.",
  "mac.net_switch": "Keine Internetverbindungen herstellen",
  "mac.net_who_mac": "Dieser Mac und Telefone in seinem WLAN folgen ihm.",
  "mac.net_who_shop": "Für den ganzen Betrieb.",
