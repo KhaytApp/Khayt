@@ -2027,6 +2027,7 @@
  "mac.net_title": "Uso de internet",
  "mac.net_open": "Uso de internet…",
  "mac.net_sub": "Elige qué puede enviar Khayt por internet. Las impresoras, cámaras y teléfonos de la red de tu tienda siguen funcionando siempre.",
+ "mac.net_slicers": "Un laminador que Khayt ejecuta, como Snapmaker Orca, puede conectarse a internet por su cuenta: envía sus informes de fallos a su fabricante. Este interruptor no lo impide.",
  "mac.net_switch": "No hacer llamadas a internet",
  "mac.net_who_mac": "Este Mac y los teléfonos de su Wi-Fi lo siguen.",
  "mac.net_who_shop": "Para toda la tienda.",

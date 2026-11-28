@@ -2027,6 +2027,7 @@
  "mac.net_title": "Utilisation d'Internet",
  "mac.net_open": "Utilisation d'Internet…",
  "mac.net_sub": "Choisissez ce que Khayt peut envoyer sur Internet. Les imprimantes, caméras et téléphones du réseau de votre atelier continuent toujours de fonctionner.",
+ "mac.net_slicers": "Un trancheur lancé par Khayt, comme Snapmaker Orca, peut quand même se connecter à Internet de lui-même : il envoie ses rapports de plantage à son éditeur. Ce réglage ne l’en empêche pas.",
  "mac.net_switch": "Ne faire aucun appel à Internet",
  "mac.net_who_mac": "Ce Mac et les téléphones sur son Wi-Fi le suivent.",
  "mac.net_who_shop": "Pour tout l'atelier.",

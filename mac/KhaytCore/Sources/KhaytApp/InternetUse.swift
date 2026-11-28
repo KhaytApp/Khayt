@@ -294,6 +294,11 @@ struct InternetUsePage: View {
             Text(words.callIt("mac.net_title")).font(.system(size: 20, weight: .semibold))
             Text(words.callIt("mac.net_sub")).font(.system(size: 12)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            // A slicer is its own program: Snapmaker Orca reports its crashes
+            // and errors over the internet by itself (seen Nov 27), and this
+            // switch cannot stop it. Said, so the switch never claims more.
+            Text(words.callIt("mac.net_slicers")).font(.system(size: 12)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             // The question waiting for the owner, here too: the every-screen
             // notice's link leads to this page (frames G1 and G2).
             if let ask = pretendAsk ?? (pretend == nil ? shop.networkSwitchAsk : nil) {
