@@ -108,7 +108,16 @@ extension Shop {
         }
         switch sliced {
         case .failure(let failure):
-            let said = words.callIt("slicer.fail") + " " + failure.description
+            // A slicer killed by a signal is said to have CRASHED, in the
+            // shared words (`lib/slicers.js sliceFailureReason`), not as
+            // "produced no G-code. signal 11", which read as Khayt's fault
+            // to the shop that saw it (Nov 27, Snapmaker Orca on a U1).
+            var why = failure.description
+            if case .producedNothing(let raw) = failure, raw.hasPrefix("signal "),
+               let worded = try? await engine.sliceFailureReason(stderr: "", stdout: "", code: 0, signal: raw) {
+                why = worded
+            }
+            let said = words.callIt("slicer.fail") + " " + why
             printerProblem[machine.id] = said
             sendNote = said
         case .success(let gcode):

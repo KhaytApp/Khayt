@@ -2027,6 +2027,7 @@
  "mac.net_title": "İnternet kullanımı",
  "mac.net_open": "İnternet kullanımı…",
  "mac.net_sub": "Khayt'ın internet üzerinden neler gönderebileceğini seçin. İşletmenizin ağındaki yazıcılar, kameralar ve telefonlar her zaman çalışmaya devam eder.",
+ "mac.net_slicers": "Khayt'ın çalıştırdığı bir dilimleyici, örneğin Snapmaker Orca, yine de kendi başına internete bağlanabilir: çökme raporlarını üreticisine gönderir. Bu anahtar bunu durdurmaz.",
  "mac.net_switch": "İnternete hiç bağlanma",
  "mac.net_who_mac": "Bu Mac ve Wi-Fi'sindeki telefonlar buna uyar.",
  "mac.net_who_shop": "Tüm işletme için.",

@@ -4127,6 +4127,8 @@ final class Words {
         "mac.net_title": ["en": "Internet use", "ar": "استخدام الإنترنت"],
         "mac.net_open": ["en": "Internet use…", "ar": "استخدام الإنترنت…"],
         "mac.net_sub": ["en": "Choose what Khayt may send over the internet. Printers, cameras and phones on your shop's network always keep working.", "ar": "اختر ما يُسمح لخيط بإرساله عبر الإنترنت. الطابعات والكاميرات والجوالات على شبكة متجرك تواصل العمل دائمًا."],
+        "mac.net_slicers": ["en": "A slicer that Khayt runs, such as Snapmaker Orca, can still go online by itself: it sends its own crash reports to its maker. This switch does not stop that.",
+                            "ar": "قد يتصل برنامج التقطيع الذي يشغّله خيط، مثل Snapmaker Orca، بالإنترنت من تلقاء نفسه: فهو يرسل تقارير أعطاله إلى صانعه. هذا المفتاح لا يوقف ذلك."],
         "mac.net_switch": ["en": "Make no internet calls", "ar": "عدم إجراء أي اتصال بالإنترنت"],
         "mac.net_who_mac": ["en": "This Mac and phones on its Wi-Fi follow it.", "ar": "هذا الـMac والجوالات على شبكته اللاسلكية يتبعونه."],
         "mac.net_who_shop": ["en": "For the whole shop.", "ar": "للمتجر كله."],
