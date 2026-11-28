@@ -69,9 +69,10 @@ struct LiveActivityPushTests {
         let encoded = String(decoding: try JSONEncoder().encode(JSONValue.object(start)), as: UTF8.self)
         #expect(encoded.contains("\"progress\":42") && !encoded.contains("42."), Comment(rawValue: encoded))
         #expect(state["startedAt"] == .string("2026-08-29T10:40:00Z"))
-        // Five minutes, not the print's finish an hour away: a stream that
-        // stops goes stale on the phone within that (push review M1).
-        #expect(start["staleAt"] == .string("2026-08-29T10:45:00Z"))
+        // The print's finish an hour away, not five minutes: a Mac that goes
+        // quiet leaves the card live until the finish, where the phone shows
+        // "Should be done" itself (Nov 28; was five minutes, push review M1).
+        #expect(start["staleAt"] == .string("2026-08-29T11:40:00Z"))
         // When it happened on the Mac, in Unix seconds (push review C3).
         #expect(start["at"] == .number(1_788_000_000))
 
@@ -92,8 +93,12 @@ struct LiveActivityPushTests {
     func staleAndRefresh() {
         let none = LiveActivityPlan.State(phase: .printing, job: "a.gcode", progress: 10, startedAt: Self.now, endsAt: nil)
         #expect(LiveActivityPlan.staleAt(none, now: Self.now) == Self.now.addingTimeInterval(300))
+        // A finish sooner than the window: still the window, so a late print stays live.
         var soon = none; soon.endsAt = Self.now.addingTimeInterval(60)
-        #expect(LiveActivityPlan.staleAt(soon, now: Self.now) == Self.now.addingTimeInterval(60))
+        #expect(LiveActivityPlan.staleAt(soon, now: Self.now) == Self.now.addingTimeInterval(300))
+        // The last push 40 minutes before the finish carries the finish.
+        var later = none; later.endsAt = Self.now.addingTimeInterval(40 * 60)
+        #expect(LiveActivityPlan.staleAt(later, now: Self.now) == Self.now.addingTimeInterval(40 * 60))
         let body = LiveActivityPush.body(.update(machineId: "m1", none), now: Self.now)
         #expect(body["staleAt"] == .string("2026-08-29T10:45:00Z"), "an update with no finish has no staleAt")
 
@@ -353,7 +358,7 @@ struct LiveActivityPushTests {
         #expect(LiveActivityPush.optInKey == "mac.liveActivities")
     }
 
-    @Test("a 200 with no phones goes quiet: updates and ends are not posted, a start asks again after ten minutes")
+    @Test("a 200 with no phones goes quiet: an update inside ten minutes is held, but the END is always posted")
     func noPhones() async throws {
         let (shop, rec) = await Self.shop(cloud: Self.connected)
         let machine = try #require(shop.machines.first)
@@ -362,25 +367,65 @@ struct LiveActivityPushTests {
         await Self.settle(rec, count: 1)
         try await Task.sleep(for: .milliseconds(50))
         #expect(shop.liveActivities.noPhonesSince == Self.now)
-        // The print moves and ends: nothing posted, but the plan keeps up.
+        // The print moves inside ten minutes: held, but the plan keeps up.
         shop.liveActivityHeard(machine, status: try Self.status("printing", progress: 60), now: Self.now.addingTimeInterval(60))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(rec.requests.count == 1)
+        // It ends: the end IS posted, one request, whoever is listening.
         shop.liveActivityHeard(machine, status: try Self.status("standby", left: nil), now: Self.now.addingTimeInterval(120))
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(rec.requests.count == 1)
-        #expect(shop.liveActivities.running[machine.id] == nil, "the ended print is still remembered as running")
-        // A new print inside ten minutes: still quiet.
-        shop.liveActivityHeard(machine, status: try Self.status("printing"), now: Self.now.addingTimeInterval(300))
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(rec.requests.count == 1)
-        // A new print after them: asked again, and a phone is there now.
-        shop.liveActivityHeard(machine, status: try Self.status("standby", left: nil), now: Self.now.addingTimeInterval(400))
-        rec.reply = #"{"ok":true,"tokens":1}"#
-        shop.liveActivityHeard(machine, status: try Self.status("printing"), now: Self.now.addingTimeInterval(700))
         await Self.settle(rec, count: 2)
         try await Task.sleep(for: .milliseconds(50))
         #expect(rec.requests.count == 2)
-        #expect(try Self.body(try #require(rec.requests.last))["event"] as? String == "start")
+        #expect(try Self.body(try #require(rec.requests.last))["event"] as? String == "end")
+        #expect(shop.liveActivities.running[machine.id] == nil, "the ended print is still remembered as running")
+        // A new print inside ten minutes of that reply: still quiet.
+        shop.liveActivityHeard(machine, status: try Self.status("printing"), now: Self.now.addingTimeInterval(300))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(rec.requests.count == 2)
+    }
+
+    /// Turki, Nov 28: the Live Activity stayed at 61% after the print finished.
+    /// The phone registered its update token AFTER the cloud had said nobody
+    /// was listening, and from then on only a start was ever posted.
+    @Test("a phone that registers mid-print: an update after ten minutes reaches it, and so does the end")
+    func latePhone() async throws {
+        let (shop, rec) = await Self.shop(cloud: Self.connected)
+        let machine = try #require(shop.machines.first)
+        rec.reply = #"{"ok":true,"tokens":0}"#
+        shop.liveActivityHeard(machine, status: try Self.status("printing", progress: 10), now: Self.now)
+        await Self.settle(rec, count: 1)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(shop.liveActivities.noPhonesSince == Self.now)
+        // The phone registers now; the cloud would say so to the next post.
+        rec.reply = #"{"ok":true,"tokens":1}"#
+        shop.liveActivityHeard(machine, status: try Self.status("printing", progress: 30), now: Self.now.addingTimeInterval(120))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(rec.requests.count == 1, "an update inside ten minutes is held")
+        // Ten minutes on, an update is the probe: it is posted, and the quiet lifts.
+        shop.liveActivityHeard(machine, status: try Self.status("printing", progress: 61), now: Self.now.addingTimeInterval(601))
+        await Self.settle(rec, count: 2)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(try Self.body(try #require(rec.requests.last))["event"] as? String == "update")
         #expect(shop.liveActivities.noPhonesSince == nil)
+        // And the print finishing is posted as the end.
+        shop.liveActivityHeard(machine, status: try Self.status("standby", left: nil), now: Self.now.addingTimeInterval(700))
+        await Self.settle(rec, count: 3)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(try Self.body(try #require(rec.requests.last))["event"] as? String == "end")
+    }
+
+    @Test("a printer taken out of watch while no phone was listening still gets its end posted")
+    func unwatchedEndsWhileQuiet() async throws {
+        let (shop, rec) = await Self.shop(cloud: Self.connected)
+        let machine = try #require(shop.machines.first)
+        rec.reply = #"{"ok":true,"tokens":0}"#
+        shop.liveActivityHeard(machine, status: try Self.status("printing"), now: Self.now)
+        await Self.settle(rec, count: 1)
+        try await Task.sleep(for: .milliseconds(50))
+        shop.liveActivityUnwatched(machine.id, now: Self.now.addingTimeInterval(60))
+        await Self.settle(rec, count: 2)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(try Self.body(try #require(rec.requests.last))["event"] as? String == "end")
     }
 
     @Test("401 is quiet for an hour; 400, 413, 5xx and no answer back off, growing, capped")
