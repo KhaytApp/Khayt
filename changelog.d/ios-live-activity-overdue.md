@@ -1,0 +1,1 @@
+- iPhone: a print's Lock Screen card no longer stands at its last percent once the print should be done. When the estimated finish has passed and nothing has been heard since, it says "Should be done — open Khayt" (in all nine languages, right to left in Arabic), with no frozen figure or clock time. Opening Khayt hears the printer and ends the card as it really went.

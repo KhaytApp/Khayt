@@ -9,7 +9,7 @@ import WidgetKit
 struct PrintActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: PrintActivityAttributes.self) { context in
-            PrintActivityLockScreen(attributes: context.attributes, state: context.state)
+            PrintActivityLockScreen(attributes: context.attributes, state: context.state, stale: context.isStale)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 16)
                 .activityBackgroundTint(PrintActivityLook.surface.opacity(0.92))
@@ -17,7 +17,8 @@ struct PrintActivityWidget: Widget {
                 .widgetURL(URL(string: "khayt://machine/\(context.attributes.machineId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "")"))
         } dynamicIsland: { context in
             let state = context.state
-            let tone = PrintActivityLook.tone(state.phase)
+            let overdue = PrintActivityText.overdue(state, stale: context.isStale)
+            let tone = overdue ? PrintActivityLook.note : PrintActivityLook.tone(state.phase)
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 8) {
@@ -33,10 +34,13 @@ struct PrintActivityWidget: Widget {
                     .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    PrintPhasePill(phase: state.phase).padding(.trailing, 4)
+                    if !overdue { PrintPhasePill(phase: state.phase).padding(.trailing, 4) }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 8) {
+                        if overdue {
+                            PrintOverdue().font(PrintActivityLook.display(20))
+                        } else {
                         HStack(alignment: .firstTextBaseline) {
                             PrintHeadline(state: state)
                                 .font(PrintActivityLook.display(26).monospacedDigit())
@@ -47,9 +51,10 @@ struct PrintActivityWidget: Widget {
                                 .font(PrintActivityLook.text(12, .medium).monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
+                        }
                         HStack(spacing: 8) {
-                            PrintBar(state: state)
-                            if PrintActivityText.showsPercent(state.phase) {
+                            PrintBar(state: state, overdue: overdue)
+                            if PrintActivityText.showsPercent(state.phase), !overdue {
                                 Text(verbatim: PrintActivityText.percent(state.progress))
                                     .font(PrintActivityLook.mono(12))
                                     .foregroundStyle(tone)
@@ -69,9 +74,14 @@ struct PrintActivityWidget: Widget {
                 Image(systemName: PrintActivityLook.symbol(state.phase))
                     .foregroundStyle(tone)
             } compactTrailing: {
+                // No frozen percent: the open-the-app sign instead.
+                if overdue {
+                    Image(systemName: "arrow.up.forward.app").foregroundStyle(tone)
+                } else {
                 CompactRemaining(state: state)
                     .font(PrintActivityLook.display(14).monospacedDigit())
                     .foregroundStyle(tone)
+                }
             } minimal: {
                 if let range = PrintActivityText.barRange(state) {
                     ProgressView(timerInterval: range, countsDown: false) { EmptyView() } currentValueLabel: {

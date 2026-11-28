@@ -128,8 +128,11 @@ struct PrintActivityLockScreen: View {
     /// Where the words are looked up: the extension's own table. A parameter
     /// only so the app's tests can point it there too.
     var bundle: Bundle = .main
+    /// `context.isStale`: no reading has moved the card since its stale date.
+    var stale: Bool = false
 
     private var tone: Color { PrintActivityLook.tone(state.phase) }
+    private var overdue: Bool { PrintActivityText.overdue(state, stale: stale) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -154,9 +157,15 @@ struct PrintActivityLockScreen: View {
                     }
                 }
                 Spacer(minLength: 8)
-                PrintPhasePill(phase: state.phase, bundle: bundle)
+                // "Printing" is no longer known; the headline says what is.
+                if !overdue { PrintPhasePill(phase: state.phase, bundle: bundle) }
             }
 
+            if overdue {
+                PrintOverdue(bundle: bundle)
+                    .font(PrintActivityLook.display(24))
+                    .foregroundStyle(PrintActivityLook.ink)
+            } else {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 PrintHeadline(state: state, bundle: bundle)
                     .font(PrintActivityLook.display(34).monospacedDigit())
@@ -169,10 +178,11 @@ struct PrintActivityLockScreen: View {
                     .foregroundStyle(PrintActivityLook.note)
                     .lineLimit(1)
             }
+            }
 
             HStack(spacing: 10) {
-                PrintBar(state: state)
-                if PrintActivityText.showsPercent(state.phase) {
+                PrintBar(state: state, overdue: overdue)
+                if PrintActivityText.showsPercent(state.phase), !overdue {
                     Text(verbatim: PrintActivityText.percent(state.progress))
                         .font(PrintActivityLook.mono(13))
                         .foregroundStyle(tone)
@@ -238,6 +248,22 @@ struct PrintHeadline: View {
     }
 }
 
+/// A print whose estimated finish has passed with no reading since: the
+/// last percent is no longer true, and the card cannot know how it went.
+/// It says so and sends the reader to the app, which hears the printer and
+/// ends the card (Turki, Nov 28: "lock screen card, yes add the safety net",
+/// after a U1 print stood at 61% long after it was done). No figure and no
+/// clock time: nothing on it can be out of date.
+struct PrintOverdue: View {
+    var bundle: Bundle = .main
+    var body: some View {
+        Text("Should be done — open Khayt", bundle: bundle)
+            .lineLimit(2)
+            .minimumScaleFactor(0.8)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 /// The time left, counted down by the system to the minute. The Lock Screen
 /// stops ticking seconds while it sleeps and draws a seconds timer as
 /// "1:11:--", so this one never asks for seconds.
@@ -279,9 +305,10 @@ struct PrintEnds: View {
 /// colour.
 struct PrintBar: View {
     let state: PrintActivityAttributes.ContentState
+    var overdue: Bool = false
 
     var body: some View {
-        if state.phase == .printing, let range = PrintActivityText.barRange(state) {
+        if !overdue, state.phase == .printing, let range = PrintActivityText.barRange(state) {
             ProgressView(timerInterval: range, countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
                 .progressViewStyle(.linear)
                 .tint(PrintActivityLook.bar(state.phase))
@@ -291,7 +318,7 @@ struct PrintBar: View {
             GeometryReader { box in
                 ZStack(alignment: .leading) {
                     Capsule().fill(PrintActivityLook.track)
-                    Capsule().fill(PrintActivityLook.bar(state.phase))
+                    Capsule().fill(overdue ? PrintActivityLook.note : PrintActivityLook.bar(state.phase))
                         .frame(width: max(6, box.size.width * fraction))
                 }
             }
@@ -337,6 +364,15 @@ enum PrintActivityText {
         var start = now.addingTimeInterval(-end.timeIntervalSince(now) * done / (1 - done))
         if done == 0, let seen = state.startedAt, seen < now { start = seen }
         return start...end
+    }
+
+    /// The card's estimated finish has passed and no reading has come since
+    /// (`stale`: iOS's `isStale`, which the phone sets for the estimated
+    /// finish, `PrintActivityPlan.staleDate`). A print with no estimate is
+    /// never called overdue: there is nothing to have passed.
+    static func overdue(_ state: PrintActivityAttributes.ContentState, stale: Bool, now: Date = Date()) -> Bool {
+        guard stale, state.phase == .printing, let end = state.endsAt else { return false }
+        return end <= now
     }
 
     /// Western digits in both languages, as everywhere else in Khayt.
