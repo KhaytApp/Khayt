@@ -92,6 +92,31 @@ extension Snapshot {
             }
         }
 
+        // THE SHOP FLOOR TILE'S HEADS (page 29, frame 2): a U1 with four
+        // heads, one of them empty, drawn as nozzles with the filament type.
+        plant(.one, on: shop, at: now)
+        var fourHeads = KhaytEngine.PrinterStatus(
+                state: "printing", progress: 61, progressSource: "layers", filename: "gear-set.gcode",
+                timeRemaining: 40 * 60, tempNozzle: 220, tempBed: 60, type: "moonraker",
+                loaded: [.init(slot: 0, hex: "#111111", material: "PLA SnapSpeed"),
+                         .init(slot: 1, hex: "#F5F5F5", material: "PETG"),
+                         .init(slot: 2, hex: "#FF3B30", material: "PLA")])
+        fourHeads.heads = 4
+        shop.printers.setReadingForTesting("MACH-u1", PrinterWatch.Reading(status: fourHeads, problem: nil, at: now))
+        await settle()
+        if let u1 = shop.machines.first(where: { $0.id == "MACH-u1" }) {
+            captureView(named: "floor-tile-heads\(tag)",
+                        MachineCard(machine: u1, wear: nil, shop: shop)
+                            .environment(shop.cameras)
+                            .frame(width: 320).padding(16)
+                            .background(dark ? Color(white: 0.17) : Color(white: 0.96))
+                            .environment(\.colorScheme, dark ? .dark : .light)
+                            .environment(\.layoutDirection, Direction.rtlLanguages.contains(shop.words.language)
+                                         ? .rightToLeft : .leftToRight)
+                            .modifier(ShopsLocale(words: shop.words)),
+                        into: dir)
+        }
+
         // THE FINISH MOMENT. Two were printing and one has just finished: the
         // seam has said so (`lastPrintEnded`), the printer reads complete, and
         // the panel is holding its green. Then the same floor once the hold

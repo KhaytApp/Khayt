@@ -1,0 +1,1 @@
+- **Mac: a printer's tile on the Shop floor shows its heads.** For a printer that reports what is loaded (a Snapmaker U1, for example), the tile shows each head as a small nozzle in its spool's colour, with the head's number and the filament type under it (PLA, PETG). An empty head is a dashed nozzle.

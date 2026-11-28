@@ -11886,9 +11886,12 @@ public actor KhaytEngine {
         public let sensors: [String]
         public let chamber: String?
         public let headFans: [String]
+        /// How many toolheads the firmware lists (`extruder`, `extruder1`…),
+        /// nil when it did not say. An AMS tray is not a head.
+        public var heads: Int? = nil
 
-        public init(sensors: [String] = [], chamber: String? = nil, headFans: [String] = []) {
-            self.sensors = sensors; self.chamber = chamber; self.headFans = headFans
+        public init(sensors: [String] = [], chamber: String? = nil, headFans: [String] = [], heads: Int? = nil) {
+            self.sensors = sensors; self.chamber = chamber; self.headFans = headFans; self.heads = heads
         }
 
         /// Nothing discovered: the query is the bare `QUERY`, and a runout
@@ -11898,7 +11901,8 @@ public actor KhaytEngine {
         var json: JSONValue {
             .object(["sensors": .array(sensors.map(JSONValue.string)),
                      "chamber": chamber.map(JSONValue.string) ?? .null,
-                     "headFans": .array(headFans.map(JSONValue.string))])
+                     "headFans": .array(headFans.map(JSONValue.string)),
+                     "heads": heads.map { JSONValue.number(Double($0)) } ?? .null])
         }
     }
 
@@ -12466,6 +12470,10 @@ public actor KhaytEngine {
         /// What is loaded, head by head, when the machine reports it (a
         /// Snapmaker U1 does). Nil or empty means it cannot say.
         public let loaded: [LoadedSlot]?
+        /// How many toolheads the printer has, when it says (a Moonraker
+        /// machine's object list: four on a U1). Nil for a printer that does
+        /// not, and for an AMS's trays, which are not heads.
+        public var heads: Int? = nil
         /// What the printer says is wrong, as `lib/printer-problems.js`
         /// findings, when the poll worked them out (Moonraker). Nil for a
         /// protocol whose problems are read from its state word instead.
