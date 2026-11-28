@@ -589,9 +589,10 @@ test('re-review of #2608: lock fields change outside a window save only in main\
   let i = -1;
   while ((i = main.indexOf('updateStoreOnDiskAllowingLock(', i + 1)) !== -1) {
     const head = main.slice(0, i);
-    // The outbound switch's own writer (#2645): `settings.network` and nothing else.
+    // The outbound switch's writers (#2645, and the phone's switch, #2724): `settings.network`
+    // and nothing else. Up to the next `notify:` at any indentation (the phone's is nested).
     if (head.endsWith('updateNetwork: (fn) => ')) {
-      const call = main.slice(i, main.indexOf('\n  notify:', i));
+      const call = main.slice(i, i + main.slice(i).search(/\n\s*(?:publish|notify):/));
       assert.match(call, /\}, \['settings\.network'\]\),$/, 'the switch writer may change settings.network only');
       continue;
     }

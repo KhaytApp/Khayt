@@ -1578,7 +1578,7 @@
 "lock.after.1" = "1 分後";
 "lock.after.5" = "5 分後";
 "lock.after.15" = "15 分後";
-"lock.foot" = "オーナーとマネージャーの電話では初期設定でオンです。Khayt の起動時と、上の時間だけバックグラウンドにあった後に、Face ID またはこの iPhone のパスコードで開きます。どちらの場合も帳簿は電話に残ります。";
+"lock.foot" = "オーナーとマネージャーの電話では初期設定でオンです。Khayt の起動時と、上の時間だけバックグラウンドにあった後に、Face ID またはこの iPhone のパスコードで開きます。どちらの場合も帳簿は電話に残ります。Khayt のロック中も、Siri、ショートカット、印刷通知とライブアクティビティのボタンは使えます。これらはこの iPhone 自体のロックで守られます。";
 "lock.no_passcode" = "この iPhone にはパスコードがないため、Khayt をロックできません。iPhone の設定でパスコードを設定してください。";
 "lock.floor.title" = "ロックは不要です";
 "lock.floor.body" = "これは現場用の電話です。ショップの帳簿のコピーを保持しないため、ロックするものがありません。ショップの Wi-Fi 上にある間、キューとプリンタを表示します。";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "ロック解除";
 "lock.use_passcode" = "パスコードを使う";
 "lock.reason" = "ショップを表示するには Khayt のロックを解除してください。";
+"lock.reason.change" = "Khayt のロックを変更するには本人確認をしてください。";
 "alert.print.a_print" = "印刷";
 "intake.remind.alert.hidden" = "顧客からの依頼が返答を待っています。";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
@@ -1637,3 +1638,65 @@
 "printer.why.read_only" = "Mac はサンプルショップを表示中で、変更できません。";
 "printer.why.not_saved" = "Mac が今は保存できませんでした。もう一度お試しください。";
 "printer.why.role" = "この電話の役割ではできません。オーナーに確認してください。";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "ペアリング済みの電話";
+"owner.phones.this" = "%@（この電話）";
+"owner.phones.unnamed" = "電話";
+"owner.phones.by_pin" = "PIN でペアリング";
+"owner.phones.by_code" = "番号でペアリング";
+"owner.phones.seen" = "最終確認 %@";
+"owner.phones.now" = "たった今";
+"owner.phones.yesterday" = "昨日";
+"owner.phones.foot" = "役割の設定と電話の削除は Mac で行います（設定 › 電話と Wi-Fi）。オーナーにのみ、ショップの Wi-Fi 上で表示されます。";
+"owner.role.owner" = "オーナー";
+"owner.role.manager" = "マネージャー";
+"owner.role.operator" = "オペレーター";
+"owner.role.viewer" = "閲覧者";
+"owner.prices.title" = "スライサーでの価格";
+"owner.prices.switch" = "スライサーに価格を表示";
+"owner.prices.switch.sub" = "Mac で設定";
+"owner.prices.may" = "価格を表示できます";
+"owner.prices.hidden" = "価格は非表示";
+"owner.prices.allowed" = "許可";
+"owner.prices.not_allowed" = "不許可";
+"owner.prices.unnamed" = "スライサー";
+"owner.prices.foot" = "どのスライサーがショップの価格を表示できるかはオーナーが Mac で決めます。電話は表示するだけです。";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "成功率";
+"success.window" = "%@ · 過去 30 日間";
+"success.counts" = "完了 %1$d、失敗 %2$d";
+"success.cancelled" = "キャンセル %d は対象外";
+"success.not_enough" = "まだ印刷数が足りません: 必要 %2$d 中 %1$d";
+/* A spool tag on a head (signed frame 7a; Mac #2697) */
+"tray.title" = "%1$@ · ヘッド %2$d";
+"tray.tag_says" = "タグの内容: %@";
+"tray.tag_unknown" = "名前のないスプール";
+"tray.kg" = "%d kg";
+"tray.g" = "%d g";
+"tray.match.link" = "お手持ちのスプール「%@」と一致";
+"tray.match.ask" = "お手持ちの複数のスプールが該当する可能性があります";
+"tray.match.new" = "棚に同じようなスプールはありません";
+"tray.linked" = "このヘッド:「%@」";
+"tray.do.link" = "このスプールにリンク";
+"tray.do.choose" = "別のものを選ぶ";
+"tray.do.choose_first" = "スプールを選ぶ";
+"tray.do.add" = "タグからスプールを追加";
+"tray.foot" = "Mac 経由。タップしない限りスプールは変更されません。";
+"tray.done.linked" = "リンクしました。";
+"tray.done.created" = "棚に追加してリンクしました。価格はまだありません。";
+"tray.why.changed" = "このヘッドのタグが変わったため、何もリンクされませんでした。現在の内容はこちらです。";
+"tray.why.no_answer" = "Mac から応答がありませんでした。現在の表示はこちらです。再試行の前に確認してください。";
+"tray.why.no-spool" = "そのスプールはもう棚にありません。";
+"tray.why.tag-unusable" = "タグにフィラメントの種類がないため、スプールを作成できません。";
+"tray.why.printer-unreachable" = "Mac がプリンタに接続できませんでした。";
+"tray.why.read-only" = "Mac はサンプルショップを表示中で、変更できません。";
+"tray.why.not-saved" = "Mac が今は保存できませんでした。もう一度お試しください。";
+"tray.why.busy" = "Mac のアプリが起動中です。少ししてからお試しください。";
+"tray.why.role-scope" = "この電話の役割ではできません。オーナーに確認してください。";
+"tray.why.device-key-required" = "先にこの電話を Mac と再度ペアリングしてください。";
+"tray.why.no-trays" = "このプリンタには現在そこで読み取れるタグがありません。";
+"tray.why.not-offered" = "電話からスプールをリンクするには、Mac のアプリを更新してください。";
+"tray.why.unreachable" = "完了できませんでした。何も変更されていません。";
+"tray.linked.unnamed" = "このヘッドにはスプールが記録されています";
+"tray.not_in_printer" = "今はプリンターに入っていません。このヘッドとのリンクはそのままです。";

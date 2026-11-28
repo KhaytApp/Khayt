@@ -1517,13 +1517,30 @@ function bareModelPresetsUnsafe(slicerPath, args, modelPath, outDir) {
   try { conf = fs.readFileSync(roots.confFile, 'utf8'); } catch (_) { /* no config yet */ }
   const r = slicerPresets.choosePresets(io, { conf, user: roots.user, system: roots.system, bundled: roots.bundled });
   if (!r.ok) return { error: r.error };
-  const file = (kind) => {
-    const f = path.join(outDir, `khayt-${kind}.json`);
-    fs.writeFileSync(f, slicerPresets.presetFileJson(kind, r[kind]), 'utf8');
-    return f;
-  };
-  return { presets: { settings: [file('machine'), file('process')], filaments: [file('filament')] },
+  // The flattened presets, for the PROJECT the model becomes (runSlice). They
+  // are never handed to the slicer by flag: Snapmaker Orca 2.4.1 segfaults on
+  // --load-settings / --load-filaments (#2731, lib/slicer-project.js).
+  return { flat: { machine: r.machine, process: r.process, filament: r.filament }, entries,
            names: { machine: r.machine.name, process: r.process.name, filament: r.filament.name } };
+}
+
+/**
+ * What the slicer is given for a model that needed presets: a project 3MF
+ * with them inside (lib/main/orca-project.js), never preset flags. A model
+ * that needed none is sliced as it is.
+ */
+function sliceTarget(bare, modelPath, outDir) {
+  if (!bare || !bare.flat) return { ok: true, path: modelPath };
+  const SlicerProject = require('./lib/slicer-project.js');
+  const OrcaProject = require('./lib/main/orca-project.js');
+  const kind = SlicerProject.plan(modelPath, bare.entries);
+  if (kind === 'as-is') return { ok: true, path: modelPath };
+  if (kind === 'unsupported') return { ok: false, error: 'Khayt can slice an STL or a 3MF with this slicer. Open this file in the slicer itself.' };
+  const settingsJson = slicerPresets.projectSettingsJson(bare.flat.machine, bare.flat.process, bare.flat.filament);
+  const outPath = path.join(outDir, 'khayt-project.3mf');
+  return kind === 'stl'
+    ? OrcaProject.buildStlProject({ stlPath: modelPath, outPath, settingsJson, machine: bare.flat.machine })
+    : OrcaProject.addProjectConfig({ modelPath, outPath, settingsJson });
 }
 
 async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
@@ -1539,7 +1556,16 @@ async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   // The slicer path picks the default template: an Orca/Bambu fork has no --export-gcode.
   // A model with no settings of its own also needs the fork's presets (#1778).
   const bare = bareModelPresets(slicerPath, args, modelPath, outDir);
-  const argv = sliceArgv(args, { model: modelPath, output: outPath, outdir: outDir, slicer: slicerPath, presets: bare.presets });
+  // Made into a project with the presets inside, and sliced with NO preset
+  // flags (Snapmaker Orca 2.4.1 segfaults on them; #2731).
+  let target;
+  try { target = sliceTarget(bare, modelPath, outDir); }
+  catch (e) { target = { ok: false, error: `Khayt could not prepare this model for the slicer (${String((e && e.message) || e).slice(0, 80)}).` }; }
+  if (!target.ok) {
+    try { fs.rmSync(outDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    return { ok: false, error: target.error };
+  }
+  const argv = sliceArgv(args, { model: target.path, output: outPath, outdir: outDir, slicer: slicerPath });
   const result = await new Promise((resolve) => {
     // Both streams: the Orca forks log their real reason ("File Version 2.3.0.4 not
     // supported…") to STDOUT and leave stderr with a usage dump or nothing.
@@ -2468,6 +2494,11 @@ require('./lib/main/launch-gate.js').registerLaunchGate({
   // Asked once, as the app starts: the window writes a fresh install's first
   // book before it asks for the gate, and that is not an upgrade.
   hasBook: (() => { let had = false; try { had = fs.existsSync(dataFilePath()); } catch (_) { had = false; } return () => had; })(),
+  // The app version that last opened the book, read as the app starts, before
+  // this launch's app-version backup overwrites the marker (writeAppVersionBackup).
+  // Every build since 3.11.6 writes it, so a 4.11.x book counts from 4.11.x and
+  // is not asked about 4.11.0 again (review of 4.12.0, L1).
+  lastKnownVersion: (() => { let v = null; try { v = fs.readFileSync(path.join(app.getPath('userData'), LAST_APP_VERSION_FILE), 'utf8').trim() || null; } catch (_) { v = null; } return () => v; })(),
   isNewer: (a, b) => isVersionNewer(String(a), String(b)),
   offeredVersion: () => require('./lib/updater').offeredUpdateVersion(),
 });
@@ -5552,6 +5583,22 @@ registerLanServer({
   // until the phone ships it, as on the Mac: on only for a developer who
   // starts Khayt with KHAYT_PHONE_PAIRING_BY_CODE=1. Read here, in main, so
   // nothing the window sends can switch it on.
+  // POST /api/network/switch: an owner's phone flipping "Make no internet
+  // calls" (the Mac's route; lib/main/phone-network-switch.js). The same write,
+  // stamp and "tell my other computers" as the window's own change. The
+  // functions read networkSwitchSync when called (it is declared further down).
+  phoneNetworkSwitch: require('./lib/main/phone-network-switch').createPhoneNetworkSwitch({
+    getSettings: () => (lanServerStore && lanServerStore.settings) || null,
+    updateNetwork: (fn) => updateStoreOnDiskAllowingLock((cur) => {
+      const before = (cur.settings && cur.settings.network && typeof cur.settings.network === 'object') ? cur.settings.network : {};
+      const next = fn(before);
+      if (next === before) return cur;
+      return Object.assign({}, cur, { settings: Object.assign({}, cur.settings, { network: next }) });
+    }, ['settings.network']),
+    publish: (args) => networkSwitchSync.publish(args),
+    highestSeen: () => { try { return networkSwitchSync.state().highestSeen || null; } catch (_) { return null; } },
+    notify: (network) => BrowserWindow.getAllWindows().forEach((w) => { try { w.webContents.send('hub:network-applied', network); } catch (_) { /* gone */ } }),
+  }),
   phonePairing: require('./lib/main/phone-pairing').createPhonePairing({
     enabled: () => process.env.KHAYT_PHONE_PAIRING_BY_CODE === '1',
   }),

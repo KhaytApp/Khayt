@@ -94,10 +94,11 @@
     updateOverlay?.querySelector('[data-upd="later"]')?.addEventListener('click', closeUpdateModal);
     updateOverlay?.querySelector('[data-upd="download"]')?.addEventListener('click', () => {
       // Read and accepted here: the first launch of that version does not ask
-      // again (lib/main/launch-gate.js `acceptedFor`).
+      // again about the items shown here, in these words (lib/main/launch-gate.js
+      // `acceptedFor` + `acceptedItems`; anything else is asked again).
       const major = activeUpdateInfo && activeUpdateInfo.majorChanges;
       if (consentGiven && major && major.needsConsent && activeUpdateInfo.version) {
-        window.hubAPI?.launchGateAcceptedInUpdate?.(activeUpdateInfo.version)?.catch?.(() => {});
+        window.hubAPI?.launchGateAcceptedInUpdate?.(activeUpdateInfo.version, Array.isArray(major.items) ? major.items : [])?.catch?.(() => {});
       }
       startUpdateDownload();
     });

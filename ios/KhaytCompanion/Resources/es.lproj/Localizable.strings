@@ -1578,7 +1578,7 @@
 "lock.after.1" = "Tras 1 minuto";
 "lock.after.5" = "Tras 5 minutos";
 "lock.after.15" = "Tras 15 minutos";
-"lock.foot" = "Activado por defecto en los teléfonos del propietario y del gerente. Face ID o el código de este iPhone abre Khayt al iniciarse, y de nuevo tras estar en segundo plano el tiempo indicado arriba. Tu libro permanece en el teléfono en cualquier caso.";
+"lock.foot" = "Activado por defecto en los teléfonos del propietario y del gerente. Face ID o el código de este iPhone abre Khayt al iniciarse, y de nuevo tras estar en segundo plano el tiempo indicado arriba. Tu libro permanece en el teléfono en cualquier caso. Siri, Atajos y los botones de los avisos de impresión y de la Actividad en vivo siguen funcionando con Khayt bloqueado: los protege el bloqueo de este iPhone.";
 "lock.no_passcode" = "Este iPhone no tiene código, así que Khayt no puede bloquearse. Configura uno en los Ajustes del iPhone.";
 "lock.floor.title" = "No hace falta bloqueo";
 "lock.floor.body" = "Este es un teléfono de taller: no guarda copia del libro de la tienda, así que no hay nada que bloquear. Muestra la cola y las impresoras mientras está en la Wi-Fi de la tienda.";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Desbloquear";
 "lock.use_passcode" = "Usar el código";
 "lock.reason" = "Desbloquea Khayt para ver tu tienda.";
+"lock.reason.change" = "Confirma que eres tú para cambiar el bloqueo de Khayt.";
 "alert.print.a_print" = "Una impresión";
 "intake.remind.alert.hidden" = "Una solicitud de cliente espera tu respuesta.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
@@ -1637,3 +1638,65 @@
 "printer.why.read_only" = "El Mac muestra la tienda de muestra, que no se puede cambiar.";
 "printer.why.not_saved" = "El Mac no pudo guardarlo ahora. Inténtalo de nuevo.";
 "printer.why.role" = "El rol de este teléfono no lo permite. Pregunta al propietario.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "Teléfonos emparejados";
+"owner.phones.this" = "%@ (este teléfono)";
+"owner.phones.unnamed" = "Un teléfono";
+"owner.phones.by_pin" = "Emparejado con el PIN";
+"owner.phones.by_code" = "Emparejado por número";
+"owner.phones.seen" = "visto por última vez %@";
+"owner.phones.now" = "ahora";
+"owner.phones.yesterday" = "ayer";
+"owner.phones.foot" = "Los roles y la eliminación de un teléfono se ajustan en tu Mac (Ajustes › Teléfonos y Wi-Fi). Solo lo ve el propietario, en la Wi-Fi de la tienda.";
+"owner.role.owner" = "Propietario";
+"owner.role.manager" = "Gerente";
+"owner.role.operator" = "Operador";
+"owner.role.viewer" = "Lector";
+"owner.prices.title" = "Precios en el laminador";
+"owner.prices.switch" = "Mostrar precios en el laminador";
+"owner.prices.switch.sub" = "Se ajusta en tu Mac";
+"owner.prices.may" = "Puede ver los precios";
+"owner.prices.hidden" = "Precios ocultos";
+"owner.prices.allowed" = "Permitido";
+"owner.prices.not_allowed" = "No permitido";
+"owner.prices.unnamed" = "Un laminador";
+"owner.prices.foot" = "Qué laminador puede ver los precios de la tienda lo decide el propietario, en el Mac. El teléfono solo lo muestra.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "Tasa de éxito";
+"success.window" = "%@ · últimos 30 días";
+"success.counts" = "%1$d terminadas, %2$d fallidas";
+"success.cancelled" = "%d canceladas no contadas";
+"success.not_enough" = "Aún no hay suficientes impresiones: %1$d de %2$d necesarias";
+/* A spool tag on a head (signed frame 7a; Mac #2697) */
+"tray.title" = "%1$@ · cabezal %2$d";
+"tray.tag_says" = "La etiqueta dice: %@";
+"tray.tag_unknown" = "una bobina sin nombre";
+"tray.kg" = "%d kg";
+"tray.g" = "%d g";
+"tray.match.link" = "Coincide con tu bobina «%@»";
+"tray.match.ask" = "Más de una de tus bobinas podría ser esta";
+"tray.match.new" = "No hay ninguna bobina así en tu estante";
+"tray.linked" = "En este cabezal: «%@»";
+"tray.do.link" = "Vincular a esta bobina";
+"tray.do.choose" = "Elegir otra";
+"tray.do.choose_first" = "Elegir la bobina";
+"tray.do.add" = "Añadir bobina desde la etiqueta";
+"tray.foot" = "A través del Mac. Nada cambia una bobina sin un toque.";
+"tray.done.linked" = "Vinculada.";
+"tray.done.created" = "Añadida a tu estante y vinculada. Aún no tiene precio.";
+"tray.why.changed" = "La etiqueta de este cabezal cambió, así que no se vinculó nada. Esto es lo que hay ahora.";
+"tray.why.no_answer" = "El Mac no respondió. Esto es lo que muestra ahora; compruébalo antes de intentarlo de nuevo.";
+"tray.why.no-spool" = "Esa bobina ya no está en el estante.";
+"tray.why.tag-unusable" = "La etiqueta no indica qué filamento es, así que no se puede crear una bobina con ella.";
+"tray.why.printer-unreachable" = "El Mac no pudo conectar con la impresora.";
+"tray.why.read-only" = "El Mac muestra la tienda de muestra, que no se puede cambiar.";
+"tray.why.not-saved" = "El Mac no pudo guardarlo ahora. Inténtalo de nuevo.";
+"tray.why.busy" = "La app del Mac se está iniciando. Inténtalo en un momento.";
+"tray.why.role-scope" = "El rol de este teléfono no lo permite. Pregunta al propietario.";
+"tray.why.device-key-required" = "Este teléfono necesita emparejarse de nuevo con el Mac primero.";
+"tray.why.no-trays" = "Esta impresora no tiene ahora ninguna etiqueta que leer ahí.";
+"tray.why.not-offered" = "Actualiza la app del Mac para vincular bobinas desde el teléfono.";
+"tray.why.unreachable" = "No se pudo completar. No se cambió nada.";
+"tray.linked.unnamed" = "Hay una bobina registrada en este cabezal";
+"tray.not_in_printer" = "No está en la impresora ahora. Sigue vinculada a este cabezal.";

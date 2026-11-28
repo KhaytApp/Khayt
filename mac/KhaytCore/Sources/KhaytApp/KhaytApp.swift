@@ -979,6 +979,12 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Machine profit with the success figures, page 25 frame 5 (`SnapshotSuccessRate.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SUCCESS"] == "1", let shop = subject {
+                await captureSuccessRate(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_B13"] == "1", let shop = subject {
                 await captureBeta13(shop, into: dir, dark: dark)
                 NSApp.terminate(nil)

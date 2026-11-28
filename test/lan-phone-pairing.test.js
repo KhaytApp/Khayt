@@ -151,6 +151,7 @@ test('refused reveals: a short nonce, an all-zero key, a key that is not the one
 // ── Over HTTP ─────────────────────────────────────────────────────────────
 
 let store, handlers, lanIdentity, lanDevices, mono = 0, pairOn = true;
+let switchCalls = [];
 const ipc = (name, arg) => handlers.get(name)(null, arg);
 function start(pin) { return ipc('hub:start-lan-server', { port: PORT, pin, bindLan: 'loopback' }); }
 before(async () => {
@@ -183,6 +184,18 @@ before(async () => {
     lanIdentity,
     lanDevices,
     phonePairing: PP.createPhonePairing({ clock: () => mono, enabled: () => pairOn }),
+    // POST /api/network/switch over the same book; what main would publish and tell the window, recorded.
+    phoneNetworkSwitch: require('../lib/main/phone-network-switch.js').createPhoneNetworkSwitch({
+      getSettings: () => store.settings,
+      updateNetwork: async (fn) => {
+        const before = (store.settings && store.settings.network) || {};
+        const next = fn(before);
+        if (next !== before) store = { ...store, settings: { ...store.settings, network: next } };
+      },
+      publish: async (a) => { switchCalls.push({ publish: a, bookOffline: !!(store.settings.network && store.settings.network.offline) }); return { ok: true, via: 'cloud' }; },
+      highestSeen: () => null,
+      notify: (n) => switchCalls.push({ notify: n }),
+    }),
   });
   assert.ok((await start(PIN)).ok);
 });
@@ -541,4 +554,102 @@ test('POST /api/printer/{id}/bed-clear (the Mac\'s shape): a signed phone of ope
   assert.deepEqual([bare.status, bare.json], [403, { ok: false, reason: 'device-key-required' }]);
   const pinPhone = await enrolWithPin();   // a PIN-paired phone is the owner
   assert.equal((await signed(pinPhone, 'POST', '/api/printer/m1/bed-clear')).status, 200);
+});
+
+test('review of 4.12.0, MED-5: a phone meets the shop\'s per-printer limits (Roles ▸ Printers "control"), as the desktop\'s buttons do', async () => {
+  store.machines = [{ id: 'm1', name: 'U1' }];
+  const prevSettings = store.settings;
+  store.settings = Object.assign({}, prevSettings, { roleLimits: { operator: { printers: { control: false } } } });
+  try {
+    const operator = await pairPhone('operator');
+    const manager = await pairPhone('manager');
+    const r = await signed(operator, 'POST', '/api/printer/m1/bed-clear');
+    assert.deepEqual([r.status, r.json], [403, { reason: 'role-scope', required: 'machines:control', limit: 'printers.control' }]);
+    assert.ok(macOk(operator, r), 'the refusal is signed back');
+    assert.equal(store.machines[0].bedClearedAt, undefined, 'nothing written');
+    assert.equal((await signed(manager, 'POST', '/api/printer/m1/bed-clear')).status, 200, 'a role the shop did not limit still may');
+    // The owner is never limited, whatever a limit row says.
+    store.settings = Object.assign({}, prevSettings, { roleLimits: { operator: { printers: { control: false } }, owner: { printers: { control: false } } } });
+    const owner = await enrolWithPin();
+    assert.equal((await signed(owner, 'POST', '/api/printer/m1/bed-clear')).status, 200);
+    // And reading is untouched: the limit is on control, not on seeing the printers.
+    assert.equal((await signed(operator, 'GET', '/api/machines')).status, 200);
+  } finally { store.settings = prevSettings; }
+});
+
+// ── POST /api/network/switch: the Mac's route on Windows/Linux (Dev Hub, Nov 26) ──
+
+test('POST /api/network/switch: an owner\'s phone turns the switch on and off, every answer signed; the window is told and the other computers told in the right order', async () => {
+  const prev = store.settings;
+  store.settings = { ...prev, network: { offline: false, keep: ['storefront'], changedAt: '2026-11-20T10:00:00.000Z', changedBy: 'Desk' } };
+  switchCalls = [];
+  try {
+    const owner = await enrolWithPin();
+    const self = await signed(owner, 'GET', '/api/devices/self');
+    assert.deepEqual(self.json.can, ['network-switch'], 'an owner\'s phone is told the route is here');
+    // ON, keeping cloud: published FIRST (the book still off), then written, then the window told.
+    const on = await signed(owner, 'POST', '/api/network/switch', { offline: true, keep: ['cloud'], seen: '2026-11-20T10:00:00Z', seenKeep: ['storefront'] });
+    assert.equal(on.status, 200, on.text);
+    assert.ok(macOk(owner, on), 'signed back');
+    assert.equal(on.json.ok, true);
+    assert.deepEqual([on.json.network.offline, on.json.network.keep, on.json.network.changedBy], [true, ['cloud'], 'PIN phone']);
+    assert.ok(Date.parse(on.json.network.changedAt) > Date.parse('2026-11-20T10:00:00.000Z'), 'a new stamp, forward only');
+    assert.deepEqual(store.settings.network.offline, true);
+    assert.equal(store.settings.network.via, 'cloud', 'the cloud took it, so the 15-minute check keeps running offline');
+    assert.deepEqual(switchCalls.map((c) => (c.publish ? `publish:${c.publish.offline}:book-${c.bookOffline}` : 'notify')), ['publish:true:book-false', 'notify']);
+    // OFF: written first, then the other computers told what the book holds.
+    switchCalls = [];
+    const off = await signed(owner, 'POST', '/api/network/switch', { offline: false, seen: on.json.network.changedAt });
+    assert.equal(off.status, 200, off.text);
+    assert.equal(store.settings.network.offline, false);
+    assert.deepEqual(store.settings.network.keep, ['cloud'], 'no keep sent: left as it is');
+    assert.deepEqual(switchCalls.map((c) => (c.publish ? `publish:${c.publish.offline}:book-${c.bookOffline}` : 'notify')), ['notify', 'publish:false:book-false']);
+    // A Keep tick alone moves neither the stamp nor the name.
+    const at = store.settings.network.changedAt;
+    const tick = await signed(owner, 'POST', '/api/network/switch', { offline: false, keep: ['cloud', 'ai'], seen: at, seenKeep: ['cloud'] });
+    assert.equal(tick.status, 200, tick.text);
+    assert.deepEqual([store.settings.network.changedAt, store.settings.network.keep], [at, ['cloud', 'ai']]);
+  } finally { store.settings = prev; }
+});
+
+test('POST /api/network/switch: stale, refused and malformed requests change nothing', async () => {
+  const prev = store.settings;
+  store.settings = { ...prev, network: { offline: false, keep: ['storefront', 'a-purpose-from-a-newer-app'], changedAt: '2026-11-20T10:00:00.000Z', changedBy: 'Desk' } };
+  const before = JSON.stringify(store.settings.network);
+  try {
+    const owner = await enrolWithPin();
+    // Stale `seen`, and stale `seenKeep` (a Keep ticked at the desk meanwhile): 409 with what is true now.
+    const stale = await signed(owner, 'POST', '/api/network/switch', { offline: true, seen: '2026-11-19T10:00:00.000Z' });
+    assert.deepEqual([stale.status, stale.json.reason, stale.json.network.offline], [409, 'changed', false]);
+    assert.ok(macOk(owner, stale));
+    assert.deepEqual(stale.json.network.keep, ['storefront'], 'only the purposes this computer shows a phone');
+    assert.equal((await signed(owner, 'POST', '/api/network/switch', { offline: true, seenKeep: [] })).json.reason, 'changed');
+    // Keep: `lan`, `switch-sync` and an unknown id are refused, not dropped.
+    for (const keep of [['lan'], ['switch-sync'], ['nope'], [7]]) {
+      const r = await signed(owner, 'POST', '/api/network/switch', { offline: true, keep });
+      assert.deepEqual([r.status, r.json.reason], [400, 'bad-keep'], JSON.stringify(keep));
+    }
+    for (const body of [{}, { offline: 'yes' }, { offline: true, keep: 'cloud' }, { offline: true, seen: 5 }, { offline: true, seenKeep: [1] }]) {
+      const r = await signed(owner, 'POST', '/api/network/switch', body);
+      assert.deepEqual([r.status, r.json.reason], [400, 'bad-body'], JSON.stringify(body));
+    }
+    const big = await signed(owner, 'POST', '/api/network/switch', { offline: true, pad: 'x'.repeat(5000) });
+    assert.deepEqual([big.status, big.json.reason], [400, 'bad-body'], 'over 4 KB');
+    assert.equal(JSON.stringify(store.settings.network), before, 'nothing written');
+    // Not the owner: refused before the route, signed.
+    const operator = await pairPhone('operator');
+    const op = await signed(operator, 'POST', '/api/network/switch', { offline: true });
+    assert.deepEqual([op.status, op.json], [403, { reason: 'role-scope', required: 'owner' }]);
+    assert.ok(macOk(operator, op));
+    const opSelf = await signed(operator, 'GET', '/api/devices/self');
+    assert.equal(opSelf.json.can, undefined, 'no control offered to a phone that may not use it');
+    // The PIN alone is not a phone.
+    const bare = await call('POST', '/api/network/switch', { headers: { 'x-khayt-pin': PIN }, body: { offline: true } });
+    assert.deepEqual([bare.status, bare.json], [403, { ok: false, reason: 'device-key-required' }]);
+    assert.equal(JSON.stringify(store.settings.network), before, 'still nothing written');
+    // Keep sent while the book holds a purpose this computer does not know: that one is left there.
+    const kept = await signed(owner, 'POST', '/api/network/switch', { offline: false, keep: ['cloud'], seen: '2026-11-20T10:00:00.000Z' });
+    assert.equal(kept.status, 200, kept.text);
+    assert.deepEqual(store.settings.network.keep, ['cloud', 'a-purpose-from-a-newer-app']);
+  } finally { store.settings = prev; }
 });

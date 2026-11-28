@@ -133,10 +133,16 @@ struct MachineCarePage: View {
     @State private var care = CareBook()
     @State private var loaded = false
     @Environment(\.dismiss) private var dismiss
+    /// The printer's success rate over the last 30 days (signed frame 6);
+    /// nil on a phone that keeps no book.
+    @State private var success: MachineSuccess?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                if let success { SuccessRateCard(name: name, success: success) }
+                // The spool tags its heads read (a Snapmaker U1): nothing for any other printer.
+                SpoolTagCards(machineId: machineId, machineName: name)
                 if api.shopMode.isProfessionalOnly("machineUpkeep") {
                     ProfessionalGateCard(title: L10n.tr("simple.gate.care.title"),
                                          message: L10n.tr("simple.gate.care.body"),
@@ -157,8 +163,47 @@ struct MachineCarePage: View {
 
     private func refresh() async {
         care = await api.printerCare() ?? CareBook()
+        success = await api.machineSuccess(machineId: machineId)
         loaded = true
         await reload()
+    }
+}
+
+/// "Prusa MK4 · last 30 days / Success rate / 23 finished, 2 failed · 3
+/// cancelled not counted / 92%" (signed frame 6). A dash while there are too
+/// few prints to say.
+struct SuccessRateCard: View {
+    let name: String
+    let success: MachineSuccess
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L10n.format("success.window", name))
+                .font(.khayt(17, .semibold, relativeTo: .headline))
+                .foregroundStyle(KhaytDesign.ink)
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.tr("success.title"))
+                        .font(.khayt(14.5, relativeTo: .subheadline))
+                        .foregroundStyle(KhaytDesign.ink)
+                    Text(success.detail)
+                        .font(.khayt(12, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.note)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 12)
+                Text(verbatim: success.percent ?? "—")
+                    .font(.khayt(15, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(success.percent == nil ? KhaytDesign.note : KhaytDesign.done)
+                    .accessibilityHidden(success.percent == nil)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(KhaytDesign.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+        .accessibilityElement(children: .combine)
     }
 }
 

@@ -1529,7 +1529,10 @@ final class LanServer {
         case (_, false) where request.method == "POST" && host.bedClear != nil
                 && Self.bedClearPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
-            guard LanDevices.isSigned(request.headers) else {
+            // `!tokenScoped`: an API token skips the signature check in
+            // `pinGate`, so a route for signed phones refuses one itself
+            // (Nov 26 review, L5).
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.bedClear!(Self.bedClearPath(path)!)
@@ -2758,6 +2761,16 @@ final class LanServer {
         }
         let device = KhaytEngine.deviceRecord(kind: stored["kind"], role: stored["role"],
                                               rolesVersion: stored["rolesVersion"].flatMap(Int.init))
+        // ── A KEY SENT TWICE IS NOT READ (Nov 26 review, MED-1) ──────────
+        // The rule below reads the body with JavaScript, where the LAST of a
+        // repeated key wins; the routes read it in Swift, where the FIRST
+        // does. `{"status":"pending","status":null}` was no status to the
+        // rule (orders:write) and "pending" to the route: an operator's phone
+        // moved quotes on and priced jobs. No real client repeats a key, so
+        // the whole body is refused before either reads it.
+        if !request.body.isEmpty, JSONRepeatedKeys.found(in: request.body) {
+            return signedForPhone(.json(400, #"{"ok":false,"reason":"repeated-key"}"#), request)
+        }
         // The rule is asked about the REQUEST, not only the route: on a job
         // write the body decides too (a price, a new quote, or moving a quote
         // on is pricing, `quote:write`, whatever route carries it).
@@ -2767,7 +2780,21 @@ final class LanServer {
             bodyText: write.map { _ in String(decoding: request.body, as: UTF8.self) }, job: write?.job) else {
             return signedForPhone(.json(403, #"{"reason":"role-scope","required":"owner"}"#), request)
         }
-        if answer.ok { return nil }
+        if answer.ok {
+            // ── AND THE SHOP'S OWN PER-PRINTER LIMITS (Nov 26 review, MED-5) ──
+            // The role table gives every operator `machines:control`. A shop
+            // that took printer control away from operators (Roles ▸
+            // Printers, `settings.roleLimits`) is obeyed here as at the Mac
+            // (`printerRoleHas`): the same rule, `KhaytRbac.canPrinter`.
+            guard answer.required == "machines:control" else { return nil }
+            var limits: JSONValue?
+            if case .object(let settings)? = host.store()["settings"] { limits = settings["roleLimits"] }
+            guard let role = try? await host.engine.deviceRole(device),
+                  (try? await host.engine.rbacCanPrinter(role: role, verb: "control", lockEnabled: true, limits: limits)) == true else {
+                return signedForPhone(.json(403, #"{"reason":"role-scope","required":"machines:control"}"#), request)
+            }
+            return nil
+        }
         let body = (try? JSONEncoder().encode(["reason": "role-scope", "required": answer.required ?? "owner"])) ?? Data()
         // Signed back: a phone acts on this answer (it steps down to its floor
         // mode), so a device on the Wi-Fi must not be able to forge it.
@@ -3959,12 +3986,15 @@ extension Shop {
         }
         // A customer's upload is nearly always a bare mesh, and an Orca fork
         // will not slice one without a printer, print and filament profile —
-        // its built-in defaults fail its own validation (#1778).
-        let presets = await SlicerRun.bareModelPresets(engine: engine, slicer: slicer, template: slicer.args,
-                                                       model: model, outDir: dir).presets
-        guard let argv = try? await engine.sliceArgv(template: slicer.args, model: model.path,
+        // its built-in defaults fail its own validation (#1778). It goes in as a
+        // PROJECT carrying them, never with preset flags: Snapmaker Orca
+        // segfaults on those (`SlicerRun.sliceInput`).
+        let input = await SlicerRun.sliceInput(engine: engine, slicer: slicer, template: slicer.args,
+                                               model: model, outDir: dir)
+        let sliceable = input.model
+        guard let argv = try? await engine.sliceArgv(template: slicer.args, model: sliceable.path,
                                                      output: output.path, outdir: dir.path,
-                                                     slicer: slicer.path, presets: presets) else { return nil }
+                                                     slicer: slicer.path, presets: .null) else { return nil }
         // OFF THE MAIN ACTOR. A slice takes up to three minutes and `slice`
         // blocks for all of it; run here, on the shop's main actor, a stranger's
         // upload froze the whole app — and a slicer that never exited froze it
@@ -3975,7 +4005,7 @@ extension Shop {
         // three-core Mac (see `LanServer.estimate`). Oct 2026.
         let text: String? = await withCheckedContinuation { (done: CheckedContinuation<String?, Never>) in
             LanServer.measureQueue.async {
-                guard (try? SlicerRun.slice(model, with: slicer, argv: argv, allowed: true)) != nil,
+                guard (try? SlicerRun.slice(sliceable, with: slicer, argv: argv, allowed: true)) != nil,
                       let gcode = SlicerRun.gcode(in: dir, expected: output) else {
                     done.resume(returning: nil); return
                 }

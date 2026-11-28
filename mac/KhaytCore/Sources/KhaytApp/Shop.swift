@@ -2622,6 +2622,12 @@ final class Shop {
     /// An update Khayt found that has unread "Before you update" items: the
     /// sheet in front of it (`UpdateGate.swift`). Nil when none is held.
     var updateOffer: UpdateOffer?
+    /// Whether the "An update is ready" sheet is really on screen, and the
+    /// hold waiting for the window to be free (`holdUpdate`).
+    var updateGateOnScreen = false
+    var updateOfferWaiting: Task<Void, Never>?
+    /// TESTS ONLY: whether a window has a sheet up.
+    var updateGateWindowBusyForTests: (() -> Bool)?
     /// TESTS ONLY: a release's gate file, instead of asking GitHub for it.
     var updateGateFetchForTests: (@Sendable (String) async -> String?)?
     /// TESTS ONLY: the version this Mac runs (a test build has none).

@@ -96,7 +96,8 @@ test('the window holds it: no Later, no Escape, Continue only once ticked, and a
   assert.match(fn, /new MutationObserver\(/);
   assert.match(fn, /later\.disconnect\(\);\s*\n\s*for \(const el of madeInert\) el\.inert = false;/);
   assert.doesNotMatch(fn, /data-upd="later"/);
-  assert.match(ui, /launchGateAcceptedInUpdate\?\.\(activeUpdateInfo\.version\)/);
+  // With the texts it showed (review of 4.12.0, LOW-7): the first launch skips only those, in those words.
+  assert.match(ui, /launchGateAcceptedInUpdate\?\.\(activeUpdateInfo\.version, Array\.isArray\(major\.items\) \? major\.items : \[\]\)/);
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'renderer/app-boot.js'), 'utf8'), /showLaunchGateIfNeeded\(\)/);
   for (const l of ['en', 'ar', 'de', 'es', 'fr', 'ja', 'pt-BR', 'tr', 'zh']) {
     const s = fs.readFileSync(path.join(__dirname, '..', `renderer/locales/${l}.js`), 'utf8');

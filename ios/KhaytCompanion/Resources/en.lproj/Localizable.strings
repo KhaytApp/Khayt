@@ -1578,7 +1578,7 @@
 "lock.after.1" = "After 1 minute";
 "lock.after.5" = "After 5 minutes";
 "lock.after.15" = "After 15 minutes";
-"lock.foot" = "On by default on owner and manager phones. Face ID or this iPhone's passcode opens Khayt when it starts, and again after it has been in the background for the time above. Your book stays on the phone either way.";
+"lock.foot" = "On by default on owner and manager phones. Face ID or this iPhone's passcode opens Khayt when it starts, and again after it has been in the background for the time above. Your book stays on the phone either way. Siri, Shortcuts and the buttons on print alerts and the Live Activity still work while Khayt is locked: this iPhone's own lock guards them.";
 "lock.no_passcode" = "This iPhone has no passcode, so Khayt cannot lock. Set one in the iPhone's Settings.";
 "lock.floor.title" = "No lock needed";
 "lock.floor.body" = "This is a floor phone: it keeps no copy of the shop's book, so there is nothing on it to lock. It shows the queue and printers while it is on the shop's Wi-Fi.";
@@ -1592,6 +1592,7 @@
 "lock.unlock" = "Unlock";
 "lock.use_passcode" = "Use passcode";
 "lock.reason" = "Unlock Khayt to see your shop.";
+"lock.reason.change" = "Confirm it’s you to change the Khayt lock.";
 "alert.print.a_print" = "A print";
 "intake.remind.alert.hidden" = "A customer request is waiting for your answer.";
 /* Settings > Internet use (frames 1A, 1B). The switch's own words are the desktop's iu.*. */
@@ -1637,3 +1638,65 @@
 "printer.why.read_only" = "The Mac is showing the sample shop, which cannot be changed.";
 "printer.why.not_saved" = "The Mac could not save it just now. Try again.";
 "printer.why.role" = "This phone's role cannot do that. Ask the owner.";
+
+/* The owner's read-only views: paired phones, prices in the slicer (signed Nov 24; Mac #2707) */
+"owner.phones.title" = "Paired phones";
+"owner.phones.this" = "%@ (this phone)";
+"owner.phones.unnamed" = "A phone";
+"owner.phones.by_pin" = "Paired with the PIN";
+"owner.phones.by_code" = "Paired by number";
+"owner.phones.seen" = "last seen %@";
+"owner.phones.now" = "now";
+"owner.phones.yesterday" = "yesterday";
+"owner.phones.foot" = "Roles and removing a phone are set on your Mac (Settings › Phones & Wi-Fi). Shown to the owner only, on the shop's Wi-Fi.";
+"owner.role.owner" = "Owner";
+"owner.role.manager" = "Manager";
+"owner.role.operator" = "Operator";
+"owner.role.viewer" = "Viewer";
+"owner.prices.title" = "Prices in the slicer";
+"owner.prices.switch" = "Show prices in the slicer";
+"owner.prices.switch.sub" = "Set on your Mac";
+"owner.prices.may" = "May see prices";
+"owner.prices.hidden" = "Prices hidden";
+"owner.prices.allowed" = "Allowed";
+"owner.prices.not_allowed" = "Not allowed";
+"owner.prices.unnamed" = "A slicer";
+"owner.prices.foot" = "Which slicer may see the shop's prices is the owner's choice, made on the Mac. The phone only shows it.";
+/* Success rate on the machine page (signed frame 6) */
+"success.title" = "Success rate";
+"success.window" = "%@ · last 30 days";
+"success.counts" = "%1$d finished, %2$d failed";
+"success.cancelled" = "%d cancelled not counted";
+"success.not_enough" = "Not enough prints yet: %1$d of %2$d needed";
+/* A spool tag on a head (signed frame 7a; Mac #2697) */
+"tray.title" = "%1$@ · head %2$d";
+"tray.tag_says" = "The tag says %@";
+"tray.tag_unknown" = "a spool it does not name";
+"tray.kg" = "%d kg";
+"tray.g" = "%d g";
+"tray.match.link" = "Matches your spool “%@”";
+"tray.match.ask" = "More than one of your spools could be this one";
+"tray.match.new" = "No spool like it on your shelf";
+"tray.linked" = "In this head: “%@”";
+"tray.do.link" = "Link to this spool";
+"tray.do.choose" = "Choose another";
+"tray.do.choose_first" = "Choose the spool";
+"tray.do.add" = "Add spool from the tag";
+"tray.foot" = "Through the Mac. Nothing changes a spool without a tap.";
+"tray.done.linked" = "Linked.";
+"tray.done.created" = "Added to your shelf and linked. It has no price yet.";
+"tray.why.changed" = "The tag in this head changed, so nothing was linked. This is what is there now.";
+"tray.why.no_answer" = "The Mac did not answer. This is what it shows now; check before trying again.";
+"tray.why.no-spool" = "That spool is no longer on the shelf.";
+"tray.why.tag-unusable" = "The tag does not say what the filament is, so no spool can be made from it.";
+"tray.why.printer-unreachable" = "The Mac could not reach the printer.";
+"tray.why.read-only" = "The Mac is showing the sample shop, which cannot be changed.";
+"tray.why.not-saved" = "The Mac could not save it just now. Try again.";
+"tray.why.busy" = "The app on the Mac is starting. Try again in a moment.";
+"tray.why.role-scope" = "This phone's role cannot do that. Ask the owner.";
+"tray.why.device-key-required" = "This phone needs to pair with the Mac again first.";
+"tray.why.no-trays" = "This printer has no tag to read there now.";
+"tray.why.not-offered" = "Update the app on the Mac to link spools from the phone.";
+"tray.why.unreachable" = "That did not go through. Nothing was changed.";
+"tray.linked.unnamed" = "A spool is recorded in this head";
+"tray.not_in_printer" = "Not in the printer now. Still linked to this head.";

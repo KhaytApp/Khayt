@@ -54,6 +54,7 @@ for (const c of vec('printer-success').cases) test('P6 ' + c.why, () => {
   assert.deepEqual(PS.successRates(input), c.want);
 });
 
+for (const c of vec('printer-success').tone.cases) test('P6 successTone: ' + c.why, () => assert.equal(PS.successTone(c.rate, c.enough), c.want));
 for (const c of vec('printer-success').percent.cases) test('P6 successPercent: ' + c.why + ' (' + JSON.stringify(c.rate) + ')', () => assert.equal(PS.successPercent(c.rate), c.want));
 
 test('P6: a rate never rounds a failure (or a success) away, however many runs', () => {

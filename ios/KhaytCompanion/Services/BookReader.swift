@@ -62,6 +62,10 @@ actor BookReader {
     /// `static let` is made once, on first use, under the runtime's lock.
     private static let appEngine = Result<KhaytEngine, any Error> { try KhaytEngine() }
 
+    /// The app's one engine, for a screen that needs a shared rule and holds
+    /// no book (a colour's name on the spool tags, read from the Mac).
+    static func appWideEngine() throws -> KhaytEngine { try appEngine.get() }
+
     /// A roll, as the shop's own rule would book it in — built here, written
     /// by `BookWriter.addSpool`. See `BookWriter.spoolRecord` for the rule.
     func newSpool(from draft: SpoolDraft, now: Date = Date()) async throws -> [String: JSONValue] {

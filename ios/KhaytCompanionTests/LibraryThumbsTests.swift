@@ -73,6 +73,54 @@ final class LibraryThumbsTests: XCTestCase {
         XCTAssertEqual(ThumbMac.asked, asked, "not again within twelve hours")
     }
 
+    /// The U1 run (Nov 27): 317 connections to the Mac in 65 s, one picture
+    /// straight after another. Now there is a pause between two pictures.
+    func testThePicturesComeWithAPauseBetweenThem() async {
+        let s = ConnectionSettings()
+        let saved = (s.host, s.port, s.isPaired, s.isSampleShop)
+        defer { s.host = saved.0; s.port = saved.1; s.isPaired = saved.2; s.isSampleShop = saved.3 }
+        s.host = "khayt-thumbs.invalid"; s.port = 3219; s.isPaired = true; s.isSampleShop = false
+        let defaults = UserDefaults(suiteName: "pics-\(UUID().uuidString)")!
+        ThumbMac.library = (1...5).map { "PF-\($0)" }
+        ThumbMac.withPicture = Set(ThumbMac.library)
+        ThumbMac.image = picture(200)
+        let api = KhaytAPIClient(settings: s, protocols: [ThumbMac.self], withBook: false)
+        api.thumbShelf = LibraryThumbs(directory: dir)
+        XCTAssertEqual(KhaytAPIClient.picturePause, .milliseconds(100))
+
+        let start = ContinuousClock.now
+        let fetched = await api.keepAllLibraryPictures(now: Date(), defaults: defaults)
+        XCTAssertEqual(fetched, 5)
+        XCTAssertGreaterThanOrEqual(ContinuousClock.now - start, .milliseconds(400), "at least a pause between each two")
+    }
+
+    func testTwoFailedPicturesInARowStopTheWalkForTenMinutes() async {
+        let s = ConnectionSettings()
+        let saved = (s.host, s.port, s.isPaired, s.isSampleShop)
+        defer { s.host = saved.0; s.port = saved.1; s.isPaired = saved.2; s.isSampleShop = saved.3 }
+        s.host = "khayt-thumbs.invalid"; s.port = 3219; s.isPaired = true; s.isSampleShop = false
+        let defaults = UserDefaults(suiteName: "pics-\(UUID().uuidString)")!
+        ThumbMac.library = (1...6).map { "PF-\($0)" }
+        ThumbMac.withPicture = Set(ThumbMac.library).subtracting(["PF-2"])
+        ThumbMac.failing = ["PF-4", "PF-5"]
+        ThumbMac.image = picture(200)
+        let api = KhaytAPIClient(settings: s, protocols: [ThumbMac.self], withBook: false)
+        api.thumbShelf = LibraryThumbs(directory: dir)
+
+        let now = Date()
+        let fetched = await api.keepAllLibraryPictures(now: now, defaults: defaults)
+        XCTAssertEqual(fetched, 2, "PF-1 and PF-3; PF-2 has no picture to ask for")
+        XCTAssertEqual(ThumbMac.picturesAsked, ["PF-1", "PF-3", "PF-4", "PF-5"], "PF-6 is not asked for")
+
+        ThumbMac.picturesAsked = []
+        let soon = await api.keepAllLibraryPictures(now: now.addingTimeInterval(120), defaults: defaults)
+        XCTAssertEqual(soon, 0)
+        XCTAssertEqual(ThumbMac.picturesAsked, [], "not on the next poll")
+        ThumbMac.failing = []
+        let later = await api.keepAllLibraryPictures(now: now.addingTimeInterval(11 * 60), defaults: defaults)
+        XCTAssertEqual(later, 3, "ten minutes on, the rest")
+    }
+
     func testEveryFolderIsWalkedAndPicturesTheMacNoLongerListsGo() async {
         let s = ConnectionSettings()
         let saved = (s.host, s.port, s.isPaired, s.isSampleShop)
@@ -152,8 +200,14 @@ final class ThumbMac: URLProtocol, @unchecked Sendable {
     /// Each model's folder; none is the top folder.
     nonisolated(unsafe) static var folderOf: [String: String] = [:]
     nonisolated(unsafe) static var image = Data("jpeg".utf8)
+    /// Pictures the Mac fails to give (a 500), and each picture asked for, in order.
+    nonisolated(unsafe) static var failing: Set<String> = []
+    nonisolated(unsafe) static var picturesAsked: [String] = []
 
-    static func reset() { reachable = true; hasPicture = true; asked = 0; library = []; withPicture = []; folderOf = [:]; image = Data("jpeg".utf8) }
+    static func reset() {
+        reachable = true; hasPicture = true; asked = 0; library = []; withPicture = []; folderOf = [:]
+        image = Data("jpeg".utf8); failing = []; picturesAsked = []
+    }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-thumbs.invalid" }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -189,8 +243,10 @@ final class ThumbMac: URLProtocol, @unchecked Sendable {
         }
         if !Self.library.isEmpty {
             let id = path.split(separator: "/").dropLast().last.map(String.init) ?? ""
+            Self.picturesAsked.append(id)
             let has = Self.withPicture.contains(id)
-            let response = HTTPURLResponse(url: request.url!, statusCode: has ? 200 : 404, httpVersion: "HTTP/1.1", headerFields: nil)!
+            let status = Self.failing.contains(id) ? 500 : (has ? 200 : 404)
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: has ? Self.image : Data("{}".utf8))
             client?.urlProtocolDidFinishLoading(self)
