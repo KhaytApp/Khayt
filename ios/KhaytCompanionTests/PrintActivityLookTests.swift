@@ -111,9 +111,20 @@ final class PrintActivityLookTests: XCTestCase {
         XCTAssertFalse(PrintActivityText.overdue(s(.printing, ends: nil), stale: true, now: now), "no estimate: nothing has passed")
         XCTAssertFalse(PrintActivityText.overdue(s(.paused, ends: -60), stale: true, now: now))
         XCTAssertFalse(PrintActivityText.overdue(s(.finished, ends: -60), stale: true, now: now))
-        // The phone's own stale date is the estimated finish, so the card turns overdue on time.
+        // No update after the start: iOS flips isStale at the date the START
+        // carried, and the phone starts with the estimated finish (or later),
+        // never before it. So a card nobody ever updates still turns overdue
+        // at its finish.
         let ends = now.addingTimeInterval(40 * 60)
-        XCTAssertEqual(PrintActivityPlan.staleDate(endsAt: ends, now: now), ends)
+        let startStale = PrintActivityPlan.staleDate(endsAt: ends, now: now)
+        XCTAssertEqual(startStale, ends)
+        XCTAssertTrue(PrintActivityText.overdue(s(.printing, ends: 40 * 60), stale: true, now: startStale))
+        // A finish within five minutes: stale at five minutes, already past it.
+        let soon = PrintActivityPlan.staleDate(endsAt: now.addingTimeInterval(60), now: now)
+        XCTAssertTrue(PrintActivityText.overdue(s(.printing, ends: 60), stale: true, now: soon))
+        // An estimate already passed when it started: stale in five minutes, overdue then.
+        let past = PrintActivityPlan.staleDate(endsAt: now.addingTimeInterval(-60), now: now)
+        XCTAssertTrue(PrintActivityText.overdue(s(.printing, ends: -60), stale: true, now: past))
     }
 
     func testAPrintersFileNameReadsAsATitle() {
