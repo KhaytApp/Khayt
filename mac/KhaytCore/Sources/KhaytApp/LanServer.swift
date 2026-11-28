@@ -207,6 +207,11 @@ final class LanServer {
         /// Unset, the route is not here and the phone reads the 404 as "this
         /// Mac predates it".
         var bedClear: (@MainActor (_ machineId: String) async -> (Int, String))? = nil
+        /// The spool tags a printer's heads read, and saying which of the
+        /// shop's spools is in a head (`Shop.phoneTrays`, `Shop.phoneLinkTray`).
+        /// Unset, the routes are not here (404).
+        var trays: (@MainActor (_ machineId: String) async -> (Int, String))? = nil
+        var linkTray: (@MainActor (_ machineId: String, _ head: Int, _ body: Data) async -> (Int, String))? = nil
         /// An owner's phone turning the shop's "Make no internet calls" on or
         /// off (`Shop.phoneSetOutbound`). Unset, the route is not here (404)
         /// and `/api/devices/self` does not advertise it.
@@ -1533,6 +1538,33 @@ final class LanServer {
             let (status, body) = await host.bedClear!(Self.bedClearPath(path)!)
             return .json(status, body)
 
+        // `GET /api/printer/{machineId}/trays`: the spool tags the heads
+        // read, each matched against the shelf. SIGNED PHONES ONLY (never an
+        // API token, never the PIN alone): the answer names the shop's
+        // spools. The gate's role check asks `inventory:read`.
+        case (_, true) where request.method == "GET" && host.trays != nil && Self.trayReadPath(path) != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let (status, body) = await host.trays!(Self.trayReadPath(path)!)
+            // Signed back: the phone offers a spool to link on this answer,
+            // so it must know the Mac said it and nothing on the Wi-Fi did.
+            return signedForPhone(.json(status, body), request)
+
+        // `POST /api/printer/{machineId}/trays/{head}/spool`: which spool is
+        // in that head. It writes the machine's record and may add one spool,
+        // so: a signed phone, and `inventory:write` (`lib/device-roles.js`),
+        // which a viewer's phone does not hold.
+        case (_, false) where request.method == "POST" && host.linkTray != nil && Self.trayLinkPath(path) != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let asked = Self.trayLinkPath(path)!
+            let (status, body) = await host.linkTray!(asked.id, asked.head, request.body)
+            return signedForPhone(.json(status, body), request)
+
         // ── A PHONE TELLS A PRINTER WHAT TO DO ───────────────────────────
         //
         // SIGNED PHONES ONLY. Every other phone route also opens to the owner
@@ -2815,6 +2847,9 @@ final class LanServer {
         // list, so later ones can be added; an older Mac sends none.
         var can: [JSONValue] = []
         if host.networkSwitch != nil, role == "owner" { can.append(.string("network-switch")) }
+        // The spool-tag routes: said when this Mac serves them, to a phone
+        // whose role may at least read them.
+        if host.trays != nil, scopes.contains("inventory:read") { can.append(.string("trays")) }
         // The owner's read-only views (`LanServer+OwnerViews`).
         if role == "owner" { can.append(.string("devices")); can.append(.string("slicer-prices")) }
         let answer: JSONValue = .object(["deviceId": .string(id), "role": .string(role),
@@ -3484,6 +3519,12 @@ extension Shop {
         }
         host.bedClear = { [weak self] id in
             await self?.phoneBedClear(id) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        host.trays = { [weak self] id in
+            await self?.phoneTrays(id) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        host.linkTray = { [weak self] id, head, body in
+            await self?.phoneLinkTray(id, head: head, body: body) ?? (503, #"{"ok":false,"reason":"busy"}"#)
         }
         host.addJobPhoto = { [weak self] id, data in
             await self?.phoneAddJobPhoto(id, data) ?? (503, #"{"ok":false,"reason":"busy"}"#)

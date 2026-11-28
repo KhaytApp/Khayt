@@ -599,6 +599,83 @@
     "required": "machines:control",
     "role": "owner"
    }
+  },
+  {
+   "why": "a viewer reads a printer's spool tags",
+   "role": "viewer",
+   "path": "/api/printer/m1/trays",
+   "method": "GET",
+   "want": {
+    "ok": true,
+    "required": "inventory:read",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "a viewer cannot say which spool is in a head",
+   "role": "viewer",
+   "path": "/api/printer/m1/trays/2/spool",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "inventory:write",
+    "role": "viewer"
+   }
+  },
+  {
+   "why": "an operator says which spool is in a head",
+   "role": "operator",
+   "path": "/api/printer/m1/trays/2/spool",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "inventory:write",
+    "role": "operator"
+   }
+  },
+  {
+   "why": "a manager says which spool is in a head",
+   "role": "manager",
+   "path": "/api/printer/m1/trays/2/spool",
+   "method": "POST",
+   "want": {
+    "ok": true,
+    "required": "inventory:write",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "the tags are read, not written: a POST to them is the owner's",
+   "role": "manager",
+   "path": "/api/printer/m1/trays",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "the link is written, not read: a GET of it is the owner's",
+   "role": "manager",
+   "path": "/api/printer/m1/trays/2/spool",
+   "method": "GET",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "manager"
+   }
+  },
+  {
+   "why": "a head with nothing after it is not a route",
+   "role": "operator",
+   "path": "/api/printer/m1/trays/2",
+   "method": "POST",
+   "want": {
+    "ok": false,
+    "required": "owner",
+    "role": "operator"
+   }
   }
  ],
  "phonePaths": [
@@ -756,6 +833,16 @@
    "GET",
    "/api/printer/m1/bed-clear",
    "owner"
+  ],
+  [
+   "GET",
+   "/api/printer/m1/trays",
+   "inventory:read"
+  ],
+  [
+   "POST",
+   "/api/printer/m1/trays/1/spool",
+   "inventory:write"
   ]
  ],
  "requests": [
