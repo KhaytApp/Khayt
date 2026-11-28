@@ -1,0 +1,62 @@
+{
+ "about": "lib/head-spools.js link(machines, machineId, head, spoolId) and unlink(machines, machineId, head): a spool is in at most one head of one printer. Each case gives the machines' headSpools before (by machine id), the call, and want: the headSpools after, the heads the spool was taken out of, and the machines changed. shown(linked, reportsEmpty) has its own list. Synthetic ids; the first case is Baby U1's double link from the watched run, Nov 27 2026.",
+ "cases": [
+  {
+   "why": "Baby U1, Nov 27: the spool moved from head 1 to head 2 and was linked again; it must leave head 1",
+   "before": { "BABY": { "0": "INV-black" }, "BIG": {} },
+   "call": { "op": "link", "machineId": "BABY", "head": 1, "spoolId": "INV-black" },
+   "want": { "after": { "BABY": { "1": "INV-black" }, "BIG": {} }, "moved": [{ "machineId": "BABY", "head": "0" }], "changed": ["BABY"] }
+  },
+  {
+   "why": "a spool linked on another printer comes off it",
+   "before": { "BABY": {}, "BIG": { "2": "S1", "3": "S2" } },
+   "call": { "op": "link", "machineId": "BABY", "head": "0", "spoolId": "S1" },
+   "want": { "after": { "BABY": { "0": "S1" }, "BIG": { "3": "S2" } }, "moved": [{ "machineId": "BIG", "head": "2" }], "changed": ["BABY", "BIG"] }
+  },
+  {
+   "why": "a head that held another spool now holds this one; the other spool is simply no longer in a head",
+   "before": { "BABY": { "0": "S2" } },
+   "call": { "op": "link", "machineId": "BABY", "head": 0, "spoolId": "S1" },
+   "want": { "after": { "BABY": { "0": "S1" } }, "moved": [], "changed": ["BABY"] }
+  },
+  {
+   "why": "linking what is already there changes nothing",
+   "before": { "BABY": { "0": "S1" }, "BIG": { "1": "S9" } },
+   "call": { "op": "link", "machineId": "BABY", "head": 0, "spoolId": "S1" },
+   "want": { "after": { "BABY": { "0": "S1" }, "BIG": { "1": "S9" } }, "moved": [], "changed": [] }
+  },
+  {
+   "why": "a machine with no headSpools yet gets one",
+   "before": { "BABY": null },
+   "call": { "op": "link", "machineId": "BABY", "head": 3, "spoolId": "S1" },
+   "want": { "after": { "BABY": { "3": "S1" } }, "moved": [], "changed": ["BABY"] }
+  },
+  {
+   "why": "a head that is not a number is refused, nothing changes",
+   "before": { "BABY": { "0": "S1" } },
+   "call": { "op": "link", "machineId": "BABY", "head": "one", "spoolId": "S2" },
+   "want": { "after": { "BABY": { "0": "S1" } }, "moved": [], "changed": [], "error": "bad-head" }
+  },
+  {
+   "why": "an unknown machine is refused, and the spool is NOT taken off its head elsewhere",
+   "before": { "BABY": { "0": "S1" } },
+   "call": { "op": "link", "machineId": "GONE", "head": 0, "spoolId": "S1" },
+   "want": { "after": { "BABY": { "0": "S1" } }, "moved": [], "changed": [], "error": "no-machine" }
+  },
+  {
+   "why": "unlink takes the head's spool out, and only that head",
+   "before": { "BABY": { "0": "S1", "1": "S2" } },
+   "call": { "op": "unlink", "machineId": "BABY", "head": 0 },
+   "want": { "after": { "BABY": { "1": "S2" } }, "moved": [{ "machineId": "BABY", "head": "0" }], "changed": ["BABY"] }
+  }
+ ],
+ "shown": {
+  "about": "shown(linkedSpoolId, reportsEmpty): an empty read keeps the link and says so; only an ANSWERED empty head counts.",
+  "cases": [
+   { "why": "linked and present", "linked": "S1", "reportsEmpty": false, "want": "linked" },
+   { "why": "linked, the printer says the head is empty: taken out", "linked": "S1", "reportsEmpty": true, "want": "not-in-printer" },
+   { "why": "the printer did not answer: still linked", "linked": "S1", "reportsEmpty": null, "want": "linked" },
+   { "why": "nothing linked", "linked": null, "reportsEmpty": true, "want": "none" }
+  ]
+ }
+}

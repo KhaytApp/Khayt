@@ -311,9 +311,9 @@ struct WritersAreGatedTests {
         let sources = try Self.read()
         let fns = sources.flatMap(\.functions)
         #expect(fns.count > 500, "found \(fns.count) functions")
-        // A known nested helper: `file` inside bareModelPresets, which must not
+        // A known nested helper: `emit` inside Mesh.eachLine, which must not
         // swallow the function around it.
-        let outer = try #require(fns.first { $0.name == "bareModelPresets" })
+        let outer = try #require(fns.first { $0.name == "eachLine" })
         #expect(outer.end - outer.start > 20)
     }
 }
