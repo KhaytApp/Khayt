@@ -722,11 +722,21 @@ function openHeadLink(machineId, head) {
         inventory.push(made.spool);
         spoolId = made.spool.id;
       }
-      const now = machines.find((x) => x.id === machineId);
-      if (!now) return true;
-      now.headSpools = Object.assign({}, now.headSpools || {}, { [head]: spoolId });
+      // One spool, one head (lib/head-spools.js): linking it here takes it out
+      // of every other head, on this printer and any other. It only ADDED a
+      // link before, so a spool moved from head 1 to head 2 stayed in both.
+      const HS = (typeof globalThis !== 'undefined' && globalThis.KhaytHeadSpools) || null;
+      if (!HS || !machines.some((x) => x.id === machineId)) return true;
+      const r = HS.link(machines, machineId, head, spoolId);
+      if (r.error) { toast(t('common.save_failed'), 'error'); return false; }
+      // The same array the rest of the window holds: only the changed records are replaced.
+      for (const id of r.changed) {
+        const i = machines.findIndex((x) => String(x.id) === id);
+        const next = r.machines.find((x) => x && String(x.id) === id);
+        if (i >= 0 && next) machines[i] = next;
+      }
       saveAll();
-      paintMachineHeads(machineId);
+      for (const id of new Set([String(machineId), ...r.changed])) paintMachineHeads(id);
       if (chosen === '__new' && typeof openInventoryEditor === 'function') setTimeout(() => openInventoryEditor(spoolId), 50);
       return true;
     },
